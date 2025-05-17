@@ -1,0 +1,4 @@
+/pages/.*
+node_modules
+/.nuxt
+pages

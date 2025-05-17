@@ -138,6 +138,38 @@
 <body>
 <?php
 // ---------- PHP Logic for File Browsing ---------- //
+
+/**
+ * Extracts a URL from “link”‑type files so we can treat them like normal hyperlinks
+ * in the browser sidebar. Supports macOS *.webloc*, Windows *.url*, and Linux *.desktop* files.
+ *
+ * @param string $filePath  Absolute path to the link file.
+ * @return string|null      The extracted URL or null if none was found.
+ */
+function extractLinkFileUrl(string $filePath): ?string {
+    $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    $content = @file_get_contents($filePath);
+    if (!$content) {
+        return null;
+    }
+
+    switch ($ext) {
+        case 'webloc':   // macOS .webloc (plist xml)
+            if (preg_match('/<key>URL<\/key>\s*<string>([^<]+)<\/string>/i', $content, $m)) {
+                return trim($m[1]);
+            }
+            break;
+
+        case 'url':      // Windows Internet Shortcut (.url)
+        case 'desktop':  // Linux .desktop
+            if (preg_match('/^URL=(.+)$/mi', $content, $m)) {
+                return trim($m[1]);
+            }
+            break;
+    }
+    return null;
+}
+
 $baseDir = realpath(__DIR__);
 $requestedRelativePath = isset($_GET['path']) ? trim($_GET['path'], "\\/") : '';
 $currentAbsolutePath = realpath($baseDir . DIRECTORY_SEPARATOR . $requestedRelativePath);
@@ -177,6 +209,7 @@ if ($items !== false) {
         if ($item === '.' || $item === '..' || ($currentRelativePath === '' && $item === $currentScript) || $item === 'poff.config.json') continue;
         $itemFullPath = $currentAbsolutePath . DIRECTORY_SEPARATOR . $item;
         $isDir = is_dir($itemFullPath);
+        $linkUrl = $isDir ? null : extractLinkFileUrl($itemFullPath);
         $itemRelativePath = $currentRelativePath ? rtrim($currentRelativePath, '/\\') . '/' . $item : $item;
         if ($isDir) {
             $directories[] = [
@@ -186,9 +219,10 @@ if ($items !== false) {
             ];
         } else {
             $files[] = [
-                'name' => $item,
-                'data_src' => $itemRelativePath,
-                'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>'
+                'name'     => $item,
+                // Use the extracted URL when we have one; fall back to the relative file path otherwise
+                'data_src' => $linkUrl ?? $itemRelativePath,
+                'icon'     => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>'
             ];
         }
     }
@@ -210,7 +244,7 @@ if ($items !== false) {
     <!-- ---------- Main Content (header + iframe) ---------- -->
     <div class="main-content">
         <div id="folderMeta" class="folder-meta"></div>
-        <iframe id="contentFrame" name="contentFrame" class="content-frame" src="about:blank" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-presentation allow-same-origin allow-scripts"></iframe>
+        <iframe id="contentFrame" name="contentFrame" class="content-frame" src="about:blank" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-presentation allow-same-origin allow-scripts allow-top-navigation"></iframe>
     </div>
 </div>
 
@@ -262,7 +296,12 @@ navList.addEventListener('click', (e) => {
     if (!target || target.tagName !== 'A') return;
     if (target.dataset.src) {
         e.preventDefault();
-        contentFrame.src = target.dataset.src;
+        // Check if the URL is external (starts with http:// or https://)
+        if (target.dataset.src.match(/^https?:\/\//)) {
+            window.open(target.dataset.src, '_blank');
+        } else {
+            contentFrame.src = target.dataset.src;
+        }
         if (activeLink) activeLink.classList.remove('active');
         target.classList.add('active');
         activeLink = target;
