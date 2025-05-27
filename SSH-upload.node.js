@@ -33,8 +33,23 @@ const uploadDir = async (localDir, remoteDir) => {
         concurrency: 8,
         validate: function (itemPath) {
             const baseName = path.basename(itemPath)
-            return baseName[0] !== '.' && // do not allow dot files
-                baseName !== 'node_modules' // do not allow node_modules
+            // Skip dot files and node_modules
+            if (baseName[0] === '.' || baseName === 'node_modules') {
+                return false;
+            }
+            
+            // Follow symlinks and include webloc files
+            if (fs.lstatSync(itemPath).isSymbolicLink()) {
+                try {
+                    fs.readlinkSync(itemPath);
+                    return true;
+                } catch (e) {
+                    console.log('Skipping broken symlink:', itemPath);
+                    return false;
+                }
+            }
+            
+            return true;
         },
         tick: function (localPath, remotePath, error) {
             if (error) {

@@ -4,34 +4,19 @@
  * and triggers SSH upload after successful build.
  */
 
-// Configuration
-$sourceDir = __DIR__ . '/../src';
-$outputDir = __DIR__ . '/../pages/dominikeggermann.com';
-$outputFile = $outputDir . '/index.php';
+// Load configuration and modules
+$config = require __DIR__ . '/BuildConfig.php';
+require_once __DIR__ . '/ComponentReader.php';
+require_once __DIR__ . '/FileCopier.php';
+
+// Extract configuration
+$sourceDir = $config['sourceDir'];
+$outputDir = $config['outputDir'];
+$outputFile = $outputDir . $config['outputFile'];
 
 // Ensure output directory exists
 if (!is_dir($outputDir)) {
     mkdir($outputDir, 0755, true);
-}
-
-// Function to read and clean file contents
-function readComponentFile($path) {
-    if (!file_exists($path)) {
-        throw new Exception("File not found: $path");
-    }
-    $content = file_get_contents($path);
-    if ($content === false) {
-        throw new Exception("Failed to read file: $path");
-    }
-    
-    // Remove PHP tags
-    $content = preg_replace('/^<\?php\s*/', '', $content);
-    $content = preg_replace('/\?>\s*$/', '', $content);
-    
-    // Remove PHP doc comments that shouldn't be in the output
-    $content = preg_replace('/\/\*\*\s*\n\s*\*[^*]*\*\/\s*\n/', '', $content);
-    
-    return $content;
 }
 
 try {
@@ -49,28 +34,40 @@ try {
             }
         }
     }
-    
+
     // Add function definition without its doc comment
-    $functionsContent = readComponentFile($sourceDir . '/includes/functions.php');
+    $functionsContent = ComponentReader::readComponentFile($sourceDir . '/includes/functions.php');
     if (preg_match('/function\s+extractLinkFileUrl.*?^}/ms', $functionsContent, $matches)) {
         $buildContent .= $matches[0] . "\n\n";
     }
-    
-    // Add the initialization code from index.php
-    if (preg_match('/\$baseDir = realpath.*?(?=require_once.*?header\.php)/s', $indexContent, $matches)) {
-        $buildContent .= trim($matches[0]) . "\n";
-    }
+
+    // Add initialization code
+    $buildContent .= <<<'PHP'
+// Initialize path variables
+$baseDir = getcwd(); // Use current working directory
+$currentScript = basename($_SERVER['SCRIPT_NAME']);
+$currentRelativePath = isset($_GET['path']) ? trim($_GET['path'], '/\\') : '';
+$currentAbsolutePath = $baseDir . ($currentRelativePath ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $currentRelativePath) : '');
+
+// Read folder config if it exists
+$folderPoffConfig = null;
+$poffConfigPath = $currentAbsolutePath . DIRECTORY_SEPARATOR . 'poff.config.json';
+if (file_exists($poffConfigPath)) {
+    $folderPoffConfig = json_decode(file_get_contents($poffConfigPath), true);
+}
+
+PHP;
     
     // Close PHP tag for HTML content
     $buildContent .= "?>\n";
     
     // Add HTML structure from header.php without PHP tags
-    $content = readComponentFile($sourceDir . '/includes/header.php');
+    $content = ComponentReader::readComponentFile($sourceDir . '/includes/header.php');
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     $buildContent .= trim($content) . "\n";
     
     // Add layout.php content with navigation code
-    $content = readComponentFile($sourceDir . '/includes/layout.php');
+    $content = ComponentReader::readComponentFile($sourceDir . '/includes/layout.php');
     // Clean up HTML structure and PHP tags, preserving the navigation code
     if (preg_match('/(\/\/ Generate navigation.*?)(?=<\/ul>)/s', $content, $matches)) {
         $navCode = trim($matches[1]);
@@ -88,7 +85,7 @@ try {
     $buildContent .= trim($content) . "\n";
     
     // Add scripts.php content with JavaScript variables
-    $content = readComponentFile($sourceDir . '/includes/scripts.php');
+    $content = ComponentReader::readComponentFile($sourceDir . '/includes/scripts.php');
     // Remove all PHP tags first
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     // Add back PHP expressions for JavaScript variables
@@ -104,25 +101,13 @@ try {
     }
 
     echo "Build completed successfully!\n";
+
+    // Copy the built index.php to all directories
+    FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
     
-    // Trigger SSH upload
-    $sshUploadScript = __DIR__ . '/../SSH-upload.node.js';
-    if (file_exists($sshUploadScript) && false) {
-        echo "Starting SSH upload...\n";
-        $command = "node " . escapeshellarg($sshUploadScript);
-        exec($command, $output, $returnCode);
-        
-        if ($returnCode === 0) {
-            echo "SSH upload completed successfully!\n";
-            foreach ($output as $line) {
-                echo $line . "\n";
-            }
-        } else {
-            throw new Exception("SSH upload failed with code $returnCode");
-        }
-    } else {
-        echo "Warning: SSH-upload.node.js not found. Skipping upload.\n";
-    }
+    // Trigger SSH upload using SSHUploader
+    require_once __DIR__ . '/SSHUploader.php';
+   //--> SSHUploader::upload();
 
 } catch (Exception $e) {
     echo "Build failed: " . $e->getMessage() . "\n";
