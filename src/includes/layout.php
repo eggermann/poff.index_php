@@ -6,18 +6,29 @@
 <div class="container">
     <!-- ---------- Sidebar ---------- -->
     <nav class="sidebar">
-        <h2>Navigation</h2>
         <ul id="navList">
-            <?php 
+            <div id="navLoading" style="display:none;text-align:center;padding:10px;">
+                <span class="loader" style="display:inline-block;width:24px;height:24px;border:4px solid #3b82f6;border-top:4px solid #e5e7eb;border-radius:50%;animation:spin 1s linear infinite;"></span>
+                <span style="margin-left:8px;">Loading...</span>
+            </div>
+            <style>
+            @keyframes spin { 100% { transform: rotate(360deg); } }
+            </style>
+            <?php
             // Generate navigation list directly here instead of including browse.php
-            if (!empty($currentRelativePath)) {
-                $parentRelativePath = dirname($currentRelativePath);
+            $navFolder = $currentRelativePath;
+            if (isset($_SERVER['QUERY_STRING']) && preg_match('/#\/([^\/]+)(?:\/([^\/]+))?/', $_SERVER['QUERY_STRING'], $matches)) {
+                $navFolder = $matches[1];
+            }
+            if (!empty($navFolder)) {
+                $parentRelativePath = dirname($navFolder);
                 if ($parentRelativePath === '.') $parentRelativePath = '';
                 $upLink = '?path=' . urlencode($parentRelativePath);
                 echo '<li class="go-up-link"><a href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a></li>';
             }
 
-            $items = scandir($currentAbsolutePath);
+            $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
+            $items = scandir($navAbsolutePath);
             if ($items !== false) {
                 $directories = $files = [];
                 foreach ($items as $item) {
@@ -64,8 +75,6 @@
     <!-- ---------- Main Content (header + iframe) ---------- -->
     <div class="main-content">
         <div id="folderMeta" class="folder-meta"></div>
-        <iframe id="contentFrame" name="contentFrame" class="content-frame" src="about:blank" 
-                sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-presentation allow-same-origin allow-scripts allow-top-navigation">
-        </iframe>
+        <iframe id="contentFrame" name="contentFrame" class="content-frame" src="about:blank"></iframe>
     </div>
 </div>

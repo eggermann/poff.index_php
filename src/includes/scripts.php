@@ -46,24 +46,19 @@ function loadCurrentFolderInIframe() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // If hash is present, load the file/directory in iframe and update sidebar
+    const sidebarLoading = document.getElementById('sidebarLoading');
+    // If hash is present, load iframe first, then update sidebar only if hash is for subfolder
     if (window.location.hash && window.location.hash.length > 1) {
         const hashPath = window.location.hash.replace(/^#\/?/, '');
-        if (hashPath) {
-            contentFrame.src = hashPath;
-
-            // Sidebar logic: always show folder contents from hash and highlight file if present
-            const parts = hashPath.split('/');
-            let folderPath = '';
-            let fileName = '';
-            if (parts.length >= 2) {
-                folderPath = parts.slice(0, parts.length - 1).join('/');
-                fileName = parts[parts.length - 1];
-            } else if (parts.length === 1) {
-                folderPath = '';
-                fileName = parts[0];
-            }
-            // Always fetch folder contents via AJAX and render sidebar
+        contentFrame.src = hashPath;
+        // Only update sidebar if hash is for subfolder (not root)
+        const parts = hashPath.split('/');
+        let folderPath = '';
+        let fileName = '';
+        if (parts.length >= 2) {
+            folderPath = parts.slice(0, parts.length - 1).join('/');
+            fileName = parts[parts.length - 1];
+            if (sidebarLoading) sidebarLoading.style.display = 'block';
             fetch(`?ajax=1&path=${encodeURIComponent(folderPath)}`)
                 .then(response => response.text())
                 .then(html => {
@@ -76,9 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             el.classList.add('active');
                         }
                     });
+                    if (sidebarLoading) sidebarLoading.style.display = 'none';
                 })
                 .catch(() => {
                     navList.innerHTML = '<li>Error loading folder contents</li>';
+                    if (sidebarLoading) sidebarLoading.style.display = 'none';
                 });
         }
     } else {
@@ -114,15 +111,34 @@ navList.addEventListener('click', (e) => {
                 .then(response => response.text())
                 .then(html => {
                     navList.innerHTML = html;
+                    // Auto-load index.html or index.htm if present (never index.php)
+                    const indexFiles = ['index.html', 'index.htm'];
+                    let foundIndex = null;
+                    indexFiles.forEach(idx => {
+                        const indexEl = navList.querySelector(`li[data-file="${idx}"]`);
+                        if (indexEl && !foundIndex) {
+                            foundIndex = idx;
+                        }
+                    });
+                    if (foundIndex) {
+                        // Load index file in iframe (relative to folder)
+                        contentFrame.src = relPath.replace(/\/$/, '') + '/' + foundIndex;
+                        window.location.hash = '/' + relPath.replace(/^\/+/, '') + '/' + foundIndex;
+                    } else {
+                        // If no index file, load folder itself in iframe (for folder view)
+                        contentFrame.src = relPath.replace(/\/$/, '') + '/';
+                        window.location.hash = '/' + relPath.replace(/^\/+/, '');
+                    }
                     // Optionally, re-attach event listeners if needed
                 })
                 .catch(err => {
                     navList.innerHTML = '<li>Error loading folder contents</li>';
+                    contentFrame.src = relPath.replace(/\/$/, '') + '/';
+                    window.location.hash = '/' + relPath.replace(/^\/+/, '');
                 });
-            // Update hash
-            window.location.hash = '/' + relPath.replace(/^\/+/, '');
         } else {
             // File link: load in iframe
+            // Always use iframe for all file types, including PDF
             contentFrame.src = relPath;
             window.location.hash = '/' + relPath.replace(/^\/+/, '');
         }
