@@ -45,7 +45,17 @@ function loadCurrentFolderInIframe() {
     renderFolderMeta();
 }
 
-document.addEventListener('DOMContentLoaded', loadCurrentFolderInIframe);
+document.addEventListener('DOMContentLoaded', () => {
+    // If hash is present, load the file/directory in iframe
+    if (window.location.hash && window.location.hash.length > 1) {
+        const hashPath = window.location.hash.replace(/^#\/?/, '');
+        if (hashPath) {
+            contentFrame.src = hashPath;
+        }
+    } else {
+        loadCurrentFolderInIframe();
+    }
+});
 
 navList.addEventListener('click', (e) => {
     let target = e.target;
@@ -55,13 +65,37 @@ navList.addEventListener('click', (e) => {
     if (!target || target.tagName !== 'A') {
         return;
     }
-    if (target.dataset.src) {
+    // Get the href or data-src for directories/files
+    let relPath = '';
+    if (target.hasAttribute('href') && target.getAttribute('href').startsWith('?path=')) {
+        // Directory link
+        relPath = decodeURIComponent(target.getAttribute('href').replace('?path=', ''));
+    } else if (target.dataset.src) {
+        // File link
+        relPath = target.dataset.src;
+    }
+    if (relPath) {
         e.preventDefault();
         // Check if the URL is external (starts with http:// or https://)
-        if (target.dataset.src.match(/^https?:\/\//)) {
-            window.open(target.dataset.src, '_blank');
+        if (relPath.match(/^https?:\/\//)) {
+            window.open(relPath, '_blank');
+        } else if (target.hasAttribute('href') && target.getAttribute('href').startsWith('?path=')) {
+            // Directory link: fetch contents via AJAX and update sidebar
+            fetch(`?ajax=1&path=${encodeURIComponent(relPath)}`)
+                .then(response => response.text())
+                .then(html => {
+                    navList.innerHTML = html;
+                    // Optionally, re-attach event listeners if needed
+                })
+                .catch(err => {
+                    navList.innerHTML = '<li>Error loading folder contents</li>';
+                });
+            // Update hash
+            window.location.hash = '/' + relPath.replace(/^\/+/, '');
         } else {
-            contentFrame.src = target.dataset.src;
+            // File link: load in iframe
+            contentFrame.src = relPath;
+            window.location.hash = '/' + relPath.replace(/^\/+/, '');
         }
         if (activeLink) {
             activeLink.classList.remove('active');

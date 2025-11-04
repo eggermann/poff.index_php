@@ -12,7 +12,12 @@ require_once __DIR__ . '/FileCopier.php';
 // Extract configuration
 $sourceDir = $config['sourceDir'];
 $outputDir = $config['outputDir'];
+$outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
 $outputFile = $outputDir . $config['outputFile'];
+// Prevent accidental creation of pages/dominikeggermann.comindex.php
+if (file_exists($outputDir . 'index.php') && $outputDir !== (__DIR__ . '/../pages/dominikeggermann.com/')) {
+    unlink($outputDir . 'index.php');
+}
 
 // Ensure output directory exists
 if (!is_dir($outputDir)) {
