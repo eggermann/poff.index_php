@@ -46,11 +46,40 @@ function loadCurrentFolderInIframe() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // If hash is present, load the file/directory in iframe
+    // If hash is present, load the file/directory in iframe and update sidebar
     if (window.location.hash && window.location.hash.length > 1) {
         const hashPath = window.location.hash.replace(/^#\/?/, '');
         if (hashPath) {
             contentFrame.src = hashPath;
+
+            // Sidebar logic: always show folder contents from hash and highlight file if present
+            const parts = hashPath.split('/');
+            let folderPath = '';
+            let fileName = '';
+            if (parts.length >= 2) {
+                folderPath = parts.slice(0, parts.length - 1).join('/');
+                fileName = parts[parts.length - 1];
+            } else if (parts.length === 1) {
+                folderPath = '';
+                fileName = parts[0];
+            }
+            // Always fetch folder contents via AJAX and render sidebar
+            fetch(`?ajax=1&path=${encodeURIComponent(folderPath)}`)
+                .then(response => response.text())
+                .then(html => {
+                    navList.innerHTML = html;
+                    // Highlight the file if present
+                    const fileEls = navList.querySelectorAll('li[data-file]');
+                    fileEls.forEach(el => {
+                        el.classList.remove('active');
+                        if (el.getAttribute('data-file') === fileName) {
+                            el.classList.add('active');
+                        }
+                    });
+                })
+                .catch(() => {
+                    navList.innerHTML = '<li>Error loading folder contents</li>';
+                });
         }
     } else {
         loadCurrentFolderInIframe();
