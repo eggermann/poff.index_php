@@ -7,6 +7,7 @@
 const navList       = document.getElementById('navList');
 const contentFrame  = document.getElementById('contentFrame');
 const folderMetaEl  = document.getElementById('folderMeta');
+const iframeLoading = document.getElementById('iframeLoading');
 let activeLink      = null;
 const currentPoffConfig = <?php echo json_encode($folderPoffConfig); ?>;
 
@@ -138,7 +139,8 @@ navList.addEventListener('click', (e) => {
                 });
         } else {
             // File link: load in iframe
-            // Always use iframe for all file types, including PDF
+            // Show iframe loading indicator
+            if (iframeLoading) iframeLoading.style.display = 'block';
             contentFrame.src = relPath;
             window.location.hash = '/' + relPath.replace(/^\/+/, '');
         }
@@ -148,6 +150,9 @@ navList.addEventListener('click', (e) => {
         target.classList.add('active');
         activeLink = target;
     }
+});
+contentFrame.addEventListener('load', () => {
+    if (iframeLoading) iframeLoading.style.display = 'none';
 });
 </script>
 </body>

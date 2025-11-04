@@ -75,6 +75,13 @@
     <!-- ---------- Main Content (header + iframe) ---------- -->
     <div class="main-content">
         <div id="folderMeta" class="folder-meta"></div>
+        <div id="iframeLoading" style="display:none;text-align:center;padding:10px;">
+            <span class="loader" style="display:inline-block;width:24px;height:24px;border:4px solid #3b82f6;border-top:4px solid #e5e7eb;border-radius:50%;animation:spin 1s linear infinite;"></span>
+            <span style="margin-left:8px;">Loading content...</span>
+        </div>
         <iframe id="contentFrame" name="contentFrame" class="content-frame" src="about:blank"></iframe>
+        <style>
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        </style>
     </div>
 </div>
