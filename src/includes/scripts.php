@@ -4,6 +4,11 @@
  */
 ?>
 <script>
+if (window.location.hash === '#mcp') {
+    const basePath = window.location.pathname.split('#')[0];
+    window.location.href = `${basePath}?mcp=1`;
+}
+
 const navList       = document.getElementById('navList');
 const contentFrame  = document.getElementById('contentFrame');
 const folderMetaEl  = document.getElementById('folderMeta');
@@ -108,6 +113,7 @@ navList.addEventListener('click', (e) => {
             window.open(relPath, '_blank');
         } else if (target.hasAttribute('href') && target.getAttribute('href').startsWith('?path=')) {
             // Directory link: fetch contents via AJAX and update sidebar
+            if (iframeLoading) iframeLoading.style.display = 'block';
             fetch(`?ajax=1&path=${encodeURIComponent(relPath)}`)
                 .then(response => response.text())
                 .then(html => {
@@ -140,7 +146,7 @@ navList.addEventListener('click', (e) => {
         } else {
             // File link: load in iframe
             // Show iframe loading indicator
-            if (iframeLoading) iframeLoading.style.display = 'block';
+            // Do not show iframe loading indicator for file clicks
             contentFrame.src = relPath;
             window.location.hash = '/' + relPath.replace(/^\/+/, '');
         }

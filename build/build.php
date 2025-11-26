@@ -17,6 +17,8 @@ $outputFile = $outputDir . $config['outputFile'];
 // Prevent accidental creation of pages/dominikeggermann.comindex.php
 if (file_exists($outputDir . 'index.php') && $outputDir !== (__DIR__ . '/../pages/dominikeggermann.com/')) {
     unlink($outputDir . 'index.php');
+    echo ('????');
+    die();
 }
 
 // Ensure output directory exists
@@ -26,7 +28,7 @@ if (!is_dir($outputDir)) {
 
 try {
     $buildContent = "<?php\n";
-    
+
     // Get the first file header comment only
     $indexContent = file_get_contents($sourceDir . '/index.php');
     // Get header comment by finding first comment with `File:` in it
@@ -62,15 +64,15 @@ if (file_exists($poffConfigPath)) {
 }
 
 PHP;
-    
+
     // Close PHP tag for HTML content
     $buildContent .= "?>\n";
-    
+
     // Add HTML structure from header.php without PHP tags
     $content = ComponentReader::readComponentFile($sourceDir . '/includes/header.php');
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     $buildContent .= trim($content) . "\n";
-    
+
     // Add layout.php content with navigation code
     $content = ComponentReader::readComponentFile($sourceDir . '/includes/layout.php');
     // Clean up HTML structure and PHP tags, preserving the navigation code
@@ -88,18 +90,24 @@ PHP;
         );
     }
     $buildContent .= trim($content) . "\n";
-    
+
     // Add scripts.php content with JavaScript variables
     $content = ComponentReader::readComponentFile($sourceDir . '/includes/scripts.php');
     // Remove all PHP tags first
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     // Add back PHP expressions for JavaScript variables
-    $content = str_replace('const currentPoffConfig = ;',
-                         'const currentPoffConfig = <?php echo $folderPoffConfig ? json_encode($folderPoffConfig) : "null"; ?>;', $content);
-    $content = str_replace('const currentPathForIframe = ;',
-                         'const currentPathForIframe = <?php echo !empty($currentRelativePath) ? json_encode($currentRelativePath) : "null"; ?>;', $content);
+    $content = str_replace(
+        'const currentPoffConfig = ;',
+        'const currentPoffConfig = <?php echo $folderPoffConfig ? json_encode($folderPoffConfig) : "null"; ?>;',
+        $content
+    );
+    $content = str_replace(
+        'const currentPathForIframe = ;',
+        'const currentPathForIframe = <?php echo !empty($currentRelativePath) ? json_encode($currentRelativePath) : "null"; ?>;',
+        $content
+    );
     $buildContent .= trim($content);
-    
+
     // Write the concatenated content to the output file
     if (file_put_contents($outputFile, $buildContent) === false) {
         throw new Exception("Failed to write output file: $outputFile");
@@ -109,10 +117,10 @@ PHP;
 
     // Copy the built index.php to all directories
     FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
-    
+
     // Trigger SSH upload using SSHUploader
     require_once __DIR__ . '/SSHUploader.php';
-   //--> SSHUploader::upload();
+    //--> SSHUploader::upload();
 
 } catch (Exception $e) {
     echo "Build failed: " . $e->getMessage() . "\n";

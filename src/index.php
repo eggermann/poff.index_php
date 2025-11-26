@@ -7,6 +7,11 @@
  *       iframe. The title becomes a hyperlink (if a link/url field exists) that
  *       loads in the preview pane.
  */
+// MCP JSON endpoint switch: /index.php?mcp=1
+if (isset($_GET['mcp'])) {
+    require __DIR__ . '/mcp/server.php';
+}
+
 function extractLinkFileUrl(string $filePath): ?string {
     $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
     $content = @file_get_contents($filePath);
