@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "watch": "node scripts/watch-build.js"
+  },
   "devDependencies": {
     "node-ssh": "^13.2.1"
   }
