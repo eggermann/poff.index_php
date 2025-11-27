@@ -12,6 +12,9 @@ if (isset($_GET['mcp'])) {
     require __DIR__ . '/mcp/server.php';
 }
 
+require __DIR__ . '/includes/PoffConfig.php';
+require __DIR__ . '/includes/viewer.php';
+
 function extractLinkFileUrl(string $filePath): ?string {
     $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
     $content = @file_get_contents($filePath);
@@ -51,13 +54,18 @@ if (
     die('Invalid path.');
 }
 
+// Viewer route for typed rendering
+if (isset($_GET['view']) && isset($_GET['file'])) {
+    renderViewer($baseDir, $_GET['file']);
+    return;
+}
+
 $currentAbsolutePath = $baseDir . ($currentRelativePath ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $currentRelativePath) : '');
 
 // Read folder config if it exists
 $folderPoffConfig = null;
-$poffConfigPath = $currentAbsolutePath . DIRECTORY_SEPARATOR . 'poff.config.json';
-if (file_exists($poffConfigPath)) {
-    $folderPoffConfig = json_decode(file_get_contents($poffConfigPath), true);
+if (is_dir($currentAbsolutePath)) {
+    $folderPoffConfig = PoffConfig::ensure($currentAbsolutePath);
 }
 ?>
 <?php include __DIR__ . '/includes/header.php'; ?>

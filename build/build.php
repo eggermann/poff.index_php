@@ -48,6 +48,17 @@ try {
         $buildContent .= $matches[0] . "\n\n";
     }
 
+    // Add PoffConfig model
+    $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
+    $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);
+    $buildContent .= trim($poffConfigContent) . "\n\n";
+
+    // Add viewer partial (functions only)
+    $viewerContent = ComponentReader::readComponentFile($sourceDir . '/includes/viewer.php');
+    $viewerContent = preg_replace('/^<\?php\s*/', '', $viewerContent);
+    $viewerContent = preg_replace('/\?>\s*$/', '', $viewerContent);
+    $buildContent .= trim($viewerContent) . "\n\n";
+
     // Add initialization code
     $buildContent .= <<<'PHP'
 // Initialize path variables
@@ -56,11 +67,26 @@ $currentScript = basename($_SERVER['SCRIPT_NAME']);
 $currentRelativePath = isset($_GET['path']) ? trim($_GET['path'], '/\\') : '';
 $currentAbsolutePath = $baseDir . ($currentRelativePath ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $currentRelativePath) : '');
 
+// Directory Traversal Protection
+if (
+    strpos($currentRelativePath, '..') !== false ||
+    strpos($currentRelativePath, "\0") !== false ||
+    preg_match('#^[\\/]|[\\/]{2,}#', $currentRelativePath)
+) {
+    http_response_code(400);
+    die('Invalid path.');
+}
+
+// Viewer route for typed rendering
+if (isset($_GET['view']) && isset($_GET['file'])) {
+    renderViewer($baseDir, $_GET['file']);
+    return;
+}
+
 // Read folder config if it exists
 $folderPoffConfig = null;
-$poffConfigPath = $currentAbsolutePath . DIRECTORY_SEPARATOR . 'poff.config.json';
-if (file_exists($poffConfigPath)) {
-    $folderPoffConfig = json_decode(file_get_contents($poffConfigPath), true);
+if (is_dir($currentAbsolutePath)) {
+    $folderPoffConfig = PoffConfig::ensure($currentAbsolutePath);
 }
 
 PHP;

@@ -56,7 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // If hash is present, load iframe first, then update sidebar only if hash is for subfolder
     if (window.location.hash && window.location.hash.length > 1) {
         const hashPath = window.location.hash.replace(/^#\/?/, '');
-        contentFrame.src = hashPath;
+        const isFile = /\.[^\\/]+$/.test(hashPath);
+        contentFrame.src = isFile
+            ? `?view=1&file=${encodeURIComponent(hashPath)}`
+            : hashPath;
         // Only update sidebar if hash is for subfolder (not root)
         const parts = hashPath.split('/');
         let folderPath = '';
@@ -129,7 +132,8 @@ navList.addEventListener('click', (e) => {
                     });
                     if (foundIndex) {
                         // Load index file in iframe (relative to folder)
-                        contentFrame.src = relPath.replace(/\/$/, '') + '/' + foundIndex;
+                        const indexPath = relPath.replace(/\/$/, '') + '/' + foundIndex;
+                        contentFrame.src = `?view=1&file=${encodeURIComponent(indexPath)}`;
                         window.location.hash = '/' + relPath.replace(/^\/+/, '') + '/' + foundIndex;
                     } else {
                         // If no index file, load folder itself in iframe (for folder view)
@@ -145,9 +149,8 @@ navList.addEventListener('click', (e) => {
                 });
         } else {
             // File link: load in iframe
-            // Show iframe loading indicator
-            // Do not show iframe loading indicator for file clicks
-            contentFrame.src = relPath;
+            if (iframeLoading) iframeLoading.style.display = 'block';
+            contentFrame.src = `?view=1&file=${encodeURIComponent(relPath)}`;
             window.location.hash = '/' + relPath.replace(/^\/+/, '');
         }
         if (activeLink) {
