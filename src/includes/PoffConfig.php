@@ -90,6 +90,7 @@ class PoffConfig
         $modified = @filemtime($fullPath);
         $size = @filesize($fullPath);
         $now = date('c');
+        $mime = self::detectMimeType($fullPath, $fileName);
         $base = [
             'name' => $fileName,
             'slug' => self::slugify($fileName),
@@ -98,12 +99,59 @@ class PoffConfig
             'size' => $size !== false ? $size : null,
             'modifiedAt' => $modified ? date('c', (int) $modified) : null,
             'visible' => true,
+            'mimeType' => $mime,
         ];
         $hash = hash('sha256', json_encode($base));
         $base['hash'] = $hash;
         $base['updatedAt'] = $now;
 
         return $base;
+    }
+
+    /**
+     * Attempt to detect a MIME type for a file.
+     */
+    public static function detectMimeType(string $fullPath, string $fileName): ?string
+    {
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = finfo_file($finfo, $fullPath);
+                finfo_close($finfo);
+                if ($mime !== false) {
+                    return $mime;
+                }
+            }
+        }
+
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $map = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'bmp' => 'image/bmp',
+            'mp4' => 'video/mp4',
+            'mov' => 'video/quicktime',
+            'webm' => 'video/webm',
+            'avi' => 'video/x-msvideo',
+            'mkv' => 'video/x-matroska',
+            'm4v' => 'video/x-m4v',
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'm4a' => 'audio/mp4',
+            'pdf' => 'application/pdf',
+            'txt' => 'text/plain',
+            'html' => 'text/html',
+            'htm' => 'text/html',
+            'json' => 'application/json',
+            'csv' => 'text/csv',
+        ];
+
+        return $map[$ext] ?? null;
     }
 
     /**
@@ -195,7 +243,7 @@ class PoffConfig
 
         if ($shouldWrite) {
             $data['updatedAt'] = date('c');
-            file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT));
+            file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
         return $data;
@@ -250,7 +298,7 @@ class PoffConfig
                 mkdir($dirPath, 0755, true);
             }
             $data['updatedAt'] = date('c');
-            file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT));
+            file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
         return $data;
