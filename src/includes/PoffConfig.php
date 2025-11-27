@@ -7,6 +7,15 @@
 
 class PoffConfig
 {
+    private static function generateId(): string
+    {
+        try {
+            return 'poff_' . bin2hex(random_bytes(8));
+        } catch (Exception $e) {
+            return 'poff_' . uniqid();
+        }
+    }
+
     public static function configPath(string $dir): string
     {
         return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff.config.json';
@@ -73,6 +82,7 @@ class PoffConfig
             'title' => $folderName,
             'description' => '',
             'type' => 'folder',
+            'id' => self::generateId(),
             'tree' => $tree,
             'treeHash' => $treeHash,
             'updatedAt' => $now,
@@ -104,6 +114,7 @@ class PoffConfig
         $hash = hash('sha256', json_encode($base));
         $base['hash'] = $hash;
         $base['updatedAt'] = $now;
+        $base['id'] = self::generateId();
 
         return $base;
     }
@@ -214,6 +225,12 @@ class PoffConfig
             if (isset($existing['url'])) {
                 $data['url'] = $existing['url'];
             }
+            if (isset($existing['id'])) {
+                $data['id'] = $existing['id'];
+            }
+        }
+        if (empty($data['id'])) {
+            $data['id'] = self::generateId();
         }
 
         // Write only when new or when state changed
@@ -280,6 +297,9 @@ class PoffConfig
             if (isset($existing['url'])) {
                 $data['url'] = $existing['url'];
             }
+            if (isset($existing['id'])) {
+                $data['id'] = $existing['id'];
+            }
             // Carry any extra custom fields
             foreach ($existing as $k => $v) {
                 if (array_key_exists($k, $data)) {
@@ -287,6 +307,9 @@ class PoffConfig
                 }
                 $data[$k] = $v;
             }
+        }
+        if (empty($data['id'])) {
+            $data['id'] = self::generateId();
         }
 
         // Only write when changed
