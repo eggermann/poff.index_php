@@ -53,6 +53,47 @@ try {
     $mediaTypeContent = str_replace(['<?php', '?>'], '', $mediaTypeContent);
     $buildContent .= trim($mediaTypeContent) . "\n\n";
 
+    // Add Worktype helper
+    $worktypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype.php');
+    $worktypeContent = str_replace(['<?php', '?>'], '', $worktypeContent);
+    $buildContent .= trim($worktypeContent) . "\n\n";
+    // Embed worktype definitions and templates (prefer bundle file)
+    $bundlePath = $sourceDir . '/includes/worktypes/worktypes.php';
+    $embeddedWorktypes = [];
+    $embeddedTemplates = [];
+    if (file_exists($bundlePath)) {
+        $bundle = include $bundlePath;
+        if (is_array($bundle)) {
+            if (isset($bundle['definitions']) && is_array($bundle['definitions'])) {
+                $embeddedWorktypes = $bundle['definitions'];
+            }
+            if (isset($bundle['templates']) && is_array($bundle['templates'])) {
+                $embeddedTemplates = $bundle['templates'];
+            }
+        }
+    }
+    if (!$embeddedWorktypes) {
+        $worktypeFiles = glob($sourceDir . '/includes/worktypes/*.worktype.php') ?: [];
+        foreach ($worktypeFiles as $wtFile) {
+            $key = pathinfo($wtFile, PATHINFO_FILENAME);
+            $data = include $wtFile;
+            if (is_array($data)) {
+                $embeddedWorktypes[$key] = $data;
+            }
+        }
+    }
+    if (!$embeddedTemplates) {
+        $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.tpl') ?: [];
+        foreach ($templateFiles as $tplFile) {
+            $key = pathinfo($tplFile, PATHINFO_FILENAME);
+            $embeddedTemplates[$key] = file_get_contents($tplFile);
+        }
+    }
+    $buildContent .= '$__worktypeEmbedded = ' . var_export($embeddedWorktypes, true) . ";\n";
+    $buildContent .= "Worktype::setEmbedded(\$__worktypeEmbedded);\n\n";
+    $buildContent .= '$__worktypeTemplates = ' . var_export($embeddedTemplates, true) . ";\n";
+    $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
+
     // Add PoffConfig model
     $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
     $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);

@@ -18,52 +18,7 @@ class PoffConfig
 
     private static function defaultWork(string $kind, ?string $mime = null): array
     {
-        switch ($kind) {
-            case 'image':
-                return [
-                    'type' => 'image',
-                    'fit' => 'contain',
-                    'background' => '#000',
-                    'caption' => '',
-                ];
-            case 'video':
-                return [
-                    'type' => 'video',
-                    'autoplay' => false,
-                    'loop' => false,
-                    'muted' => false,
-                    'poster' => null,
-                ];
-            case 'audio':
-                return [
-                    'type' => 'audio',
-                    'autoplay' => false,
-                ];
-            case 'pdf':
-                return [
-                    'type' => 'pdf',
-                    'viewer' => 'embed',
-                ];
-            case 'text':
-                return [
-                    'type' => 'text',
-                    'syntax' => $mime ?? 'text/plain',
-                ];
-            case 'link':
-                return [
-                    'type' => 'link',
-                    'target' => '_blank',
-                ];
-            case 'folder':
-                return [
-                    'type' => 'folder',
-                    'layout' => 'list',
-                ];
-            default:
-                return [
-                    'type' => $kind,
-                ];
-        }
+        return Worktype::definition($kind, $mime);
     }
 
     public static function configPath(string $dir): string

@@ -38,6 +38,9 @@ function renderViewer(string $baseDir, string $requestedPath): void
     }
 
     $type = detectFileType($fullPath);
+    $mimeType = MediaType::detectMimeType($fullPath, basename($fullPath));
+    $work = Worktype::definition($type, $mimeType);
+
     $linkUrl = null;
     if ($type === 'link') {
         $linkUrl = extractLinkFileUrl($fullPath);
@@ -48,22 +51,12 @@ function renderViewer(string $baseDir, string $requestedPath): void
 
     $safeLinkUrl = $linkUrl ? htmlspecialchars($linkUrl, ENT_QUOTES, 'UTF-8') : '';
 
-    $bodyContent = '';
-    if ($type === 'image') {
-        $bodyContent = '<img src="' . $safePath . '" alt="' . $safeName . '">';
-    } elseif ($type === 'video') {
-        $bodyContent = '<video controls><source src="' . $safePath . '">Your browser does not support the video tag.</video>';
-    } elseif ($type === 'audio') {
-        $bodyContent = '<audio controls style="width:100%;"><source src="' . $safePath . '">Your browser does not support the audio element.</audio>';
-    } elseif ($type === 'link') {
-        if ($safeLinkUrl) {
-            $bodyContent = '<div class="message"><div style="margin-bottom:12px;">External link</div><a href="' . $safeLinkUrl . '" target="_blank" rel="noopener">' . $safeLinkUrl . '</a></div>';
-        } else {
-            $bodyContent = '<div class="message">Link file detected, but URL could not be read.</div>';
-        }
-    } else {
-        $bodyContent = '<iframe src="' . $safePath . '" title="' . $safeName . '"></iframe>';
-    }
+    $bodyContent = Worktype::render($type, [
+        'safePath' => $safePath,
+        'safeName' => $safeName,
+        'safeLinkUrl' => $safeLinkUrl,
+        'work' => $work,
+    ]);
 
     $html = <<<HTML
 <!DOCTYPE html>

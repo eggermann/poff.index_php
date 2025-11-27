@@ -13,6 +13,7 @@ if (isset($_GET['mcp'])) {
 }
 
 require __DIR__ . '/includes/MediaType.php';
+require __DIR__ . '/includes/Worktype.php';
 require __DIR__ . '/includes/PoffConfig.php';
 require __DIR__ . '/includes/viewer.php';
 
