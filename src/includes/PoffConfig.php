@@ -16,6 +16,80 @@ class PoffConfig
         }
     }
 
+    private static function defaultWork(string $kind, ?string $mime = null): array
+    {
+        switch ($kind) {
+            case 'image':
+                return [
+                    'type' => 'image',
+                    'fit' => 'contain',
+                    'background' => '#000',
+                    'caption' => '',
+                ];
+            case 'video':
+                return [
+                    'type' => 'video',
+                    'autoplay' => false,
+                    'loop' => false,
+                    'muted' => false,
+                    'poster' => null,
+                ];
+            case 'audio':
+                return [
+                    'type' => 'audio',
+                    'autoplay' => false,
+                ];
+            case 'pdf':
+                return [
+                    'type' => 'pdf',
+                    'viewer' => 'embed',
+                ];
+            case 'text':
+                return [
+                    'type' => 'text',
+                    'syntax' => $mime ?? 'text/plain',
+                ];
+            case 'link':
+                return [
+                    'type' => 'link',
+                    'target' => '_blank',
+                ];
+            case 'folder':
+                return [
+                    'type' => 'folder',
+                    'layout' => 'list',
+                ];
+            default:
+                return [
+                    'type' => $kind,
+                ];
+        }
+    }
+
+    private static function classifyFileKind(string $fileName): string
+    {
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'heic'], true)) {
+            return 'image';
+        }
+        if (in_array($ext, ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v', 'mts'], true)) {
+            return 'video';
+        }
+        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'], true)) {
+            return 'audio';
+        }
+        if (in_array($ext, ['webloc', 'url', 'desktop'], true)) {
+            return 'link';
+        }
+        if (in_array($ext, ['txt', 'md', 'csv', 'json', 'log', 'ini', 'yml', 'yaml', 'xml', 'html', 'htm', 'css', 'js'], true)) {
+            return 'text';
+        }
+        if ($ext === 'pdf') {
+            return 'pdf';
+        }
+        return 'other';
+    }
+
     public static function configPath(string $dir): string
     {
         return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff.config.json';
@@ -43,7 +117,17 @@ class PoffConfig
         $tree = [];
 
         foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..' || $entry === 'poff.config.json' || $entry === '.works') {
+            if (
+                $entry === '.' ||
+                $entry === '..' ||
+                $entry === 'poff.config.json' ||
+                $entry === '.works' ||
+                $entry === '.DS_Store' ||
+                $entry === 'Thumbs.db' ||
+                $entry === '.git' ||
+                $entry === '.idea' ||
+                $entry === 'node_modules'
+            ) {
                 continue;
             }
 
@@ -77,6 +161,7 @@ class PoffConfig
         $now = date('c');
 
         return [
+            '$schema' => 'https://dominikeggermann.com/poff-config.schema.json',
             'folderName' => $folderName,
             'slug' => self::slugify($folderName),
             'title' => $folderName,
@@ -86,6 +171,7 @@ class PoffConfig
             'tree' => $tree,
             'treeHash' => $treeHash,
             'updatedAt' => $now,
+            'work' => self::defaultWork('folder'),
         ];
     }
 
@@ -101,10 +187,13 @@ class PoffConfig
         $size = @filesize($fullPath);
         $now = date('c');
         $mime = self::detectMimeType($fullPath, $fileName);
+        $kind = self::classifyFileKind($fileName);
         $base = [
+            '$schema' => 'https://dominikeggermann.com/poff-config.schema.json',
             'name' => $fileName,
             'slug' => self::slugify($fileName),
             'type' => 'file',
+            'kind' => $kind,
             'path' => $fileName,
             'size' => $size !== false ? $size : null,
             'modifiedAt' => $modified ? date('c', (int) $modified) : null,
@@ -115,6 +204,7 @@ class PoffConfig
         $base['hash'] = $hash;
         $base['updatedAt'] = $now;
         $base['id'] = self::generateId();
+        $base['work'] = self::defaultWork($kind, $mime);
 
         return $base;
     }
@@ -200,9 +290,15 @@ class PoffConfig
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
             }
+            if (isset($existing['work']) && is_array($existing['work'])) {
+                $data['work'] = array_merge(self::defaultWork('folder'), $existing['work']);
+            }
         }
         if (empty($data['id'])) {
             $data['id'] = self::generateId();
+        }
+        if (empty($data['work'])) {
+            $data['work'] = self::defaultWork('folder');
         }
 
         // Write only when new or when state changed
@@ -272,6 +368,9 @@ class PoffConfig
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
             }
+            if (isset($existing['work']) && is_array($existing['work'])) {
+                $data['work'] = array_merge(self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null), $existing['work']);
+            }
             // Carry any extra custom fields
             foreach ($existing as $k => $v) {
                 if (array_key_exists($k, $data)) {
@@ -282,6 +381,9 @@ class PoffConfig
         }
         if (empty($data['id'])) {
             $data['id'] = self::generateId();
+        }
+        if (empty($data['work'])) {
+            $data['work'] = self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null);
         }
 
         // Only write when changed

@@ -13,17 +13,23 @@ function sanitizeRelativePath(string $path): string
 function detectFileType(string $path): string
 {
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'], true)) {
+    if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'heic'], true)) {
         return 'image';
     }
-    if (in_array($ext, ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v'], true)) {
+    if (in_array($ext, ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v', 'mts'], true)) {
         return 'video';
     }
-    if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a'], true)) {
+    if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'], true)) {
         return 'audio';
     }
     if (in_array($ext, ['webloc', 'url', 'desktop'], true)) {
         return 'link';
+    }
+    if (in_array($ext, ['txt', 'md', 'csv', 'json', 'log', 'ini', 'yml', 'yaml', 'xml', 'html', 'htm', 'css', 'js'], true)) {
+        return 'text';
+    }
+    if (in_array($ext, ['pdf'], true)) {
+        return 'pdf';
     }
     return 'other';
 }
@@ -148,7 +154,7 @@ function renderViewer(string $baseDir, string $requestedPath): void
         }
 
        .viewer iframe {
-          background: #1f2937;
+          background: #c3cddbff;
 
         }
 

@@ -66,6 +66,11 @@
                             $item === '.' ||
                             $item === '..' ||
                             $item === '.works' ||
+                            $item === '.DS_Store' ||
+                            $item === 'Thumbs.db' ||
+                            $item === '.git' ||
+                            $item === '.idea' ||
+                            $item === 'node_modules' ||
                             ($currentRelativePath === '' && $item === $currentScript) ||
                             $item === 'poff.config.json'
                         ) {
