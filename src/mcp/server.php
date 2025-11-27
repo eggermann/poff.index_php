@@ -7,10 +7,19 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/helpers.php';
+@require_once __DIR__ . '/../includes/MediaType.php';
+@require_once __DIR__ . '/../includes/Worktype.php';
+@require_once __DIR__ . '/../includes/PoffConfig.php';
+require_once __DIR__ . '/routes/workprompt.php';
+require_once __DIR__ . '/routes/style.php';
+
 $rootDir = getcwd();
 $configPath = $rootDir . DIRECTORY_SEPARATOR . 'poff.config.toon';
 $route = isset($_GET['route']) ? trim((string) $_GET['route']) : 'info';
 $prompt = isset($_GET['prompt']) ? trim((string) $_GET['prompt']) : '';
+$targetFile = isset($_GET['file']) ? trim((string) $_GET['file']) : '';
+$stylePrompt = isset($_GET['style']) ? trim((string) $_GET['style']) : '';
 
 header('Content-Type: application/json');
 
@@ -101,22 +110,21 @@ function ensureConfig(string $path, array $tree): array
     ];
 }
 
-$tree = buildFileTree($rootDir, $rootDir);
-$configState = ensureConfig($configPath, $tree);
+$tree = mcpLoadTreeFromConfig($configPath) ?? mcpBuildFileTree($rootDir, $rootDir);
+$configState = mcpEnsureConfig($configPath, $tree);
 
 $mcpUrl = rtrim($_SERVER['SCRIPT_NAME'] ?? '/index.php', '/') . '#mcp';
 
 switch ($route) {
+    case 'workprompt':
+        echo json_encode(handleWorkPrompt([
+            'rootDir' => $rootDir,
+            'file' => $targetFile,
+            'style' => $stylePrompt,
+        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
     case 'style':
-        $response = [
-            'route' => 'style',
-            'prompt' => $prompt,
-            'message' => $prompt !== ''
-                ? 'Style prompt accepted.'
-                : 'Provide a prompt query parameter to describe desired style.',
-            'mcpUrl' => $mcpUrl,
-            'configPath' => $configPath,
-        ];
+        $response = handleStyleRoute($prompt, $mcpUrl, $configPath);
         break;
     default:
         $response = [
