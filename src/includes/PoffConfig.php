@@ -66,30 +66,6 @@ class PoffConfig
         }
     }
 
-    private static function classifyFileKind(string $fileName): string
-    {
-        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'heic'], true)) {
-            return 'image';
-        }
-        if (in_array($ext, ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v', 'mts'], true)) {
-            return 'video';
-        }
-        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'], true)) {
-            return 'audio';
-        }
-        if (in_array($ext, ['webloc', 'url', 'desktop'], true)) {
-            return 'link';
-        }
-        if (in_array($ext, ['txt', 'md', 'csv', 'json', 'log', 'ini', 'yml', 'yaml', 'xml', 'html', 'htm', 'css', 'js'], true)) {
-            return 'text';
-        }
-        if ($ext === 'pdf') {
-            return 'pdf';
-        }
-        return 'other';
-    }
-
     public static function configPath(string $dir): string
     {
         return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff.config.json';
@@ -186,8 +162,8 @@ class PoffConfig
         $modified = @filemtime($fullPath);
         $size = @filesize($fullPath);
         $now = date('c');
-        $mime = self::detectMimeType($fullPath, $fileName);
-        $kind = self::classifyFileKind($fileName);
+        $mime = MediaType::detectMimeType($fullPath, $fileName);
+        $kind = MediaType::classifyExtension($fileName);
         $base = [
             '$schema' => 'https://dominikeggermann.com/poff-config.schema.json',
             'name' => $fileName,

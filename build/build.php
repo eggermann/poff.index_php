@@ -48,6 +48,11 @@ try {
         $buildContent .= $matches[0] . "\n\n";
     }
 
+    // Add MediaType helper
+    $mediaTypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/MediaType.php');
+    $mediaTypeContent = str_replace(['<?php', '?>'], '', $mediaTypeContent);
+    $buildContent .= trim($mediaTypeContent) . "\n\n";
+
     // Add PoffConfig model
     $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
     $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);
