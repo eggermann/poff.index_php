@@ -30,17 +30,9 @@ try {
     $buildContent = "<?php\n";
 
     // Get the first file header comment only
-    $indexContent = file_get_contents($sourceDir . '/index.php');
-    // Get header comment by finding first comment with `File:` in it
-    preg_match_all('/\/\*\*.*?\*\//s', $indexContent, $matches);
-    if ($matches[0]) {
-        foreach ($matches[0] as $comment) {
-            if (strpos($comment, 'File:') !== false) {
-                $buildContent .= trim(str_replace('<?php', '', $comment)) . "\n";
-                break;
-            }
-        }
-    }
+  
+    
+
 
     // Add function definition without its doc comment
     $functionsContent = ComponentReader::readComponentFile($sourceDir . '/includes/functions.php');
