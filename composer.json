@@ -1,0 +1,5 @@
+{
+    "require": {
+        "php-mcp/server": "^3.3"
+    }
+}
