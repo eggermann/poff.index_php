@@ -70,6 +70,21 @@ try {
             if (isset($bundle['templates']) && is_array($bundle['templates'])) {
                 $embeddedTemplates = $bundle['templates'];
             }
+            if (!$embeddedWorktypes) {
+                foreach ($bundle as $key => $value) {
+                    if (!is_array($value)) {
+                        continue;
+                    }
+                    if (isset($value['model'])) {
+                        $embeddedWorktypes[$key] = $value['model'];
+                    } elseif (isset($value['definition'])) {
+                        $embeddedWorktypes[$key] = $value['definition'];
+                    }
+                    if (isset($value['template'])) {
+                        $embeddedTemplates[$key] = $value['template'];
+                    }
+                }
+            }
         }
     }
     if (!$embeddedWorktypes) {

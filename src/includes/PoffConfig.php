@@ -211,6 +211,7 @@ class PoffConfig
         $data['tree'] = $mergedTree;
         $data['treeHash'] = hash('sha256', json_encode($mergedTree));
         $workDefault = self::defaultWork('folder');
+        $existingWork = [];
         if (is_array($existing)) {
             $data['title'] = $existing['title'] ?? $data['title'] ?? '';
             $data['description'] = $existing['description'] ?? $data['description'] ?? '';
@@ -224,10 +225,10 @@ class PoffConfig
                 $data['id'] = $existing['id'];
             }
             $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
-            $data['work'] = array_merge($workDefault, $existingWork);
-            if (count(array_diff_key($workDefault, $existingWork)) > 0) {
-                $forceWrite = true;
-            }
+        }
+        $data['work'] = array_merge($workDefault, $existingWork);
+        if ($existingWork !== $data['work']) {
+            $forceWrite = true;
         }
         if (empty($data['id'])) {
             $data['id'] = self::generateId();
@@ -316,10 +317,6 @@ class PoffConfig
                 $data['id'] = $existing['id'];
             }
             $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
-            $data['work'] = array_merge($workDefault, $existingWork);
-            if (count(array_diff_key($workDefault, $existingWork)) > 0) {
-                $forceWrite = true;
-            }
             // Carry any extra custom fields
             foreach ($existing as $k => $v) {
                 if (array_key_exists($k, $data)) {
@@ -327,6 +324,10 @@ class PoffConfig
                 }
                 $data[$k] = $v;
             }
+        }
+        $data['work'] = array_merge($workDefault, $existingWork);
+        if ($existingWork !== $data['work']) {
+            $forceWrite = true;
         }
         if (empty($data['id'])) {
             $data['id'] = self::generateId();
