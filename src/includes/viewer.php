@@ -32,14 +32,17 @@ function renderViewer(string $baseDir, string $requestedPath): void
         return;
     }
 
-    // Ensure per-file config under .works
+    // Ensure per-file config under .works and load it for work/model data
+    $fileConfig = null;
     if (class_exists('PoffConfig')) {
-        PoffConfig::ensureFileConfig(dirname($fullPath), basename($fullPath));
+        $fileConfig = PoffConfig::ensureFileConfig(dirname($fullPath), basename($fullPath));
     }
 
     $type = detectFileType($fullPath);
     $mimeType = MediaType::detectMimeType($fullPath, basename($fullPath));
-    $work = Worktype::definition($type, $mimeType);
+    $workDefaults = Worktype::definition($type, $mimeType);
+    $workData = (isset($fileConfig['work']) && is_array($fileConfig['work'])) ? $fileConfig['work'] : [];
+    $work = array_merge($workDefaults, $workData);
 
     $linkUrl = null;
     if ($type === 'link') {

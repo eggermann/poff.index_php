@@ -168,6 +168,7 @@ class PoffConfig
         $configPath = self::configPath($dir);
         $defaults = self::defaultConfig($dir);
         $existing = null;
+        $forceWrite = false;
 
         if (file_exists($configPath)) {
             $existing = json_decode((string) file_get_contents($configPath), true);
@@ -209,9 +210,10 @@ class PoffConfig
         $data = $defaults;
         $data['tree'] = $mergedTree;
         $data['treeHash'] = hash('sha256', json_encode($mergedTree));
+        $workDefault = self::defaultWork('folder');
         if (is_array($existing)) {
-            $data['title'] = $existing['title'] ?? $data['title'];
-            $data['description'] = $existing['description'] ?? $data['description'];
+            $data['title'] = $existing['title'] ?? $data['title'] ?? '';
+            $data['description'] = $existing['description'] ?? $data['description'] ?? '';
             if (isset($existing['link'])) {
                 $data['link'] = $existing['link'];
             }
@@ -221,15 +223,24 @@ class PoffConfig
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
             }
-            if (isset($existing['work']) && is_array($existing['work'])) {
-                $data['work'] = array_merge(self::defaultWork('folder'), $existing['work']);
+            $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
+            $data['work'] = array_merge($workDefault, $existingWork);
+            if (count(array_diff_key($workDefault, $existingWork)) > 0) {
+                $forceWrite = true;
             }
         }
         if (empty($data['id'])) {
             $data['id'] = self::generateId();
         }
         if (empty($data['work'])) {
-            $data['work'] = self::defaultWork('folder');
+            $data['work'] = $workDefault;
+            $forceWrite = true;
+        }
+        if (!isset($data['title'])) {
+            $data['title'] = '';
+        }
+        if (!isset($data['description'])) {
+            $data['description'] = '';
         }
 
         // Write only when new or when state changed
@@ -281,9 +292,14 @@ class PoffConfig
         }
 
         $data = $defaults;
+        $workDefault = self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null);
+        $existingWork = [];
+        $forceWrite = false;
         if (is_array($existing)) {
             // Preserve user-editable metadata and visibility
             $data['visible'] = $existing['visible'] ?? $data['visible'];
+            $data['title'] = $existing['title'] ?? '';
+            $data['description'] = $existing['description'] ?? '';
             if (isset($existing['title'])) {
                 $data['title'] = $existing['title'];
             }
@@ -299,8 +315,10 @@ class PoffConfig
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
             }
-            if (isset($existing['work']) && is_array($existing['work'])) {
-                $data['work'] = array_merge(self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null), $existing['work']);
+            $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
+            $data['work'] = array_merge($workDefault, $existingWork);
+            if (count(array_diff_key($workDefault, $existingWork)) > 0) {
+                $forceWrite = true;
             }
             // Carry any extra custom fields
             foreach ($existing as $k => $v) {
@@ -313,14 +331,21 @@ class PoffConfig
         if (empty($data['id'])) {
             $data['id'] = self::generateId();
         }
+        if (!isset($data['title'])) {
+            $data['title'] = '';
+        }
+        if (!isset($data['description'])) {
+            $data['description'] = '';
+        }
         if (empty($data['work'])) {
-            $data['work'] = self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null);
+            $data['work'] = $workDefault;
+            $forceWrite = true;
         }
 
         // Only write when changed
         $serializedExisting = is_array($existing) ? json_encode($existing) : '';
         $serializedData = json_encode($data);
-        if ($serializedExisting !== $serializedData) {
+        if ($forceWrite || $serializedExisting !== $serializedData) {
             $dirPath = dirname($configPath);
             if (!is_dir($dirPath)) {
                 mkdir($dirPath, 0755, true);

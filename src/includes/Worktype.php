@@ -104,15 +104,19 @@ class Worktype
             '{{path}}' => $safePath,
             '{{name}}' => $safeName,
             '{{linkUrl}}' => $safeLinkUrl,
-            '{{target}}' => htmlspecialchars($work['target'] ?? '_blank', ENT_QUOTES, 'UTF-8'),
-            '{{fit}}' => htmlspecialchars($work['fit'] ?? 'contain', ENT_QUOTES, 'UTF-8'),
-            '{{background}}' => htmlspecialchars($work['background'] ?? '#000', ENT_QUOTES, 'UTF-8'),
-            '{{poster}}' => htmlspecialchars($work['poster'] ?? '', ENT_QUOTES, 'UTF-8'),
-            '{{autoplayAttr}}' => !empty($work['autoplay']) ? 'autoplay' : '',
-            '{{loopAttr}}' => !empty($work['loop']) ? 'loop' : '',
-            '{{mutedAttr}}' => !empty($work['muted']) ? 'muted' : '',
-            '{{viewer}}' => htmlspecialchars($work['viewer'] ?? 'embed', ENT_QUOTES, 'UTF-8'),
         ];
+
+        foreach ($work as $key => $value) {
+            $placeholder = '{{' . $key . '}}';
+            if (is_bool($value)) {
+                $replacements[$placeholder] = $value ? 'true' : 'false';
+                // Provide attribute-style placeholder (e.g., autoplayAttr) if templates use it
+                $attrKey = '{{' . $key . 'Attr}}';
+                $replacements[$attrKey] = $value ? $key : '';
+            } elseif (is_scalar($value) || $value === null) {
+                $replacements[$placeholder] = htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+            }
+        }
 
         return strtr($tpl, $replacements);
     }
