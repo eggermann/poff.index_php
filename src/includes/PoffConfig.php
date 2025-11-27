@@ -43,6 +43,7 @@ class PoffConfig
                 'type' => $isDir ? 'folder' : 'file',
                 'path' => $entry,
                 'modifiedAt' => $modifiedAt ? date('c', (int) $modifiedAt) : null,
+                'visible' => true,
             ];
         }
 
@@ -88,8 +89,42 @@ class PoffConfig
             $existing = json_decode((string) file_get_contents($configPath), true);
         }
 
+        // Merge tree with existing to preserve visibility/custom flags per item
+        $mergedTree = $defaults['tree'];
+        if (is_array($existing) && isset($existing['tree']) && is_array($existing['tree'])) {
+            $existingByName = [];
+            foreach ($existing['tree'] as $item) {
+                if (!isset($item['name'])) {
+                    continue;
+                }
+                $existingByName[$item['name']] = $item;
+            }
+
+            foreach ($mergedTree as &$item) {
+                $name = $item['name'];
+                if (isset($existingByName[$name]) && is_array($existingByName[$name])) {
+                    $existingItem = $existingByName[$name];
+                    if (array_key_exists('visible', $existingItem)) {
+                        $item['visible'] = $existingItem['visible'];
+                    }
+                    // Preserve any custom keys the user may have added
+                    foreach ($existingItem as $k => $v) {
+                        if (in_array($k, ['name', 'slug', 'type', 'path', 'modifiedAt'], true)) {
+                            continue;
+                        }
+                        if (!array_key_exists($k, $item)) {
+                            $item[$k] = $v;
+                        }
+                    }
+                }
+            }
+            unset($item);
+        }
+
         // Start with defaults but preserve user-provided title/description/link/url if present
         $data = $defaults;
+        $data['tree'] = $mergedTree;
+        $data['treeHash'] = hash('sha256', json_encode($mergedTree));
         if (is_array($existing)) {
             $data['title'] = $existing['title'] ?? $data['title'];
             $data['description'] = $existing['description'] ?? $data['description'];
@@ -98,10 +133,6 @@ class PoffConfig
             }
             if (isset($existing['url'])) {
                 $data['url'] = $existing['url'];
-            }
-            // If tree hash matches, keep prior updatedAt to avoid noisy rewrites
-            if (($existing['treeHash'] ?? '') === $defaults['treeHash']) {
-                $data['updatedAt'] = $existing['updatedAt'] ?? $data['updatedAt'];
             }
         }
 
