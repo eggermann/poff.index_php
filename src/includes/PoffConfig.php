@@ -43,7 +43,7 @@ class PoffConfig
         $tree = [];
 
         foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..' || $entry === 'poff.config.json') {
+            if ($entry === '.' || $entry === '..' || $entry === 'poff.config.json' || $entry === '.works') {
                 continue;
             }
 
@@ -134,35 +134,7 @@ class PoffConfig
                 }
             }
         }
-
-        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        $map = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'svg' => 'image/svg+xml',
-            'bmp' => 'image/bmp',
-            'mp4' => 'video/mp4',
-            'mov' => 'video/quicktime',
-            'webm' => 'video/webm',
-            'avi' => 'video/x-msvideo',
-            'mkv' => 'video/x-matroska',
-            'm4v' => 'video/x-m4v',
-            'mp3' => 'audio/mpeg',
-            'wav' => 'audio/wav',
-            'ogg' => 'audio/ogg',
-            'm4a' => 'audio/mp4',
-            'pdf' => 'application/pdf',
-            'txt' => 'text/plain',
-            'html' => 'text/html',
-            'htm' => 'text/html',
-            'json' => 'application/json',
-            'csv' => 'text/csv',
-        ];
-
-        return $map[$ext] ?? null;
+        return null;
     }
 
     /**

@@ -140,10 +140,19 @@ function renderViewer(string $baseDir, string $requestedPath): void
             border-radius: 6px;
             background: #111827;
         }
+
         .viewer video, .viewer iframe {
             width: 100%;
             height: 100%;
+
         }
+
+       .viewer iframe {
+          background: #1f2937;
+
+        }
+
+
         .message {
             padding: 24px;
             text-align: center;

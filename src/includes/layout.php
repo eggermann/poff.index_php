@@ -62,7 +62,13 @@
                 $items = scandir($navAbsolutePath);
                 if ($items !== false) {
                     foreach ($items as $item) {
-                        if ($item === '.' || $item === '..' || ($currentRelativePath === '' && $item === $currentScript) || $item === 'poff.config.json') {
+                        if (
+                            $item === '.' ||
+                            $item === '..' ||
+                            $item === '.works' ||
+                            ($currentRelativePath === '' && $item === $currentScript) ||
+                            $item === 'poff.config.json'
+                        ) {
                             continue;
                         }
 
