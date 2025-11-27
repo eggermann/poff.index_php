@@ -45,6 +45,11 @@ function renderViewer(string $baseDir, string $requestedPath): void
         return;
     }
 
+    // Ensure per-file config under .works
+    if (class_exists('PoffConfig')) {
+        PoffConfig::ensureFileConfig(dirname($fullPath), basename($fullPath));
+    }
+
     $type = detectFileType($fullPath);
     $linkUrl = null;
     if ($type === 'link') {

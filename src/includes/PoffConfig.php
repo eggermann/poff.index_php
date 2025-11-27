@@ -12,6 +12,11 @@ class PoffConfig
         return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff.config.json';
     }
 
+    public static function fileConfigPath(string $dir, string $fileName): string
+    {
+        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.works' . DIRECTORY_SEPARATOR . $fileName . '.config.json';
+    }
+
     public static function slugify(string $name): string
     {
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($name));
@@ -72,6 +77,33 @@ class PoffConfig
             'treeHash' => $treeHash,
             'updatedAt' => $now,
         ];
+    }
+
+    /**
+     * Default per-file config.
+     *
+     * @return array<string,mixed>
+     */
+    public static function defaultFileConfig(string $dir, string $fileName): array
+    {
+        $fullPath = rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $fileName;
+        $modified = @filemtime($fullPath);
+        $size = @filesize($fullPath);
+        $now = date('c');
+        $base = [
+            'name' => $fileName,
+            'slug' => self::slugify($fileName),
+            'type' => 'file',
+            'path' => $fileName,
+            'size' => $size !== false ? $size : null,
+            'modifiedAt' => $modified ? date('c', (int) $modified) : null,
+            'visible' => true,
+        ];
+        $hash = hash('sha256', json_encode($base));
+        $base['hash'] = $hash;
+        $base['updatedAt'] = $now;
+
+        return $base;
     }
 
     /**
@@ -162,6 +194,61 @@ class PoffConfig
         }
 
         if ($shouldWrite) {
+            $data['updatedAt'] = date('c');
+            file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT));
+        }
+
+        return $data;
+    }
+
+    /**
+     * Ensure a per-file config exists under .works/{filename}.config.json.
+     *
+     * @return array<string,mixed>
+     */
+    public static function ensureFileConfig(string $dir, string $fileName): array
+    {
+        $configPath = self::fileConfigPath($dir, $fileName);
+        $defaults = self::defaultFileConfig($dir, $fileName);
+        $existing = null;
+
+        if (file_exists($configPath)) {
+            $existing = json_decode((string) file_get_contents($configPath), true);
+        }
+
+        $data = $defaults;
+        if (is_array($existing)) {
+            // Preserve user-editable metadata and visibility
+            $data['visible'] = $existing['visible'] ?? $data['visible'];
+            if (isset($existing['title'])) {
+                $data['title'] = $existing['title'];
+            }
+            if (isset($existing['description'])) {
+                $data['description'] = $existing['description'];
+            }
+            if (isset($existing['link'])) {
+                $data['link'] = $existing['link'];
+            }
+            if (isset($existing['url'])) {
+                $data['url'] = $existing['url'];
+            }
+            // Carry any extra custom fields
+            foreach ($existing as $k => $v) {
+                if (array_key_exists($k, $data)) {
+                    continue;
+                }
+                $data[$k] = $v;
+            }
+        }
+
+        // Only write when changed
+        $serializedExisting = is_array($existing) ? json_encode($existing) : '';
+        $serializedData = json_encode($data);
+        if ($serializedExisting !== $serializedData) {
+            $dirPath = dirname($configPath);
+            if (!is_dir($dirPath)) {
+                mkdir($dirPath, 0755, true);
+            }
             $data['updatedAt'] = date('c');
             file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT));
         }
