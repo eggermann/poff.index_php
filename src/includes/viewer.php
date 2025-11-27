@@ -61,6 +61,11 @@ function renderViewer(string $baseDir, string $requestedPath): void
         'work' => $work,
     ]);
 
+    $descriptionHtml = '';
+    if (!empty($fileConfig['description'])) {
+        $descriptionHtml = '<div class="work-description">' . nl2br(htmlspecialchars($fileConfig['description'], ENT_QUOTES, 'UTF-8')) . '</div>';
+    }
+
     $html = <<<HTML
 <!DOCTYPE html>
 <html lang="en">
@@ -135,6 +140,22 @@ function renderViewer(string $baseDir, string $requestedPath): void
 
         }
 
+        .work-description {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            padding: 12px 14px;
+            background: rgba(17, 24, 39, 0.6);
+            color: #e5e7eb;
+            border-radius: 16px;
+            backdrop-filter: blur(8px);
+            margin: 0;
+            max-width: 70%;
+            line-height: 1.4;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
 
         .message {
             padding: 24px;
@@ -155,6 +176,7 @@ function renderViewer(string $baseDir, string $requestedPath): void
     </header>
     <div class="viewer">
         {$bodyContent}
+        {$descriptionHtml}
     </div>
 </body>
 </html>
