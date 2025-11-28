@@ -12,6 +12,7 @@ require_once __DIR__ . '/helpers.php';
 @require_once __DIR__ . '/../includes/Worktype.php';
 @require_once __DIR__ . '/../includes/PoffConfig.php';
 require_once __DIR__ . '/routes/workprompt.php';
+require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/style.php';
 
 $rootDir = getcwd();
@@ -121,6 +122,14 @@ switch ($route) {
             'rootDir' => $rootDir,
             'file' => $targetFile,
             'style' => $stylePrompt,
+        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    case 'create':
+        echo json_encode(handleCreate([
+            'rootDir' => $rootDir,
+            'name' => isset($_GET['name']) ? trim((string) $_GET['name']) : '',
+            'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : null,
+            'url' => isset($_GET['url']) ? trim((string) $_GET['url']) : null,
         ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     case 'style':
