@@ -3,3 +3,6 @@ node_modules
 /.nuxt
 pages
 .history
+vendor/
+
+.DS_Store

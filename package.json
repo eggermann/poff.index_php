@@ -2,7 +2,12 @@
   "scripts": {
     "watch": "node scripts/watch-build.js"
   },
+  "scripts": {
+    "test:mcp": "MCP_JSON=1 jest --watchman=false tests/mcp.create.test.js"
+  },
   "devDependencies": {
+    "jest": "^29.7.0",
+    "node-fetch": "^2.7.0",
     "node-ssh": "^13.2.1"
   }
 }

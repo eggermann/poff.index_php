@@ -57,13 +57,16 @@ $server = Server::make()
     ->build();
 
 // Streamable HTTP transport (SSE by default). Host cannot be 0.0.0.0 per MCP spec.
+$jsonMode = getenv('MCP_JSON') === '1';
+$stateless = getenv('MCP_STATELESS') === '1';
+
 $transport = new StreamableHttpServerTransport(
     '127.0.0.1',
     8080,
     'mcp',
     sslContext: null,
-    enableJsonResponse: false, // SSE streaming responses
-    stateless: false           // allow GET /mcp/sse (with Accept: text/event-stream)
+    enableJsonResponse: $jsonMode,
+    stateless: $jsonMode ? true : $stateless // JSON mode prefers stateless POST; SSE mode keeps false unless explicitly set
 );
 
 $server->listen($transport);
