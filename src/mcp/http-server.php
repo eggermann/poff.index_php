@@ -35,11 +35,13 @@ $server = Server::make()
     )
     ->withTool(
         function (array $args) use ($rootDir) {
+            $poffDirOverride = getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null;
             return handleCreate([
                 'rootDir' => $rootDir,
                 'name' => $args['name'] ?? '',
                 'path' => $args['path'] ?? null,
                 'url' => $args['url'] ?? null,
+                'poffDir' => $poffDirOverride,
             ]);
         },
         name: 'create',

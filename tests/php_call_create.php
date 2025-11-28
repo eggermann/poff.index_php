@@ -8,6 +8,7 @@ $rootDir = realpath(__DIR__ . '/..');
 $name = '';
 $path = null;
 $url = null;
+$poffDir = getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null;
 
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--name=')) {
@@ -24,6 +25,7 @@ $result = handleCreate([
     'name' => $name,
     'path' => $path,
     'url' => $url,
+    'poffDir' => $poffDir,
 ]);
 
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

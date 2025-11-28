@@ -41,13 +41,13 @@ function handleCreate(array $opts): array
     $name = $opts['name'] ?? '';
     $path = $opts['path'] ?? null;
     $url = $opts['url'] ?? null;
+    $poffDir = $opts['poffDir'] ?? ($rootDir . DIRECTORY_SEPARATOR . 'poff');
 
     if ($name === '') {
         mcpJsonError('Missing name parameter', ['route' => 'create']);
     }
 
     $safeName = mcp_sanitize_name($name);
-    $poffDir = $rootDir . DIRECTORY_SEPARATOR . 'poff';
     $destDir = $poffDir . DIRECTORY_SEPARATOR . $safeName;
     if (!is_dir($poffDir)) {
         mkdir($poffDir, 0755, true);

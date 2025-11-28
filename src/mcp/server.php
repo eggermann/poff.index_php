@@ -130,6 +130,7 @@ switch ($route) {
             'name' => isset($_GET['name']) ? trim((string) $_GET['name']) : '',
             'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : null,
             'url' => isset($_GET['url']) ? trim((string) $_GET['url']) : null,
+            'poffDir' => getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null,
         ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     case 'style':
