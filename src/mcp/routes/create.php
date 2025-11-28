@@ -38,17 +38,17 @@ function mcp_copy_recursive(string $src, string $dst): void
 function handleCreate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
-    $name = $opts['name'] ?? '';
+    $dest = $opts['dest'] ?? '';
     $path = $opts['path'] ?? null;
     $url = $opts['url'] ?? null;
     $poffDir = $opts['poffDir'] ?? ($rootDir . DIRECTORY_SEPARATOR . 'poff');
 
-    if ($name === '') {
-        mcpJsonError('Missing name parameter', ['route' => 'create']);
+    if ($dest === '') {
+        mcpJsonError('Missing dest parameter', ['route' => 'create']);
     }
 
-    $safeName = mcp_sanitize_name($name);
-    $destDir = $poffDir . DIRECTORY_SEPARATOR . $safeName;
+    $safeDest = mcp_sanitize_name($dest);
+    $destDir = $poffDir . DIRECTORY_SEPARATOR . $safeDest;
     if (!is_dir($poffDir)) {
         mkdir($poffDir, 0755, true);
     }
@@ -94,7 +94,7 @@ function handleCreate(array $opts): array
 
     return [
         'route' => 'create',
-        'name' => $safeName,
+        'dest' => $safeDest,
         'dest' => $destDir,
         'created' => $created,
         'copied' => $copied,

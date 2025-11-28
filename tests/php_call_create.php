@@ -5,14 +5,14 @@ require __DIR__ . '/../src/mcp/helpers.php';
 require __DIR__ . '/../src/mcp/routes/create.php';
 
 $rootDir = realpath(__DIR__ . '/..');
-$name = '';
+$dest = '';
 $path = null;
 $url = null;
 $poffDir = getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null;
 
 foreach ($argv as $arg) {
-    if (str_starts_with($arg, '--name=')) {
-        $name = substr($arg, 7);
+    if (str_starts_with($arg, '--dest=')) {
+        $dest = substr($arg, 7);
     } elseif (str_starts_with($arg, '--path=')) {
         $path = substr($arg, 7);
     } elseif (str_starts_with($arg, '--url=')) {
@@ -22,7 +22,7 @@ foreach ($argv as $arg) {
 
 $result = handleCreate([
     'rootDir' => $rootDir,
-    'name' => $name,
+    'dest' => $dest,
     'path' => $path,
     'url' => $url,
     'poffDir' => $poffDir,

@@ -127,7 +127,7 @@ switch ($route) {
     case 'create':
         echo json_encode(handleCreate([
             'rootDir' => $rootDir,
-            'name' => isset($_GET['name']) ? trim((string) $_GET['name']) : '',
+            'dest' => isset($_GET['dest']) ? trim((string) $_GET['dest']) : '',
             'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : null,
             'url' => isset($_GET['url']) ? trim((string) $_GET['url']) : null,
             'poffDir' => getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null,

@@ -38,22 +38,22 @@ $server = Server::make()
             $poffDirOverride = getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null;
             return handleCreate([
                 'rootDir' => $rootDir,
-                'name' => $args['name'] ?? '',
+                'dest' => $args['dest'] ?? '',
                 'path' => $args['path'] ?? null,
                 'url' => $args['url'] ?? null,
                 'poffDir' => $poffDirOverride,
             ]);
         },
         name: 'create',
-        description: 'Create entry under /poff. Required: name. Optional: path (copy) or url (download).',
+        description: 'Create entry under /poff. Required: dest (relative inside /poff). Optional: path (copy) or url (download).',
         inputSchema: [
             'type' => 'object',
             'properties' => [
-                'name' => ['type' => 'string', 'description' => 'Name for destination folder'],
-                'path' => ['type' => 'string', 'description' => 'Relative path to copy into /poff/{name}'],
-                'url' => ['type' => 'string', 'description' => 'URL to download into /poff/{name}'],
+                'dest' => ['type' => 'string', 'description' => 'Relative destination inside /poff'],
+                'path' => ['type' => 'string', 'description' => 'Relative path to copy into /poff/{dest}'],
+                'url' => ['type' => 'string', 'description' => 'URL to download into /poff/{dest}'],
             ],
-            'required' => ['name'],
+            'required' => ['dest'],
         ]
     )
     ->build();
