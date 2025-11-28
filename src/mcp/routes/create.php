@@ -95,7 +95,7 @@ function handleCreate(array $opts): array
     return [
         'route' => 'create',
         'dest' => $safeDest,
-        'dest' => $destDir,
+        'destPath' => $destDir,
         'created' => $created,
         'copied' => $copied,
         'downloaded' => $downloaded,
