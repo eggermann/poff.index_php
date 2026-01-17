@@ -1,8 +1,8 @@
 # Poff File Browser
 
 A single-file PHP file browser built from modular source files in `src/`.
-It includes a viewer for common file types, per-folder/per-file config, and an MCP
-endpoint used for helper routes like create, workprompt, edit-config, and prompt-template.
+It includes a viewer for common file types, per-folder/per-file config, and MCP
+routes for automation helpers like create and workprompt.
 
 ## What This App Does
 
@@ -16,6 +16,7 @@ endpoint used for helper routes like create, workprompt, edit-config, and prompt
 
 - `src/` - Source files (edit here).
   - `src/includes/` - Header, layout, scripts, viewer, and config helpers.
+  - `src/assets/` - Modular JS/SCSS sources for the bundled inline assets.
   - `src/mcp/` - MCP server + route handlers.
 - `build/` - Build pipeline that concatenates `src` into a single `index.php`.
 - `pages/` - Generated output (`pages/dominikeggermann.com/index.php`).
@@ -52,7 +53,7 @@ Edit mode UI:
 - "More..." drawer: link, url, work type, work layout, tree visibility.
 - Prompt window: generates and saves `work.layout.template`.
 
-Edits are saved through MCP `route=edit-config`.
+Edits are saved through same-page edit endpoints (`?edit=config`, `?edit=save`, `?edit=prompt`).
 
 ## Prompt Window (Template Generation)
 
@@ -79,7 +80,7 @@ Expected local response:
 - JSON with `{ "template": "..." }`, or
 - a plain text body (used as template).
 
-Templates are saved into `work.layout.template` via MCP `route=edit-config`.
+Templates are saved into `work.layout.template` via the same-page edit endpoint.
 
 ## MCP Routes
 
@@ -91,8 +92,7 @@ Routes:
 - `create`: create folders or copy content into a destination
 - `workprompt`: prepare a work prompt and template for a file
 - `style`: simple echo route for styling prompts
-- `edit-config`: read/write `poff.config.json` for the current folder
-- `prompt-template`: call local/OpenAI/Gemini to generate `work.layout.template`
+Note: the edit UI does not use MCP. It calls the same page with `?edit=...`.
 
 ### MCP Examples
 
@@ -142,8 +142,29 @@ Source is compiled into a single PHP file:
 - Config: `build/BuildConfig.php`
 - Output: `pages/dominikeggermann.com/index.php`
 
+Asset build dependencies:
+```sh
+npm install
+```
+
+Asset pipeline:
+- JS entry: `src/assets/js/app.js`
+- SCSS entry: `src/assets/scss/main.scss`
+- The builder injects compiled output into the `POFF_STYLE_*` and `POFF_SCRIPT_*` blocks in `src/includes/`.
+
 Manual build:
 ```sh
+npm run build
+```
+
+If you only want to rebuild assets:
+```sh
+npm run build:assets
+```
+
+Manual (two-step) build:
+```sh
+node scripts/build-assets.js
 php build/build.php
 ```
 
@@ -155,7 +176,7 @@ Auto build:
 node scripts/watch-build.js
 ```
 
-The watcher rebuilds on changes and optionally refreshes a browser tab when running under MAMP.
+The watcher rebuilds on changes (assets + PHP) and optionally refreshes a browser tab when running under MAMP.
 
 ## Tests
 
@@ -167,6 +188,7 @@ npm run test:mcp
 ## Development Notes
 
 - Edit only files in `src/`; rebuild to update `pages/`.
+- JavaScript lives in `src/assets/js/`; SCSS lives in `src/assets/scss/`.
 - `PoffConfig` merges new tree data while preserving custom fields.
 - The edit UI uses localStorage for prompt settings; remove to reset.
 

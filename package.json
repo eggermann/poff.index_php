@@ -1,13 +1,15 @@
 {
   "scripts": {
-    "watch": "node scripts/watch-build.js"
-  },
-  "scripts": {
+    "build:assets": "node scripts/build-assets.js",
+    "build": "node scripts/build-assets.js && php build/build.php",
+    "watch": "node scripts/watch-build.js",
     "test:mcp": "MCP_JSON=1 jest --watchman=false tests/mcp.create.test.js"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "jest": "^29.7.0",
     "node-fetch": "^2.7.0",
-    "node-ssh": "^13.2.1"
+    "node-ssh": "^13.2.1",
+    "sass": "^1.85.0"
   }
 }
