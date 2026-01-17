@@ -18,7 +18,9 @@ const editToggle    = document.getElementById('editToggle');
 const iframeLoading = document.getElementById('iframeLoading');
 let activeLink      = null;
 const currentPoffConfig = <?php echo json_encode($folderPoffConfig); ?>;
-let editableConfig  = currentPoffConfig;
+let folderConfig    = currentPoffConfig;
+let editConfig      = currentPoffConfig;
+let editTarget      = 'folder';
 const editRequested = new URLSearchParams(window.location.search).get('edit') === 'true';
 const editQuery     = editRequested ? '&edit=true' : '';
 let drawerOpen      = false;
@@ -26,19 +28,19 @@ let promptHistory   = [];
 const promptSettingsKey = 'poffEditPromptSettings';
 
 function renderFolderMeta() {
-    if (editableConfig && (editableConfig.title || editableConfig.description)) {
+    if (folderConfig && (folderConfig.title || folderConfig.description)) {
         let html = '';
         // Build linked title if link/url present
-        if (editableConfig.title) {
-            if (editableConfig.link || editableConfig.url) {
-                const lnk = editableConfig.link || editableConfig.url;
-                html += `<h3><a href="${lnk}" target="contentFrame">${editableConfig.title}</a></h3>`;
+        if (folderConfig.title) {
+            if (folderConfig.link || folderConfig.url) {
+                const lnk = folderConfig.link || folderConfig.url;
+                html += `<h3><a href="${lnk}" target="contentFrame">${folderConfig.title}</a></h3>`;
             } else {
-                html += `<h3>${editableConfig.title}</h3>`;
+                html += `<h3>${folderConfig.title}</h3>`;
             }
         }
-        if (editableConfig.description) {
-            html += `<p>${editableConfig.description}</p>`;
+        if (folderConfig.description) {
+            html += `<p>${folderConfig.description}</p>`;
         }
         folderMetaEl.innerHTML = html;
         folderMetaEl.style.display = 'block';
@@ -79,6 +81,10 @@ function escapeHtml(value) {
 }
 
 function getActivePath() {
+    return getActiveSelection().path;
+}
+
+function getActiveSelection() {
     const rawHash = window.location.hash.replace(/^#\/?/, '');
     let hashPath = rawHash;
     if (rawHash) {
@@ -90,13 +96,16 @@ function getActivePath() {
     }
     if (hashPath) {
         const isFile = /\.[^\\/]+$/.test(hashPath);
-        if (isFile) {
-            return hashPath.split('/').slice(0, -1).join('/');
-        }
-        return hashPath;
+        return {
+            path: hashPath,
+            isFile,
+        };
     }
     const params = new URLSearchParams(window.location.search);
-    return params.get('path') || '';
+    return {
+        path: params.get('path') || '',
+        isFile: false,
+    };
 }
 
 function buildCmsUrl(action, path) {
@@ -206,11 +215,16 @@ async function saveConfig(payload, statusEl) {
         if (!data || data.error) {
             throw new Error(data?.error || 'Save failed.');
         }
-        editableConfig = data.config || editableConfig;
-        renderFolderMeta();
-        renderEditUI(editableConfig, {
+        editConfig = data.config || editConfig;
+        editTarget = data.target || editTarget;
+        if (editTarget === 'folder') {
+            folderConfig = editConfig;
+            renderFolderMeta();
+        }
+        renderEditUI(editConfig, {
             allowed: data.allowed !== false,
             error: data.error,
+            target: editTarget,
         });
         if (statusEl) {
             statusEl.textContent = 'Config saved.';
@@ -284,8 +298,9 @@ function renderEditPanel(config, status) {
         return;
     }
 
+    const label = status?.target === 'file' ? 'Edit mode (file)' : 'Edit mode (folder)';
     editPanel.innerHTML = `
-        <h3>Edit mode</h3>
+        <h3>${label}</h3>
         <div class="edit-status" id="editInlineStatus"></div>
         <form id="inlineEditForm" class="edit-inline">
             <div>
@@ -313,32 +328,39 @@ function renderEditPanel(config, status) {
     }
     if (titleInput) {
         titleInput.addEventListener('input', () => {
-            if (!editableConfig) {
+            if (!editConfig) {
                 return;
             }
-            editableConfig.title = titleInput.value;
-            renderFolderMeta();
+            editConfig.title = titleInput.value;
+            if (status?.target !== 'file') {
+                folderConfig = editConfig;
+                renderFolderMeta();
+            }
         });
     }
     if (descInput) {
         descInput.addEventListener('input', () => {
-            if (!editableConfig) {
+            if (!editConfig) {
                 return;
             }
-            editableConfig.description = descInput.value;
-            renderFolderMeta();
+            editConfig.description = descInput.value;
+            if (status?.target !== 'file') {
+                folderConfig = editConfig;
+                renderFolderMeta();
+            }
         });
     }
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const elements = form.elements;
-        const payload = {
-            path: getActivePath(),
-            title: (elements.title?.value || '').trim(),
-            description: (elements.description?.value || '').trim(),
-        };
-        await saveConfig(payload, statusEl);
-    });
+            const selection = getActiveSelection();
+            const payload = {
+                path: selection.path,
+                title: (elements.title?.value || '').trim(),
+                description: (elements.description?.value || '').trim(),
+            };
+            await saveConfig(payload, statusEl);
+        });
     if (moreToggle) {
         moreToggle.addEventListener('click', () => {
             drawerOpen = !drawerOpen;
@@ -368,21 +390,24 @@ function renderEditDrawer(config, status) {
     }
 
     const layoutState = getLayoutState(config);
-    const treeItems = Array.isArray(config.tree) ? config.tree : [];
-    const treeHtml = treeItems.length
-        ? treeItems.map((item) => {
-            const label = escapeHtml(item.name || '');
-            const key = escapeHtml(item.path || item.name || '');
-            const visible = item.visible !== false ? 'checked' : '';
-            const type = escapeHtml(item.type || 'item');
-            return `
-                <label class="edit-tree-item">
-                    <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
-                    <span>${label} <span style="opacity:0.6">(${type})</span></span>
-                </label>
-            `;
-        }).join('')
-        : '<div class="edit-tree-item">No items found.</div>';
+    let treeHtml = '';
+    if (status?.target !== 'file') {
+        const treeItems = Array.isArray(config.tree) ? config.tree : [];
+        treeHtml = treeItems.length
+            ? treeItems.map((item) => {
+                const label = escapeHtml(item.name || '');
+                const key = escapeHtml(item.path || item.name || '');
+                const visible = item.visible !== false ? 'checked' : '';
+                const type = escapeHtml(item.type || 'item');
+                return `
+                    <label class="edit-tree-item">
+                        <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
+                        <span>${label} <span style="opacity:0.6">(${type})</span></span>
+                    </label>
+                `;
+            }).join('')
+            : '<div class="edit-tree-item">No items found.</div>';
+    }
 
     const settings = loadPromptSettings();
     editDrawer.innerHTML = `
@@ -416,10 +441,12 @@ function renderEditDrawer(config, status) {
                 <label for="edit-work-template">Work Layout Template</label>
                 <textarea id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
             </div>
+            ${status?.target !== 'file' ? `
             <div>
                 <label>Visible items</label>
                 <div class="edit-tree">${treeHtml}</div>
             </div>
+            ` : ''}
             <div class="edit-actions">
                 <button type="submit">Save advanced</button>
             </div>
@@ -472,22 +499,28 @@ function renderEditDrawer(config, status) {
         drawerForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const elements = drawerForm.elements;
-            const visibleInputs = editDrawer.querySelectorAll('input[name="tree_visible"]:checked');
-            const treeVisible = Array.from(visibleInputs).map((input) => input.value);
+            let treeVisible = [];
+            if (status?.target !== 'file') {
+                const visibleInputs = editDrawer.querySelectorAll('input[name="tree_visible"]:checked');
+                treeVisible = Array.from(visibleInputs).map((input) => input.value);
+            }
             const layoutPayload = {
                 mode: (elements.work_layout?.value || '').trim(),
                 template: elements.work_template?.value ?? '',
             };
+            const selection = getActiveSelection();
             const payload = {
-                path: getActivePath(),
+                path: selection.path,
                 link: (elements.link?.value || '').trim(),
                 url: (elements.url?.value || '').trim(),
                 work: {
                     type: (elements.work_type?.value || '').trim(),
                 },
                 layout: layoutPayload,
-                treeVisible,
             };
+            if (status?.target !== 'file') {
+                payload.treeVisible = treeVisible;
+            }
             await saveConfig(payload, drawerStatus);
         });
     }
@@ -558,7 +591,7 @@ function renderEditDrawer(config, status) {
             }
             const historyForRequest = promptHistory.slice(0, -1);
             const payload = {
-                path: getActivePath(),
+                path: getActiveSelection().path,
                 provider: providerEl ? providerEl.value : 'local',
                 model: modelEl ? modelEl.value.trim() : '',
                 endpoint: endpointEl ? endpointEl.value.trim() : '',
@@ -591,7 +624,7 @@ function renderEditDrawer(config, status) {
                 layoutPayload.model = response.model;
             }
             await saveConfig({
-                path: getActivePath(),
+                path: getActiveSelection().path,
                 layout: layoutPayload,
             }, drawerStatus);
         });
@@ -608,15 +641,20 @@ async function initEditMode() {
     if (!editRequested || !editPanel) {
         return;
     }
-    const path = getActivePath();
-    const data = await requestEditConfig('config', { path });
+    const selection = getActiveSelection();
+    const data = await requestEditConfig('config', { path: selection.path });
     if (data.config) {
-        editableConfig = data.config;
-        renderFolderMeta();
+        editConfig = data.config;
+        editTarget = data.target || (selection.isFile ? 'file' : 'folder');
+        if (editTarget === 'folder') {
+            folderConfig = editConfig;
+            renderFolderMeta();
+        }
     }
-    renderEditUI(data.config || editableConfig, {
+    renderEditUI(data.config || editConfig, {
         allowed: data.allowed !== false,
         error: data.error,
+        target: editTarget,
     });
 }
 

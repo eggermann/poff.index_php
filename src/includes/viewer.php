@@ -21,12 +21,19 @@ function cmsReadJsonBody(): array
     return is_array($data) ? $data : [];
 }
 
-function cmsResolvePath(string $rootDir, string $relativePath): ?string
+function cmsResolveTarget(string $rootDir, string $relativePath): ?array
 {
     $trimmed = trim($relativePath, "/\\");
     $base = rtrim($rootDir, DIRECTORY_SEPARATOR);
     if ($trimmed === '') {
-        return realpath($base) ?: null;
+        $resolved = realpath($base);
+        if ($resolved === false) {
+            return null;
+        }
+        return [
+            'type' => 'folder',
+            'dir' => $resolved,
+        ];
     }
     $candidate = realpath($base . DIRECTORY_SEPARATOR . $trimmed);
     if ($candidate === false) {
@@ -35,10 +42,21 @@ function cmsResolvePath(string $rootDir, string $relativePath): ?string
     if (strpos($candidate, $base) !== 0) {
         return null;
     }
-    if (!is_dir($candidate)) {
-        return null;
+    if (is_dir($candidate)) {
+        return [
+            'type' => 'folder',
+            'dir' => $candidate,
+        ];
     }
-    return $candidate;
+    if (is_file($candidate)) {
+        return [
+            'type' => 'file',
+            'dir' => dirname($candidate),
+            'file' => basename($candidate),
+            'path' => $candidate,
+        ];
+    }
+    return null;
 }
 
 function cmsLoadEnv(string $rootDir): array
@@ -131,19 +149,27 @@ function cmsHandleEditAction(): void
     if ($path === '' && isset($data['path'])) {
         $path = (string) $data['path'];
     }
-    $targetDir = cmsResolvePath($rootDir, $path);
-    if ($targetDir === null) {
+    $target = cmsResolveTarget($rootDir, $path);
+    if ($target === null) {
         cmsJsonResponse([
             'allowed' => true,
             'error' => 'Invalid folder path.',
         ]);
     }
+    $targetType = $target['type'];
+    $targetDir = $target['dir'];
+    $targetFile = $target['file'] ?? null;
 
-    $config = PoffConfig::ensure($targetDir);
+    if ($targetType === 'file') {
+        $config = PoffConfig::ensureFileConfig($targetDir, (string) $targetFile);
+    } else {
+        $config = PoffConfig::ensure($targetDir);
+    }
 
     if ($action === 'config') {
         cmsJsonResponse([
             'allowed' => true,
+            'target' => $targetType,
             'config' => $config,
         ]);
     }
@@ -256,30 +282,36 @@ function cmsHandleEditAction(): void
 
         $config['work'] = $work;
 
-        $treeVisible = $data['treeVisible'] ?? $data['tree_visible'] ?? null;
-        $hasTreeUpdate = array_key_exists('treeVisible', $data) || array_key_exists('tree_visible', $data);
-        if ($hasTreeUpdate && is_array($config['tree'] ?? null)) {
-            $visibleKeys = [];
-            if (is_array($treeVisible)) {
-                foreach ($treeVisible as $key) {
-                    if (is_scalar($key)) {
-                        $visibleKeys[(string) $key] = true;
+        if ($targetType === 'folder') {
+            $treeVisible = $data['treeVisible'] ?? $data['tree_visible'] ?? null;
+            $hasTreeUpdate = array_key_exists('treeVisible', $data) || array_key_exists('tree_visible', $data);
+            if ($hasTreeUpdate && is_array($config['tree'] ?? null)) {
+                $visibleKeys = [];
+                if (is_array($treeVisible)) {
+                    foreach ($treeVisible as $key) {
+                        if (is_scalar($key)) {
+                            $visibleKeys[(string) $key] = true;
+                        }
                     }
                 }
-            }
-            foreach ($config['tree'] as &$item) {
-                $key = $item['path'] ?? $item['name'] ?? null;
-                if ($key === null) {
-                    continue;
+                foreach ($config['tree'] as &$item) {
+                    $key = $item['path'] ?? $item['name'] ?? null;
+                    if ($key === null) {
+                        continue;
+                    }
+                    $item['visible'] = isset($visibleKeys[$key]);
                 }
-                $item['visible'] = isset($visibleKeys[$key]);
+                unset($item);
             }
-            unset($item);
         }
 
         $config['updatedAt'] = date('c');
-        $config['treeHash'] = hash('sha256', json_encode($config['tree'] ?? []));
-        $configPath = PoffConfig::configPath($targetDir);
+        if ($targetType === 'folder') {
+            $config['treeHash'] = hash('sha256', json_encode($config['tree'] ?? []));
+        }
+        $configPath = $targetType === 'file'
+            ? PoffConfig::fileConfigPath($targetDir, (string) $targetFile)
+            : PoffConfig::configPath($targetDir);
         $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($encoded === false) {
             cmsJsonResponse([
@@ -291,6 +323,7 @@ function cmsHandleEditAction(): void
 
         cmsJsonResponse([
             'allowed' => true,
+            'target' => $targetType,
             'saved' => true,
             'config' => $config,
         ]);
@@ -442,6 +475,7 @@ function cmsHandleEditAction(): void
 
         cmsJsonResponse([
             'allowed' => true,
+            'target' => $targetType,
             'provider' => $provider,
             'model' => $usedModel,
             'template' => $template,
