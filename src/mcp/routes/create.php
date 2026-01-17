@@ -8,6 +8,26 @@ function mcp_sanitize_name(string $name): string
     return $clean !== '' ? $clean : 'untitled';
 }
 
+function mcp_sanitize_relpath(string $path): string
+{
+    $parts = preg_split('/[\\/]+/', $path) ?: [];
+    $cleanParts = [];
+
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '' || $part === '.' || $part === '..') {
+            continue;
+        }
+        $clean = preg_replace('/[^a-zA-Z0-9._-]+/', '-', $part);
+        $clean = trim($clean, '-');
+        if ($clean !== '') {
+            $cleanParts[] = $clean;
+        }
+    }
+
+    return $cleanParts === [] ? 'untitled' : implode(DIRECTORY_SEPARATOR, $cleanParts);
+}
+
 function mcp_copy_recursive(string $src, string $dst): void
 {
     if (is_dir($src)) {
@@ -42,12 +62,13 @@ function handleCreate(array $opts): array
     $path = $opts['path'] ?? null;
     $url = $opts['url'] ?? null;
     $poffDir = $opts['poffDir'] ?? ($rootDir . DIRECTORY_SEPARATOR . 'poff');
+    $pathBase = $poffDir;
 
     if ($dest === '') {
         mcpJsonError('Missing dest parameter', ['route' => 'create']);
     }
 
-    $safeDest = mcp_sanitize_name($dest);
+    $safeDest = mcp_sanitize_relpath($dest);
     $destDir = $poffDir . DIRECTORY_SEPARATOR . $safeDest;
     if (!is_dir($poffDir)) {
         mkdir($poffDir, 0755, true);
@@ -60,9 +81,9 @@ function handleCreate(array $opts): array
     $details = [];
 
     if ($path) {
-        $absSrc = realpath($rootDir . DIRECTORY_SEPARATOR . ltrim($path, '/\\'));
-        if ($absSrc === false || strpos($absSrc, $rootDir) !== 0) {
-            $errors[] = 'Source path not found or outside project';
+        $absSrc = realpath($pathBase . DIRECTORY_SEPARATOR . ltrim($path, '/\\'));
+        if ($absSrc === false || strpos($absSrc, $pathBase) !== 0) {
+            $errors[] = 'Source path not found or outside /poff';
         } else {
             mcp_copy_recursive($absSrc, $destDir);
             $copied = true;
@@ -86,9 +107,13 @@ function handleCreate(array $opts): array
             }
         }
     } else {
-        if (!is_dir($destDir)) {
-            mkdir($destDir, 0755, true);
-            $created = true;
+        if (pathinfo($safeDest, PATHINFO_EXTENSION)) {
+            $errors[] = 'Destination looks like a file; provide --path to copy an existing file from /poff.';
+        } else {
+            if (!is_dir($destDir)) {
+                mkdir($destDir, 0755, true);
+                $created = true;
+            }
         }
     }
 
