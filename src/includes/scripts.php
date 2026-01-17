@@ -21,7 +21,6 @@ const currentPoffConfig = <?php echo json_encode($folderPoffConfig); ?>;
 let editableConfig  = currentPoffConfig;
 const editRequested = new URLSearchParams(window.location.search).get('edit') === 'true';
 const editQuery     = editRequested ? '&edit=true' : '';
-let editEndpoint    = null;
 let drawerOpen      = false;
 let promptHistory   = [];
 const promptSettingsKey = 'poffEditPromptSettings';
@@ -80,7 +79,15 @@ function escapeHtml(value) {
 }
 
 function getActivePath() {
-    const hashPath = window.location.hash.replace(/^#\/?/, '');
+    const rawHash = window.location.hash.replace(/^#\/?/, '');
+    let hashPath = rawHash;
+    if (rawHash) {
+        try {
+            hashPath = decodeURIComponent(rawHash);
+        } catch (err) {
+            hashPath = rawHash;
+        }
+    }
     if (hashPath) {
         const isFile = /\.[^\\/]+$/.test(hashPath);
         if (isFile) {
@@ -92,9 +99,13 @@ function getActivePath() {
     return params.get('path') || '';
 }
 
-function buildEditUrl(base, params) {
-    const joiner = base.includes('?') ? '&' : '?';
-    return `${base}${joiner}${params}`;
+function buildCmsUrl(action, path) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set('edit', action);
+    if (path) {
+        url.searchParams.set('path', path);
+    }
+    return url.toString();
 }
 
 function extractNavHtml(html) {
@@ -111,41 +122,24 @@ function extractNavHtml(html) {
     }
 }
 
-async function requestEditConfig(method, payload) {
-    const candidates = [
-        `${window.location.pathname}?mcp=1`,
-        `${window.location.origin}/mcp/server.php`,
-        `${window.location.origin}/src/mcp/server.php`,
-    ];
-    const params = new URLSearchParams({ route: 'edit-config' });
-    if (payload.path) {
-        params.set('path', payload.path);
-    }
-    for (const base of candidates) {
-        const url = buildEditUrl(base, params.toString());
-        try {
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    'Accept': 'application/json',
-                    ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
-                },
-                body: method === 'POST' ? JSON.stringify(payload) : undefined,
-            });
-            if (!res.ok) {
-                continue;
-            }
-            const data = await res.json();
-            if (!data || data.route !== 'edit-config') {
-                continue;
-            }
-            editEndpoint = base;
-            return data;
-        } catch (err) {
-            continue;
+async function requestEditConfig(action, payload) {
+    const url = buildCmsUrl(action, payload.path || '');
+    try {
+        const res = await fetch(url, {
+            method: action === 'config' ? 'GET' : 'POST',
+            headers: {
+                'Accept': 'application/json',
+                ...(action === 'config' ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: action === 'config' ? undefined : JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            return { allowed: false, error: 'Edit endpoint unavailable.' };
         }
+        return await res.json();
+    } catch (err) {
+        return { allowed: false, error: 'Edit endpoint unavailable.' };
     }
-    return { route: 'edit-config', allowed: false, error: 'Edit endpoint unavailable.' };
 }
 
 function getLayoutState(config) {
@@ -208,7 +202,7 @@ async function saveConfig(payload, statusEl) {
             statusEl.textContent = 'Saving...';
             statusEl.className = 'edit-status';
         }
-        const data = await requestEditConfig('POST', payload);
+        const data = await requestEditConfig('save', payload);
         if (!data || data.error) {
             throw new Error(data?.error || 'Save failed.');
         }
@@ -233,41 +227,23 @@ async function saveConfig(payload, statusEl) {
 }
 
 async function requestPromptTemplate(payload) {
-    const candidates = [
-        editEndpoint || `${window.location.pathname}?mcp=1`,
-        `${window.location.pathname}?mcp=1`,
-        `${window.location.origin}/mcp/server.php`,
-        `${window.location.origin}/src/mcp/server.php`,
-    ].filter(Boolean);
-    const params = new URLSearchParams({ route: 'prompt-template' });
-    if (payload.path) {
-        params.set('path', payload.path);
-    }
-    for (const base of candidates) {
-        const url = buildEditUrl(base, params.toString());
-        try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-            if (!res.ok) {
-                continue;
-            }
-            const data = await res.json();
-            if (!data || data.route !== 'prompt-template') {
-                continue;
-            }
-            editEndpoint = base;
-            return data;
-        } catch (err) {
-            continue;
+    const url = buildCmsUrl('prompt', payload.path || '');
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            return { error: 'Prompt endpoint unavailable.' };
         }
+        return await res.json();
+    } catch (err) {
+        return { error: 'Prompt endpoint unavailable.' };
     }
-    return { route: 'prompt-template', error: 'Prompt endpoint unavailable.' };
 }
 
 function syncDrawerVisibility() {
@@ -633,7 +609,7 @@ async function initEditMode() {
         return;
     }
     const path = getActivePath();
-    const data = await requestEditConfig('GET', { path });
+    const data = await requestEditConfig('config', { path });
     if (data.config) {
         editableConfig = data.config;
         renderFolderMeta();
@@ -660,7 +636,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // If hash is present, load iframe first, then update sidebar only if hash is for subfolder
     if (window.location.hash && window.location.hash.length > 1) {
-        const hashPath = window.location.hash.replace(/^#\/?/, '');
+        const rawHashPath = window.location.hash.replace(/^#\/?/, '');
+        let hashPath = rawHashPath;
+        if (rawHashPath) {
+            try {
+                hashPath = decodeURIComponent(rawHashPath);
+            } catch (err) {
+                hashPath = rawHashPath;
+            }
+        }
         const isFile = /\.[^\\/]+$/.test(hashPath);
         contentFrame.src = isFile
             ? `?view=1&file=${encodeURIComponent(hashPath)}`
