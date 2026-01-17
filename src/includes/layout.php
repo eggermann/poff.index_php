@@ -6,6 +6,9 @@
 <div class="container">
     <!-- ---------- Sidebar ---------- -->
     <nav class="sidebar">
+        <div class="sidebar-tools">
+            <button id="editToggle" class="edit-toggle" type="button">Edit mode</button>
+        </div>
         <ul id="navList">
             <div id="navLoading" style="display:none;text-align:center;padding:10px;">
                 <span class="loader" style="display:inline-block;width:24px;height:24px;border:4px solid #3b82f6;border-top:4px solid #e5e7eb;border-radius:50%;animation:spin 1s linear infinite;"></span>
@@ -16,6 +19,7 @@
             </style>
             <?php
             // Generate navigation list directly here instead of including browse.php
+            $editQuery = (isset($_GET['edit']) && $_GET['edit'] === 'true') ? '&edit=true' : '';
             $navFolder = $currentRelativePath;
             if (isset($_SERVER['QUERY_STRING']) && preg_match('/#\/([^\/]+)(?:\/([^\/]+))?/', $_SERVER['QUERY_STRING'], $matches)) {
                 $navFolder = $matches[1];
@@ -23,11 +27,11 @@
             if (!empty($navFolder)) {
                 $parentRelativePath = dirname($navFolder);
                 if ($parentRelativePath === '.') $parentRelativePath = '';
-                $upLink = '?path=' . urlencode($parentRelativePath);
+                $upLink = '?path=' . urlencode($parentRelativePath) . $editQuery;
                 echo '<li class="go-up-link"><a href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a></li>';
             }
             // Current directory link
-            echo '<li class="go-up-link"><a href="' . htmlspecialchars($navFolder ? '?path=' . urlencode($navFolder) : '?path=') . '">./</a></li>';
+            echo '<li class="go-up-link"><a href="' . htmlspecialchars($navFolder ? '?path=' . urlencode($navFolder) . $editQuery : '?path=' . $editQuery) . '">./</a></li>';
 
             $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
             $directories = $files = [];
@@ -49,7 +53,7 @@
                     if ($itemType === 'folder') {
                         $directories[] = [
                             'name' => $itemName,
-                            'link' => '?path=' . urlencode($relativePath),
+                            'link' => '?path=' . urlencode($relativePath) . $editQuery,
                             'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>'
                         ];
                     } else {
@@ -73,6 +77,7 @@
                             $item === '.git' ||
                             $item === '.idea' ||
                             $item === 'node_modules' ||
+                            $item === '.edit.allow' ||
                             ($currentRelativePath === '' && $item === $currentScript) ||
                             $item === 'poff.config.json'
                         ) {
@@ -87,7 +92,7 @@
                         if ($isDir) {
                             $directories[] = [
                                 'name' => $item,
-                                'link' => '?path=' . urlencode($itemRelativePath),
+                                'link' => '?path=' . urlencode($itemRelativePath) . $editQuery,
                                 'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>'
                             ];
                         } else {
@@ -118,6 +123,8 @@
 
     <!-- ---------- Main Content (header + iframe) ---------- -->
     <div class="main-content">
+        <div id="editPanel" class="edit-panel" hidden></div>
+        <aside id="editDrawer" class="edit-drawer" hidden></aside>
         <div id="folderMeta" class="folder-meta"></div>
         <div id="iframeLoading" style="display:none;text-align:center;padding:10px;">
             <span class="loader" style="display:inline-block;width:24px;height:24px;border:4px solid #3b82f6;border-top:4px solid #e5e7eb;border-radius:50%;animation:spin 1s linear infinite;"></span>

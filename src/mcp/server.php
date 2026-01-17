@@ -13,6 +13,8 @@ require_once __DIR__ . '/helpers.php';
 @require_once __DIR__ . '/../includes/PoffConfig.php';
 require_once __DIR__ . '/routes/workprompt.php';
 require_once __DIR__ . '/routes/create.php';
+require_once __DIR__ . '/routes/edit-config.php';
+require_once __DIR__ . '/routes/prompt-template.php';
 require_once __DIR__ . '/routes/style.php';
 
 $rootDir = getcwd();
@@ -131,6 +133,18 @@ switch ($route) {
             'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : null,
             'url' => isset($_GET['url']) ? trim((string) $_GET['url']) : null,
             'poffDir' => getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null,
+        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    case 'edit-config':
+        echo json_encode(handleEditConfig([
+            'rootDir' => $rootDir,
+            'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : '',
+        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    case 'prompt-template':
+        echo json_encode(handlePromptTemplate([
+            'rootDir' => $rootDir,
+            'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : '',
         ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     case 'style':

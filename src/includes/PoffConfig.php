@@ -57,7 +57,8 @@ class PoffConfig
                 $entry === 'Thumbs.db' ||
                 $entry === '.git' ||
                 $entry === '.idea' ||
-                $entry === 'node_modules'
+                $entry === 'node_modules' ||
+                $entry === '.edit.allow'
             ) {
                 continue;
             }
