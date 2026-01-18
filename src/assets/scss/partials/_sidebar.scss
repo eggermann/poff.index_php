@@ -1,0 +1,88 @@
+/* -------------- Sidebar -------------- */
+.sidebar {
+    width: 280px;
+    background-color: #ffffff;
+    padding: 20px;
+    overflow-y: auto;
+    border-right: 1px solid #d1d5db;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+    flex-shrink: 0;
+}
+.sidebar h2 {
+    margin-top: 0;
+    font-size: 1.3em;
+    color: #1f2937;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 12px;
+    margin-bottom: 15px;
+}
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.sidebar li a {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    text-decoration: none;
+    color: #374151;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.sidebar li a:hover {
+    background-color: #e5e7eb;
+    color: #111827;
+}
+.sidebar li a.active {
+    background-color: #3b82f6;
+    color: #ffffff;
+    font-weight: 500;
+}
+.sidebar li a.active .item-icon {
+    filter: brightness(0) invert(1);
+}
+/* Icon */
+.item-icon {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+}
+/* Go-Up link */
+.go-up-link a {
+    font-weight: 500;
+    color: #10b981;
+}
+.go-up-link a:hover {
+    color: #059669;
+    background-color: #d1fae5;
+}
+.sidebar-tools {
+    margin-bottom: 12px;
+}
+.edit-toggle {
+    width: 100%;
+    border: 1px solid #111827;
+    background: #111827;
+    color: #ffffff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.edit-toggle:hover {
+    background: #1f2937;
+}
+.edit-toggle.on {
+    background: #f97316;
+    border-color: #f97316;
+    color: #111827;
+}
+.edit-toggle.on:hover {
+    background: #fb923c;
+}

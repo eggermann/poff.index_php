@@ -115,18 +115,7 @@ function startWatcher() {
     building = true;
     console.log(`[watch] Running build (${reason || 'change'})...`);
 
-    const assetResult = spawnSync('node', [path.join('scripts', 'build-assets.js')], {
-      cwd: rootDir,
-      stdio: 'inherit',
-    });
-
-    if (assetResult.status !== 0) {
-      building = false;
-      console.error('[watch] Asset build failed.');
-      return;
-    }
-
-    const proc = spawn('php', [path.join('build', 'build.php')], {
+    const proc = spawn('node', [path.join('scripts', 'build-all.js')], {
       cwd: rootDir,
       stdio: 'inherit',
     });
@@ -154,7 +143,7 @@ function startWatcher() {
   };
 
   try {
-    const ignoredFiles = new Set(['includes/header.php', 'includes/scripts.php']);
+    const ignoredFiles = new Set(['includes/header.built.php', 'includes/scripts.built.php']);
     fs.watch(sourceDir, { recursive: true }, (_event, fileName) => {
       const normalized = fileName ? fileName.replace(/\\/g, '/') : '';
       if (normalized && ignoredFiles.has(normalized)) {

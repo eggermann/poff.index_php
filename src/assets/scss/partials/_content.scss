@@ -1,0 +1,40 @@
+/* -------------- Main Content -------------- */
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #ffffff;
+    position: relative;
+}
+/* Folder meta header */
+.folder-meta {
+    display: none; /* Shown only when metadata exists */
+    padding: 16px 20px;
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+.folder-meta h3 {
+    margin: 0;
+    font-size: 1.25em;
+    color: #111827;
+}
+.folder-meta p {
+    margin: 4px 0 0;
+    font-size: 0.95em;
+    color: #4b5563;
+}
+/* link style */
+.folder-meta a {
+    text-decoration: none;
+    color: #2563eb;
+}
+.folder-meta a:hover {
+    text-decoration: underline;
+}
+
+/* Iframe */
+.content-frame {
+    flex-grow: 1;
+    border: none;
+}

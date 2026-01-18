@@ -169,6 +169,12 @@ body, html {
   text-decoration: underline;
 }
 
+/* Iframe */
+.content-frame {
+  flex-grow: 1;
+  border: none;
+}
+
 /* Edit mode */
 .edit-panel {
   border-bottom: 1px solid #e5e7eb;
@@ -362,12 +368,6 @@ body, html {
 .edit-drawer .small-note {
   font-size: 0.8em;
   color: #6b7280;
-}
-
-/* Iframe */
-.content-frame {
-  flex-grow: 1;
-  border: none;
 }
 /* POFF_STYLE_END */
     </style>

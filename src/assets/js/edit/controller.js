@@ -1,0 +1,409 @@
+import { requestEditConfig, requestPromptTemplate } from '../api/edit.js';
+import { getActiveSelection } from '../core/selection.js';
+import { escapeHtml, getLayoutState } from '../core/utils.js';
+import { bindPromptWindow, loadPromptSettings } from './prompt.js';
+
+export function createEditController({ elements, context, editRequested }) {
+    const { editPanel, editDrawer, editToggle, folderMetaEl } = elements;
+    const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, 'currentPoffConfig')
+        ? context.currentPoffConfig
+        : null;
+
+    let folderConfig = currentPoffConfig;
+    let editConfig = currentPoffConfig;
+    let editTarget = 'folder';
+    let drawerOpen = false;
+
+    function renderFolderMeta() {
+        if (!folderMetaEl) {
+            return;
+        }
+        if (folderConfig && (folderConfig.title || folderConfig.description)) {
+            let html = '';
+            if (folderConfig.title) {
+                if (folderConfig.link || folderConfig.url) {
+                    const lnk = folderConfig.link || folderConfig.url;
+                    html += `<h3><a href="${lnk}" target="contentFrame">${folderConfig.title}</a></h3>`;
+                } else {
+                    html += `<h3>${folderConfig.title}</h3>`;
+                }
+            }
+            if (folderConfig.description) {
+                html += `<p>${folderConfig.description}</p>`;
+            }
+            folderMetaEl.innerHTML = html;
+            folderMetaEl.style.display = 'block';
+        } else if (folderMetaEl) {
+            folderMetaEl.innerHTML = '';
+            folderMetaEl.style.display = 'none';
+        }
+    }
+
+    function syncEditToggle() {
+        if (!editToggle) {
+            return;
+        }
+        editToggle.textContent = editRequested ? 'Exit edit mode' : 'Enable edit mode';
+        editToggle.classList.toggle('on', editRequested);
+        editToggle.setAttribute('aria-pressed', editRequested ? 'true' : 'false');
+    }
+
+    function bindEditToggle() {
+        if (!editToggle) {
+            return;
+        }
+        editToggle.addEventListener('click', () => {
+            const url = new URL(window.location.href);
+            if (editRequested) {
+                url.searchParams.delete('edit');
+            } else {
+                url.searchParams.set('edit', 'true');
+            }
+            window.location.href = url.toString();
+        });
+    }
+
+    async function saveConfig(payload, statusEl) {
+        try {
+            if (statusEl) {
+                statusEl.textContent = 'Saving...';
+                statusEl.className = 'edit-status';
+            }
+            const data = await requestEditConfig('save', payload);
+            if (!data || data.error) {
+                throw new Error(data?.error || 'Save failed.');
+            }
+            editConfig = data.config || editConfig;
+            editTarget = data.target || editTarget;
+            if (editTarget === 'folder') {
+                folderConfig = editConfig;
+                renderFolderMeta();
+            }
+            renderEditUI(editConfig, {
+                allowed: data.allowed !== false,
+                error: data.error,
+                target: editTarget,
+            });
+            if (statusEl) {
+                statusEl.textContent = 'Config saved.';
+                statusEl.className = 'edit-status success';
+            }
+            return data.config;
+        } catch (err) {
+            if (statusEl) {
+                statusEl.textContent = err.message || 'Save failed.';
+                statusEl.className = 'edit-status';
+            }
+            throw err;
+        }
+    }
+
+    function syncDrawerVisibility() {
+        if (!editDrawer) {
+            return;
+        }
+        if (!editRequested || !drawerOpen) {
+            editDrawer.classList.remove('open');
+            editDrawer.hidden = true;
+            return;
+        }
+        editDrawer.hidden = false;
+        editDrawer.classList.add('open');
+    }
+
+    function renderEditPanel(config, status) {
+        if (!editPanel) {
+            return;
+        }
+        if (!editRequested) {
+            editPanel.hidden = true;
+            return;
+        }
+        editPanel.hidden = false;
+        if (!config || status?.error) {
+            const message = status?.error || 'Edit mode is unavailable.';
+            editPanel.innerHTML = `
+                <h3>Edit mode</h3>
+                <div class="edit-status">${escapeHtml(message)}</div>
+            `;
+            return;
+        }
+        if (!status?.allowed) {
+            editPanel.innerHTML = `
+                <h3>Edit mode</h3>
+                <div class="edit-status">Create a file named <code>.edit.allow</code> in the site root to enable edit mode.</div>
+            `;
+            return;
+        }
+
+        const label = status?.target === 'file' ? 'Edit mode (file)' : 'Edit mode (folder)';
+        editPanel.innerHTML = `
+            <h3>${label}</h3>
+            <div class="edit-status" id="editInlineStatus"></div>
+            <form id="inlineEditForm" class="edit-inline">
+                <div>
+                    <label for="edit-title">Title</label>
+                    <input id="edit-title" type="text" name="title" value="${escapeHtml(config.title || '')}">
+                </div>
+                <div>
+                    <label for="edit-description">Description</label>
+                    <textarea id="edit-description" name="description">${escapeHtml(config.description || '')}</textarea>
+                </div>
+                <div class="edit-inline-actions">
+                    <button type="submit">Save</button>
+                    <button type="button" id="editMoreToggle" class="edit-secondary">More...</button>
+                </div>
+            </form>
+        `;
+
+        const form = document.getElementById('inlineEditForm');
+        const statusEl = document.getElementById('editInlineStatus');
+        const moreToggle = document.getElementById('editMoreToggle');
+        const titleInput = document.getElementById('edit-title');
+        const descInput = document.getElementById('edit-description');
+        if (!form || !statusEl) {
+            return;
+        }
+        if (titleInput) {
+            titleInput.addEventListener('input', () => {
+                if (!editConfig) {
+                    return;
+                }
+                editConfig.title = titleInput.value;
+                if (status?.target !== 'file') {
+                    folderConfig = editConfig;
+                    renderFolderMeta();
+                }
+            });
+        }
+        if (descInput) {
+            descInput.addEventListener('input', () => {
+                if (!editConfig) {
+                    return;
+                }
+                editConfig.description = descInput.value;
+                if (status?.target !== 'file') {
+                    folderConfig = editConfig;
+                    renderFolderMeta();
+                }
+            });
+        }
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const elements = form.elements;
+            const selection = getActiveSelection();
+            const payload = {
+                path: selection.path,
+                title: (elements.title?.value || '').trim(),
+                description: (elements.description?.value || '').trim(),
+            };
+            await saveConfig(payload, statusEl);
+        });
+        if (moreToggle) {
+            moreToggle.addEventListener('click', () => {
+                drawerOpen = !drawerOpen;
+                syncDrawerVisibility();
+            });
+        }
+    }
+
+    function renderEditDrawer(config, status) {
+        if (!editDrawer) {
+            return;
+        }
+        if (!editRequested) {
+            editDrawer.hidden = true;
+            editDrawer.classList.remove('open');
+            return;
+        }
+        if (!config || status?.error) {
+            editDrawer.innerHTML = '';
+            syncDrawerVisibility();
+            return;
+        }
+        if (!status?.allowed) {
+            editDrawer.innerHTML = '';
+            syncDrawerVisibility();
+            return;
+        }
+
+        const layoutState = getLayoutState(config);
+        let treeHtml = '';
+        if (status?.target !== 'file') {
+            const treeItems = Array.isArray(config.tree) ? config.tree : [];
+            treeHtml = treeItems.length
+                ? treeItems.map((item) => {
+                    const label = escapeHtml(item.name || '');
+                    const key = escapeHtml(item.path || item.name || '');
+                    const visible = item.visible !== false ? 'checked' : '';
+                    const type = escapeHtml(item.type || 'item');
+                    return `
+                        <label class="edit-tree-item">
+                            <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
+                            <span>${label} <span style="opacity:0.6">(${type})</span></span>
+                        </label>
+                    `;
+                }).join('')
+                : '<div class="edit-tree-item">No items found.</div>';
+        }
+
+        const settings = loadPromptSettings();
+        editDrawer.innerHTML = `
+            <div class="drawer-header">
+                <h4>More settings</h4>
+                <button type="button" class="drawer-close" id="editDrawerClose">&times;</button>
+            </div>
+            <div class="edit-status" id="editDrawerStatus"></div>
+            <form id="editDrawerForm">
+                <div class="edit-grid">
+                    <div>
+                        <label for="edit-link">Link</label>
+                        <input id="edit-link" type="text" name="link" value="${escapeHtml(config.link || '')}">
+                    </div>
+                    <div>
+                        <label for="edit-url">URL</label>
+                        <input id="edit-url" type="text" name="url" value="${escapeHtml(config.url || '')}">
+                    </div>
+                </div>
+                <div class="edit-grid">
+                    <div>
+                        <label for="edit-work-type">Work Type</label>
+                        <input id="edit-work-type" type="text" name="work_type" value="${escapeHtml((config.work || {}).type || '')}">
+                    </div>
+                    <div>
+                        <label for="edit-work-layout">Work Layout</label>
+                        <input id="edit-work-layout" type="text" name="work_layout" value="${escapeHtml(layoutState.mode)}">
+                    </div>
+                </div>
+                <div>
+                    <label for="edit-work-template">Work Layout Template</label>
+                    <textarea id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
+                </div>
+                ${status?.target !== 'file' ? `
+                <div>
+                    <label>Visible items</label>
+                    <div class="edit-tree">${treeHtml}</div>
+                </div>
+                ` : ''}
+                <div class="edit-actions">
+                    <button type="submit">Save advanced</button>
+                </div>
+            </form>
+            <div class="prompt-window" id="promptWindow">
+                <h4>Prompt edit window</h4>
+                <div class="edit-grid">
+                    <div>
+                        <label for="prompt-provider">Provider</label>
+                        <select id="prompt-provider">
+                            <option value="local">Local URL</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="gemini">Gemini</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="prompt-model">Model</label>
+                        <input id="prompt-model" type="text" value="${escapeHtml(settings.model || '')}" placeholder="optional">
+                    </div>
+                </div>
+                <div id="prompt-endpoint-row">
+                    <label for="prompt-endpoint">Local endpoint URL</label>
+                    <input id="prompt-endpoint" type="text" value="${escapeHtml(settings.endpoint || '')}" placeholder="http://localhost:1234/generate">
+                </div>
+                <div>
+                    <label for="prompt-api-key">API key (stored in localStorage)</label>
+                    <input id="prompt-api-key" type="password" value="${escapeHtml(settings.apiKey || '')}">
+                </div>
+                <div class="prompt-messages" id="promptMessages"></div>
+                <textarea id="prompt-input" placeholder="Describe the template you want..."></textarea>
+                <div class="prompt-actions">
+                    <button type="button" id="prompt-send">Send</button>
+                    <button type="button" id="prompt-clear" class="edit-secondary">Clear</button>
+                </div>
+                <div class="small-note">Template responses are saved to <code>work.layout.template</code>.</div>
+            </div>
+        `;
+
+        const drawerClose = document.getElementById('editDrawerClose');
+        if (drawerClose) {
+            drawerClose.addEventListener('click', () => {
+                drawerOpen = false;
+                syncDrawerVisibility();
+            });
+        }
+
+        const drawerStatus = document.getElementById('editDrawerStatus');
+        const drawerForm = document.getElementById('editDrawerForm');
+        if (drawerForm && drawerStatus) {
+            drawerForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const elements = drawerForm.elements;
+                let treeVisible = [];
+                if (status?.target !== 'file') {
+                    const visibleInputs = editDrawer.querySelectorAll('input[name="tree_visible"]:checked');
+                    treeVisible = Array.from(visibleInputs).map((input) => input.value);
+                }
+                const layoutPayload = {
+                    mode: (elements.work_layout?.value || '').trim(),
+                    template: elements.work_template?.value ?? '',
+                };
+                const selection = getActiveSelection();
+                const payload = {
+                    path: selection.path,
+                    link: (elements.link?.value || '').trim(),
+                    url: (elements.url?.value || '').trim(),
+                    work: {
+                        type: (elements.work_type?.value || '').trim(),
+                    },
+                    layout: layoutPayload,
+                };
+                if (status?.target !== 'file') {
+                    payload.treeVisible = treeVisible;
+                }
+                await saveConfig(payload, drawerStatus);
+            });
+        }
+
+        bindPromptWindow({
+            root: editDrawer,
+            statusEl: drawerStatus,
+            drawerForm,
+            getActiveSelection,
+            requestPromptTemplate,
+            saveConfig,
+        });
+    }
+
+    function renderEditUI(config, status) {
+        renderEditPanel(config, status);
+        renderEditDrawer(config, status);
+        syncDrawerVisibility();
+    }
+
+    async function initEditMode() {
+        if (!editRequested || !editPanel) {
+            return;
+        }
+        const selection = getActiveSelection();
+        const data = await requestEditConfig('config', { path: selection.path });
+        if (data.config) {
+            editConfig = data.config;
+            editTarget = data.target || (selection.isFile ? 'file' : 'folder');
+            if (editTarget === 'folder') {
+                folderConfig = editConfig;
+                renderFolderMeta();
+            }
+        }
+        renderEditUI(data.config || editConfig, {
+            allowed: data.allowed !== false,
+            error: data.error,
+            target: editTarget,
+        });
+    }
+
+    return {
+        renderFolderMeta,
+        syncEditToggle,
+        bindEditToggle,
+        initEditMode,
+    };
+}

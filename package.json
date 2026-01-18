@@ -1,7 +1,7 @@
 {
   "scripts": {
     "build:assets": "node scripts/build-assets.js",
-    "build": "node scripts/build-assets.js && php build/build.php",
+    "build": "node scripts/build-all.js",
     "watch": "node scripts/watch-build.js",
     "test:mcp": "MCP_JSON=1 jest --watchman=false tests/mcp.create.test.js"
   },

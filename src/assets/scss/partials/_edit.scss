@@ -1,0 +1,166 @@
+/* Edit mode */
+.edit-panel {
+    border-bottom: 1px solid #e5e7eb;
+    background: #fff7ed;
+    padding: 14px 20px;
+}
+.edit-panel h3 {
+    margin: 0 0 6px;
+    font-size: 1.05em;
+    color: #111827;
+}
+.edit-panel .edit-status {
+    font-size: 0.9em;
+    color: #b91c1c;
+    margin-bottom: 8px;
+}
+.edit-panel .edit-status.success {
+    color: #166534;
+}
+.edit-panel form {
+    display: grid;
+    gap: 12px;
+}
+.edit-panel .edit-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.edit-panel label {
+    font-size: 0.85em;
+    color: #374151;
+    display: block;
+    margin-bottom: 4px;
+}
+.edit-panel input[type="text"],
+.edit-panel textarea,
+.edit-panel select,
+.edit-drawer input[type="text"],
+.edit-drawer input[type="password"],
+.edit-drawer textarea,
+.edit-drawer select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.95em;
+    box-sizing: border-box;
+}
+.edit-panel textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+.edit-panel .edit-tree {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 10px;
+    background: #ffffff;
+    max-height: 220px;
+    overflow: auto;
+}
+.edit-panel .edit-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 0.9em;
+    color: #374151;
+}
+.edit-panel .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.edit-panel button {
+    background: #111827;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.95em;
+}
+.edit-panel button:hover {
+    background: #1f2937;
+}
+.edit-panel .edit-inline {
+    display: grid;
+    gap: 12px;
+}
+.edit-panel .edit-inline-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.edit-panel .edit-secondary {
+    background: #f97316;
+}
+.edit-panel .edit-secondary:hover {
+    background: #ea580c;
+}
+.edit-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    background: #ffffff;
+    border-left: 1px solid #e5e7eb;
+    box-shadow: -8px 0 18px rgba(15, 23, 42, 0.08);
+    padding: 16px;
+    overflow: auto;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 3;
+}
+.edit-drawer.open {
+    transform: translateX(0%);
+}
+.edit-drawer h4 {
+    margin: 0 0 8px;
+    font-size: 1em;
+    color: #111827;
+}
+.edit-drawer .drawer-close {
+    border: none;
+    background: transparent;
+    font-size: 1.2em;
+    cursor: pointer;
+    color: #6b7280;
+}
+.edit-drawer .drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.edit-drawer .prompt-window {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+}
+.edit-drawer .prompt-messages {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f8fafc;
+    max-height: 160px;
+    overflow: auto;
+    font-size: 0.9em;
+}
+.edit-drawer .prompt-message {
+    margin: 0 0 8px;
+}
+.edit-drawer .prompt-message .role {
+    font-weight: 600;
+    margin-right: 6px;
+}
+.edit-drawer .prompt-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.edit-drawer .small-note {
+    font-size: 0.8em;
+    color: #6b7280;
+}

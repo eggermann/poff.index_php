@@ -148,7 +148,7 @@ PHP;
     $buildContent .= "?>\n";
 
     // Add HTML structure from header.php without PHP tags
-    $content = ComponentReader::readComponentFile($sourceDir . '/includes/header.php');
+    $content = ComponentReader::readComponentFile($sourceDir . '/includes/header.built.php');
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     $buildContent .= trim($content) . "\n";
 
@@ -171,17 +171,17 @@ PHP;
     $buildContent .= trim($content) . "\n";
 
     // Add scripts.php content with JavaScript variables
-    $content = ComponentReader::readComponentFile($sourceDir . '/includes/scripts.php');
+    $content = ComponentReader::readComponentFile($sourceDir . '/includes/scripts.built.php');
     // Remove all PHP tags first
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     // Add back PHP expressions for JavaScript variables
     $content = str_replace(
-        'const currentPoffConfig = ;',
+        'const currentPoffConfig = /* POFF_CONTEXT */ null;',
         'const currentPoffConfig = <?php echo $folderPoffConfig ? json_encode($folderPoffConfig) : "null"; ?>;',
         $content
     );
     $content = str_replace(
-        'const currentPathForIframe = ;',
+        'const currentPathForIframe = /* POFF_IFRAME_PATH */ null;',
         'const currentPathForIframe = <?php echo !empty($currentRelativePath) ? json_encode($currentRelativePath) : "null"; ?>;',
         $content
     );

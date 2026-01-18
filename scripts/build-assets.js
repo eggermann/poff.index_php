@@ -7,8 +7,8 @@ const sass = require('sass');
 const rootDir = path.resolve(__dirname, '..');
 const jsEntry = path.join(rootDir, 'src', 'assets', 'js', 'app.js');
 const scssEntry = path.join(rootDir, 'src', 'assets', 'scss', 'main.scss');
-const headerPath = path.join(rootDir, 'src', 'includes', 'header.php');
-const scriptsPath = path.join(rootDir, 'src', 'includes', 'scripts.php');
+const headerPath = path.join(rootDir, 'src', 'includes', 'header.built.php');
+const scriptsPath = path.join(rootDir, 'src', 'includes', 'scripts.built.php');
 const distDir = path.join(rootDir, 'build', 'assets');
 
 function replaceBetween(content, startMarker, endMarker, replacement) {

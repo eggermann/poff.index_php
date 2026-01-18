@@ -150,7 +150,7 @@ npm install
 Asset pipeline:
 - JS entry: `src/assets/js/app.js`
 - SCSS entry: `src/assets/scss/main.scss`
-- The builder injects compiled output into the `POFF_STYLE_*` and `POFF_SCRIPT_*` blocks in `src/includes/`.
+- The builder injects compiled output into `src/includes/header.built.php` and `src/includes/scripts.built.php` (see `POFF_STYLE_*` and `POFF_SCRIPT_*` blocks).
 
 Manual build:
 ```sh
