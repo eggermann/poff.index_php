@@ -6,6 +6,7 @@
     height: 100vh;
     background-color: #ffffff;
     position: relative;
+    overflow-y: auto;
 }
 /* Folder meta header */
 .folder-meta {
@@ -37,4 +38,6 @@
 .content-frame {
     flex-grow: 1;
     border: none;
+    min-height: 60vh;
+    padding-bottom: 24px;
 }

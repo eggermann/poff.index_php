@@ -9,14 +9,47 @@ export function initNavigation({
 }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements;
     let activeLink = null;
+    const initialQueryPath = new URLSearchParams(window.location.search).get('path') || '';
+
+    function showNavLoading() {
+        if (!navList) return;
+        navList.innerHTML = `
+            <div id="navLoading" class="loading-row" style="display:flex;align-items:center;">
+                <span class="loader"></span>
+                <span class="loader-label">Loading...</span>
+            </div>
+        `;
+    }
+
+    function loadNav(relPath = '') {
+        if (!navList) return;
+        showNavLoading();
+        fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery}`)
+            .then(response => response.text())
+            .then(html => {
+                const extracted = extractNavHtml(html) || '';
+                if (extracted.trim()) {
+                    navList.innerHTML = extracted;
+                    navList.dataset.loaded = '1';
+                } else {
+                    navList.dataset.stale = '1';
+                }
+            })
+            .catch(() => {
+                navList.dataset.error = '1';
+            });
+    }
 
     function loadCurrentFolderInIframe() {
         if (currentPathForIframe && contentFrame) {
             contentFrame.src = currentPathForIframe;
             if (activeLink) {
-                activeLink.classList.remove('active');
+                activeLink.classList.remove('nav-link-active');
                 activeLink = null;
             }
+        }
+        if (navList && !navList.dataset.loaded) {
+            loadNav(initialQueryPath);
         }
         if (renderFolderMeta) {
             renderFolderMeta();
@@ -53,12 +86,19 @@ export function initNavigation({
         fetch(`?ajax=1&path=${encodeURIComponent(folderPath)}${editQuery}`)
             .then(response => response.text())
             .then(html => {
-                navList.innerHTML = extractNavHtml(html);
-                const fileEls = navList.querySelectorAll('li[data-file]');
+                const extracted = extractNavHtml(html) || '';
+                if (extracted.trim()) {
+                    navList.innerHTML = extracted;
+                    navList.dataset.loaded = '1';
+                } else {
+                    // keep existing nav when empty to avoid blank menu
+                    navList.dataset.stale = '1';
+                }
+                const fileEls = navList.querySelectorAll('a[data-file]');
                 fileEls.forEach(el => {
-                    el.classList.remove('active');
+                    el.classList.remove('nav-link-active');
                     if (el.getAttribute('data-file') === fileName) {
-                        el.classList.add('active');
+                        el.classList.add('nav-link-active');
                     }
                 });
                 if (sidebarLoading) {
@@ -66,7 +106,7 @@ export function initNavigation({
                 }
             })
             .catch(() => {
-                navList.innerHTML = '<li>Error loading folder contents</li>';
+                navList.dataset.error = '1';
                 if (sidebarLoading) {
                     sidebarLoading.style.display = 'none';
                 }
@@ -105,11 +145,17 @@ export function initNavigation({
                 iframeLoading.style.display = 'block';
             }
             fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery}`)
-                .then(response => response.text())
-                .then(html => {
-                    navList.innerHTML = extractNavHtml(html);
-                    const indexFiles = ['index.html', 'index.htm'];
-                    let foundIndex = null;
+            .then(response => response.text())
+            .then(html => {
+                const extracted = extractNavHtml(html) || '';
+                if (extracted.trim()) {
+                    navList.innerHTML = extracted;
+                    navList.dataset.loaded = '1';
+                } else {
+                    navList.dataset.stale = '1';
+                }
+                const indexFiles = ['index.html', 'index.htm'];
+                let foundIndex = null;
                     indexFiles.forEach(idx => {
                         const indexEl = navList.querySelector(`li[data-file="${idx}"]`);
                         if (indexEl && !foundIndex) {
@@ -129,7 +175,7 @@ export function initNavigation({
                     }
                 })
                 .catch(() => {
-                    navList.innerHTML = '<li>Error loading folder contents</li>';
+                    navList.dataset.error = '1';
                     contentFrame.src = relPath.replace(/\/$/, '') + '/';
                     window.location.hash = '/' + relPath.replace(/^\/+/, '');
                     if (initEditMode) {
@@ -147,9 +193,9 @@ export function initNavigation({
             }
         }
         if (activeLink) {
-            activeLink.classList.remove('active');
+            activeLink.classList.remove('nav-link-active');
         }
-        target.classList.add('active');
+        target.classList.add('nav-link-active');
         activeLink = target;
     }
 

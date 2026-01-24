@@ -2,14 +2,16 @@
 const fs = require('fs');
 const path = require('path');
 const esbuild = require('esbuild');
-const sass = require('sass');
+const { createGenerator } = require('@unocss/core');
 
 const rootDir = path.resolve(__dirname, '..');
 const jsEntry = path.join(rootDir, 'src', 'assets', 'js', 'app.js');
-const scssEntry = path.join(rootDir, 'src', 'assets', 'scss', 'main.scss');
 const headerPath = path.join(rootDir, 'src', 'includes', 'header.built.php');
 const scriptsPath = path.join(rootDir, 'src', 'includes', 'scripts.built.php');
 const distDir = path.join(rootDir, 'build', 'assets');
+const unoConfig = require(path.join(rootDir, 'uno.config.js'));
+const srcDir = path.join(rootDir, 'src');
+const contentExtensions = new Set(['.php', '.js']);
 
 function replaceBetween(content, startMarker, endMarker, replacement) {
   const startIndex = content.indexOf(startMarker);
@@ -39,11 +41,35 @@ function buildJs() {
   return result.outputFiles[0].text;
 }
 
-function buildCss() {
-  const result = sass.compile(scssEntry, {
-    style: 'expanded',
-  });
-  return result.css;
+function collectContentFiles(dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectContentFiles(fullPath));
+      continue;
+    }
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (!contentExtensions.has(path.extname(entry.name))) {
+      continue;
+    }
+    if (fullPath === headerPath || fullPath === scriptsPath) {
+      continue;
+    }
+    files.push(fullPath);
+  }
+  return files;
+}
+
+async function buildCss() {
+  const uno = createGenerator(unoConfig);
+  const files = collectContentFiles(srcDir);
+  const contents = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+  const { css } = await uno.generate(contents, { preflights: true });
+  return css.trim();
 }
 
 function writeIfChanged(targetPath, nextContent) {
@@ -76,14 +102,16 @@ function updateScripts(js) {
   writeIfChanged(scriptsPath, updated);
 }
 
-try {
+async function runBuild() {
   const js = buildJs();
-  const css = buildCss();
+  const css = await buildCss();
   writeDist(js, css);
   updateHeader(css);
   updateScripts(js);
   console.log('[assets] Built CSS/JS and updated header/scripts placeholders.');
-} catch (err) {
+}
+
+runBuild().catch((err) => {
   console.error(`[assets] ${err.message}`);
   process.exit(1);
-}
+});

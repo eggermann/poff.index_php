@@ -59,7 +59,20 @@ class Worktype
      */
     public static function render(string $kind, array $ctx): string
     {
-        $tpl = self::loadTemplate($kind);
+        $work = $ctx['work'] ?? [];
+        $tpl = null;
+
+        // Allow per-item override via work.layout.template
+        if (is_array($work)) {
+            $layout = $work['layout'] ?? null;
+            if (is_array($layout) && !empty($layout['template']) && is_string($layout['template'])) {
+                $tpl = $layout['template'];
+            }
+        }
+
+        if (!$tpl) {
+            $tpl = self::loadTemplate($kind);
+        }
         if (!$tpl) {
             $tpl = self::loadTemplate('other');
         }
@@ -98,12 +111,14 @@ class Worktype
         $safePath = htmlspecialchars($ctx['safePath'] ?? '', ENT_QUOTES, 'UTF-8');
         $safeName = htmlspecialchars($ctx['safeName'] ?? '', ENT_QUOTES, 'UTF-8');
         $safeLinkUrl = htmlspecialchars($ctx['safeLinkUrl'] ?? '', ENT_QUOTES, 'UTF-8');
+        $safeSlug = htmlspecialchars($ctx['slug'] ?? '', ENT_QUOTES, 'UTF-8');
         $work = $ctx['work'] ?? [];
 
         $replacements = [
             '{{path}}' => $safePath,
             '{{name}}' => $safeName,
             '{{linkUrl}}' => $safeLinkUrl,
+            '{{slug}}' => $safeSlug,
         ];
 
         foreach ($work as $key => $value) {

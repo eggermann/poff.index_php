@@ -2,7 +2,6 @@ import { createEditController } from './edit/controller.js';
 import { initNavigation } from './nav/navigation.js';
 
 
-
 if (window.location.hash === '#mcp') {
     const basePath = window.location.pathname.split('#')[0];
     window.location.href = `${basePath}?mcp=1`;

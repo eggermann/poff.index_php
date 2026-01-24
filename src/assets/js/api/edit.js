@@ -29,6 +29,12 @@ export async function requestEditConfig(action, payload) {
 
 export async function requestPromptTemplate(payload) {
     const url = buildCmsUrl('prompt', payload.path || '');
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeout = setTimeout(() => {
+        if (controller) {
+            controller.abort();
+        }
+    }, 20000);
     try {
         const res = await fetch(url, {
             method: 'POST',
@@ -37,12 +43,18 @@ export async function requestPromptTemplate(payload) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
+            signal: controller ? controller.signal : undefined,
         });
+        clearTimeout(timeout);
         if (!res.ok) {
             return { error: 'Prompt endpoint unavailable.' };
         }
         return await res.json();
     } catch (err) {
+        clearTimeout(timeout);
+        if (err?.name === 'AbortError') {
+            return { error: 'Prompt request timed out.' };
+        }
         return { error: 'Prompt endpoint unavailable.' };
     }
 }

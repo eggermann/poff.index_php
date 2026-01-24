@@ -1,0 +1,201 @@
+{
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "folderName": "poff.index_php",
+    "slug": "poff-index-php",
+    "title": "poff.index_php",
+    "description": "",
+    "type": "folder",
+    "id": "poff_283fb05cd282e205",
+    "tree": [
+        {
+            "name": ".gitignore",
+            "slug": "gitignore",
+            "type": "file",
+            "path": ".gitignore",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": ".history",
+            "slug": "history",
+            "type": "folder",
+            "path": ".history",
+            "modifiedAt": "2026-01-24T20:28:07+00:00",
+            "visible": true
+        },
+        {
+            "name": ".roorules-architect",
+            "slug": "roorules-architect",
+            "type": "file",
+            "path": ".roorules-architect",
+            "modifiedAt": "2025-05-21T10:28:03+00:00",
+            "visible": true
+        },
+        {
+            "name": ".roorules-ask",
+            "slug": "roorules-ask",
+            "type": "file",
+            "path": ".roorules-ask",
+            "modifiedAt": "2025-05-21T10:28:03+00:00",
+            "visible": true
+        },
+        {
+            "name": ".roorules-code",
+            "slug": "roorules-code",
+            "type": "file",
+            "path": ".roorules-code",
+            "modifiedAt": "2025-05-21T10:28:03+00:00",
+            "visible": true
+        },
+        {
+            "name": ".roorules-debug",
+            "slug": "roorules-debug",
+            "type": "file",
+            "path": ".roorules-debug",
+            "modifiedAt": "2025-05-21T10:28:04+00:00",
+            "visible": true
+        },
+        {
+            "name": ".roorules-eggermann",
+            "slug": "roorules-eggermann",
+            "type": "file",
+            "path": ".roorules-eggermann",
+            "modifiedAt": "2025-05-21T10:29:32+00:00",
+            "visible": true
+        },
+        {
+            "name": "AGENTS.md",
+            "slug": "agents-md",
+            "type": "file",
+            "path": "AGENTS.md",
+            "modifiedAt": "2026-01-24T20:28:07+00:00",
+            "visible": true
+        },
+        {
+            "name": "README.md",
+            "slug": "readme-md",
+            "type": "file",
+            "path": "README.md",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "SSH-upload.node.js",
+            "slug": "ssh-upload-node-js",
+            "type": "file",
+            "path": "SSH-upload.node.js",
+            "modifiedAt": "2025-05-27T17:16:44+00:00",
+            "visible": true
+        },
+        {
+            "name": "build",
+            "slug": "build",
+            "type": "folder",
+            "path": "build",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "composer.json",
+            "slug": "composer-json",
+            "type": "file",
+            "path": "composer.json",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "composer.lock",
+            "slug": "composer-lock",
+            "type": "file",
+            "path": "composer.lock",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "install.sh",
+            "slug": "install-sh",
+            "type": "file",
+            "path": "install.sh",
+            "modifiedAt": "2025-05-21T10:28:02+00:00",
+            "visible": true
+        },
+        {
+            "name": "package-lock.json",
+            "slug": "package-lock-json",
+            "type": "file",
+            "path": "package-lock.json",
+            "modifiedAt": "2026-01-24T21:09:12+00:00",
+            "visible": true
+        },
+        {
+            "name": "package.json",
+            "slug": "package-json",
+            "type": "file",
+            "path": "package.json",
+            "modifiedAt": "2026-01-24T21:03:09+00:00",
+            "visible": true
+        },
+        {
+            "name": "pages",
+            "slug": "pages",
+            "type": "folder",
+            "path": "pages",
+            "modifiedAt": "2025-11-04T10:07:32+00:00",
+            "visible": true
+        },
+        {
+            "name": "plan.md",
+            "slug": "plan-md",
+            "type": "file",
+            "path": "plan.md",
+            "modifiedAt": "2025-05-17T18:48:26+00:00",
+            "visible": true
+        },
+        {
+            "name": "scripts",
+            "slug": "scripts",
+            "type": "folder",
+            "path": "scripts",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "src",
+            "slug": "src",
+            "type": "folder",
+            "path": "src",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "tests",
+            "slug": "tests",
+            "type": "folder",
+            "path": "tests",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        },
+        {
+            "name": "uno.config.js",
+            "slug": "uno-config-js",
+            "type": "file",
+            "path": "uno.config.js",
+            "modifiedAt": "2026-01-24T21:05:50+00:00",
+            "visible": true
+        },
+        {
+            "name": "vendor",
+            "slug": "vendor",
+            "type": "folder",
+            "path": "vendor",
+            "modifiedAt": "2026-01-18T00:54:01+00:00",
+            "visible": true
+        }
+    ],
+    "treeHash": "920cdc294190103ba1370665a01215adfde0ff482ca3024287823a2fdebab3ed",
+    "updatedAt": "2026-01-24T22:34:47+00:00",
+    "work": {
+        "type": "folder",
+        "layout": "list"
+    }
+}

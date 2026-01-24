@@ -106,11 +106,20 @@ try {
     $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);
     $buildContent .= trim($poffConfigContent) . "\n\n";
 
-    // Add viewer partial (functions only)
-    $viewerContent = ComponentReader::readComponentFile($sourceDir . '/includes/viewer.php');
-    $viewerContent = preg_replace('/^<\?php\s*/', '', $viewerContent);
-    $viewerContent = preg_replace('/\?>\s*$/', '', $viewerContent);
-    $buildContent .= trim($viewerContent) . "\n\n";
+    // Inline viewer helpers so the built output stays single-file (no require_once).
+    $viewerUtils = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/utils.php');
+    $viewerEdit = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit.php');
+    $viewerRender = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render.php');
+    $stripRequires = static function (string $content): string {
+        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
+    };
+    $viewerUtils = $stripRequires($viewerUtils);
+    $viewerEdit = $stripRequires($viewerEdit);
+    $viewerRender = $stripRequires($viewerRender);
+    $buildContent .= trim($viewerUtils) . "\n\n";
+    $buildContent .= trim($viewerEdit) . "\n\n";
+    $buildContent .= trim($viewerRender) . "\n\n";
+    $buildContent .= "cmsHandleEditAction();\n\n";
 
     // Add initialization code
     $buildContent .= <<<'PHP'
@@ -162,10 +171,11 @@ PHP;
         // Clean up any trailing PHP tags in the nav code
         $navCode = preg_replace('/\s*\?>\s*$/', '', $navCode);
         // Add back the navigation code with proper PHP tags
-        $content = str_replace(
-            '<ul id="navList">',
-            '<ul id="navList"><?php ' . $navCode . ' ?>',
-            $content
+        $content = preg_replace_callback(
+            '/<ul\s+id="navList"([^>]*)>/',
+            static fn($m) => '<ul id="navList"' . $m[1] . '><?php ' . $navCode . ' ?>',
+            $content,
+            1
         );
     }
     $buildContent .= trim($content) . "\n";

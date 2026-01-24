@@ -1,15 +1,3 @@
-<?php
-/**
- * JavaScript functionality for the file browser
- */
-?>
-<script>
-const currentPoffConfig = /* POFF_CONTEXT */ null;
-const currentPathForIframe = /* POFF_IFRAME_PATH */ null;
-window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
-</script>
-<script>
-/* POFF_SCRIPT_START */
 (() => {
   // src/assets/js/api/edit.js
   function buildCmsUrl(action, path) {
@@ -1424,5 +1412,3 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     }
   });
 })();
-/* POFF_SCRIPT_END */
-</script>

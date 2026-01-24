@@ -6,6 +6,8 @@
     "test:mcp": "MCP_JSON=1 jest --watchman=false tests/mcp.create.test.js"
   },
   "devDependencies": {
+    "@unocss/core": "^0.63.0",
+    "@unocss/preset-uno": "^0.63.0",
     "esbuild": "^0.25.0",
     "jest": "^29.7.0",
     "node-fetch": "^2.7.0",
