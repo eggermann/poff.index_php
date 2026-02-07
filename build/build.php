@@ -161,24 +161,13 @@ PHP;
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     $buildContent .= trim($content) . "\n";
 
-    // Add layout.php content with navigation code
-    $content = ComponentReader::readComponentFile($sourceDir . '/includes/layout.php');
-    // Clean up HTML structure and PHP tags, preserving the navigation code
-    if (preg_match('/(\/\/ Generate navigation.*?)(?=<\/ul>)/s', $content, $matches)) {
-        $navCode = trim($matches[1]);
-        // Clean up HTML structure
-        $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
-        // Clean up any trailing PHP tags in the nav code
-        $navCode = preg_replace('/\s*\?>\s*$/', '', $navCode);
-        // Add back the navigation code with proper PHP tags
-        $content = preg_replace_callback(
-            '/<ul\s+id="navList"([^>]*)>/',
-            static fn($m) => '<ul id="navList"' . $m[1] . '><?php ' . $navCode . ' ?>',
-            $content,
-            1
-        );
-    }
-    $buildContent .= trim($content) . "\n";
+    // Add layout.php content and inject nav placeholder from includes/nav.php
+    $layout = ComponentReader::readComponentFile($sourceDir . '/includes/layout.php');
+    $layout = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $layout);
+    $nav = ComponentReader::readComponentFile($sourceDir . '/includes/nav.php');
+    $nav = preg_replace('/<\?php\s*|\?>/s', '', $nav); // strip PHP tags before inlining
+    $layout = str_replace('<!-- NAV_PLACEHOLDER -->', '<?php ' . trim($nav) . ' ?>', $layout);
+    $buildContent .= trim($layout) . "\n";
 
     // Add scripts.php content with JavaScript variables
     $content = ComponentReader::readComponentFile($sourceDir . '/includes/scripts.built.php');
