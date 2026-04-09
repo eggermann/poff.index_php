@@ -130,6 +130,10 @@ function cmsHandleEditAction(): void
         $layoutModel = null;
         $layoutTemplateProvided = false;
         $layoutTemplate = null;
+        $layoutCssProvided = false;
+        $layoutCss = null;
+        $layoutJsProvided = false;
+        $layoutJs = null;
         $hasLayoutUpdate = false;
 
         if (is_array($layoutPayload)) {
@@ -139,6 +143,14 @@ function cmsHandleEditAction(): void
             if (array_key_exists('template', $layoutPayload)) {
                 $layoutTemplateProvided = true;
                 $layoutTemplate = (string) $layoutPayload['template'];
+            }
+            if (array_key_exists('css', $layoutPayload) || array_key_exists('style', $layoutPayload)) {
+                $layoutCssProvided = true;
+                $layoutCss = (string) ($layoutPayload['css'] ?? $layoutPayload['style'] ?? '');
+            }
+            if (array_key_exists('js', $layoutPayload) || array_key_exists('script', $layoutPayload)) {
+                $layoutJsProvided = true;
+                $layoutJs = (string) ($layoutPayload['js'] ?? $layoutPayload['script'] ?? '');
             }
         }
 
@@ -160,6 +172,16 @@ function cmsHandleEditAction(): void
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $data['layoutTemplate'];
         }
+        if (array_key_exists('layout_css', $data)) {
+            $hasLayoutUpdate = true;
+            $layoutCssProvided = true;
+            $layoutCss = (string) $data['layout_css'];
+        }
+        if (array_key_exists('layout_js', $data)) {
+            $hasLayoutUpdate = true;
+            $layoutJsProvided = true;
+            $layoutJs = (string) $data['layout_js'];
+        }
 
         $workLayout = '';
         if (array_key_exists('work_layout', $data)) {
@@ -179,6 +201,12 @@ function cmsHandleEditAction(): void
             if ($layoutTemplateProvided) {
                 $layout['template'] = $layoutTemplate;
             }
+            if ($layoutCssProvided) {
+                $layout['css'] = $layoutCss;
+            }
+            if ($layoutJsProvided) {
+                $layout['js'] = $layoutJs;
+            }
             if (is_string($layoutModel) && $layoutModel !== '') {
                 $layout['model'] = $layoutModel;
             }
@@ -187,6 +215,12 @@ function cmsHandleEditAction(): void
             $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
 
+        $work['layout'] = PoffConfig::persistLayoutFiles(
+            $targetDir,
+            $targetType === 'file' ? (string) $targetFile : null,
+            $work['layout'] ?? null,
+            $layoutSection
+        );
         $config['work'] = $work;
 
         if ($targetType === 'folder') {
@@ -228,11 +262,17 @@ function cmsHandleEditAction(): void
         }
         file_put_contents($configPath, $encoded);
 
+        $responseConfig = PoffConfig::hydrateConfigLayout(
+            $config,
+            $targetDir,
+            $targetType === 'file' ? (string) $targetFile : null
+        );
+
         cmsJsonResponse([
             'allowed' => true,
             'target' => $targetType,
             'saved' => true,
-            'config' => $config,
+            'config' => $responseConfig,
         ]);
     }
 
@@ -263,7 +303,7 @@ function cmsHandleEditAction(): void
         $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $defaultSystemPrompt = implode("\n", [
             'You are a Handlebars (HBS) template generator for this single-page CMS.',
-            'Return one HBS template string rendered through the LightnCandy renderer and saved to work.layout.template.',
+            'Return one HBS template string rendered through the LightnCandy renderer and saved to .layout/template.hbs.',
             'Return only the template (no Markdown, no fences).',
             'Default layout technique: use {{> default-layout}}. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.',
             'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',

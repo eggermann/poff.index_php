@@ -45,6 +45,9 @@ function renderFileViewer(string $relativePath, string $fullPath): void
     $workDefaults = Worktype::definition($type, $mimeType);
     $workData = (isset($fileConfig['work']) && is_array($fileConfig['work'])) ? $fileConfig['work'] : [];
     $work = array_merge($workDefaults, $workData);
+    if (class_exists('PoffConfig')) {
+        $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, true, 'work');
+    }
 
     $linkUrl = null;
     if ($type === 'link') {
@@ -76,6 +79,7 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'type' => $type,
         'name' => $rawName,
         'path' => $relativePath,
+        'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,
         'openHref' => viewerAssetHref($relativePath),
         'openLabel' => 'Open Raw',
@@ -92,6 +96,9 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
     $workDefaults = Worktype::definition('folder');
     $workData = (isset($folderConfig['work']) && is_array($folderConfig['work'])) ? $folderConfig['work'] : [];
     $work = array_merge($workDefaults, $workData);
+    if (class_exists('PoffConfig')) {
+        $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, false, 'works');
+    }
 
     $rawName = $folderConfig['folderName'] ?? basename($fullPath);
     if ($rawName === '') {
@@ -148,6 +155,7 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'type' => 'folder',
         'name' => $rawName,
         'path' => $relativePath,
+        'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,
         'openHref' => $browseHref,
         'openLabel' => 'Open Folder',
@@ -358,12 +366,17 @@ function renderViewerShell(array $payload): void
     $bodyContent = (string) ($payload['bodyContent'] ?? '');
     $openHref = isset($payload['openHref']) ? (string) $payload['openHref'] : '';
     $openLabel = isset($payload['openLabel']) ? (string) $payload['openLabel'] : 'Open';
+    $layout = isset($payload['layout']) && is_array($payload['layout']) ? $payload['layout'] : [];
 
     $safeName = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
     $safePath = htmlspecialchars($rawPath === '' ? '.' : $rawPath, ENT_QUOTES, 'UTF-8');
     $safeOpenHref = htmlspecialchars($openHref, ENT_QUOTES, 'UTF-8');
     $safeOpenLabel = htmlspecialchars($openLabel, ENT_QUOTES, 'UTF-8');
     $safeType = htmlspecialchars($rawType, ENT_QUOTES, 'UTF-8');
+    $layoutCssHref = trim((string) ($layout['cssHref'] ?? ''));
+    $layoutJsHref = trim((string) ($layout['jsHref'] ?? ''));
+    $layoutCssInline = $layoutCssHref === '' ? trim((string) ($layout['css'] ?? '')) : '';
+    $layoutJsInline = $layoutJsHref === '' ? trim((string) ($layout['js'] ?? '')) : '';
 
     ?>
 <!DOCTYPE html>
@@ -500,6 +513,11 @@ function renderViewerShell(array $payload): void
         }
         .message { padding: 24px; text-align: center; color: #d1d5db; }
     </style>
+<?php if ($layoutCssHref !== ''): ?>
+    <link rel="stylesheet" href="<?= htmlspecialchars($layoutCssHref, ENT_QUOTES, 'UTF-8') ?>">
+<?php elseif ($layoutCssInline !== ''): ?>
+    <style data-layout-style><?= $layoutCssInline ?></style>
+<?php endif; ?>
 </head>
 <body>
     <header>
@@ -514,6 +532,11 @@ function renderViewerShell(array $payload): void
     <div class="viewer">
         <?= $bodyContent ?>
     </div>
+<?php if ($layoutJsHref !== ''): ?>
+    <script src="<?= htmlspecialchars($layoutJsHref, ENT_QUOTES, 'UTF-8') ?>" defer></script>
+<?php elseif ($layoutJsInline !== ''): ?>
+    <script><?= $layoutJsInline ?></script>
+<?php endif; ?>
 </body>
 </html>
 <?php

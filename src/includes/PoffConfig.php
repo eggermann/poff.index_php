@@ -7,6 +7,10 @@
 
 class PoffConfig
 {
+    private const LAYOUT_TEMPLATE_FILE = 'template.hbs';
+    private const LAYOUT_STYLE_FILE = 'style.css';
+    private const LAYOUT_SCRIPT_FILE = 'script.js';
+
     private static function generateId(): string
     {
         try {
@@ -35,6 +39,36 @@ class PoffConfig
         return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.works' . DIRECTORY_SEPARATOR . $fileName . '.config.json';
     }
 
+    public static function folderLayoutDir(string $dir): string
+    {
+        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.layout';
+    }
+
+    public static function fileLayoutDir(string $dir, string $fileName): string
+    {
+        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.works' . DIRECTORY_SEPARATOR . $fileName . '.layout';
+    }
+
+    public static function relativeLayoutPath(string $itemPath, bool $isFile): string
+    {
+        $normalized = str_replace('\\', '/', trim($itemPath, "/\\"));
+        if (!$isFile) {
+            return $normalized === '' ? '.layout' : $normalized . '/.layout';
+        }
+
+        if ($normalized === '') {
+            return '.works/unknown.layout';
+        }
+
+        $fileName = basename($normalized);
+        $dirName = dirname($normalized);
+        if ($dirName === '.' || $dirName === DIRECTORY_SEPARATOR) {
+            $dirName = '';
+        }
+
+        return ($dirName !== '' ? $dirName . '/' : '') . '.works/' . $fileName . '.layout';
+    }
+
     public static function slugify(string $name): string
     {
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($name));
@@ -57,6 +91,7 @@ class PoffConfig
                 $entry === '..' ||
                 $entry === 'poff.config.json' ||
                 $entry === '.works' ||
+                $entry === '.layout' ||
                 $entry === '.DS_Store' ||
                 $entry === 'Thumbs.db' ||
                 $entry === '.git' ||
@@ -280,7 +315,7 @@ class PoffConfig
             file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
-        return $data;
+        return self::hydrateConfigLayout($data, $dir);
     }
 
     /**
@@ -362,6 +397,227 @@ class PoffConfig
             file_put_contents($configPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
-        return $data;
+        return self::hydrateConfigLayout($data, $dir, $fileName);
+    }
+
+    public static function persistLayoutFiles(string $dir, ?string $fileName, mixed $layout, string $section = 'work'): array
+    {
+        $normalized = Worktype::normalizeLayout($layout, $section);
+        $layoutDir = $fileName === null
+            ? self::folderLayoutDir($dir)
+            : self::fileLayoutDir($dir, $fileName);
+
+        $managedFiles = [
+            self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,
+            self::LAYOUT_STYLE_FILE => array_key_exists('css', $normalized) ? (string) $normalized['css'] : null,
+            self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $normalized) ? (string) $normalized['js'] : null,
+        ];
+
+        foreach ($managedFiles as $name => $contents) {
+            if ($contents === null) {
+                continue;
+            }
+
+            $targetPath = $layoutDir . DIRECTORY_SEPARATOR . $name;
+            if (trim($contents) === '') {
+                if (is_file($targetPath)) {
+                    unlink($targetPath);
+                }
+                continue;
+            }
+
+            if (!is_dir($layoutDir)) {
+                mkdir($layoutDir, 0755, true);
+            }
+
+            file_put_contents($targetPath, $contents);
+        }
+
+        if (self::isDirectoryEmpty($layoutDir)) {
+            @rmdir($layoutDir);
+        }
+
+        return self::serializeLayout($normalized, $section);
+    }
+
+    public static function hydrateConfigLayout(array $config, string $dir, ?string $fileName = null): array
+    {
+        $section = $fileName === null ? 'works' : 'work';
+        $work = isset($config['work']) && is_array($config['work']) ? $config['work'] : [];
+        $work['layout'] = self::hydrateLayoutFilesystem($work['layout'] ?? null, $dir, $fileName, $section);
+        $config['work'] = $work;
+
+        return $config;
+    }
+
+    public static function prepareLayoutForView(mixed $layout, string $itemPath, bool $isFile, string $section = 'work'): array
+    {
+        $resolved = Worktype::normalizeLayout($layout, $section);
+        $basePath = self::relativeLayoutPath($itemPath, $isFile);
+        $resolved['baseHref'] = self::encodeRelativePath($basePath);
+
+        $assets = [];
+        $files = [];
+        foreach (($resolved['assets'] ?? []) as $asset) {
+            if (!is_array($asset)) {
+                continue;
+            }
+
+            $assetPath = str_replace('\\', '/', (string) ($asset['path'] ?? ''));
+            if ($assetPath === '') {
+                continue;
+            }
+
+            $asset['href'] = self::encodeRelativePath($basePath . '/' . $assetPath);
+            $assets[] = $asset;
+            $files[$assetPath] = $asset['href'];
+        }
+
+        $resolved['assets'] = $assets;
+        $resolved['files'] = $files;
+        $resolved['assetCount'] = count($assets);
+
+        if (($resolved['storage'] ?? '') === 'filesystem') {
+            if (array_key_exists('css', $resolved) && trim((string) $resolved['css']) !== '') {
+                $resolved['cssHref'] = self::encodeRelativePath($basePath . '/' . self::LAYOUT_STYLE_FILE);
+            }
+            if (array_key_exists('js', $resolved) && trim((string) $resolved['js']) !== '') {
+                $resolved['jsHref'] = self::encodeRelativePath($basePath . '/' . self::LAYOUT_SCRIPT_FILE);
+            }
+        }
+
+        return $resolved;
+    }
+
+    private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
+    {
+        $resolved = Worktype::normalizeLayout($layout, $section);
+        $layoutDir = $fileName === null
+            ? self::folderLayoutDir($dir)
+            : self::fileLayoutDir($dir, $fileName);
+        $resolved['directory'] = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
+
+        $assets = [];
+        $files = [];
+        if (is_dir($layoutDir)) {
+            $resolved['storage'] = 'filesystem';
+
+            $templatePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_TEMPLATE_FILE;
+            if (is_file($templatePath)) {
+                $resolved['template'] = (string) file_get_contents($templatePath);
+            }
+
+            $stylePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_STYLE_FILE;
+            if (is_file($stylePath)) {
+                $resolved['css'] = (string) file_get_contents($stylePath);
+            }
+
+            $scriptPath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_SCRIPT_FILE;
+            if (is_file($scriptPath)) {
+                $resolved['js'] = (string) file_get_contents($scriptPath);
+            }
+
+            [$assets, $files] = self::scanLayoutAssets($layoutDir);
+        } elseif (
+            (!empty($resolved['template']) && is_string($resolved['template']))
+            || (!empty($resolved['css']) && is_string($resolved['css']))
+            || (!empty($resolved['js']) && is_string($resolved['js']))
+        ) {
+            $resolved['storage'] = 'inline';
+        } else {
+            $resolved['storage'] = 'default';
+        }
+
+        $resolved['assets'] = $assets;
+        $resolved['files'] = $files;
+        $resolved['assetCount'] = count($assets);
+
+        return $resolved;
+    }
+
+    private static function serializeLayout(mixed $layout, string $section): array
+    {
+        $resolved = Worktype::normalizeLayout($layout, $section);
+        $serialized = [
+            'mode' => $resolved['mode'],
+            'name' => $resolved['name'],
+            'engine' => $resolved['engine'],
+            'section' => $resolved['section'],
+        ];
+
+        foreach (['model', 'stylePrompt'] as $key) {
+            if (array_key_exists($key, $resolved)) {
+                $serialized[$key] = $resolved[$key];
+            }
+        }
+
+        return $serialized;
+    }
+
+    private static function scanLayoutAssets(string $layoutDir): array
+    {
+        $assets = [];
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($layoutDir, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $fileInfo) {
+            if (!$fileInfo->isFile()) {
+                continue;
+            }
+
+            $pathName = $fileInfo->getPathname();
+            $relativePath = substr($pathName, strlen($layoutDir) + 1);
+            if ($relativePath === false || $relativePath === '') {
+                continue;
+            }
+
+            $relativePath = str_replace('\\', '/', $relativePath);
+            if (in_array($relativePath, [self::LAYOUT_TEMPLATE_FILE, self::LAYOUT_STYLE_FILE, self::LAYOUT_SCRIPT_FILE], true)) {
+                continue;
+            }
+
+            $asset = [
+                'name' => basename($relativePath),
+                'path' => $relativePath,
+                'size' => $fileInfo->getSize(),
+                'updatedAt' => date('c', $fileInfo->getMTime()),
+            ];
+            $assets[] = $asset;
+            $files[$relativePath] = $relativePath;
+        }
+
+        usort($assets, static fn(array $left, array $right): int => strcasecmp((string) ($left['path'] ?? ''), (string) ($right['path'] ?? '')));
+
+        return [$assets, $files];
+    }
+
+    private static function isDirectoryEmpty(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $entries = scandir($dir);
+        if ($entries === false) {
+            return false;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry !== '.' && $entry !== '..') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function encodeRelativePath(string $path): string
+    {
+        $parts = explode('/', str_replace('\\', '/', $path));
+        $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
+
+        return implode('/', $encoded);
     }
 }

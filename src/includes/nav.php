@@ -62,6 +62,7 @@ if (is_array($tree)) {
                 $item === '.' ||
                 $item === '..' ||
                 $item === '.works' ||
+                $item === '.layout' ||
                 $item === '.DS_Store' ||
                 $item === 'Thumbs.db' ||
                 $item === '.git' ||

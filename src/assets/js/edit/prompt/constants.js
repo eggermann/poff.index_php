@@ -2,7 +2,7 @@ export const promptSettingsKey = 'poffEditPromptSettings';
 export const promptHistoryKey = 'poffEditPromptHistory';
 export const defaultSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
-    'Transform the user description into one HBS template string that will be saved to work.layout.template and rendered by LightnCandy.',
+    'Transform the user description into one HBS template string that will be saved to .layout/template.hbs and rendered by LightnCandy.',
     'Return only the template (no Markdown, no fences).',
     'Use {{> default-layout}} as the default layout technique. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',

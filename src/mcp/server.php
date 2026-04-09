@@ -39,7 +39,7 @@ function buildFileTree(string $dir, string $base): array
             continue;
         }
         // Ignore common noisy/system folders
-        if (in_array($entry, ['.git', '.DS_Store', 'node_modules'], true)) {
+        if (in_array($entry, ['.git', '.DS_Store', 'node_modules', '.works', '.layout'], true)) {
             continue;
         }
 

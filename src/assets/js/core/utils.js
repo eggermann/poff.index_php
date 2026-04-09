@@ -27,12 +27,16 @@ export function getLayoutState(config) {
         return {
             mode: layoutValue.name || layoutValue.mode || layoutValue.value || '',
             template: layoutValue.template || '',
+            css: layoutValue.css || '',
+            js: layoutValue.js || '',
             model: layoutValue.model || '',
             engine: layoutValue.engine || 'lightncandy',
+            directory: layoutValue.directory || '',
+            assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : [],
         };
     }
     if (typeof layoutValue === 'string') {
-        return { mode: layoutValue, template: '', model: '', engine: 'lightncandy' };
+        return { mode: layoutValue, template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', assets: [] };
     }
-    return { mode: 'default-layout', template: '', model: '', engine: 'lightncandy' };
+    return { mode: 'default-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', assets: [] };
 }

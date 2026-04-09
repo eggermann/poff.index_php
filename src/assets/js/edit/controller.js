@@ -162,6 +162,8 @@ export function createEditController({ elements, context, editRequested }) {
                     name: (elements.work_layout?.value || '').trim(),
                     engine: 'lightncandy',
                     template: elements.work_template?.value ?? '',
+                    css: elements.layout_css?.value ?? '',
+                    js: elements.layout_js?.value ?? '',
                 };
                 const selection = getActiveSelection();
                 const payload = {

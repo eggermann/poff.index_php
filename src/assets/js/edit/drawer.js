@@ -26,6 +26,8 @@ export function renderEditDrawer({
     }
 
     const layoutState = getLayoutState(config);
+    const layoutDirectory = layoutState.directory || '.layout';
+    const layoutAssets = Array.isArray(layoutState.assets) ? layoutState.assets : [];
     let treeHtml = '';
     if (status?.target !== 'file') {
         const treeItems = Array.isArray(config.tree) ? config.tree : [];
@@ -44,6 +46,20 @@ export function renderEditDrawer({
             }).join('')
             : '<div class="edit-tree-item">No items found.</div>';
     }
+    const layoutAssetsHtml = layoutAssets.length
+        ? `
+            <div>
+                <label class="edit-label">Layout assets</label>
+                <div class="edit-tree">
+                    ${layoutAssets.map((asset) => `
+                        <div class="edit-tree-item">
+                            <span>${escapeHtml(asset.path || asset.name || '')}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `
+        : '';
 
     editDrawer.innerHTML = `
         <div class="drawer-header">
@@ -76,6 +92,18 @@ export function renderEditDrawer({
                 <label class="edit-label" for="edit-work-template">Work Layout Template (HBS)</label>
                 <textarea class="form-textarea" id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
             </div>
+            <div class="small-note">Layout files live in <code>${escapeHtml(layoutDirectory)}</code>. Put thumbnails, background images, and other layout-specific files there.</div>
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-layout-css">Layout CSS</label>
+                    <textarea class="form-textarea" id="edit-layout-css" name="layout_css">${escapeHtml(layoutState.css)}</textarea>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-layout-js">Layout JS</label>
+                    <textarea class="form-textarea" id="edit-layout-js" name="layout_js">${escapeHtml(layoutState.js)}</textarea>
+                </div>
+            </div>
+            ${layoutAssetsHtml}
             ${status?.target !== 'file' ? `
             <div>
                 <label class="edit-label">Visible items</label>

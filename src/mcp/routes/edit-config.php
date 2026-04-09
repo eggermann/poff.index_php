@@ -83,6 +83,10 @@ function handleEditConfig(array $opts): array
         $layoutPayloadMode = is_array($layoutPayload) ? ($layoutPayload['mode'] ?? $layoutPayload['name'] ?? '') : '';
         $layoutMode = trim((string) ($data['layout_mode'] ?? $layoutPayloadMode));
         $layoutModel = is_array($layoutPayload) ? ($layoutPayload['model'] ?? null) : null;
+        $layoutCssProvided = false;
+        $layoutCss = null;
+        $layoutJsProvided = false;
+        $layoutJs = null;
         if ($layoutModel === null && array_key_exists('layout_model', $data)) {
             $layoutModel = $data['layout_model'];
         }
@@ -92,6 +96,14 @@ function handleEditConfig(array $opts): array
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $layoutPayload['template'];
         }
+        if (is_array($layoutPayload) && (array_key_exists('css', $layoutPayload) || array_key_exists('style', $layoutPayload))) {
+            $layoutCssProvided = true;
+            $layoutCss = (string) ($layoutPayload['css'] ?? $layoutPayload['style'] ?? '');
+        }
+        if (is_array($layoutPayload) && (array_key_exists('js', $layoutPayload) || array_key_exists('script', $layoutPayload))) {
+            $layoutJsProvided = true;
+            $layoutJs = (string) ($layoutPayload['js'] ?? $layoutPayload['script'] ?? '');
+        }
         if (array_key_exists('layout_template', $data)) {
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $data['layout_template'];
@@ -99,6 +111,14 @@ function handleEditConfig(array $opts): array
         if (array_key_exists('layoutTemplate', $data)) {
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $data['layoutTemplate'];
+        }
+        if (array_key_exists('layout_css', $data)) {
+            $layoutCssProvided = true;
+            $layoutCss = (string) $data['layout_css'];
+        }
+        if (array_key_exists('layout_js', $data)) {
+            $layoutJsProvided = true;
+            $layoutJs = (string) $data['layout_js'];
         }
         $treeVisible = $data['treeVisible'] ?? $data['tree_visible'] ?? null;
         $visibleKeys = [];
@@ -139,12 +159,20 @@ function handleEditConfig(array $opts): array
         if ($layoutTemplateProvided) {
             $layout['template'] = $layoutTemplate;
         }
+        if ($layoutCssProvided) {
+            $layout['css'] = $layoutCss;
+        }
+        if ($layoutJsProvided) {
+            $layout['js'] = $layoutJs;
+        }
         if (is_string($layoutModel) && $layoutModel !== '') {
             $layout['model'] = $layoutModel;
         }
         $layoutSection = 'works';
         $hasLayoutUpdate = is_array($layoutPayload)
             || $layoutTemplateProvided
+            || $layoutCssProvided
+            || $layoutJsProvided
             || array_key_exists('layout_mode', $data)
             || array_key_exists('layout_model', $data);
         if ($hasLayoutUpdate) {
@@ -152,6 +180,7 @@ function handleEditConfig(array $opts): array
         } elseif ($workLayout !== '') {
             $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
+        $work['layout'] = PoffConfig::persistLayoutFiles($targetDir, null, $work['layout'] ?? null, $layoutSection);
         $config['work'] = $work;
 
         if ($hasTreeUpdate && isset($config['tree']) && is_array($config['tree'])) {
@@ -182,7 +211,7 @@ function handleEditConfig(array $opts): array
             'route' => 'edit-config',
             'allowed' => true,
             'saved' => true,
-            'config' => $config,
+            'config' => PoffConfig::hydrateConfigLayout($config, $targetDir),
         ];
     }
 

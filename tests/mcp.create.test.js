@@ -14,6 +14,9 @@ const POFF_SOURCE_DIR = path.join(POFF_DIR, 'source-files');
 const EXISTING_PARENT_DIR = path.join(POFF_DIR, 'existing-parent');
 const EXISTING_NESTED_SRC = path.join(EXISTING_PARENT_DIR, 'nested-src');
 const VIEWER_FOLDER_DIR = path.join(POFF_DIR, 'viewer-folder');
+const VIEWER_FILE_NAME = 'viewer-file.txt';
+const VIEWER_FILE_PATH = path.join(POFF_DIR, VIEWER_FILE_NAME);
+const PERSIST_LAYOUT_DIR = path.join(POFF_DIR, 'persist-layout');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -86,6 +89,28 @@ function runViewer(relativePath, baseDir = POFF_DIR) {
   });
 }
 
+function runLayoutFilesystem(action, dir, fileName = '', payload = null) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_layout_filesystem.php'), action, dir, fileName];
+    if (payload !== null) {
+      args.push(JSON.stringify(payload));
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`layout helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -116,19 +141,42 @@ describe('MCP create route helper (CLI)', () => {
     fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, 'nested-child'), { recursive: true });
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'child.txt'), 'viewer child');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'nested-child', 'nested-video.mp4'), 'fake video');
+    fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'template.hbs'), '<div class="folder-custom" data-layout="{{layout.directory}}">{{title}}|{{#each tree}}{{#if isFolder}}<span class="branch">{{name}}</span>{{#each children}}{{#if (contains name ".mp4")}}<span class="child">{{path}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type "file")}}<span class="entry">{{name}}:{{type}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class="video">{{path}}</span>{{/each}}{{#each layout.assets}}<span class="asset">{{href}}</span>{{/each}}</div>');
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'style.css'), '.folder-custom{color:#8ec5ff;}');
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'script.js'), 'window.__folderLayout = true;');
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'background.txt'), 'folder background');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'poff.config.json'), JSON.stringify({
       title: 'Folder Preview',
       description: 'Folder layout from prompt',
       work: {
         type: 'folder',
         layout: {
-          name: 'prompted-folder-layout',
+          name: 'filesystem-folder-layout',
           engine: 'lightncandy',
           section: 'works',
-          template: '<div class="folder-custom">{{title}}|{{#each tree}}{{#if isFolder}}<span class="branch">{{name}}</span>{{#each children}}{{#if (contains name ".mp4")}}<span class="child">{{path}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type "file")}}<span class="entry">{{name}}:{{type}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class="video">{{path}}</span>{{/each}}</div>',
         },
       },
     }, null, 2));
+    fs.writeFileSync(VIEWER_FILE_PATH, 'viewer file');
+    fs.mkdirSync(path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`, 'template.hbs'), '<div class="file-custom">{{title}}|{{#each layout.assets}}<span class="asset">{{href}}</span>{{/each}}</div>');
+    fs.writeFileSync(path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`, 'style.css'), '.file-custom{border:1px solid #8ec5ff;}');
+    fs.writeFileSync(path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`, 'script.js'), 'window.__fileLayout = true;');
+    fs.writeFileSync(path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`, 'thumbnail.txt'), 'file thumb');
+    fs.writeFileSync(path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.config.json`), JSON.stringify({
+      title: 'Viewer File',
+      description: 'File layout from filesystem',
+      work: {
+        type: 'text',
+        layout: {
+          name: 'filesystem-file-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+    fs.mkdirSync(PERSIST_LAYOUT_DIR, { recursive: true });
   });
 
   afterAll(() => {
@@ -190,6 +238,27 @@ describe('Worktype HBS renderer', () => {
       engine: 'lightncandy',
       section: 'work',
     });
+  });
+
+  test('hydrates folder layout metadata from the .layout filesystem', async () => {
+    const output = await runLayoutFilesystem('ensure-folder', VIEWER_FOLDER_DIR);
+    const config = JSON.parse(output);
+
+    expect(config.work.layout).toMatchObject({
+      name: 'filesystem-folder-layout',
+      section: 'works',
+      storage: 'filesystem',
+      directory: '.layout',
+    });
+    expect(config.work.layout.template).toContain('folder-custom');
+    expect(config.work.layout.css).toContain('.folder-custom');
+    expect(config.work.layout.js).toContain('__folderLayout');
+    expect(config.work.layout.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'background.txt' }),
+      ]),
+    );
+    expect(config.tree.map((item) => item.name)).not.toContain('.layout');
   });
 
   test('renders the default layout with the file work partial', async () => {
@@ -278,10 +347,52 @@ describe('Worktype HBS renderer', () => {
     const output = await runViewer('viewer-folder');
 
     expect(output).toContain('<title>Viewer - viewer-folder</title>');
-    expect(output).toContain('<div class="folder-custom">');
+    expect(output).toContain('viewer-folder/.layout/style.css');
+    expect(output).toContain('viewer-folder/.layout/script.js');
+    expect(output).toContain('<div class="folder-custom"');
     expect(output).toContain('Folder Preview');
     expect(output).toContain('nested-child');
     expect(output).toContain('nested-child/nested-video.mp4');
     expect(output).toContain('child.txt:file');
+    expect(output).toContain('viewer-folder/.layout/background.txt');
+  });
+
+  test('renders file previews from .works/<file>.layout', async () => {
+    const output = await runViewer(VIEWER_FILE_NAME);
+
+    expect(output).toContain('<title>Viewer - viewer-file.txt</title>');
+    expect(output).toContain('.works/viewer-file.txt.layout/style.css');
+    expect(output).toContain('.works/viewer-file.txt.layout/script.js');
+    expect(output).toContain('<div class="file-custom">');
+    expect(output).toContain('Viewer File');
+    expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
+  });
+
+  test('persists edited folder layout files into .layout', async () => {
+    const payload = {
+      name: 'persisted-layout',
+      engine: 'lightncandy',
+      section: 'works',
+      template: '<div class="persisted-layout">Persisted</div>',
+      css: '.persisted-layout{color:#fff;}',
+      js: 'window.__persistedLayout = true;',
+    };
+
+    const output = await runLayoutFilesystem('persist-folder', PERSIST_LAYOUT_DIR, '', payload);
+    const serializedLayout = JSON.parse(output);
+
+    expect(serializedLayout).toMatchObject({
+      name: 'persisted-layout',
+      section: 'works',
+      engine: 'lightncandy',
+    });
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('Persisted');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.persisted-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__persistedLayout');
+
+    const ensuredOutput = await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
+    const ensuredConfig = JSON.parse(ensuredOutput);
+    expect(ensuredConfig.work.layout.template).toContain('Persisted');
+    expect(ensuredConfig.work.layout.storage).toBe('filesystem');
   });
 });

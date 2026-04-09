@@ -127,7 +127,27 @@ class Worktype
             $layout['section'] = trim($value['section']);
         }
 
-        foreach (['template', 'model', 'stylePrompt'] as $key) {
+        if (array_key_exists('css', $value) || array_key_exists('style', $value)) {
+            $layout['css'] = (string) ($value['css'] ?? $value['style'] ?? '');
+        }
+
+        if (array_key_exists('js', $value) || array_key_exists('script', $value)) {
+            $layout['js'] = (string) ($value['js'] ?? $value['script'] ?? '');
+        }
+
+        foreach ([
+            'template',
+            'model',
+            'stylePrompt',
+            'storage',
+            'directory',
+            'baseHref',
+            'cssHref',
+            'jsHref',
+            'assets',
+            'files',
+            'assetCount',
+        ] as $key) {
             if (array_key_exists($key, $value)) {
                 $layout[$key] = $value[$key];
             }

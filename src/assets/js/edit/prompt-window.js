@@ -89,7 +89,7 @@ export function renderPromptWindow(settings = {}) {
             </div>
             <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
             <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
-            <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
+            <div class="small-note">Template responses are saved to <code>.layout/template.hbs</code> for the LightnCandy renderer.</div>
         </div>
     `;
 }

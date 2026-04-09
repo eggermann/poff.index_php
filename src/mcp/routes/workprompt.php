@@ -33,14 +33,19 @@ function handleWorkPrompt(array $opts): array
         $currentConfig = $fileConfig ?? [];
         $existingWork = isset($currentConfig['work']) && is_array($currentConfig['work']) ? $currentConfig['work'] : [];
         $mergedWork = array_merge($model, $existingWork);
-        $mergedWork['layout'] = [
-            'name' => 'default-layout',
-            'engine' => 'lightncandy',
-            'section' => 'work',
-            'model' => $model,
-            'template' => $template,
-            'stylePrompt' => $stylePrompt,
-        ];
+        $mergedWork['layout'] = PoffConfig::persistLayoutFiles(
+            dirname($absPath),
+            basename($absPath),
+            [
+                'name' => 'default-layout',
+                'engine' => 'lightncandy',
+                'section' => 'work',
+                'model' => $model,
+                'template' => $template,
+                'stylePrompt' => $stylePrompt,
+            ],
+            'work'
+        );
         $currentConfig['work'] = $mergedWork;
         $currentConfig['updatedAt'] = date('c');
         $dirPath = dirname($configPath);
@@ -48,7 +53,7 @@ function handleWorkPrompt(array $opts): array
             mkdir($dirPath, 0755, true);
         }
         file_put_contents($configPath, json_encode($currentConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        $fileConfig = $currentConfig;
+        $fileConfig = PoffConfig::hydrateConfigLayout($currentConfig, dirname($absPath), basename($absPath));
     }
 
     return [
@@ -61,6 +66,6 @@ function handleWorkPrompt(array $opts): array
         'partials' => $partials,
         'config' => $fileConfig,
         'configPath' => $configPath,
-        'instruction' => 'Use the default-layout HBS template and partials as a base. The section includes works for folders and work for files. Save updates into work.layout.model/template with the LightnCandy renderer.',
+        'instruction' => 'Use the default-layout HBS template and partials as a base. The section includes works for folders and work for files. Save updates into the item layout filesystem (.layout/template.hbs, style.css, script.js) with the LightnCandy renderer.',
     ];
 }
