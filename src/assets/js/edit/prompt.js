@@ -57,8 +57,8 @@ export function bindPromptWindow({
         promptHistory = tagHistory(list);
     };
 
-    const renderHistory = () => {
-        renderPromptHistory(promptMessagesEl, promptHistory, stream.state);
+    const renderHistory = (options = {}) => {
+        renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
 
     const renderContext = () => {
@@ -194,7 +194,7 @@ export function bindPromptWindow({
             const isFile = selection?.isFile ?? /\.[^\\/]+$/.test(activeViewerPath);
             frame.src = isFile
                 ? `?view=1&file=${encodeURIComponent(activeViewerPath)}`
-                : activeViewerPath.replace(/\/$/, '') + '/';
+                : `?view=1&path=${encodeURIComponent(activeViewerPath)}`;
             return;
         }
         if (frame && frame.contentWindow) {
@@ -260,7 +260,7 @@ export function bindPromptWindow({
                 } else {
                     setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
                 }
-                renderHistory();
+                renderHistory({ forceScroll: true });
                 if (statusEl) {
                     statusEl.textContent = errMsg;
                     statusEl.className = 'edit-status';
@@ -287,7 +287,7 @@ export function bindPromptWindow({
                 setHistory([...promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
                 pendingAssistantIndex = promptHistory.length - 1;
                 writeStoredHistory(activePath, promptHistory);
-                renderHistory();
+                renderHistory({ forceScroll: true });
                 renderContext();
                 promptInputEl.value = '';
                 if (statusEl) {
@@ -330,7 +330,7 @@ export function bindPromptWindow({
                         pendingAssistantIndex = promptHistory.length - 1;
                     }
                     writeStoredHistory(activePath, promptHistory);
-                    renderHistory();
+                    renderHistory({ forceScroll: true });
                     if (statusEl) {
                         statusEl.textContent = errMsg;
                         statusEl.className = 'edit-status';
@@ -347,14 +347,14 @@ export function bindPromptWindow({
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
                 writeStoredHistory(activePath, promptHistory);
-                renderHistory();
+                renderHistory({ forceScroll: true });
                 if (streamToggleEl && streamToggleEl.checked && templateText) {
                     startStreaming({
                         stream,
                         targetIndex: pendingAssistantIndex ?? (promptHistory.length - 1),
                         fullText: templateText,
                         history: promptHistory,
-                        renderHistory,
+                        renderHistory: () => renderHistory({ forceScroll: true }),
                     });
                 }
                 renderContext();
@@ -441,7 +441,7 @@ export function bindPromptWindow({
                     setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
                 }
                 writeStoredHistory(activePath, promptHistory);
-                renderHistory();
+                renderHistory({ forceScroll: true });
                 renderSummary(errMsg);
             } finally {
                 window.clearTimeout(fallbackTimer);

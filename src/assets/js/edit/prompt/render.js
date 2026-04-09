@@ -1,9 +1,10 @@
 import { escapeHtml } from '../../core/utils.js';
 
-export function renderPromptHistory(container, history, streamState) {
+export function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
         return;
     }
+    const { forceScroll = false } = options;
     const stickToBottom = (container.scrollHeight - container.clientHeight - container.scrollTop) < 24;
     if (!history || !history.length) {
         container.innerHTML = '<div class="small-note">No messages yet.</div>';
@@ -21,7 +22,7 @@ export function renderPromptHistory(container, history, streamState) {
             </div>
         `;
     }).join('');
-    if (stickToBottom) {
+    if (forceScroll || stickToBottom) {
         container.scrollTop = container.scrollHeight;
     }
 }

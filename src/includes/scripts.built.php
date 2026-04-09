@@ -223,10 +223,11 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   }
 
   // src/assets/js/edit/prompt/render.js
-  function renderPromptHistory(container, history, streamState) {
+  function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
       return;
     }
+    const { forceScroll = false } = options;
     const stickToBottom = container.scrollHeight - container.clientHeight - container.scrollTop < 24;
     if (!history || !history.length) {
       container.innerHTML = '<div class="small-note">No messages yet.</div>';
@@ -244,7 +245,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
             </div>
         `;
     }).join("");
-    if (stickToBottom) {
+    if (forceScroll || stickToBottom) {
       container.scrollTop = container.scrollHeight;
     }
   }
@@ -385,8 +386,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       const list = Array.isArray(nextHistory) ? nextHistory : [];
       promptHistory = tagHistory(list);
     };
-    const renderHistory = () => {
-      renderPromptHistory(promptMessagesEl, promptHistory, stream.state);
+    const renderHistory = (options = {}) => {
+      renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
     const renderContext = () => {
       const context = buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig });
@@ -511,7 +512,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       const activeViewerPath = (selection == null ? void 0 : selection.path) || activePath;
       if (frame && activeViewerPath) {
         const isFile = (_a = selection == null ? void 0 : selection.isFile) != null ? _a : /\.[^\\/]+$/.test(activeViewerPath);
-        frame.src = isFile ? `?view=1&file=${encodeURIComponent(activeViewerPath)}` : activeViewerPath.replace(/\/$/, "") + "/";
+        frame.src = isFile ? `?view=1&file=${encodeURIComponent(activeViewerPath)}` : `?view=1&path=${encodeURIComponent(activeViewerPath)}`;
         return;
       }
       if (frame && frame.contentWindow) {
@@ -574,7 +575,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
           } else {
             setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
           }
-          renderHistory();
+          renderHistory({ forceScroll: true });
           if (statusEl) {
             statusEl.textContent = errMsg;
             statusEl.className = "edit-status";
@@ -598,7 +599,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
           setHistory([...promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
           pendingAssistantIndex = promptHistory.length - 1;
           writeStoredHistory(activePath, promptHistory);
-          renderHistory();
+          renderHistory({ forceScroll: true });
           renderContext();
           promptInputEl.value = "";
           if (statusEl) {
@@ -641,7 +642,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
               pendingAssistantIndex = promptHistory.length - 1;
             }
             writeStoredHistory(activePath, promptHistory);
-            renderHistory();
+            renderHistory({ forceScroll: true });
             if (statusEl) {
               statusEl.textContent = errMsg;
               statusEl.className = "edit-status";
@@ -658,14 +659,14 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
             pendingAssistantIndex = promptHistory.length - 1;
           }
           writeStoredHistory(activePath, promptHistory);
-          renderHistory();
+          renderHistory({ forceScroll: true });
           if (streamToggleEl && streamToggleEl.checked && templateText) {
             startStreaming({
               stream,
               targetIndex: pendingAssistantIndex != null ? pendingAssistantIndex : promptHistory.length - 1,
               fullText: templateText,
               history: promptHistory,
-              renderHistory
+              renderHistory: () => renderHistory({ forceScroll: true })
             });
           }
           renderContext();
@@ -752,7 +753,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
             setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
           }
           writeStoredHistory(activePath, promptHistory);
-          renderHistory();
+          renderHistory({ forceScroll: true });
           renderSummary(errMsg);
         } finally {
           window.clearTimeout(fallbackTimer);
@@ -1303,7 +1304,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     function loadCurrentFolderInIframe() {
       if (currentPathForIframe2 && contentFrame) {
         const isFile = /\.[^\\/]+$/.test(currentPathForIframe2);
-        contentFrame.src = isFile ? `?view=1&file=${encodeURIComponent(currentPathForIframe2)}` : currentPathForIframe2;
+        contentFrame.src = isFile ? `?view=1&file=${encodeURIComponent(currentPathForIframe2)}` : `?view=1&path=${encodeURIComponent(currentPathForIframe2)}`;
         if (activeLink) {
           activeLink.classList.remove("nav-link-active");
           activeLink = null;
@@ -1330,13 +1331,13 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         }
       }
       const isFile = /\.[^\\/]+$/.test(hashPath);
-      contentFrame.src = isFile ? `?view=1&file=${encodeURIComponent(hashPath)}` : hashPath;
-      const parts = hashPath.split("/");
-      if (parts.length < 2 || !navList) {
+      contentFrame.src = isFile ? `?view=1&file=${encodeURIComponent(hashPath)}` : `?view=1&path=${encodeURIComponent(hashPath)}`;
+      if (!hashPath || !navList) {
         return;
       }
-      const folderPath = parts.slice(0, parts.length - 1).join("/");
-      const fileName = parts[parts.length - 1];
+      const parts = hashPath.split("/");
+      const folderPath = isFile ? parts.slice(0, parts.length - 1).join("/") : hashPath;
+      const fileName = isFile ? parts[parts.length - 1] : "";
       if (sidebarLoading) {
         sidebarLoading.style.display = "block";
       }
@@ -1348,13 +1349,15 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         } else {
           navList.dataset.stale = "1";
         }
-        const fileEls = navList.querySelectorAll("a[data-file]");
-        fileEls.forEach((el) => {
-          el.classList.remove("nav-link-active");
-          if (el.getAttribute("data-file") === fileName) {
-            el.classList.add("nav-link-active");
-          }
-        });
+        if (isFile) {
+          const fileEls = navList.querySelectorAll("a[data-file]");
+          fileEls.forEach((el) => {
+            el.classList.remove("nav-link-active");
+            if (el.getAttribute("data-file") === fileName) {
+              el.classList.add("nav-link-active");
+            }
+          });
+        }
         if (sidebarLoading) {
           sidebarLoading.style.display = "none";
         }
@@ -1404,28 +1407,14 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
           } else {
             navList.dataset.stale = "1";
           }
-          const indexFiles = ["index.html", "index.htm"];
-          let foundIndex = null;
-          indexFiles.forEach((idx) => {
-            const indexEl = navList.querySelector(`li[data-file="${idx}"]`);
-            if (indexEl && !foundIndex) {
-              foundIndex = idx;
-            }
-          });
-          if (foundIndex) {
-            const indexPath = relPath.replace(/\/$/, "") + "/" + foundIndex;
-            contentFrame.src = `?view=1&file=${encodeURIComponent(indexPath)}`;
-            window.location.hash = "/" + relPath.replace(/^\/+/, "") + "/" + foundIndex;
-          } else {
-            contentFrame.src = relPath.replace(/\/$/, "") + "/";
-            window.location.hash = "/" + relPath.replace(/^\/+/, "");
-          }
+          contentFrame.src = `?view=1&path=${encodeURIComponent(relPath)}`;
+          window.location.hash = "/" + relPath.replace(/^\/+/, "");
           if (initEditMode) {
             initEditMode();
           }
         }).catch(() => {
           navList.dataset.error = "1";
-          contentFrame.src = relPath.replace(/\/$/, "") + "/";
+          contentFrame.src = `?view=1&path=${encodeURIComponent(relPath)}`;
           window.location.hash = "/" + relPath.replace(/^\/+/, "");
           if (initEditMode) {
             initEditMode();

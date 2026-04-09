@@ -13,6 +13,7 @@ const POFF_DATA_SRC = path.join(POFF_DIR, 'datas');
 const POFF_SOURCE_DIR = path.join(POFF_DIR, 'source-files');
 const EXISTING_PARENT_DIR = path.join(POFF_DIR, 'existing-parent');
 const EXISTING_NESTED_SRC = path.join(EXISTING_PARENT_DIR, 'nested-src');
+const VIEWER_FOLDER_DIR = path.join(POFF_DIR, 'viewer-folder');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -67,6 +68,24 @@ function runWorktype(action, kind, payload = null) {
   });
 }
 
+function runViewer(relativePath, baseDir = POFF_DIR) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`viewer helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -94,6 +113,21 @@ describe('MCP create route helper (CLI)', () => {
     fs.writeFileSync(path.join(POFF_SOURCE_DIR, 'note.txt'), 'hello poff');
     fs.mkdirSync(EXISTING_NESTED_SRC, { recursive: true });
     fs.writeFileSync(path.join(EXISTING_NESTED_SRC, 'data.md'), 'nested data');
+    fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, 'nested-child'), { recursive: true });
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'child.txt'), 'viewer child');
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'poff.config.json'), JSON.stringify({
+      title: 'Folder Preview',
+      description: 'Folder layout from prompt',
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'prompted-folder-layout',
+          engine: 'lightncandy',
+          section: 'works',
+          template: '<div class="folder-custom">{{title}}|{{#each items}}<span class="entry">{{name}}:{{type}}</span>{{/each}}</div>',
+        },
+      },
+    }, null, 2));
   });
 
   afterAll(() => {
@@ -203,6 +237,17 @@ describe('Worktype HBS renderer', () => {
         descriptionHtml: '',
         linkUrl: '',
         slug: 'projects',
+        displayPath: 'projects',
+        hasItems: true,
+        itemCount: 2,
+        items: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        tree: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
         work: {
           type: 'folder',
           layout: {
@@ -222,6 +267,18 @@ describe('Worktype HBS renderer', () => {
 
     expect(output).toContain('<div class="custom-shell">');
     expect(output).toContain('<section class="viewer-template viewer-template--folder">');
-    expect(output).toContain('<iframe src="projects" title="projects"></iframe>');
+    expect(output).toContain('projects');
+    expect(output).toContain('alpha');
+    expect(output).toContain('notes.txt');
+  });
+
+  test('renders folder previews through the typed viewer route', async () => {
+    const output = await runViewer('viewer-folder');
+
+    expect(output).toContain('<title>Viewer - viewer-folder</title>');
+    expect(output).toContain('<div class="folder-custom">');
+    expect(output).toContain('Folder Preview');
+    expect(output).toContain('child.txt:file');
+    expect(output).toContain('nested-child:folder');
   });
 });

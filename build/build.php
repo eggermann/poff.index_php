@@ -143,8 +143,8 @@ if (
 }
 
 // Viewer route for typed rendering
-if (isset($_GET['view']) && isset($_GET['file'])) {
-    renderViewer($baseDir, $_GET['file']);
+if (isset($_GET['view']) && (isset($_GET['file']) || array_key_exists('path', $_GET))) {
+    renderViewer($baseDir, $_GET['file'] ?? $_GET['path']);
     return;
 }
 

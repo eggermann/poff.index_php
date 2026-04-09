@@ -1,1 +1,19 @@
-<iframe src="{{path}}" title="{{name}}"></iframe>
+<div class="folder-view">
+    <div class="folder-view-summary">
+        <span>{{displayPath}}</span>
+        <span>{{itemCount}} entries</span>
+    </div>
+    {{#if hasItems}}
+        <div class="folder-view-grid">
+            {{#each items}}
+                <article class="folder-view-card folder-view-card--{{type}}">
+                    <span class="folder-view-card-label">{{#if isFolder}}Folder{{else}}File{{/if}}</span>
+                    <strong class="folder-view-card-name">{{name}}</strong>
+                    <span class="folder-view-card-path">{{path}}</span>
+                </article>
+            {{/each}}
+        </div>
+    {{else}}
+        <div class="message">This folder is empty.</div>
+    {{/if}}
+</div>

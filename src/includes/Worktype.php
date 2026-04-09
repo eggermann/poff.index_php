@@ -238,6 +238,13 @@ class Worktype
             'isOther' => $kind === 'other',
         ];
 
+        foreach ($ctx as $key => $value) {
+            if ($key === 'work') {
+                continue;
+            }
+            $context[$key] = $value;
+        }
+
         foreach ($work as $key => $value) {
             if (is_bool($value)) {
                 $context[$key] = $value;

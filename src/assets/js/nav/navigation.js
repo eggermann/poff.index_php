@@ -45,7 +45,7 @@ export function initNavigation({
             const isFile = /\.[^\\/]+$/.test(currentPathForIframe);
             contentFrame.src = isFile
                 ? `?view=1&file=${encodeURIComponent(currentPathForIframe)}`
-                : currentPathForIframe;
+                : `?view=1&path=${encodeURIComponent(currentPathForIframe)}`;
             if (activeLink) {
                 activeLink.classList.remove('nav-link-active');
                 activeLink = null;
@@ -75,14 +75,14 @@ export function initNavigation({
         const isFile = /\.[^\\/]+$/.test(hashPath);
         contentFrame.src = isFile
             ? `?view=1&file=${encodeURIComponent(hashPath)}`
-            : hashPath;
+            : `?view=1&path=${encodeURIComponent(hashPath)}`;
 
-        const parts = hashPath.split('/');
-        if (parts.length < 2 || !navList) {
+        if (!hashPath || !navList) {
             return;
         }
-        const folderPath = parts.slice(0, parts.length - 1).join('/');
-        const fileName = parts[parts.length - 1];
+        const parts = hashPath.split('/');
+        const folderPath = isFile ? parts.slice(0, parts.length - 1).join('/') : hashPath;
+        const fileName = isFile ? parts[parts.length - 1] : '';
         if (sidebarLoading) {
             sidebarLoading.style.display = 'block';
         }
@@ -97,13 +97,15 @@ export function initNavigation({
                     // keep existing nav when empty to avoid blank menu
                     navList.dataset.stale = '1';
                 }
-                const fileEls = navList.querySelectorAll('a[data-file]');
-                fileEls.forEach(el => {
-                    el.classList.remove('nav-link-active');
-                    if (el.getAttribute('data-file') === fileName) {
-                        el.classList.add('nav-link-active');
-                    }
-                });
+                if (isFile) {
+                    const fileEls = navList.querySelectorAll('a[data-file]');
+                    fileEls.forEach(el => {
+                        el.classList.remove('nav-link-active');
+                        if (el.getAttribute('data-file') === fileName) {
+                            el.classList.add('nav-link-active');
+                        }
+                    });
+                }
                 if (sidebarLoading) {
                     sidebarLoading.style.display = 'none';
                 }
@@ -157,29 +159,15 @@ export function initNavigation({
                 } else {
                     navList.dataset.stale = '1';
                 }
-                const indexFiles = ['index.html', 'index.htm'];
-                let foundIndex = null;
-                    indexFiles.forEach(idx => {
-                        const indexEl = navList.querySelector(`li[data-file="${idx}"]`);
-                        if (indexEl && !foundIndex) {
-                            foundIndex = idx;
-                        }
-                    });
-                    if (foundIndex) {
-                        const indexPath = relPath.replace(/\/$/, '') + '/' + foundIndex;
-                        contentFrame.src = `?view=1&file=${encodeURIComponent(indexPath)}`;
-                        window.location.hash = '/' + relPath.replace(/^\/+/, '') + '/' + foundIndex;
-                    } else {
-                        contentFrame.src = relPath.replace(/\/$/, '') + '/';
-                        window.location.hash = '/' + relPath.replace(/^\/+/, '');
-                    }
-                    if (initEditMode) {
-                        initEditMode();
-                    }
+                contentFrame.src = `?view=1&path=${encodeURIComponent(relPath)}`;
+                window.location.hash = '/' + relPath.replace(/^\/+/, '');
+                if (initEditMode) {
+                    initEditMode();
+                }
                 })
                 .catch(() => {
                     navList.dataset.error = '1';
-                    contentFrame.src = relPath.replace(/\/$/, '') + '/';
+                    contentFrame.src = `?view=1&path=${encodeURIComponent(relPath)}`;
                     window.location.hash = '/' + relPath.replace(/^\/+/, '');
                     if (initEditMode) {
                         initEditMode();

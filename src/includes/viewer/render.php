@@ -1,6 +1,6 @@
 <?php
 /**
- * Viewer rendering: HTML output for files.
+ * Viewer rendering: HTML output for files and folders.
  */
 
 require_once __DIR__ . '/utils.php';
@@ -9,19 +9,32 @@ function renderViewer(string $baseDir, string $requestedPath): void
 {
     $relativePath = sanitizeRelativePath($requestedPath);
 
-    if ($relativePath === '' || strpos($relativePath, '..') !== false) {
+    if (strpos($relativePath, '..') !== false) {
         http_response_code(400);
-        echo 'Invalid file path.';
+        echo 'Invalid path.';
         return;
     }
 
-    $fullPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    $fullPath = rtrim($baseDir, DIRECTORY_SEPARATOR);
+    if ($relativePath !== '') {
+        $fullPath .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    }
     if (!file_exists($fullPath)) {
         http_response_code(404);
-        echo 'File not found.';
+        echo 'Path not found.';
         return;
     }
 
+    if (is_dir($fullPath)) {
+        renderFolderViewer($relativePath, $fullPath);
+        return;
+    }
+
+    renderFileViewer($relativePath, $fullPath);
+}
+
+function renderFileViewer(string $relativePath, string $fullPath): void
+{
     $fileConfig = null;
     if (class_exists('PoffConfig')) {
         $fileConfig = PoffConfig::ensureFileConfig(dirname($fullPath), basename($fullPath));
@@ -38,13 +51,9 @@ function renderViewer(string $baseDir, string $requestedPath): void
         $linkUrl = extractLinkFileUrl($fullPath);
     }
 
-    $safePath = htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8');
     $rawName = basename($relativePath);
-    $safeName = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
     $rawSlug = $fileConfig['slug'] ?? preg_replace('/[^a-z0-9\\-]+/i', '-', $rawName);
     $rawSlug = trim((string) $rawSlug, '-');
-    $safeSlug = htmlspecialchars($rawSlug === '' ? 'item' : $rawSlug, ENT_QUOTES, 'UTF-8');
-    $safeLinkUrl = $linkUrl ? htmlspecialchars($linkUrl, ENT_QUOTES, 'UTF-8') : '';
 
     $descriptionHtml = '';
     if (!empty($fileConfig['description'])) {
@@ -62,6 +71,137 @@ function renderViewer(string $baseDir, string $requestedPath): void
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
         'work' => $work,
     ]);
+
+    renderViewerShell([
+        'type' => $type,
+        'name' => $rawName,
+        'path' => $relativePath,
+        'bodyContent' => $bodyContent,
+        'openHref' => viewerAssetHref($relativePath),
+        'openLabel' => 'Open Raw',
+    ]);
+}
+
+function renderFolderViewer(string $relativePath, string $fullPath): void
+{
+    $folderConfig = null;
+    if (class_exists('PoffConfig')) {
+        $folderConfig = PoffConfig::ensure($fullPath);
+    }
+
+    $workDefaults = Worktype::definition('folder');
+    $workData = (isset($folderConfig['work']) && is_array($folderConfig['work'])) ? $folderConfig['work'] : [];
+    $work = array_merge($workDefaults, $workData);
+
+    $rawName = $folderConfig['folderName'] ?? basename($fullPath);
+    if ($rawName === '') {
+        $rawName = basename(rtrim($fullPath, DIRECTORY_SEPARATOR));
+    }
+    $rawSlug = $folderConfig['slug'] ?? preg_replace('/[^a-z0-9\\-]+/i', '-', $rawName);
+    $rawSlug = trim((string) $rawSlug, '-');
+    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig);
+    $descriptionHtml = '';
+    if (!empty($folderConfig['description'])) {
+        $descriptionHtml = '<div class="work-description">' . nl2br(htmlspecialchars($folderConfig['description'], ENT_QUOTES, 'UTF-8')) . '</div>';
+    }
+
+    $bodyContent = Worktype::render('folder', [
+        'path' => $relativePath,
+        'displayPath' => $relativePath === '' ? '.' : $relativePath,
+        'name' => $rawName,
+        'title' => $folderConfig['title'] ?? $rawName,
+        'description' => $folderConfig['description'] ?? '',
+        'descriptionHtml' => $descriptionHtml,
+        'linkUrl' => $folderConfig['link'] ?? $folderConfig['url'] ?? '',
+        'slug' => $rawSlug === '' ? 'item' : $rawSlug,
+        'folderName' => $folderConfig['folderName'] ?? $rawName,
+        'tree' => $tree,
+        'items' => $tree,
+        'hasItems' => $tree !== [],
+        'itemCount' => count($tree),
+        'work' => $work,
+    ]);
+
+    $browseHref = '?path=';
+    if ($relativePath !== '') {
+        $browseHref .= rawurlencode($relativePath);
+    }
+
+    renderViewerShell([
+        'type' => 'folder',
+        'name' => $rawName,
+        'path' => $relativePath,
+        'bodyContent' => $bodyContent,
+        'openHref' => $browseHref,
+        'openLabel' => 'Open Folder',
+    ]);
+}
+
+function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig): array
+{
+    $tree = [];
+    if (is_array($folderConfig) && isset($folderConfig['tree']) && is_array($folderConfig['tree'])) {
+        $tree = $folderConfig['tree'];
+    } elseif (class_exists('PoffConfig')) {
+        $tree = PoffConfig::buildFirstLevelTree($fullPath);
+    }
+
+    $items = [];
+    foreach ($tree as $entry) {
+        if (!is_array($entry) || (($entry['visible'] ?? true) === false)) {
+            continue;
+        }
+        $entryName = trim((string) ($entry['name'] ?? ''));
+        if ($entryName === '') {
+            continue;
+        }
+
+        $entryType = (($entry['type'] ?? 'file') === 'folder') ? 'folder' : 'file';
+        $entryRelativePath = $relativePath === '' ? $entryName : $relativePath . '/' . $entryName;
+        $entryFullPath = $fullPath . DIRECTORY_SEPARATOR . $entryName;
+        $entryKind = $entryType === 'folder' ? 'folder' : detectFileType($entryFullPath);
+
+        $items[] = array_merge($entry, [
+            'name' => $entryName,
+            'title' => $entry['title'] ?? $entryName,
+            'type' => $entryType,
+            'kind' => $entryKind,
+            'path' => $entryRelativePath,
+            'viewerHref' => '?view=1&path=' . rawurlencode($entryRelativePath),
+            'isFolder' => $entryType === 'folder',
+            'isFile' => $entryType !== 'folder',
+        ]);
+    }
+
+    return $items;
+}
+
+function viewerAssetHref(string $relativePath): string
+{
+    if ($relativePath === '') {
+        return '';
+    }
+
+    $parts = explode('/', $relativePath);
+    $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
+
+    return implode('/', $encoded);
+}
+
+function renderViewerShell(array $payload): void
+{
+    $rawType = (string) ($payload['type'] ?? 'file');
+    $rawName = (string) ($payload['name'] ?? '');
+    $rawPath = (string) ($payload['path'] ?? '');
+    $bodyContent = (string) ($payload['bodyContent'] ?? '');
+    $openHref = isset($payload['openHref']) ? (string) $payload['openHref'] : '';
+    $openLabel = isset($payload['openLabel']) ? (string) $payload['openLabel'] : 'Open';
+
+    $safeName = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
+    $safePath = htmlspecialchars($rawPath === '' ? '.' : $rawPath, ENT_QUOTES, 'UTF-8');
+    $safeOpenHref = htmlspecialchars($openHref, ENT_QUOTES, 'UTF-8');
+    $safeOpenLabel = htmlspecialchars($openLabel, ENT_QUOTES, 'UTF-8');
+    $safeType = htmlspecialchars($rawType, ENT_QUOTES, 'UTF-8');
 
     ?>
 <!DOCTYPE html>
@@ -115,6 +255,71 @@ function renderViewer(string $baseDir, string $requestedPath): void
         }
         .viewer video, .viewer iframe { width: 100%; height: 100%; }
         .viewer iframe { background: #c3cddbff; }
+        .viewer .viewer-template {
+            width: 100%;
+            min-height: 100%;
+            box-sizing: border-box;
+        }
+        .viewer .viewer-template--folder {
+            padding: 24px;
+        }
+        .folder-view {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .folder-view-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+        .folder-view-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+        .folder-view-card {
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(17, 24, 39, 0.72);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+        }
+        .folder-view-card-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.16);
+            color: #93c5fd;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .folder-view-card--folder .folder-view-card-label {
+            background: rgba(34, 197, 94, 0.16);
+            color: #86efac;
+        }
+        .folder-view-card-name {
+            display: block;
+            margin-top: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #f9fafb;
+            word-break: break-word;
+        }
+        .folder-view-card-path {
+            display: block;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #94a3b8;
+            word-break: break-word;
+        }
         .work-description {
             position: absolute;
             bottom: 16px;
@@ -137,11 +342,11 @@ function renderViewer(string $baseDir, string $requestedPath): void
 <body>
     <header>
         <div class="meta">
-            <div class="name"><?= $safeName ?> <span style="opacity:0.7;font-size:12px;">(<?= $type ?>)</span></div>
+            <div class="name"><?= $safeName ?> <span style="opacity:0.7;font-size:12px;">(<?= $safeType ?>)</span></div>
             <div class="path"><?= $safePath ?></div>
         </div>
         <div>
-            <a href="<?= $safePath ?>" target="_blank" rel="noopener">Open Raw</a>
+            <a href="<?= $safeOpenHref ?>" target="_blank" rel="noopener"><?= $safeOpenLabel ?></a>
         </div>
     </header>
     <div class="viewer">

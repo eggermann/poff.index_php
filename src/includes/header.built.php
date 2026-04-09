@@ -110,12 +110,16 @@
 .visible{visibility:visible;}
 .absolute{position:absolute;}
 .static{position:static;}
+.grid{display:grid;}
 .block{display:block;}
 .contents{display:contents;}
 .hidden{display:none;}
 .flex{display:flex;}
+.inline-flex{display:inline-flex;}
+.flex-wrap{flex-wrap:wrap;}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .border{border-width:1px;}
+.uppercase{text-transform:uppercase;}
 .underline{text-decoration-line:underline;}
 .opacity-60{opacity:0.6;}
 .backdrop-filter{-webkit-backdrop-filter:var(--un-backdrop-blur) var(--un-backdrop-brightness) var(--un-backdrop-contrast) var(--un-backdrop-grayscale) var(--un-backdrop-hue-rotate) var(--un-backdrop-invert) var(--un-backdrop-opacity) var(--un-backdrop-saturate) var(--un-backdrop-sepia);backdrop-filter:var(--un-backdrop-blur) var(--un-backdrop-brightness) var(--un-backdrop-contrast) var(--un-backdrop-grayscale) var(--un-backdrop-hue-rotate) var(--un-backdrop-invert) var(--un-backdrop-opacity) var(--un-backdrop-saturate) var(--un-backdrop-sepia);}
