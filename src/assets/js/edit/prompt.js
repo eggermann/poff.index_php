@@ -48,10 +48,17 @@ export function bindPromptWindow({
     const promptGenerationLabelEl = root.querySelector('#promptGenerationLabel');
     const promptInputEl = root.querySelector('#prompt-input');
     const promptSendEl = root.querySelector('#prompt-send');
+    const promptAttachEl = root.querySelector('#prompt-attach');
     const promptClearEl = root.querySelector('#prompt-clear');
+    const promptImageInputEl = root.querySelector('#prompt-image-input');
+    const promptAttachmentEl = root.querySelector('#promptAttachment');
+    const promptAttachmentPreviewEl = root.querySelector('#promptAttachmentPreview');
+    const promptAttachmentNameEl = root.querySelector('#promptAttachmentName');
+    const promptAttachmentRemoveEl = root.querySelector('#prompt-attachment-remove');
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection ? getActiveSelection().path : '';
+    let imageAttachment = null;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
 
     const setHistory = (nextHistory) => {
@@ -73,6 +80,70 @@ export function bindPromptWindow({
         renderPromptSummary(promptSummaryEl, content);
     };
 
+    const updateAttachmentUi = () => {
+        if (!promptAttachmentEl || !promptAttachmentPreviewEl || !promptAttachmentNameEl || !promptInputEl) {
+            return;
+        }
+        const hasAttachment = !!imageAttachment;
+        promptAttachmentEl.hidden = !hasAttachment;
+        promptInputEl.classList.toggle('prompt-input-has-attachment', hasAttachment);
+        if (!hasAttachment) {
+            promptAttachmentPreviewEl.removeAttribute('src');
+            promptAttachmentNameEl.textContent = 'Image attached';
+            return;
+        }
+        promptAttachmentPreviewEl.src = imageAttachment.dataUrl;
+        promptAttachmentNameEl.textContent = imageAttachment.name || 'clipboard-image.png';
+    };
+
+    const clearAttachment = () => {
+        imageAttachment = null;
+        if (promptImageInputEl) {
+            promptImageInputEl.value = '';
+        }
+        updateAttachmentUi();
+    };
+
+    const isSupportedImageFile = (file) => !!file && typeof file.type === 'string' && file.type.startsWith('image/');
+
+    const readImageFile = (file) => new Promise((resolve, reject) => {
+        if (!isSupportedImageFile(file)) {
+            reject(new Error('Only image files are supported.'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+            if (!dataUrl.startsWith('data:image/')) {
+                reject(new Error('Invalid image data.'));
+                return;
+            }
+            resolve({
+                name: file.name || 'clipboard-image.png',
+                mimeType: file.type || 'image/png',
+                dataUrl,
+            });
+        };
+        reader.onerror = () => reject(new Error('Failed to read image.'));
+        reader.readAsDataURL(file);
+    });
+
+    const attachImageFile = async (file) => {
+        try {
+            imageAttachment = await readImageFile(file);
+            updateAttachmentUi();
+            if (statusEl) {
+                statusEl.textContent = `Attached image: ${imageAttachment.name}`;
+                statusEl.className = 'edit-status edit-status-success';
+            }
+        } catch (err) {
+            if (statusEl) {
+                statusEl.textContent = err.message || 'Failed to attach image.';
+                statusEl.className = 'edit-status';
+            }
+        }
+    };
+
     const setGeneratingState = (active, label = 'Generating answer...') => {
         root.classList.toggle('prompt-window-generating', active);
         root.setAttribute('aria-busy', active ? 'true' : 'false');
@@ -89,8 +160,14 @@ export function bindPromptWindow({
             promptSendEl.disabled = active;
             promptSendEl.textContent = active ? 'Generating...' : 'Send';
         }
+        if (promptAttachEl) {
+            promptAttachEl.disabled = active;
+        }
         if (promptClearEl) {
             promptClearEl.disabled = active;
+        }
+        if (promptAttachmentRemoveEl) {
+            promptAttachmentRemoveEl.disabled = active;
         }
         if (promptInputEl) {
             promptInputEl.disabled = active;
@@ -187,6 +264,7 @@ export function bindPromptWindow({
     renderHistory();
     renderContext();
     renderSummary('Waiting for response...');
+    updateAttachmentUi();
 
     const reloadViewer = () => {
         const frame = document.getElementById('contentFrame');
@@ -232,6 +310,7 @@ export function bindPromptWindow({
             setHistory([]);
             writeStoredHistory(activePath, promptHistory);
             renderHistory();
+            clearAttachment();
             if (statusEl) {
                 statusEl.textContent = 'Chat cleared.';
                 statusEl.className = 'edit-status';
@@ -241,7 +320,7 @@ export function bindPromptWindow({
 
     if (promptSendEl && promptInputEl) {
         const sendPrompt = async () => {
-            if (isSending || !promptInputEl.value.trim()) {
+            if (isSending || (!promptInputEl.value.trim() && !imageAttachment)) {
                 return;
             }
             isSending = true;
@@ -312,6 +391,9 @@ export function bindPromptWindow({
                     history: historyForRequest,
                     systemPrompt: systemPromptValue,
                 };
+                if (imageAttachment) {
+                    payload.image = { ...imageAttachment };
+                }
                 debugPromptLog('request', payload);
                 const response = await requestPromptTemplate(payload);
                 settled = true;
@@ -319,7 +401,8 @@ export function bindPromptWindow({
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
                 const nextTitle = typeof response.title === 'string' ? response.title.trim() : null;
                 const nextDescription = typeof response.description === 'string' ? response.description.trim() : null;
-                const nextWork = filterAllowedWork(response.work);
+                const currentConfig = getConfig ? getConfig() : null;
+                const nextWork = filterAllowedWork(response.work, currentConfig);
                 if (response.error || !templateText) {
                     stopStreaming(stream);
                     setGeneratingState(false);
@@ -425,6 +508,7 @@ export function bindPromptWindow({
                 if (nextWork && Object.keys(nextWork).length) extra.push(`work: ${Object.keys(nextWork).join(', ')}`);
                 const summaryText = `Saved ${templateText.length} HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
                 renderSummary(summaryText);
+                clearAttachment();
                 reloadViewer();
             } catch (err) {
                 settled = true;
@@ -457,6 +541,29 @@ export function bindPromptWindow({
             void sendPrompt();
         });
 
+        if (promptAttachEl && promptImageInputEl) {
+            promptAttachEl.addEventListener('click', () => {
+                promptImageInputEl.click();
+            });
+            promptImageInputEl.addEventListener('change', async () => {
+                const file = promptImageInputEl.files && promptImageInputEl.files[0] ? promptImageInputEl.files[0] : null;
+                if (!file) {
+                    return;
+                }
+                await attachImageFile(file);
+            });
+        }
+
+        if (promptAttachmentRemoveEl) {
+            promptAttachmentRemoveEl.addEventListener('click', () => {
+                clearAttachment();
+                if (statusEl) {
+                    statusEl.textContent = 'Image removed.';
+                    statusEl.className = 'edit-status';
+                }
+            });
+        }
+
         promptInputEl.addEventListener('keydown', (event) => {
             if (
                 event.key === 'Enter' &&
@@ -469,6 +576,20 @@ export function bindPromptWindow({
                 event.preventDefault();
                 void sendPrompt();
             }
+        });
+
+        promptInputEl.addEventListener('paste', (event) => {
+            const items = event.clipboardData?.items ? Array.from(event.clipboardData.items) : [];
+            const imageItem = items.find((item) => typeof item.type === 'string' && item.type.startsWith('image/'));
+            if (!imageItem) {
+                return;
+            }
+            const file = imageItem.getAsFile();
+            if (!file) {
+                return;
+            }
+            event.preventDefault();
+            void attachImageFile(file);
         });
     }
 }

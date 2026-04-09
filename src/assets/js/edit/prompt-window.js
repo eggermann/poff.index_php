@@ -64,10 +64,22 @@ export function renderPromptWindow(settings = {}) {
                     <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}</div>
                 </div>
             </div>
+            <input id="prompt-image-input" type="file" accept="image/*" hidden>
+            <div class="prompt-attachment" id="promptAttachment" hidden>
+                <div class="prompt-attachment-preview-wrap">
+                    <img class="prompt-attachment-preview" id="promptAttachmentPreview" alt="Prompt attachment preview">
+                </div>
+                <div class="prompt-attachment-meta">
+                    <div class="prompt-attachment-name" id="promptAttachmentName">Image attached</div>
+                    <div class="small-note">Clipboard paste and image uploads are supported.</div>
+                </div>
+                <button class="btn btn-secondary" type="button" id="prompt-attachment-remove">Remove image</button>
+            </div>
             <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
             <div class="prompt-actions">
                 <div class="prompt-actions-left">
                     <button class="btn" type="button" id="prompt-send">Send</button>
+                    <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
                     <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
                 </div>
                 <label class="prompt-inline-toggle">
@@ -76,6 +88,7 @@ export function renderPromptWindow(settings = {}) {
                 </label>
             </div>
             <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
+            <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
             <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
         </div>
     `;

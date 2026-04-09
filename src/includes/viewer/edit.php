@@ -5,6 +5,25 @@
 
 require_once __DIR__ . '/utils.php';
 
+function cmsPromptImagePayload(array $data): ?array
+{
+    $image = $data['image'] ?? null;
+    if (!is_array($image)) {
+        return null;
+    }
+    $dataUrl = isset($image['dataUrl']) ? trim((string) $image['dataUrl']) : '';
+    if ($dataUrl === '' || !preg_match('#^data:(image/[a-z0-9.+-]+);base64,(.+)$#i', $dataUrl, $matches)) {
+        return null;
+    }
+
+    return [
+        'name' => trim((string) ($image['name'] ?? 'clipboard-image.png')),
+        'mimeType' => strtolower($matches[1]),
+        'dataUrl' => $dataUrl,
+        'base64' => $matches[2],
+    ];
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
@@ -232,11 +251,12 @@ function cmsHandleEditAction(): void
         $apiKey = trim((string) ($data['apiKey'] ?? ''));
         $history = is_array($data['history'] ?? null) ? $data['history'] : [];
         $systemPromptValue = trim((string) ($data['systemPrompt'] ?? ''));
+        $image = cmsPromptImagePayload($data);
 
-        if ($prompt === '') {
+        if ($prompt === '' && !$image) {
             cmsJsonResponse([
                 'allowed' => true,
-                'error' => 'Missing prompt.',
+                'error' => 'Missing prompt or image.',
             ]);
         }
 
@@ -267,6 +287,9 @@ function cmsHandleEditAction(): void
             $historyText .= strtoupper($role) . ": " . $content . "\n";
         }
         $userPrompt = "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
+        if ($image) {
+            $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
+        }
 
         $env = cmsLoadEnv($rootDir);
         $template = '';
@@ -287,7 +310,10 @@ function cmsHandleEditAction(): void
                 'model' => $usedModel,
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userPrompt],
+                    ['role' => 'user', 'content' => $image ? [
+                        ['type' => 'text', 'text' => $userPrompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+                    ] : $userPrompt],
                 ],
                 'temperature' => 0.4,
             ];
@@ -319,6 +345,12 @@ function cmsHandleEditAction(): void
                     [
                         'parts' => [
                             ['text' => $promptText],
+                            ...($image ? [[
+                                'inline_data' => [
+                                    'mime_type' => $image['mimeType'],
+                                    'data' => $image['base64'],
+                                ],
+                            ]] : []),
                         ],
                     ],
                 ],
@@ -345,6 +377,7 @@ function cmsHandleEditAction(): void
                 'history' => $history,
                 'config' => $config,
                 'instruction' => $systemPrompt,
+                'image' => $image,
             ];
             $response = cmsHttpPost($endpoint, [], $payload);
             if (!$response['ok']) {

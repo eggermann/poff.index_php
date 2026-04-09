@@ -88,20 +88,6 @@
   // src/assets/js/edit/prompt/constants.js
   var promptSettingsKey = "poffEditPromptSettings";
   var promptHistoryKey = "poffEditPromptHistory";
-  var allowedWorkKeys = [
-    "type",
-    "fit",
-    "background",
-    "caption",
-    "autoplay",
-    "loop",
-    "muted",
-    "poster",
-    "url",
-    "link",
-    "layout",
-    "model"
-  ];
   var defaultSystemPrompt = [
     "You are a Handlebars (HBS) template generator for this single-page CMS.",
     "Transform the user description into one HBS template string that will be saved to work.layout.template and rendered by LightnCandy.",
@@ -166,13 +152,20 @@
   function tagHistory(history) {
     return history.map((msg, idx) => ({ ...msg, _index: idx }));
   }
-  function filterAllowedWork(work) {
+  function filterAllowedWork(work, config) {
     if (!work || typeof work !== "object") {
       return null;
     }
+    const baseWork = config && typeof config === "object" && config.work && typeof config.work === "object" ? config.work : {};
+    const allowedKeys = /* @__PURE__ */ new Set([
+      ...Object.keys(baseWork),
+      "type",
+      "layout",
+      "model"
+    ]);
     const filtered = {};
     Object.entries(work).forEach(([key, value]) => {
-      if (allowedWorkKeys.includes(key)) {
+      if (allowedKeys.has(key)) {
         filtered[key] = value;
       }
     });
@@ -369,10 +362,17 @@
     const promptGenerationLabelEl = root.querySelector("#promptGenerationLabel");
     const promptInputEl = root.querySelector("#prompt-input");
     const promptSendEl = root.querySelector("#prompt-send");
+    const promptAttachEl = root.querySelector("#prompt-attach");
     const promptClearEl = root.querySelector("#prompt-clear");
+    const promptImageInputEl = root.querySelector("#prompt-image-input");
+    const promptAttachmentEl = root.querySelector("#promptAttachment");
+    const promptAttachmentPreviewEl = root.querySelector("#promptAttachmentPreview");
+    const promptAttachmentNameEl = root.querySelector("#promptAttachmentName");
+    const promptAttachmentRemoveEl = root.querySelector("#prompt-attachment-remove");
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection2 ? getActiveSelection2().path : "";
+    let imageAttachment = null;
     const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
     const setHistory = (nextHistory) => {
       const list = Array.isArray(nextHistory) ? nextHistory : [];
@@ -388,6 +388,65 @@
     };
     const renderSummary = (content) => {
       renderPromptSummary(promptSummaryEl, content);
+    };
+    const updateAttachmentUi = () => {
+      if (!promptAttachmentEl || !promptAttachmentPreviewEl || !promptAttachmentNameEl || !promptInputEl) {
+        return;
+      }
+      const hasAttachment = !!imageAttachment;
+      promptAttachmentEl.hidden = !hasAttachment;
+      promptInputEl.classList.toggle("prompt-input-has-attachment", hasAttachment);
+      if (!hasAttachment) {
+        promptAttachmentPreviewEl.removeAttribute("src");
+        promptAttachmentNameEl.textContent = "Image attached";
+        return;
+      }
+      promptAttachmentPreviewEl.src = imageAttachment.dataUrl;
+      promptAttachmentNameEl.textContent = imageAttachment.name || "clipboard-image.png";
+    };
+    const clearAttachment = () => {
+      imageAttachment = null;
+      if (promptImageInputEl) {
+        promptImageInputEl.value = "";
+      }
+      updateAttachmentUi();
+    };
+    const isSupportedImageFile = (file) => !!file && typeof file.type === "string" && file.type.startsWith("image/");
+    const readImageFile = (file) => new Promise((resolve, reject) => {
+      if (!isSupportedImageFile(file)) {
+        reject(new Error("Only image files are supported."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = typeof reader.result === "string" ? reader.result : "";
+        if (!dataUrl.startsWith("data:image/")) {
+          reject(new Error("Invalid image data."));
+          return;
+        }
+        resolve({
+          name: file.name || "clipboard-image.png",
+          mimeType: file.type || "image/png",
+          dataUrl
+        });
+      };
+      reader.onerror = () => reject(new Error("Failed to read image."));
+      reader.readAsDataURL(file);
+    });
+    const attachImageFile = async (file) => {
+      try {
+        imageAttachment = await readImageFile(file);
+        updateAttachmentUi();
+        if (statusEl) {
+          statusEl.textContent = `Attached image: ${imageAttachment.name}`;
+          statusEl.className = "edit-status edit-status-success";
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.textContent = err.message || "Failed to attach image.";
+          statusEl.className = "edit-status";
+        }
+      }
     };
     const setGeneratingState = (active, label = "Generating answer...") => {
       root.classList.toggle("prompt-window-generating", active);
@@ -405,8 +464,14 @@
         promptSendEl.disabled = active;
         promptSendEl.textContent = active ? "Generating..." : "Send";
       }
+      if (promptAttachEl) {
+        promptAttachEl.disabled = active;
+      }
       if (promptClearEl) {
         promptClearEl.disabled = active;
+      }
+      if (promptAttachmentRemoveEl) {
+        promptAttachmentRemoveEl.disabled = active;
       }
       if (promptInputEl) {
         promptInputEl.disabled = active;
@@ -497,6 +562,7 @@
     renderHistory();
     renderContext();
     renderSummary("Waiting for response...");
+    updateAttachmentUi();
     const reloadViewer = () => {
       var _a;
       const frame = document.getElementById("contentFrame");
@@ -537,6 +603,7 @@
         setHistory([]);
         writeStoredHistory(activePath, promptHistory);
         renderHistory();
+        clearAttachment();
         if (statusEl) {
           statusEl.textContent = "Chat cleared.";
           statusEl.className = "edit-status";
@@ -546,7 +613,7 @@
     if (promptSendEl && promptInputEl) {
       const sendPrompt = async () => {
         var _a;
-        if (isSending || !promptInputEl.value.trim()) {
+        if (isSending || !promptInputEl.value.trim() && !imageAttachment) {
           return;
         }
         isSending = true;
@@ -614,6 +681,9 @@
             history: historyForRequest,
             systemPrompt: systemPromptValue
           };
+          if (imageAttachment) {
+            payload.image = { ...imageAttachment };
+          }
           debugPromptLog("request", payload);
           const response = await requestPromptTemplate2(payload);
           settled = true;
@@ -621,7 +691,8 @@
           const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
           const nextTitle = typeof response.title === "string" ? response.title.trim() : null;
           const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
-          const nextWork = filterAllowedWork(response.work);
+          const currentConfig = getConfig ? getConfig() : null;
+          const nextWork = filterAllowedWork(response.work, currentConfig);
           if (response.error || !templateText) {
             stopStreaming(stream);
             setGeneratingState(false);
@@ -727,6 +798,7 @@
           if (nextWork && Object.keys(nextWork).length) extra.push(`work: ${Object.keys(nextWork).join(", ")}`);
           const summaryText = `Saved ${templateText.length} HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
           renderSummary(summaryText);
+          clearAttachment();
           reloadViewer();
         } catch (err) {
           settled = true;
@@ -757,11 +829,46 @@
       promptSendEl.addEventListener("click", () => {
         void sendPrompt();
       });
+      if (promptAttachEl && promptImageInputEl) {
+        promptAttachEl.addEventListener("click", () => {
+          promptImageInputEl.click();
+        });
+        promptImageInputEl.addEventListener("change", async () => {
+          const file = promptImageInputEl.files && promptImageInputEl.files[0] ? promptImageInputEl.files[0] : null;
+          if (!file) {
+            return;
+          }
+          await attachImageFile(file);
+        });
+      }
+      if (promptAttachmentRemoveEl) {
+        promptAttachmentRemoveEl.addEventListener("click", () => {
+          clearAttachment();
+          if (statusEl) {
+            statusEl.textContent = "Image removed.";
+            statusEl.className = "edit-status";
+          }
+        });
+      }
       promptInputEl.addEventListener("keydown", (event) => {
         if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing) {
           event.preventDefault();
           void sendPrompt();
         }
+      });
+      promptInputEl.addEventListener("paste", (event) => {
+        var _a;
+        const items = ((_a = event.clipboardData) == null ? void 0 : _a.items) ? Array.from(event.clipboardData.items) : [];
+        const imageItem = items.find((item) => typeof item.type === "string" && item.type.startsWith("image/"));
+        if (!imageItem) {
+          return;
+        }
+        const file = imageItem.getAsFile();
+        if (!file) {
+          return;
+        }
+        event.preventDefault();
+        void attachImageFile(file);
       });
     }
   }
@@ -935,10 +1042,22 @@
                     <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}</div>
                 </div>
             </div>
+            <input id="prompt-image-input" type="file" accept="image/*" hidden>
+            <div class="prompt-attachment" id="promptAttachment" hidden>
+                <div class="prompt-attachment-preview-wrap">
+                    <img class="prompt-attachment-preview" id="promptAttachmentPreview" alt="Prompt attachment preview">
+                </div>
+                <div class="prompt-attachment-meta">
+                    <div class="prompt-attachment-name" id="promptAttachmentName">Image attached</div>
+                    <div class="small-note">Clipboard paste and image uploads are supported.</div>
+                </div>
+                <button class="btn btn-secondary" type="button" id="prompt-attachment-remove">Remove image</button>
+            </div>
             <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
             <div class="prompt-actions">
                 <div class="prompt-actions-left">
                     <button class="btn" type="button" id="prompt-send">Send</button>
+                    <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
                     <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
                 </div>
                 <label class="prompt-inline-toggle">
@@ -947,6 +1066,7 @@
                 </label>
             </div>
             <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
+            <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
             <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
         </div>
     `;

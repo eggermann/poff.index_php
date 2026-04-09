@@ -3,6 +3,25 @@ declare(strict_types=1);
 
 const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 90;
 
+function mcpPromptImagePayload(array $data): ?array
+{
+    $image = $data['image'] ?? null;
+    if (!is_array($image)) {
+        return null;
+    }
+    $dataUrl = isset($image['dataUrl']) ? trim((string) $image['dataUrl']) : '';
+    if ($dataUrl === '' || !preg_match('#^data:(image/[a-z0-9.+-]+);base64,(.+)$#i', $dataUrl, $matches)) {
+        return null;
+    }
+
+    return [
+        'name' => trim((string) ($image['name'] ?? 'clipboard-image.png')),
+        'mimeType' => strtolower($matches[1]),
+        'dataUrl' => $dataUrl,
+        'base64' => $matches[2],
+    ];
+}
+
 function mcpPromptResolvePath(string $rootDir, string $relativePath): ?string
 {
     $trimmed = trim($relativePath, "/\\");
@@ -135,12 +154,13 @@ function handlePromptTemplate(array $opts): array
     $endpoint = trim((string) ($data['endpoint'] ?? ''));
     $apiKey = trim((string) ($data['apiKey'] ?? ''));
     $history = is_array($data['history'] ?? null) ? $data['history'] : [];
+    $image = mcpPromptImagePayload($data);
 
-    if ($prompt === '') {
+    if ($prompt === '' && !$image) {
         return [
             'route' => 'prompt-template',
             'allowed' => true,
-            'error' => 'Missing prompt.',
+            'error' => 'Missing prompt or image.',
         ];
     }
 
@@ -160,6 +180,9 @@ function handlePromptTemplate(array $opts): array
         $historyText .= strtoupper($role) . ": " . $content . "\n";
     }
     $userPrompt = "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
+    if ($image) {
+        $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
+    }
 
     $env = mcpPromptLoadEnv($rootDir);
     $template = '';
@@ -181,7 +204,10 @@ function handlePromptTemplate(array $opts): array
             'model' => $usedModel,
             'messages' => [
                 ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $userPrompt],
+                ['role' => 'user', 'content' => $image ? [
+                    ['type' => 'text', 'text' => $userPrompt],
+                    ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+                ] : $userPrompt],
             ],
             'temperature' => 0.4,
         ];
@@ -215,6 +241,12 @@ function handlePromptTemplate(array $opts): array
                 [
                     'parts' => [
                         ['text' => $promptText],
+                        ...($image ? [[
+                            'inline_data' => [
+                                'mime_type' => $image['mimeType'],
+                                'data' => $image['base64'],
+                            ],
+                        ]] : []),
                     ],
                 ],
             ],
@@ -243,6 +275,7 @@ function handlePromptTemplate(array $opts): array
             'history' => $history,
             'config' => $config,
             'instruction' => $systemPrompt,
+            'image' => $image,
         ];
         $response = mcpPromptHttpPost($endpoint, [], $payload);
         if (!$response['ok']) {
