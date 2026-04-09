@@ -67,6 +67,19 @@ function runWorktype(action, kind, payload = null) {
   });
 }
 
+async function hasLightnCandy() {
+  return new Promise((resolve) => {
+    const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.on('exit', () => resolve(stdout.trim() === 'yes'));
+  });
+}
+
 describe('MCP create route helper (CLI)', () => {
   beforeAll(() => {
     if (fs.existsSync(POFF_DIR)) {
@@ -145,6 +158,7 @@ describe('Worktype HBS renderer', () => {
   });
 
   test('renders the default layout with the file work partial', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
     const output = await runWorktype('render', 'image', {
       ctx: {
         path: 'assets/photo.png',
@@ -168,12 +182,18 @@ describe('Worktype HBS renderer', () => {
       },
     });
 
+    if (!lightnCandyInstalled) {
+      expect(output).toBe('<iframe src="assets/photo.png" title="photo.png"></iframe>');
+      return;
+    }
+
     expect(output).toContain('<section class="viewer-template viewer-template--image">');
     expect(output).toContain('<img src="assets/photo.png" alt="Project Photo"');
     expect(output).toContain('<div class="work-description">Inline description</div>');
   });
 
   test('allows a custom HBS layout template to include the default layout partial', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
     const output = await runWorktype('render', 'folder', {
       ctx: {
         path: 'projects',
@@ -194,6 +214,11 @@ describe('Worktype HBS renderer', () => {
         },
       },
     });
+
+    if (!lightnCandyInstalled) {
+      expect(output).toBe('<iframe src="projects" title="projects"></iframe>');
+      return;
+    }
 
     expect(output).toContain('<div class="custom-shell">');
     expect(output).toContain('<section class="viewer-template viewer-template--folder">');

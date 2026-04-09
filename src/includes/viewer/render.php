@@ -53,6 +53,7 @@ function renderViewer(string $baseDir, string $requestedPath): void
 
     $bodyContent = Worktype::render($type, [
         'path' => $relativePath,
+        'mimeType' => $mimeType ?? '',
         'name' => $rawName,
         'title' => $fileConfig['title'] ?? $rawName,
         'description' => $fileConfig['description'] ?? '',

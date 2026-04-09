@@ -27,6 +27,7 @@ return array(
     'Opis\\Uri\\' => array($vendorDir . '/opis/uri/src'),
     'Opis\\String\\' => array($vendorDir . '/opis/string/src'),
     'Opis\\JsonSchema\\' => array($vendorDir . '/opis/json-schema/src'),
+    'LightnCandy\\' => array($vendorDir . '/zordius/lightncandy/src'),
     'Fig\\Http\\Message\\' => array($vendorDir . '/fig/http-message-util/src'),
     'Evenement\\' => array($vendorDir . '/evenement/evenement/src'),
     'Doctrine\\Deprecations\\' => array($vendorDir . '/doctrine/deprecations/src'),

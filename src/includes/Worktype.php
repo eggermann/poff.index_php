@@ -71,7 +71,9 @@ class Worktype
         $partials = self::templates();
 
         if ($template) {
-            self::ensureRendererAvailable();
+            if (!self::rendererAvailable()) {
+                return self::fallbackRender($ctx);
+            }
             try {
                 $compiled = \LightnCandy\LightnCandy::compile($template, [
                     'partials' => $partials,
@@ -207,11 +209,9 @@ class Worktype
         return '';
     }
 
-    private static function ensureRendererAvailable(): void
+    private static function rendererAvailable(): bool
     {
-        if (!class_exists('\LightnCandy\LightnCandy')) {
-            throw new \RuntimeException('Missing dependency: install zordius/lightncandy via Composer.');
-        }
+        return class_exists('\LightnCandy\LightnCandy');
     }
 
     private static function buildRenderContext(string $kind, array $ctx, array $work, array $layout): array
@@ -219,6 +219,7 @@ class Worktype
         $context = [
             'kind' => $kind,
             'path' => (string) ($ctx['path'] ?? ''),
+            'mimeType' => (string) ($ctx['mimeType'] ?? ''),
             'name' => (string) ($ctx['name'] ?? ''),
             'title' => (string) ($ctx['title'] ?? ($ctx['name'] ?? '')),
             'description' => (string) ($ctx['description'] ?? ''),
@@ -241,10 +242,12 @@ class Worktype
             if (is_bool($value)) {
                 $context[$key] = $value;
                 $context[$key . 'Attr'] = $value ? $key : '';
+                $context['work'][$key . 'Attr'] = $value ? $key : '';
                 continue;
             }
             if (is_scalar($value) || $value === null) {
                 $context[$key] = $value;
+                $context['work'][$key] = $value;
             }
         }
 

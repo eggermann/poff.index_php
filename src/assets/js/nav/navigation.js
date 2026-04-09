@@ -42,7 +42,10 @@ export function initNavigation({
 
     function loadCurrentFolderInIframe() {
         if (currentPathForIframe && contentFrame) {
-            contentFrame.src = currentPathForIframe;
+            const isFile = /\.[^\\/]+$/.test(currentPathForIframe);
+            contentFrame.src = isFile
+                ? `?view=1&file=${encodeURIComponent(currentPathForIframe)}`
+                : currentPathForIframe;
             if (activeLink) {
                 activeLink.classList.remove('nav-link-active');
                 activeLink = null;

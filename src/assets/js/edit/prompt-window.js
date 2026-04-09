@@ -49,6 +49,10 @@ export function renderPromptWindow(settings = {}) {
                 <div class="prompt-summary-title">Template summary</div>
                 <div class="prompt-summary-body">Waiting for response...</div>
             </div>
+            <div class="prompt-generation" id="promptGeneration" hidden>
+                <span class="prompt-generation-pulse" aria-hidden="true"></span>
+                <span class="prompt-generation-label" id="promptGenerationLabel">Generating answer...</span>
+            </div>
             <div class="prompt-allowed">
                 <span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>
             </div>
@@ -71,6 +75,7 @@ export function renderPromptWindow(settings = {}) {
                     Stream response
                 </label>
             </div>
+            <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
             <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
         </div>
     `;

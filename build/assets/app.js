@@ -102,11 +102,12 @@
     "model"
   ];
   var defaultSystemPrompt = [
-    "You are a web component/template generator for this single-page CMS.",
-    "Transform the user description into one HTML template string that will be saved to work.layout.template.",
+    "You are a Handlebars (HBS) template generator for this single-page CMS.",
+    "Transform the user description into one HBS template string that will be saved to work.layout.template and rendered by LightnCandy.",
     "Return only the template (no Markdown, no fences).",
-    "Inputs available: {{path}}, {{name}}, {{linkUrl}}, and work.* values from config/work; booleans also expose {{keyAttr}} (e.g., autoplayAttr).",
-    "Use config/title/description, layout mode/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
+    "Use {{> default-layout}} as the default layout technique. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.",
+    "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
+    "Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
     "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
@@ -197,15 +198,16 @@
     const layoutValue = (_a = config == null ? void 0 : config.work) == null ? void 0 : _a.layout;
     if (layoutValue && typeof layoutValue === "object" && !Array.isArray(layoutValue)) {
       return {
-        mode: layoutValue.mode || layoutValue.value || layoutValue.name || "",
+        mode: layoutValue.name || layoutValue.mode || layoutValue.value || "",
         template: layoutValue.template || "",
-        model: layoutValue.model || ""
+        model: layoutValue.model || "",
+        engine: layoutValue.engine || "lightncandy"
       };
     }
     if (typeof layoutValue === "string") {
-      return { mode: layoutValue, template: "", model: "" };
+      return { mode: layoutValue, template: "", model: "", engine: "lightncandy" };
     }
-    return { mode: "", template: "", model: "" };
+    return { mode: "default-layout", template: "", model: "", engine: "lightncandy" };
   }
 
   // src/assets/js/edit/prompt/render.js
@@ -275,6 +277,7 @@
     contextEl.innerHTML = `
         <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
         <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
+        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml("default-layout, works, work")}</div>
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ""}
     `;
   }
@@ -357,12 +360,15 @@
     const promptMessagesEl = root.querySelector("#promptMessages");
     const promptContextEl = root.querySelector("#promptContext");
     const promptSummaryEl = root.querySelector("#promptSummary");
+    const promptGenerationEl = root.querySelector("#promptGeneration");
+    const promptGenerationLabelEl = root.querySelector("#promptGenerationLabel");
     const promptInputEl = root.querySelector("#prompt-input");
     const promptSendEl = root.querySelector("#prompt-send");
     const promptClearEl = root.querySelector("#prompt-clear");
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection2 ? getActiveSelection2().path : "";
+    const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
     const setHistory = (nextHistory) => {
       const list = Array.isArray(nextHistory) ? nextHistory : [];
       promptHistory = tagHistory(list);
@@ -377,6 +383,30 @@
     };
     const renderSummary = (content) => {
       renderPromptSummary(promptSummaryEl, content);
+    };
+    const setGeneratingState = (active, label = "Generating answer...") => {
+      root.classList.toggle("prompt-window-generating", active);
+      root.setAttribute("aria-busy", active ? "true" : "false");
+      if (promptSummaryEl) {
+        promptSummaryEl.classList.toggle("prompt-summary-generating", active);
+      }
+      if (promptGenerationEl) {
+        promptGenerationEl.hidden = !active;
+      }
+      if (promptGenerationLabelEl) {
+        promptGenerationLabelEl.textContent = label;
+      }
+      if (promptSendEl) {
+        promptSendEl.disabled = active;
+        promptSendEl.textContent = active ? "Generating..." : "Send";
+      }
+      if (promptClearEl) {
+        promptClearEl.disabled = active;
+      }
+      if (promptInputEl) {
+        promptInputEl.disabled = active;
+        promptInputEl.placeholder = active ? "Generating answer..." : defaultPromptPlaceholder;
+      }
     };
     if (providerEl) {
       providerEl.value = settings.provider || "local";
@@ -463,7 +493,15 @@
     renderContext();
     renderSummary("Waiting for response...");
     const reloadViewer = () => {
+      var _a;
       const frame = document.getElementById("contentFrame");
+      const selection = getActiveSelection2 ? getActiveSelection2() : { path: "", isFile: false };
+      const activeViewerPath = (selection == null ? void 0 : selection.path) || activePath;
+      if (frame && activeViewerPath) {
+        const isFile = (_a = selection == null ? void 0 : selection.isFile) != null ? _a : /\.[^\\/]+$/.test(activeViewerPath);
+        frame.src = isFile ? `?view=1&file=${encodeURIComponent(activeViewerPath)}` : activeViewerPath.replace(/\/$/, "") + "/";
+        return;
+      }
       if (frame && frame.contentWindow) {
         try {
           frame.contentWindow.location.reload();
@@ -501,12 +539,13 @@
       });
     }
     if (promptSendEl && promptInputEl) {
-      promptSendEl.addEventListener("click", async () => {
+      const sendPrompt = async () => {
         var _a;
         if (isSending || !promptInputEl.value.trim()) {
           return;
         }
         isSending = true;
+        setGeneratingState(true, "Generating answer...");
         stopStreaming(stream);
         let pendingAssistantIndex = null;
         let settled = false;
@@ -515,6 +554,7 @@
             return;
           }
           stopStreaming(stream);
+          setGeneratingState(false);
           const errMsg = "Prompt timed out.";
           if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
             promptHistory[pendingAssistantIndex].content = errMsg;
@@ -534,6 +574,7 @@
           const providerValue = providerEl ? providerEl.value : "local";
           const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
           if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
+            setGeneratingState(false);
             if (statusEl) {
               statusEl.textContent = providerValue === "openai" ? "Add an OpenAI API key to send prompts." : "Add a Gemini API key to send prompts.";
               statusEl.className = "edit-status";
@@ -542,16 +583,17 @@
             return;
           }
           setHistory([...promptHistory, { role: "user", content: userPrompt }].slice(-12));
-          setHistory([...promptHistory, { role: "assistant", content: "..." }].slice(-12));
+          setHistory([...promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
           pendingAssistantIndex = promptHistory.length - 1;
           writeStoredHistory(activePath, promptHistory);
           renderHistory();
           renderContext();
           promptInputEl.value = "";
           if (statusEl) {
-            statusEl.textContent = "Generating template...";
+            statusEl.textContent = "Generating answer...";
             statusEl.className = "edit-status";
           }
+          renderSummary("Generating answer...");
           const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
             role: item.role,
             content: item.content
@@ -577,6 +619,7 @@
           const nextWork = filterAllowedWork(response.work);
           if (response.error || !templateText) {
             stopStreaming(stream);
+            setGeneratingState(false);
             const errMsg = response.error || "Prompt returned no content.";
             if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
               promptHistory[pendingAssistantIndex].content = errMsg;
@@ -623,10 +666,29 @@
             if (templateField) {
               templateField.value = templateText;
             }
+            const layoutNameField = drawerForm.querySelector("#edit-work-layout");
+            if (layoutNameField && !layoutNameField.value.trim()) {
+              layoutNameField.value = "default-layout";
+            }
+            if (nextWork && typeof nextWork.type === "string") {
+              const workTypeField = drawerForm.querySelector("#edit-work-type");
+              if (workTypeField) {
+                workTypeField.value = nextWork.type;
+              }
+            }
+          }
+          const titleField = document.getElementById("edit-title");
+          if (titleField && nextTitle !== null) {
+            titleField.value = nextTitle;
+          }
+          const descriptionField = document.getElementById("edit-description");
+          if (descriptionField && nextDescription !== null) {
+            descriptionField.value = nextDescription;
           }
           const elements2 = drawerForm ? drawerForm.elements : null;
           const layoutPayload = {
-            mode: (((_a = elements2 == null ? void 0 : elements2.work_layout) == null ? void 0 : _a.value) || "").trim(),
+            name: (((_a = elements2 == null ? void 0 : elements2.work_layout) == null ? void 0 : _a.value) || "default-layout").trim(),
+            engine: "lightncandy",
             template: templateText
           };
           if (response.model) {
@@ -658,12 +720,13 @@
           if (nextTitle !== null) extra.push("title");
           if (nextDescription !== null) extra.push("description");
           if (nextWork && Object.keys(nextWork).length) extra.push(`work: ${Object.keys(nextWork).join(", ")}`);
-          const summaryText = `Saved ${templateText.length} chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
+          const summaryText = `Saved ${templateText.length} HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
           renderSummary(summaryText);
           reloadViewer();
         } catch (err) {
           settled = true;
           stopStreaming(stream);
+          setGeneratingState(false);
           debugPromptLog("error", err);
           if (statusEl) {
             statusEl.textContent = "Prompt failed.";
@@ -681,8 +744,18 @@
           renderSummary(errMsg);
         } finally {
           window.clearTimeout(fallbackTimer);
+          setGeneratingState(false);
           isSending = false;
           promptInputEl.focus();
+        }
+      };
+      promptSendEl.addEventListener("click", () => {
+        void sendPrompt();
+      });
+      promptInputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing) {
+          event.preventDefault();
+          void sendPrompt();
         }
       });
     }
@@ -753,12 +826,12 @@
                     <input class="form-input" id="edit-work-type" type="text" name="work_type" value="${escapeHtml((config.work || {}).type || "")}">
                 </div>
                 <div>
-                    <label class="edit-label" for="edit-work-layout">Work Layout</label>
+                    <label class="edit-label" for="edit-work-layout">Work Layout Name</label>
                     <input class="form-input" id="edit-work-layout" type="text" name="work_layout" value="${escapeHtml(layoutState.mode)}">
                 </div>
             </div>
             <div>
-                <label class="edit-label" for="edit-work-template">Work Layout Template</label>
+                <label class="edit-label" for="edit-work-template">Work Layout Template (HBS)</label>
                 <textarea class="form-textarea" id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
             </div>
             ${(status == null ? void 0 : status.target) !== "file" ? `
@@ -831,7 +904,7 @@
                 </div>
             </details>
             <details class="prompt-system" open>
-                <summary class="prompt-system-summary">System prompt (description &rarr; web component)</summary>
+                <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
                 <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(settings.systemPrompt || "")}</textarea>
                 <div class="prompt-system-footer">
                     <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
@@ -842,6 +915,10 @@
                 <div class="prompt-summary-title">Template summary</div>
                 <div class="prompt-summary-body">Waiting for response...</div>
             </div>
+            <div class="prompt-generation" id="promptGeneration" hidden>
+                <span class="prompt-generation-pulse" aria-hidden="true"></span>
+                <span class="prompt-generation-label" id="promptGenerationLabel">Generating answer...</span>
+            </div>
             <div class="prompt-allowed">
                 <span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>
             </div>
@@ -849,8 +926,8 @@
             <div class="prompt-context" id="promptContext">
                 <div class="prompt-context-title">Placeholders</div>
                 <div class="prompt-context-body">
-                    <div>{{path}}, {{name}}, {{linkUrl}}</div>
-                    <div>{{work.key}} (and {{keyAttr}} for booleans)</div>
+                    <div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                    <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}</div>
                 </div>
             </div>
             <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
@@ -864,7 +941,8 @@
                     Stream response
                 </label>
             </div>
-            <div class="small-note">Template responses are saved to <code>work.layout.template</code>.</div>
+            <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
+            <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
         </div>
     `;
   }
@@ -922,11 +1000,19 @@
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
             </div>
         </form>
+        <div class="edit-layout-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Layout</div>
+                <div class="small-note">Open the HBS layout editor for this item.</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+        </div>
         ${renderPromptWindow(settings)}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
     const statusEl = editPanel.querySelector("#editInlineStatus");
     const moreToggle = editPanel.querySelector("#editMoreToggle");
+    const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
     const promptRoot = editPanel.querySelector("#promptWindow");
@@ -951,6 +1037,9 @@
     }
     if (moreToggle && typeof onToggleDrawer === "function") {
       moreToggle.addEventListener("click", () => onToggleDrawer());
+    }
+    if (changeLayoutButton && typeof onToggleDrawer === "function") {
+      changeLayoutButton.addEventListener("click", () => onToggleDrawer());
     }
     return { statusEl, promptRoot };
   }
@@ -1025,11 +1114,6 @@
           folderConfig = editConfig;
           renderFolderMeta();
         }
-        renderEditUI(editConfig, {
-          allowed: data.allowed !== false,
-          error: data.error,
-          target: editTarget
-        });
         if (statusEl) {
           statusEl.textContent = "Config saved.";
           statusEl.className = "edit-status edit-status-success";
@@ -1108,7 +1192,8 @@
         onSubmit: async ({ elements: elements3, statusEl, treeVisible }) => {
           var _a, _b, _c, _d, _e, _f;
           const layoutPayload = {
-            mode: (((_a = elements3.work_layout) == null ? void 0 : _a.value) || "").trim(),
+            name: (((_a = elements3.work_layout) == null ? void 0 : _a.value) || "").trim(),
+            engine: "lightncandy",
             template: (_c = (_b = elements3.work_template) == null ? void 0 : _b.value) != null ? _c : ""
           };
           const selection = getActiveSelection();
@@ -1205,7 +1290,8 @@
     }
     function loadCurrentFolderInIframe() {
       if (currentPathForIframe2 && contentFrame) {
-        contentFrame.src = currentPathForIframe2;
+        const isFile = /\.[^\\/]+$/.test(currentPathForIframe2);
+        contentFrame.src = isFile ? `?view=1&file=${encodeURIComponent(currentPathForIframe2)}` : currentPathForIframe2;
         if (activeLink) {
           activeLink.classList.remove("nav-link-active");
           activeLink = null;

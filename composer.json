@@ -1,5 +1,6 @@
 {
     "require": {
-        "php-mcp/server": "^3.3"
+        "php-mcp/server": "^3.3",
+        "zordius/lightncandy": "^1.2"
     }
 }

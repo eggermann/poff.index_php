@@ -80,11 +80,6 @@ export function createEditController({ elements, context, editRequested }) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
-            renderEditUI(editConfig, {
-                allowed: data.allowed !== false,
-                error: data.error,
-                target: editTarget,
-            });
             if (statusEl) {
                 statusEl.textContent = 'Config saved.';
                 statusEl.className = 'edit-status edit-status-success';

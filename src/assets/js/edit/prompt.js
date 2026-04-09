@@ -42,12 +42,15 @@ export function bindPromptWindow({
     const promptMessagesEl = root.querySelector('#promptMessages');
     const promptContextEl = root.querySelector('#promptContext');
     const promptSummaryEl = root.querySelector('#promptSummary');
+    const promptGenerationEl = root.querySelector('#promptGeneration');
+    const promptGenerationLabelEl = root.querySelector('#promptGenerationLabel');
     const promptInputEl = root.querySelector('#prompt-input');
     const promptSendEl = root.querySelector('#prompt-send');
     const promptClearEl = root.querySelector('#prompt-clear');
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection ? getActiveSelection().path : '';
+    const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
 
     const setHistory = (nextHistory) => {
         const list = Array.isArray(nextHistory) ? nextHistory : [];
@@ -66,6 +69,31 @@ export function bindPromptWindow({
 
     const renderSummary = (content) => {
         renderPromptSummary(promptSummaryEl, content);
+    };
+
+    const setGeneratingState = (active, label = 'Generating answer...') => {
+        root.classList.toggle('prompt-window-generating', active);
+        root.setAttribute('aria-busy', active ? 'true' : 'false');
+        if (promptSummaryEl) {
+            promptSummaryEl.classList.toggle('prompt-summary-generating', active);
+        }
+        if (promptGenerationEl) {
+            promptGenerationEl.hidden = !active;
+        }
+        if (promptGenerationLabelEl) {
+            promptGenerationLabelEl.textContent = label;
+        }
+        if (promptSendEl) {
+            promptSendEl.disabled = active;
+            promptSendEl.textContent = active ? 'Generating...' : 'Send';
+        }
+        if (promptClearEl) {
+            promptClearEl.disabled = active;
+        }
+        if (promptInputEl) {
+            promptInputEl.disabled = active;
+            promptInputEl.placeholder = active ? 'Generating answer...' : defaultPromptPlaceholder;
+        }
     };
 
     if (providerEl) {
@@ -160,6 +188,15 @@ export function bindPromptWindow({
 
     const reloadViewer = () => {
         const frame = document.getElementById('contentFrame');
+        const selection = getActiveSelection ? getActiveSelection() : { path: '', isFile: false };
+        const activeViewerPath = selection?.path || activePath;
+        if (frame && activeViewerPath) {
+            const isFile = selection?.isFile ?? /\.[^\\/]+$/.test(activeViewerPath);
+            frame.src = isFile
+                ? `?view=1&file=${encodeURIComponent(activeViewerPath)}`
+                : activeViewerPath.replace(/\/$/, '') + '/';
+            return;
+        }
         if (frame && frame.contentWindow) {
             try {
                 frame.contentWindow.location.reload();
@@ -201,11 +238,12 @@ export function bindPromptWindow({
     }
 
     if (promptSendEl && promptInputEl) {
-        promptSendEl.addEventListener('click', async () => {
+        const sendPrompt = async () => {
             if (isSending || !promptInputEl.value.trim()) {
                 return;
             }
             isSending = true;
+            setGeneratingState(true, 'Generating answer...');
             stopStreaming(stream);
             let pendingAssistantIndex = null;
             let settled = false;
@@ -214,6 +252,7 @@ export function bindPromptWindow({
                     return;
                 }
                 stopStreaming(stream);
+                setGeneratingState(false);
                 const errMsg = 'Prompt timed out.';
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                     promptHistory[pendingAssistantIndex].content = errMsg;
@@ -233,6 +272,7 @@ export function bindPromptWindow({
                 const providerValue = providerEl ? providerEl.value : 'local';
                 const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
                 if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
+                    setGeneratingState(false);
                     if (statusEl) {
                         statusEl.textContent = providerValue === 'openai'
                             ? 'Add an OpenAI API key to send prompts.'
@@ -244,16 +284,17 @@ export function bindPromptWindow({
                 }
                 setHistory([...promptHistory, { role: 'user', content: userPrompt }].slice(-12));
                 // Add a temporary assistant placeholder
-                setHistory([...promptHistory, { role: 'assistant', content: '...' }].slice(-12));
+                setHistory([...promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
                 pendingAssistantIndex = promptHistory.length - 1;
                 writeStoredHistory(activePath, promptHistory);
                 renderHistory();
                 renderContext();
                 promptInputEl.value = '';
                 if (statusEl) {
-                    statusEl.textContent = 'Generating template...';
+                    statusEl.textContent = 'Generating answer...';
                     statusEl.className = 'edit-status';
                 }
+                renderSummary('Generating answer...');
                 const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
                     role: item.role,
                     content: item.content,
@@ -279,6 +320,7 @@ export function bindPromptWindow({
                 const nextWork = filterAllowedWork(response.work);
                 if (response.error || !templateText) {
                     stopStreaming(stream);
+                    setGeneratingState(false);
                     const errMsg = response.error || 'Prompt returned no content.';
                     if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                         promptHistory[pendingAssistantIndex].content = errMsg;
@@ -325,10 +367,28 @@ export function bindPromptWindow({
                     if (templateField) {
                         templateField.value = templateText;
                     }
+                    const layoutNameField = drawerForm.querySelector('#edit-work-layout');
+                    if (layoutNameField && !layoutNameField.value.trim()) {
+                        layoutNameField.value = 'default-layout';
+                    }
+                    if (nextWork && typeof nextWork.type === 'string') {
+                        const workTypeField = drawerForm.querySelector('#edit-work-type');
+                        if (workTypeField) {
+                            workTypeField.value = nextWork.type;
+                        }
+                    }
+                }
+                const titleField = document.getElementById('edit-title');
+                if (titleField && nextTitle !== null) {
+                    titleField.value = nextTitle;
+                }
+                const descriptionField = document.getElementById('edit-description');
+                if (descriptionField && nextDescription !== null) {
+                    descriptionField.value = nextDescription;
                 }
                 const elements = drawerForm ? drawerForm.elements : null;
                 const layoutPayload = {
-                    name: (elements?.work_layout?.value || '').trim(),
+                    name: (elements?.work_layout?.value || 'default-layout').trim(),
                     engine: 'lightncandy',
                     template: templateText,
                 };
@@ -367,6 +427,7 @@ export function bindPromptWindow({
             } catch (err) {
                 settled = true;
                 stopStreaming(stream);
+                setGeneratingState(false);
                 debugPromptLog('error', err);
                 if (statusEl) {
                     statusEl.textContent = 'Prompt failed.';
@@ -384,8 +445,27 @@ export function bindPromptWindow({
                 renderSummary(errMsg);
             } finally {
                 window.clearTimeout(fallbackTimer);
+                setGeneratingState(false);
                 isSending = false;
                 promptInputEl.focus();
+            }
+        };
+
+        promptSendEl.addEventListener('click', () => {
+            void sendPrompt();
+        });
+
+        promptInputEl.addEventListener('keydown', (event) => {
+            if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.altKey &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.isComposing
+            ) {
+                event.preventDefault();
+                void sendPrompt();
             }
         });
     }

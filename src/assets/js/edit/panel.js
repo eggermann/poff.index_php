@@ -55,12 +55,20 @@ export function renderEditPanel({
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
             </div>
         </form>
+        <div class="edit-layout-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Layout</div>
+                <div class="small-note">Open the HBS layout editor for this item.</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+        </div>
         ${renderPromptWindow(settings)}
     `;
 
     const form = editPanel.querySelector('#inlineEditForm');
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
+    const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
     const promptRoot = editPanel.querySelector('#promptWindow');
@@ -86,6 +94,9 @@ export function renderEditPanel({
     }
     if (moreToggle && typeof onToggleDrawer === 'function') {
         moreToggle.addEventListener('click', () => onToggleDrawer());
+    }
+    if (changeLayoutButton && typeof onToggleDrawer === 'function') {
+        changeLayoutButton.addEventListener('click', () => onToggleDrawer());
     }
 
     return { statusEl, promptRoot };

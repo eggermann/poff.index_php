@@ -50,6 +50,10 @@ class ComposerStaticInit4186580e53e5622e142b77b384b865a9
             'Opis\\String\\' => 12,
             'Opis\\JsonSchema\\' => 16,
         ),
+        'L' => 
+        array (
+            'LightnCandy\\' => 12,
+        ),
         'F' => 
         array (
             'Fig\\Http\\Message\\' => 17,
@@ -150,6 +154,10 @@ class ComposerStaticInit4186580e53e5622e142b77b384b865a9
         'Opis\\JsonSchema\\' => 
         array (
             0 => __DIR__ . '/..' . '/opis/json-schema/src',
+        ),
+        'LightnCandy\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/zordius/lightncandy/src',
         ),
         'Fig\\Http\\Message\\' => 
         array (
