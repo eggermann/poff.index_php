@@ -1,3 +1,5 @@
+const PROMPT_REQUEST_TIMEOUT_MS = 90000;
+
 export function buildCmsUrl(action, path) {
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set('edit', action);
@@ -34,7 +36,7 @@ export async function requestPromptTemplate(payload) {
         if (controller) {
             controller.abort();
         }
-    }, 20000);
+    }, PROMPT_REQUEST_TIMEOUT_MS);
     try {
         const res = await fetch(url, {
             method: 'POST',
@@ -53,7 +55,7 @@ export async function requestPromptTemplate(payload) {
     } catch (err) {
         clearTimeout(timeout);
         if (err?.name === 'AbortError') {
-            return { error: 'Prompt request timed out.' };
+            return { error: 'Prompt request timed out after 90 seconds.' };
         }
         return { error: 'Prompt endpoint unavailable.' };
     }

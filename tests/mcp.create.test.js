@@ -115,6 +115,7 @@ describe('MCP create route helper (CLI)', () => {
     fs.writeFileSync(path.join(EXISTING_NESTED_SRC, 'data.md'), 'nested data');
     fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, 'nested-child'), { recursive: true });
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'child.txt'), 'viewer child');
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'nested-child', 'nested-video.mp4'), 'fake video');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'poff.config.json'), JSON.stringify({
       title: 'Folder Preview',
       description: 'Folder layout from prompt',
@@ -124,7 +125,7 @@ describe('MCP create route helper (CLI)', () => {
           name: 'prompted-folder-layout',
           engine: 'lightncandy',
           section: 'works',
-          template: '<div class="folder-custom">{{title}}|{{#each items}}<span class="entry">{{name}}:{{type}}</span>{{/each}}</div>',
+          template: '<div class="folder-custom">{{title}}|{{#each tree}}{{#if isFolder}}<span class="branch">{{name}}</span>{{#each children}}{{#if (contains name ".mp4")}}<span class="child">{{path}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type "file")}}<span class="entry">{{name}}:{{type}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class="video">{{path}}</span>{{/each}}</div>',
         },
       },
     }, null, 2));
@@ -254,7 +255,7 @@ describe('Worktype HBS renderer', () => {
             name: 'custom-layout',
             engine: 'lightncandy',
             section: 'works',
-            template: '<div class="custom-shell">{{> default-layout}}</div>',
+            template: '<div class="custom-shell">{{#each items}}{{#if (eq type "file")}}<span class="entry">{{name}}</span>{{/if}}{{/each}}{{> default-layout}}</div>',
           },
         },
       },
@@ -267,6 +268,7 @@ describe('Worktype HBS renderer', () => {
 
     expect(output).toContain('<div class="custom-shell">');
     expect(output).toContain('<section class="viewer-template viewer-template--folder">');
+    expect(output).toContain('<span class="entry">notes.txt</span>');
     expect(output).toContain('projects');
     expect(output).toContain('alpha');
     expect(output).toContain('notes.txt');
@@ -278,7 +280,8 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<title>Viewer - viewer-folder</title>');
     expect(output).toContain('<div class="folder-custom">');
     expect(output).toContain('Folder Preview');
+    expect(output).toContain('nested-child');
+    expect(output).toContain('nested-child/nested-video.mp4');
     expect(output).toContain('child.txt:file');
-    expect(output).toContain('nested-child:folder');
   });
 });

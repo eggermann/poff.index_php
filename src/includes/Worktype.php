@@ -77,6 +77,7 @@ class Worktype
             try {
                 $compiled = \LightnCandy\LightnCandy::compile($template, [
                     'partials' => $partials,
+                    'helpers' => self::helpers(),
                     'flags' => \LightnCandy\LightnCandy::FLAG_HANDLEBARSJS
                         | \LightnCandy\LightnCandy::FLAG_RUNTIMEPARTIAL
                         | \LightnCandy\LightnCandy::FLAG_ERROR_LOG,
@@ -212,6 +213,51 @@ class Worktype
     private static function rendererAvailable(): bool
     {
         return class_exists('\LightnCandy\LightnCandy');
+    }
+
+    private static function helpers(): array
+    {
+        return [
+            'eq' => static function ($left = null, $right = null, $options = null): bool {
+                return $left == $right;
+            },
+            'ne' => static function ($left = null, $right = null, $options = null): bool {
+                return $left != $right;
+            },
+            'contains' => static function ($haystack = null, $needle = null, $options = null): bool {
+                if ($needle === null) {
+                    return false;
+                }
+                if (is_array($haystack)) {
+                    return in_array($needle, $haystack, false);
+                }
+
+                return str_contains((string) $haystack, (string) $needle);
+            },
+            'startsWith' => static function ($value = null, $prefix = null, $options = null): bool {
+                if ($prefix === null) {
+                    return false;
+                }
+
+                return str_starts_with((string) $value, (string) $prefix);
+            },
+            'endsWith' => static function ($value = null, $suffix = null, $options = null): bool {
+                if ($suffix === null) {
+                    return false;
+                }
+
+                return str_ends_with((string) $value, (string) $suffix);
+            },
+            'not' => static function ($value = null, $options = null): bool {
+                return !$value;
+            },
+            'and' => static function ($left = null, $right = null, $options = null): bool {
+                return (bool) $left && (bool) $right;
+            },
+            'or' => static function ($left = null, $right = null, $options = null): bool {
+                return (bool) $left || (bool) $right;
+            },
+        ];
     }
 
     private static function buildRenderContext(string $kind, array $ctx, array $work, array $layout): array

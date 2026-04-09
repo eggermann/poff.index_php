@@ -1,5 +1,6 @@
 (() => {
   // src/assets/js/api/edit.js
+  var PROMPT_REQUEST_TIMEOUT_MS = 9e4;
   function buildCmsUrl(action, path) {
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set("edit", action);
@@ -34,7 +35,7 @@
       if (controller) {
         controller.abort();
       }
-    }, 2e4);
+    }, PROMPT_REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -53,7 +54,7 @@
     } catch (err) {
       clearTimeout(timeout);
       if ((err == null ? void 0 : err.name) === "AbortError") {
-        return { error: "Prompt request timed out." };
+        return { error: "Prompt request timed out after 90 seconds." };
       }
       return { error: "Prompt endpoint unavailable." };
     }
@@ -107,6 +108,8 @@
     "Return only the template (no Markdown, no fences).",
     "Use {{> default-layout}} as the default layout technique. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.",
     "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
+    "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
+    "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
     "Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
     "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
@@ -329,6 +332,7 @@
   }
 
   // src/assets/js/edit/prompt.js
+  var PROMPT_FALLBACK_TIMEOUT_MS = 95e3;
   var promptHistory = [];
   var stream = createStreamState();
   var debugPromptLog = (label, payload) => {
@@ -556,7 +560,7 @@
           }
           stopStreaming(stream);
           setGeneratingState(false);
-          const errMsg = "Prompt timed out.";
+          const errMsg = "Prompt timed out after 95 seconds.";
           if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
             promptHistory[pendingAssistantIndex].content = errMsg;
             setHistory(promptHistory);
@@ -569,7 +573,7 @@
             statusEl.className = "edit-status";
           }
           isSending = false;
-        }, 22e3);
+        }, PROMPT_FALLBACK_TIMEOUT_MS);
         try {
           const userPrompt = promptInputEl.value.trim();
           const providerValue = providerEl ? providerEl.value : "local";

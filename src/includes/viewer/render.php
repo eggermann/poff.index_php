@@ -99,7 +99,12 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
     }
     $rawSlug = $folderConfig['slug'] ?? preg_replace('/[^a-z0-9\\-]+/i', '-', $rawName);
     $rawSlug = trim((string) $rawSlug, '-');
-    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig);
+    $folderViewData = buildFolderViewerData($relativePath, $fullPath, $folderConfig, [
+        'name' => $rawName,
+        'title' => $folderConfig['title'] ?? $rawName,
+        'slug' => $rawSlug === '' ? 'item' : $rawSlug,
+    ]);
+    $tree = $folderViewData['tree'];
     $descriptionHtml = '';
     if (!empty($folderConfig['description'])) {
         $descriptionHtml = '<div class="work-description">' . nl2br(htmlspecialchars($folderConfig['description'], ENT_QUOTES, 'UTF-8')) . '</div>';
@@ -117,8 +122,20 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'folderName' => $folderConfig['folderName'] ?? $rawName,
         'tree' => $tree,
         'items' => $tree,
+        'workTree' => $folderViewData['workTree'],
+        'allItems' => $folderViewData['allItems'],
+        'allFiles' => $folderViewData['allFiles'],
+        'allFolders' => $folderViewData['allFolders'],
+        'allImages' => $folderViewData['allImages'],
+        'allVideos' => $folderViewData['allVideos'],
+        'allAudio' => $folderViewData['allAudio'],
+        'allPdfs' => $folderViewData['allPdfs'],
+        'allTexts' => $folderViewData['allTexts'],
+        'allLinks' => $folderViewData['allLinks'],
+        'allOther' => $folderViewData['allOther'],
         'hasItems' => $tree !== [],
         'itemCount' => count($tree),
+        'allItemCount' => count($folderViewData['allItems']),
         'work' => $work,
     ]);
 
@@ -137,16 +154,53 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
     ]);
 }
 
-function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig): array
+function buildFolderViewerData(string $relativePath, string $fullPath, ?array $folderConfig, array $rootMeta): array
 {
-    $tree = [];
-    if (is_array($folderConfig) && isset($folderConfig['tree']) && is_array($folderConfig['tree'])) {
-        $tree = $folderConfig['tree'];
-    } elseif (class_exists('PoffConfig')) {
-        $tree = PoffConfig::buildFirstLevelTree($fullPath);
+    $visited = [];
+    $realPath = realpath($fullPath);
+    if (is_string($realPath) && $realPath !== '') {
+        $visited[$realPath] = true;
     }
 
+    $flatItems = [];
+    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig, $flatItems, $visited);
+    $allFiles = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFile'])));
+    $allFolders = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFolder'])));
+
+    return [
+        'tree' => $tree,
+        'workTree' => [
+            'name' => (string) ($rootMeta['name'] ?? basename($fullPath)),
+            'title' => (string) ($rootMeta['title'] ?? $rootMeta['name'] ?? basename($fullPath)),
+            'slug' => (string) ($rootMeta['slug'] ?? 'item'),
+            'type' => 'folder',
+            'kind' => 'folder',
+            'path' => $relativePath,
+            'displayPath' => $relativePath === '' ? '.' : $relativePath,
+            'viewerHref' => '?view=1&path=' . rawurlencode($relativePath),
+            'isFolder' => true,
+            'isFile' => false,
+            'childCount' => count($tree),
+            'children' => $tree,
+        ],
+        'allItems' => $flatItems,
+        'allFiles' => $allFiles,
+        'allFolders' => $allFolders,
+        'allImages' => filterFolderViewerItemsByKind($allFiles, 'image'),
+        'allVideos' => filterFolderViewerItemsByKind($allFiles, 'video'),
+        'allAudio' => filterFolderViewerItemsByKind($allFiles, 'audio'),
+        'allPdfs' => filterFolderViewerItemsByKind($allFiles, 'pdf'),
+        'allTexts' => filterFolderViewerItemsByKind($allFiles, 'text'),
+        'allLinks' => filterFolderViewerItemsByKind($allFiles, 'link'),
+        'allOther' => filterFolderViewerItemsByKind($allFiles, 'other'),
+    ];
+}
+
+function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited): array
+{
+    $tree = resolveFolderViewerTree($fullPath, $folderConfig);
     $items = [];
+
     foreach ($tree as $entry) {
         if (!is_array($entry) || (($entry['visible'] ?? true) === false)) {
             continue;
@@ -156,24 +210,132 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             continue;
         }
 
-        $entryType = (($entry['type'] ?? 'file') === 'folder') ? 'folder' : 'file';
         $entryRelativePath = $relativePath === '' ? $entryName : $relativePath . '/' . $entryName;
         $entryFullPath = $fullPath . DIRECTORY_SEPARATOR . $entryName;
-        $entryKind = $entryType === 'folder' ? 'folder' : detectFileType($entryFullPath);
+        if (!file_exists($entryFullPath)) {
+            continue;
+        }
 
-        $items[] = array_merge($entry, [
+        $isFolder = is_dir($entryFullPath);
+        $entryType = $isFolder ? 'folder' : 'file';
+        $entryKind = $isFolder ? 'folder' : detectFileType($entryFullPath);
+        $viewerHref = $isFolder
+            ? '?view=1&path=' . rawurlencode($entryRelativePath)
+            : '?view=1&file=' . rawurlencode($entryRelativePath);
+        $rawHref = $isFolder
+            ? '?path=' . rawurlencode($entryRelativePath)
+            : viewerAssetHref($entryRelativePath);
+        $item = array_merge($entry, [
             'name' => $entryName,
             'title' => $entry['title'] ?? $entryName,
             'type' => $entryType,
             'kind' => $entryKind,
             'path' => $entryRelativePath,
-            'viewerHref' => '?view=1&path=' . rawurlencode($entryRelativePath),
-            'isFolder' => $entryType === 'folder',
-            'isFile' => $entryType !== 'folder',
+            'relativePath' => $entryRelativePath,
+            'basename' => $entryName,
+            'depth' => substr_count($entryRelativePath, '/'),
+            'viewerHref' => $viewerHref,
+            'rawHref' => $rawHref,
+            'isFolder' => $isFolder,
+            'isFile' => !$isFolder,
         ]);
+
+        if ($isFolder) {
+            $childConfig = readExistingFolderViewerConfig($entryFullPath);
+            if (is_array($childConfig)) {
+                if (isset($childConfig['title']) && is_string($childConfig['title']) && trim($childConfig['title']) !== '') {
+                    $item['title'] = $childConfig['title'];
+                }
+                if (isset($childConfig['slug']) && is_string($childConfig['slug']) && trim($childConfig['slug']) !== '') {
+                    $item['slug'] = $childConfig['slug'];
+                }
+                if (isset($childConfig['description']) && is_string($childConfig['description'])) {
+                    $item['description'] = $childConfig['description'];
+                }
+            }
+            $children = [];
+            $realChildPath = realpath($entryFullPath);
+            if (!is_string($realChildPath) || $realChildPath === '' || !isset($visited[$realChildPath])) {
+                if (is_string($realChildPath) && $realChildPath !== '') {
+                    $visited[$realChildPath] = true;
+                }
+                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited);
+            }
+            $item['children'] = $children;
+            $item['childCount'] = count($children);
+        } else {
+            $item['extension'] = strtolower((string) pathinfo($entryName, PATHINFO_EXTENSION));
+            $item['mimeType'] = MediaType::detectMimeType($entryFullPath, $entryName) ?? '';
+            $fileConfig = readExistingFolderViewerFileConfig($fullPath, $entryName);
+            if (is_array($fileConfig)) {
+                if (isset($fileConfig['title']) && is_string($fileConfig['title']) && trim($fileConfig['title']) !== '') {
+                    $item['title'] = $fileConfig['title'];
+                }
+                if (isset($fileConfig['slug']) && is_string($fileConfig['slug']) && trim($fileConfig['slug']) !== '') {
+                    $item['slug'] = $fileConfig['slug'];
+                }
+                if (isset($fileConfig['description']) && is_string($fileConfig['description'])) {
+                    $item['description'] = $fileConfig['description'];
+                }
+            }
+        }
+
+        $flatItem = $item;
+        unset($flatItem['children']);
+        $flatItems[] = $flatItem;
+        $items[] = $item;
     }
 
     return $items;
+}
+
+function resolveFolderViewerTree(string $fullPath, ?array $folderConfig): array
+{
+    if (is_array($folderConfig) && isset($folderConfig['tree']) && is_array($folderConfig['tree'])) {
+        return $folderConfig['tree'];
+    }
+    if (class_exists('PoffConfig')) {
+        return PoffConfig::buildFirstLevelTree($fullPath);
+    }
+
+    return [];
+}
+
+function readExistingFolderViewerConfig(string $dir): ?array
+{
+    if (!class_exists('PoffConfig')) {
+        return null;
+    }
+
+    $configPath = PoffConfig::configPath($dir);
+    if (!is_file($configPath)) {
+        return null;
+    }
+
+    $decoded = json_decode((string) file_get_contents($configPath), true);
+
+    return is_array($decoded) ? $decoded : null;
+}
+
+function readExistingFolderViewerFileConfig(string $dir, string $fileName): ?array
+{
+    if (!class_exists('PoffConfig')) {
+        return null;
+    }
+
+    $configPath = PoffConfig::fileConfigPath($dir, $fileName);
+    if (!is_file($configPath)) {
+        return null;
+    }
+
+    $decoded = json_decode((string) file_get_contents($configPath), true);
+
+    return is_array($decoded) ? $decoded : null;
+}
+
+function filterFolderViewerItemsByKind(array $items, string $kind): array
+{
+    return array_values(array_filter($items, static fn(array $item): bool => ($item['kind'] ?? '') === $kind));
 }
 
 function viewerAssetHref(string $relativePath): string

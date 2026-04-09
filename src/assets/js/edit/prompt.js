@@ -4,6 +4,8 @@ import { tagHistory, filterAllowedWork } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
 import { createStreamState, startStreaming, stopStreaming } from './prompt/stream.js';
 
+const PROMPT_FALLBACK_TIMEOUT_MS = 95000;
+
 let promptHistory = [];
 const stream = createStreamState();
 const debugPromptLog = (label, payload) => {
@@ -253,7 +255,7 @@ export function bindPromptWindow({
                 }
                 stopStreaming(stream);
                 setGeneratingState(false);
-                const errMsg = 'Prompt timed out.';
+                const errMsg = 'Prompt timed out after 95 seconds.';
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                     promptHistory[pendingAssistantIndex].content = errMsg;
                     setHistory(promptHistory);
@@ -266,7 +268,7 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 isSending = false;
-            }, 22000);
+            }, PROMPT_FALLBACK_TIMEOUT_MS);
             try {
                 const userPrompt = promptInputEl.value.trim();
                 const providerValue = providerEl ? providerEl.value : 'local';

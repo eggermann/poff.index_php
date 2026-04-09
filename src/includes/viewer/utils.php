@@ -3,6 +3,8 @@
  * Shared CMS utilities: JSON responses, config helpers, HTTP helpers.
  */
 
+const CMS_HTTP_TIMEOUT_SECONDS = 90;
+
 function cmsJsonResponse(array $payload, int $status = 200): void
 {
     header('Content-Type: application/json');
@@ -117,7 +119,7 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
             'method' => 'POST',
             'header' => implode("\r\n", $headerLines),
             'content' => json_encode($payload),
-            'timeout' => 20,
+            'timeout' => CMS_HTTP_TIMEOUT_SECONDS,
         ],
     ]);
     $response = @file_get_contents($url, false, $context);

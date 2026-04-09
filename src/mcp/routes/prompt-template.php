@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 90;
+
 function mcpPromptResolvePath(string $rootDir, string $relativePath): ?string
 {
     $trimmed = trim($relativePath, "/\\");
@@ -75,7 +77,7 @@ function mcpPromptHttpPost(string $url, array $headers, array $payload): array
             'method' => 'POST',
             'header' => implode("\r\n", $headerLines),
             'content' => json_encode($payload),
-            'timeout' => 20,
+            'timeout' => MCP_PROMPT_HTTP_TIMEOUT_SECONDS,
         ],
     ]);
     $response = @file_get_contents($url, false, $context);
