@@ -25,13 +25,14 @@ export function getLayoutState(config) {
     const layoutValue = config?.work?.layout;
     if (layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue)) {
         return {
-            mode: layoutValue.mode || layoutValue.value || layoutValue.name || '',
+            mode: layoutValue.name || layoutValue.mode || layoutValue.value || '',
             template: layoutValue.template || '',
             model: layoutValue.model || '',
+            engine: layoutValue.engine || 'lightncandy',
         };
     }
     if (typeof layoutValue === 'string') {
-        return { mode: layoutValue, template: '', model: '' };
+        return { mode: layoutValue, template: '', model: '', engine: 'lightncandy' };
     }
-    return { mode: '', template: '', model: '' };
+    return { mode: 'default-layout', template: '', model: '', engine: 'lightncandy' };
 }

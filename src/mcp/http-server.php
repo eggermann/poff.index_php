@@ -31,7 +31,7 @@ $server = Server::make()
             ]);
         },
         name: 'workprompt',
-        description: 'Generate/override work.layout model/template for a file. Input: "path|style prompt".'
+        description: 'Generate/override LightnCandy HBS work.layout model/template for a file. Input: "path|style prompt".'
     )
     ->withTool(
         function (array $args) use ($rootDir) {

@@ -144,7 +144,7 @@ function handlePromptTemplate(array $opts): array
 
     $config = PoffConfig::ensure($targetDir);
     $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $systemPrompt = 'You are a template generator. Return only the template string. Do not wrap in code fences.';
+    $systemPrompt = 'You are a Handlebars template generator. Return only the HBS template string for the LightnCandy renderer. Use {{> default-layout}} as the default layout technique and do not wrap in code fences.';
     $historyText = '';
     foreach ($history as $msg) {
         if (!is_array($msg) || !isset($msg['role']) || !isset($msg['content'])) {

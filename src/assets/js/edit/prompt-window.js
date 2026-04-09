@@ -38,7 +38,7 @@ export function renderPromptWindow(settings = {}) {
                 </div>
             </details>
             <details class="prompt-system" open>
-                <summary class="prompt-system-summary">System prompt (description &rarr; web component)</summary>
+                <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
                 <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(settings.systemPrompt || '')}</textarea>
                 <div class="prompt-system-footer">
                     <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
@@ -56,8 +56,8 @@ export function renderPromptWindow(settings = {}) {
             <div class="prompt-context" id="promptContext">
                 <div class="prompt-context-title">Placeholders</div>
                 <div class="prompt-context-body">
-                    <div>{{path}}, {{name}}, {{linkUrl}}</div>
-                    <div>{{work.key}} (and {{keyAttr}} for booleans)</div>
+                    <div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                    <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}</div>
                 </div>
             </div>
             <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
@@ -71,7 +71,7 @@ export function renderPromptWindow(settings = {}) {
                     Stream response
                 </label>
             </div>
-            <div class="small-note">Template responses are saved to <code>work.layout.template</code>.</div>
+            <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
         </div>
     `;
 }

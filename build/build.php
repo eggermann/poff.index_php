@@ -85,12 +85,15 @@ try {
             $key = pathinfo($wtFile, PATHINFO_FILENAME);
             $data = include $wtFile;
             if (is_array($data)) {
-                $embeddedWorktypes[$key] = $data;
+                $embeddedWorktypes[$key] = $data['model'] ?? $data['definition'] ?? $data;
             }
         }
     }
     if (!$embeddedTemplates) {
-        $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.tpl') ?: [];
+        $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.hbs') ?: [];
+        if (!$templateFiles) {
+            $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.tpl') ?: [];
+        }
         foreach ($templateFiles as $tplFile) {
             $key = pathinfo($tplFile, PATHINFO_FILENAME);
             $embeddedTemplates[$key] = file_get_contents($tplFile);

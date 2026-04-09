@@ -80,7 +80,7 @@ function handleEditConfig(array $opts): array
         $workLayoutRaw = $data['work']['layout'] ?? $data['work_layout'] ?? '';
         $workLayout = trim((string) $workLayoutRaw);
         $layoutPayload = $data['layout'] ?? null;
-        $layoutPayloadMode = is_array($layoutPayload) ? ($layoutPayload['mode'] ?? '') : '';
+        $layoutPayloadMode = is_array($layoutPayload) ? ($layoutPayload['mode'] ?? $layoutPayload['name'] ?? '') : '';
         $layoutMode = trim((string) ($data['layout_mode'] ?? $layoutPayloadMode));
         $layoutModel = is_array($layoutPayload) ? ($layoutPayload['model'] ?? null) : null;
         if ($layoutModel === null && array_key_exists('layout_model', $data)) {
@@ -142,14 +142,15 @@ function handleEditConfig(array $opts): array
         if (is_string($layoutModel) && $layoutModel !== '') {
             $layout['model'] = $layoutModel;
         }
+        $layoutSection = 'works';
         $hasLayoutUpdate = is_array($layoutPayload)
             || $layoutTemplateProvided
             || array_key_exists('layout_mode', $data)
             || array_key_exists('layout_model', $data);
         if ($hasLayoutUpdate) {
-            $work['layout'] = $layout;
+            $work['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
         } elseif ($workLayout !== '') {
-            $work['layout'] = $workLayout;
+            $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
         $config['work'] = $work;
 

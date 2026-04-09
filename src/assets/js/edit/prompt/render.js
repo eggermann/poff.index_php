@@ -69,6 +69,7 @@ export function renderPromptContext(contextEl, context) {
     contextEl.innerHTML = `
         <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
         <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
+        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('default-layout, works, work')}</div>
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ''}
     `;
 }

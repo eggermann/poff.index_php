@@ -2,7 +2,12 @@
 return [
     'model' => [
         'type' => 'folder',
-        'layout' => 'list',
+        'layout' => [
+            'mode' => 'default',
+            'name' => 'default-layout',
+            'engine' => 'lightncandy',
+            'section' => 'works',
+        ],
     ],
-    'template' => (string) file_get_contents(__DIR__ . '/templates/folder.tpl'),
+    'template' => (string) file_get_contents(__DIR__ . '/templates/folder.hbs'),
 ];

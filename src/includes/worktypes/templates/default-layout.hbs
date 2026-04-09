@@ -1,0 +1,10 @@
+<section class="viewer-template viewer-template--{{kind}}">
+    {{#if isFolder}}
+        {{> works}}
+    {{else}}
+        {{> work}}
+    {{/if}}
+    {{#if descriptionHtml}}
+        {{{descriptionHtml}}}
+    {{/if}}
+</section>

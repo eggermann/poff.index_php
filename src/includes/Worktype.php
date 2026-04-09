@@ -3,6 +3,8 @@
  * Worktype helper for media layout defaults and overrides.
  */
 
+require_once __DIR__ . '/../../vendor/autoload.php';
+
 class Worktype
 {
     private static array $embedded = [];
@@ -51,6 +53,8 @@ class Worktype
         }
 
         $base['type'] = $base['type'] ?? $kind;
+        $base['layout'] = self::normalizeLayout($base['layout'] ?? null, $base['type'] === 'folder' ? 'works' : 'work');
+
         return $base;
     }
 
@@ -60,80 +64,199 @@ class Worktype
     public static function render(string $kind, array $ctx): string
     {
         $work = $ctx['work'] ?? [];
-        $tpl = null;
+        $layout = self::normalizeLayout(is_array($work) ? ($work['layout'] ?? null) : null, $kind === 'folder' ? 'works' : 'work');
+        $resolvedWork = is_array($work) ? $work : [];
+        $resolvedWork['layout'] = $layout;
+        $template = self::layoutTemplate($kind, $resolvedWork);
+        $partials = self::templates();
 
-        // Allow per-item override via work.layout.template
-        if (is_array($work)) {
-            $layout = $work['layout'] ?? null;
-            if (is_array($layout) && !empty($layout['template']) && is_string($layout['template'])) {
-                $tpl = $layout['template'];
+        if ($template) {
+            self::ensureRendererAvailable();
+            try {
+                $compiled = \LightnCandy\LightnCandy::compile($template, [
+                    'partials' => $partials,
+                    'flags' => \LightnCandy\LightnCandy::FLAG_HANDLEBARSJS
+                        | \LightnCandy\LightnCandy::FLAG_RUNTIMEPARTIAL
+                        | \LightnCandy\LightnCandy::FLAG_ERROR_LOG,
+                ]);
+                $renderer = \LightnCandy\LightnCandy::prepare($compiled);
+
+                return $renderer(self::buildRenderContext($kind, $ctx, $resolvedWork, $layout));
+            } catch (\Throwable $error) {
+                return self::fallbackRender($ctx);
             }
         }
 
-        if (!$tpl) {
-            $tpl = self::loadTemplate($kind);
-        }
-        if (!$tpl) {
-            $tpl = self::loadTemplate('other');
-        }
-
-        if ($tpl) {
-            return self::applyTemplate($tpl, $ctx);
-        }
-
-        // Fallback minimal rendering
-        return '<iframe src="' . htmlspecialchars($ctx['safePath'] ?? '', ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars($ctx['safeName'] ?? '', ENT_QUOTES, 'UTF-8') . '"></iframe>';
+        return self::fallbackRender($ctx);
     }
 
-    private static function loadTemplate(string $kind): ?string
+    public static function normalizeLayout(mixed $value, string $section = 'work'): array
+    {
+        $layout = [
+            'mode' => 'default',
+            'name' => 'default-layout',
+            'engine' => 'lightncandy',
+            'section' => $section,
+        ];
+
+        if (is_string($value) && trim($value) !== '') {
+            $name = trim($value);
+            $layout['mode'] = $name;
+            $layout['name'] = $name === 'default' ? 'default-layout' : $name;
+            return $layout;
+        }
+
+        if (!is_array($value)) {
+            return $layout;
+        }
+
+        $candidate = trim((string) ($value['name'] ?? $value['mode'] ?? $value['value'] ?? ''));
+        if ($candidate !== '') {
+            $layout['mode'] = $candidate;
+            $layout['name'] = $candidate === 'default' ? 'default-layout' : $candidate;
+        }
+
+        if (isset($value['engine']) && is_string($value['engine']) && trim($value['engine']) !== '') {
+            $layout['engine'] = trim($value['engine']);
+        }
+
+        if (isset($value['section']) && is_string($value['section']) && trim($value['section']) !== '') {
+            $layout['section'] = trim($value['section']);
+        }
+
+        foreach (['template', 'model', 'stylePrompt'] as $key) {
+            if (array_key_exists($key, $value)) {
+                $layout[$key] = $value[$key];
+            }
+        }
+
+        return $layout;
+    }
+
+    public static function templates(): array
     {
         self::loadBundle();
-        self::loadFilePair($kind);
 
-        if (isset(self::$fileTemplates[$kind])) {
-            return self::$fileTemplates[$kind];
+        $templates = self::$embeddedTemplates;
+        foreach (self::$bundleTemplates as $key => $template) {
+            $templates[$key] = $template;
         }
-        if (isset(self::$bundleTemplates[$kind])) {
-            return self::$bundleTemplates[$kind];
+
+        foreach ((glob(__DIR__ . '/worktypes/templates/*.hbs') ?: []) as $path) {
+            $templates[pathinfo($path, PATHINFO_FILENAME)] = (string) file_get_contents($path);
         }
-        $path = __DIR__ . '/worktypes/templates/' . $kind . '.tpl';
-        if (file_exists($path)) {
-            return (string) file_get_contents($path);
+
+        foreach ((glob(__DIR__ . '/worktypes/templates/*.tpl') ?: []) as $path) {
+            $key = pathinfo($path, PATHINFO_FILENAME);
+            if (!isset($templates[$key])) {
+                $templates[$key] = (string) file_get_contents($path);
+            }
         }
-        if (isset(self::$embeddedTemplates[$kind])) {
-            return self::$embeddedTemplates[$kind];
+
+        foreach (array_keys(self::$bundleDefinitions + self::$embedded) as $kind) {
+            self::loadFilePair((string) $kind);
         }
+        foreach (self::$fileTemplates as $key => $template) {
+            $templates[$key] = $template;
+        }
+
+        return $templates;
+    }
+
+    public static function template(string $name): ?string
+    {
+        self::loadBundle();
+        self::loadFilePair($name);
+
+        if (isset(self::$fileTemplates[$name])) {
+            return self::$fileTemplates[$name];
+        }
+        if (isset(self::$bundleTemplates[$name])) {
+            return self::$bundleTemplates[$name];
+        }
+        foreach (['.hbs', '.tpl'] as $extension) {
+            $path = __DIR__ . '/worktypes/templates/' . $name . $extension;
+            if (file_exists($path)) {
+                return (string) file_get_contents($path);
+            }
+        }
+        if (isset(self::$embeddedTemplates[$name])) {
+            return self::$embeddedTemplates[$name];
+        }
+
         return null;
     }
 
-    private static function applyTemplate(string $tpl, array $ctx): string
+    public static function layoutTemplate(string $kind, array $work = []): string
     {
-        $safePath = htmlspecialchars($ctx['safePath'] ?? '', ENT_QUOTES, 'UTF-8');
-        $safeName = htmlspecialchars($ctx['safeName'] ?? '', ENT_QUOTES, 'UTF-8');
-        $safeLinkUrl = htmlspecialchars($ctx['safeLinkUrl'] ?? '', ENT_QUOTES, 'UTF-8');
-        $safeSlug = htmlspecialchars($ctx['slug'] ?? '', ENT_QUOTES, 'UTF-8');
-        $work = $ctx['work'] ?? [];
+        $layout = self::normalizeLayout($work['layout'] ?? null, $kind === 'folder' ? 'works' : 'work');
+        if (!empty($layout['template']) && is_string($layout['template'])) {
+            return $layout['template'];
+        }
 
-        $replacements = [
-            '{{path}}' => $safePath,
-            '{{name}}' => $safeName,
-            '{{linkUrl}}' => $safeLinkUrl,
-            '{{slug}}' => $safeSlug,
+        $namedTemplate = self::template($layout['name']);
+        if (is_string($namedTemplate) && $namedTemplate !== '') {
+            return $namedTemplate;
+        }
+
+        $defaultTemplate = self::template('default-layout');
+        if (is_string($defaultTemplate) && $defaultTemplate !== '') {
+            return $defaultTemplate;
+        }
+
+        return '';
+    }
+
+    private static function ensureRendererAvailable(): void
+    {
+        if (!class_exists('\LightnCandy\LightnCandy')) {
+            throw new \RuntimeException('Missing dependency: install zordius/lightncandy via Composer.');
+        }
+    }
+
+    private static function buildRenderContext(string $kind, array $ctx, array $work, array $layout): array
+    {
+        $context = [
+            'kind' => $kind,
+            'path' => (string) ($ctx['path'] ?? ''),
+            'name' => (string) ($ctx['name'] ?? ''),
+            'title' => (string) ($ctx['title'] ?? ($ctx['name'] ?? '')),
+            'description' => (string) ($ctx['description'] ?? ''),
+            'descriptionHtml' => (string) ($ctx['descriptionHtml'] ?? ''),
+            'linkUrl' => (string) ($ctx['linkUrl'] ?? ''),
+            'slug' => (string) ($ctx['slug'] ?? ''),
+            'layout' => $layout,
+            'work' => $work,
+            'isFolder' => $kind === 'folder',
+            'isImage' => $kind === 'image',
+            'isVideo' => $kind === 'video',
+            'isAudio' => $kind === 'audio',
+            'isPdf' => $kind === 'pdf',
+            'isText' => $kind === 'text',
+            'isLink' => $kind === 'link',
+            'isOther' => $kind === 'other',
         ];
 
         foreach ($work as $key => $value) {
-            $placeholder = '{{' . $key . '}}';
             if (is_bool($value)) {
-                $replacements[$placeholder] = $value ? 'true' : 'false';
-                // Provide attribute-style placeholder (e.g., autoplayAttr) if templates use it
-                $attrKey = '{{' . $key . 'Attr}}';
-                $replacements[$attrKey] = $value ? $key : '';
-            } elseif (is_scalar($value) || $value === null) {
-                $replacements[$placeholder] = htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+                $context[$key] = $value;
+                $context[$key . 'Attr'] = $value ? $key : '';
+                continue;
+            }
+            if (is_scalar($value) || $value === null) {
+                $context[$key] = $value;
             }
         }
 
-        return strtr($tpl, $replacements);
+        return $context;
+    }
+
+    private static function fallbackRender(array $ctx): string
+    {
+        $path = htmlspecialchars((string) ($ctx['path'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $name = htmlspecialchars((string) ($ctx['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+        return '<iframe src="' . $path . '" title="' . $name . '"></iframe>';
     }
 
     /**

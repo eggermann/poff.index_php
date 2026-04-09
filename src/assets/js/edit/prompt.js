@@ -328,7 +328,8 @@ export function bindPromptWindow({
                 }
                 const elements = drawerForm ? drawerForm.elements : null;
                 const layoutPayload = {
-                    mode: (elements?.work_layout?.value || '').trim(),
+                    name: (elements?.work_layout?.value || '').trim(),
+                    engine: 'lightncandy',
                     template: templateText,
                 };
                 if (response.model) {
@@ -360,7 +361,7 @@ export function bindPromptWindow({
                 if (nextTitle !== null) extra.push('title');
                 if (nextDescription !== null) extra.push('description');
                 if (nextWork && Object.keys(nextWork).length) extra.push(`work: ${Object.keys(nextWork).join(', ')}`);
-                const summaryText = `Saved ${templateText.length} chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
+                const summaryText = `Saved ${templateText.length} HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
                 renderSummary(summaryText);
                 reloadViewer();
             } catch (err) {

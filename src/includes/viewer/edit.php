@@ -115,7 +115,7 @@ function cmsHandleEditAction(): void
 
         if (is_array($layoutPayload)) {
             $hasLayoutUpdate = true;
-            $layoutMode = trim((string) ($layoutPayload['mode'] ?? ''));
+            $layoutMode = trim((string) ($layoutPayload['mode'] ?? $layoutPayload['name'] ?? ''));
             $layoutModel = $layoutPayload['model'] ?? null;
             if (array_key_exists('template', $layoutPayload)) {
                 $layoutTemplateProvided = true;
@@ -147,6 +147,7 @@ function cmsHandleEditAction(): void
             $workLayout = trim((string) $data['work_layout']);
         }
 
+        $layoutSection = $targetType === 'folder' ? 'works' : 'work';
         if ($hasLayoutUpdate) {
             $layoutValue = $work['layout'] ?? null;
             $layout = is_array($layoutValue) ? $layoutValue : [];
@@ -162,9 +163,9 @@ function cmsHandleEditAction(): void
             if (is_string($layoutModel) && $layoutModel !== '') {
                 $layout['model'] = $layoutModel;
             }
-            $work['layout'] = $layout;
+            $work['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
         } elseif ($workLayout !== '') {
-            $work['layout'] = $workLayout;
+            $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
 
         $config['work'] = $work;
@@ -241,11 +242,12 @@ function cmsHandleEditAction(): void
 
         $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $defaultSystemPrompt = implode("\n", [
-            'You are a web component/template generator for this single-page CMS.',
-            'Transform the user description into one HTML template string that will be saved to work.layout.template.',
+            'You are a Handlebars (HBS) template generator for this single-page CMS.',
+            'Return one HBS template string rendered through the LightnCandy renderer and saved to work.layout.template.',
             'Return only the template (no Markdown, no fences).',
-            'Inputs available: {{path}}, {{name}}, {{linkUrl}}, and work.* values from config/work; booleans also expose {{keyAttr}} (e.g., autoplayAttr).',
-            'Use config/title/description, layout mode/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+            'Default layout technique: use {{> default-layout}}. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.',
+            'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+            'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
             'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
             'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
         ]);

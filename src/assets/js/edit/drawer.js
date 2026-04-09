@@ -68,12 +68,12 @@ export function renderEditDrawer({
                     <input class="form-input" id="edit-work-type" type="text" name="work_type" value="${escapeHtml((config.work || {}).type || '')}">
                 </div>
                 <div>
-                    <label class="edit-label" for="edit-work-layout">Work Layout</label>
+                    <label class="edit-label" for="edit-work-layout">Work Layout Name</label>
                     <input class="form-input" id="edit-work-layout" type="text" name="work_layout" value="${escapeHtml(layoutState.mode)}">
                 </div>
             </div>
             <div>
-                <label class="edit-label" for="edit-work-template">Work Layout Template</label>
+                <label class="edit-label" for="edit-work-template">Work Layout Template (HBS)</label>
                 <textarea class="form-textarea" id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
             </div>
             ${status?.target !== 'file' ? `

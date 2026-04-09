@@ -18,7 +18,11 @@ class PoffConfig
 
     private static function defaultWork(string $kind, ?string $mime = null): array
     {
-        return Worktype::definition($kind, $mime);
+        $work = Worktype::definition($kind, $mime);
+        $section = $kind === 'folder' ? 'works' : 'work';
+        $work['layout'] = Worktype::normalizeLayout($work['layout'] ?? null, $section);
+
+        return $work;
     }
 
     public static function configPath(string $dir): string
@@ -228,6 +232,7 @@ class PoffConfig
             $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
         }
         $data['work'] = array_merge($workDefault, $existingWork);
+        $data['work']['layout'] = Worktype::normalizeLayout($data['work']['layout'] ?? null, 'works');
         if ($existingWork !== $data['work']) {
             $forceWrite = true;
         }
@@ -327,6 +332,7 @@ class PoffConfig
             }
         }
         $data['work'] = array_merge($workDefault, $existingWork);
+        $data['work']['layout'] = Worktype::normalizeLayout($data['work']['layout'] ?? null, 'work');
         if ($existingWork !== $data['work']) {
             $forceWrite = true;
         }

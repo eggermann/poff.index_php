@@ -23,14 +23,8 @@ function handleWorkPrompt(array $opts): array
     $mime = class_exists('MediaType') ? MediaType::detectMimeType($absPath, basename($absPath)) : null;
     $model = class_exists('Worktype') ? Worktype::definition($kind, $mime) : ['type' => $kind];
 
-    $template = '';
-    $tplPath = __DIR__ . '/../../includes/worktypes/templates/' . $kind . '.tpl';
-    if (!file_exists($tplPath)) {
-        $tplPath = __DIR__ . '/../../includes/worktypes/templates/other.tpl';
-    }
-    if (file_exists($tplPath)) {
-        $template = (string) file_get_contents($tplPath);
-    }
+    $template = class_exists('Worktype') ? Worktype::layoutTemplate($kind, $model) : '';
+    $partials = class_exists('Worktype') ? Worktype::templates() : [];
 
     $configPath = class_exists('PoffConfig')
         ? PoffConfig::fileConfigPath(dirname($absPath), basename($absPath))
@@ -40,6 +34,9 @@ function handleWorkPrompt(array $opts): array
         $existingWork = isset($currentConfig['work']) && is_array($currentConfig['work']) ? $currentConfig['work'] : [];
         $mergedWork = array_merge($model, $existingWork);
         $mergedWork['layout'] = [
+            'name' => 'default-layout',
+            'engine' => 'lightncandy',
+            'section' => 'work',
             'model' => $model,
             'template' => $template,
             'stylePrompt' => $stylePrompt,
@@ -61,8 +58,9 @@ function handleWorkPrompt(array $opts): array
         'stylePrompt' => $stylePrompt,
         'model' => $model,
         'template' => $template,
+        'partials' => $partials,
         'config' => $fileConfig,
         'configPath' => $configPath,
-        'instruction' => 'Use model+template as a base. Apply style prompt to produce a new card template and updated work model. Save updates into work.layout.model/template.',
+        'instruction' => 'Use the default-layout HBS template and partials as a base. The section includes works for folders and work for files. Save updates into work.layout.model/template with the LightnCandy renderer.',
     ];
 }

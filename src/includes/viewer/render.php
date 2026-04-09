@@ -46,18 +46,21 @@ function renderViewer(string $baseDir, string $requestedPath): void
     $safeSlug = htmlspecialchars($rawSlug === '' ? 'item' : $rawSlug, ENT_QUOTES, 'UTF-8');
     $safeLinkUrl = $linkUrl ? htmlspecialchars($linkUrl, ENT_QUOTES, 'UTF-8') : '';
 
-    $bodyContent = Worktype::render($type, [
-        'safePath' => $safePath,
-        'safeName' => $safeName,
-        'safeLinkUrl' => $safeLinkUrl,
-        'slug' => $safeSlug,
-        'work' => $work,
-    ]);
-
     $descriptionHtml = '';
     if (!empty($fileConfig['description'])) {
         $descriptionHtml = '<div class="work-description">' . nl2br(htmlspecialchars($fileConfig['description'], ENT_QUOTES, 'UTF-8')) . '</div>';
     }
+
+    $bodyContent = Worktype::render($type, [
+        'path' => $relativePath,
+        'name' => $rawName,
+        'title' => $fileConfig['title'] ?? $rawName,
+        'description' => $fileConfig['description'] ?? '',
+        'descriptionHtml' => $descriptionHtml,
+        'linkUrl' => $linkUrl ?? '',
+        'slug' => $rawSlug === '' ? 'item' : $rawSlug,
+        'work' => $work,
+    ]);
 
     ?>
 <!DOCTYPE html>
@@ -142,7 +145,6 @@ function renderViewer(string $baseDir, string $requestedPath): void
     </header>
     <div class="viewer">
         <?= $bodyContent ?>
-        <?= $descriptionHtml ?>
     </div>
 </body>
 </html>

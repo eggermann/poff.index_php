@@ -45,6 +45,28 @@ function runCreate(args) {
   });
 }
 
+function runWorktype(action, kind, payload = null) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_render_worktype.php'), action, kind];
+    if (payload !== null) {
+      args.push(JSON.stringify(payload));
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`worktype helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 describe('MCP create route helper (CLI)', () => {
   beforeAll(() => {
     if (fs.existsSync(POFF_DIR)) {
@@ -106,5 +128,75 @@ describe('MCP create route helper (CLI)', () => {
     const copiedFile = path.join(POFF_DIR, destFolder, 'data.md');
     expect(fs.existsSync(copiedFile)).toBe(true);
     expect(fs.readFileSync(copiedFile, 'utf8')).toBe('nested data');
+  });
+});
+
+describe('Worktype HBS renderer', () => {
+  test('normalizes default layout metadata for files', async () => {
+    const output = await runWorktype('definition', 'image');
+    const definition = JSON.parse(output);
+
+    expect(definition.layout).toMatchObject({
+      mode: 'default',
+      name: 'default-layout',
+      engine: 'lightncandy',
+      section: 'work',
+    });
+  });
+
+  test('renders the default layout with the file work partial', async () => {
+    const output = await runWorktype('render', 'image', {
+      ctx: {
+        path: 'assets/photo.png',
+        name: 'photo.png',
+        title: 'Project Photo',
+        description: 'Inline description',
+        descriptionHtml: '<div class="work-description">Inline description</div>',
+        linkUrl: '',
+        slug: 'project-photo',
+        work: {
+          type: 'image',
+          fit: 'contain',
+          background: '#111111',
+          caption: '',
+          layout: {
+            name: 'default-layout',
+            engine: 'lightncandy',
+            section: 'work',
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('<section class="viewer-template viewer-template--image">');
+    expect(output).toContain('<img src="assets/photo.png" alt="Project Photo"');
+    expect(output).toContain('<div class="work-description">Inline description</div>');
+  });
+
+  test('allows a custom HBS layout template to include the default layout partial', async () => {
+    const output = await runWorktype('render', 'folder', {
+      ctx: {
+        path: 'projects',
+        name: 'projects',
+        title: 'Projects',
+        description: '',
+        descriptionHtml: '',
+        linkUrl: '',
+        slug: 'projects',
+        work: {
+          type: 'folder',
+          layout: {
+            name: 'custom-layout',
+            engine: 'lightncandy',
+            section: 'works',
+            template: '<div class="custom-shell">{{> default-layout}}</div>',
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('<div class="custom-shell">');
+    expect(output).toContain('<section class="viewer-template viewer-template--folder">');
+    expect(output).toContain('<iframe src="projects" title="projects"></iframe>');
   });
 });

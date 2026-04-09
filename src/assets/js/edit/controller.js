@@ -164,7 +164,8 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onSubmit: async ({ elements, statusEl, treeVisible }) => {
                 const layoutPayload = {
-                    mode: (elements.work_layout?.value || '').trim(),
+                    name: (elements.work_layout?.value || '').trim(),
+                    engine: 'lightncandy',
                     template: elements.work_template?.value ?? '',
                 };
                 const selection = getActiveSelection();
