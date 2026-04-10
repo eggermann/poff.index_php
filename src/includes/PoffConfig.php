@@ -12,6 +12,8 @@ class PoffConfig
     private const LAYOUT_TEMPLATE_FILE = 'template.hbs';
     private const LAYOUT_STYLE_FILE = 'style.css';
     private const LAYOUT_SCRIPT_FILE = 'script.js';
+    private const WORK_SECTION_TEMPLATE_FILE = 'work.hbs';
+    private const WORKS_SECTION_TEMPLATE_FILE = 'works.hbs';
 
     private static function generateId(): string
     {
@@ -413,6 +415,7 @@ class PoffConfig
             self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,
             self::LAYOUT_STYLE_FILE => array_key_exists('css', $normalized) ? (string) $normalized['css'] : null,
             self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $normalized) ? (string) $normalized['js'] : null,
+            self::sectionTemplateFile($section) => array_key_exists('sectionTemplate', $normalized) ? (string) $normalized['sectionTemplate'] : null,
         ];
 
         foreach ($managedFiles as $name => $contents) {
@@ -459,6 +462,10 @@ class PoffConfig
             ? str_replace('\\', '/', trim($resolved['directory'], "/\\"))
             : self::relativeLayoutPath($itemPath, $isFile);
         $resolved['baseHref'] = self::encodeRelativePath($basePath);
+        $sectionBasePath = isset($resolved['sectionDirectory']) && is_string($resolved['sectionDirectory']) && trim($resolved['sectionDirectory']) !== ''
+            ? str_replace('\\', '/', trim($resolved['sectionDirectory'], "/\\"))
+            : $basePath;
+        $resolved['sectionBaseHref'] = self::encodeRelativePath($sectionBasePath);
         $defaultBasePath = isset($resolved['defaultDirectory']) && is_string($resolved['defaultDirectory']) && trim($resolved['defaultDirectory']) !== ''
             ? str_replace('\\', '/', trim($resolved['defaultDirectory'], "/\\"))
             : $basePath;
@@ -503,8 +510,9 @@ class PoffConfig
         $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
-        $layoutDir = $localLayoutDir;
-        $resolved['directory'] = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
+        $localRelativeDir = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
+        $layoutDir = null;
+        $resolved['directory'] = $localRelativeDir;
         $defaultLayout = self::findDefaultLayoutDir($dir);
         if (is_array($defaultLayout)) {
             $resolved['defaultDirectory'] = $defaultLayout['relative'];
@@ -512,14 +520,18 @@ class PoffConfig
 
         $assets = [];
         $files = [];
-        if (!is_dir($layoutDir)) {
-            if (is_array($defaultLayout)) {
-                $layoutDir = $defaultLayout['absolute'];
-                $resolved['directory'] = $defaultLayout['relative'];
-            }
+        $sectionTemplateFile = self::sectionTemplateFile($section);
+        $sectionTemplatePath = null;
+        $resolved['sectionDirectory'] = '';
+
+        if (self::hasWrapperFiles($localLayoutDir)) {
+            $layoutDir = $localLayoutDir;
+        } elseif (is_array($defaultLayout) && self::hasWrapperFiles($defaultLayout['absolute'])) {
+            $layoutDir = $defaultLayout['absolute'];
+            $resolved['directory'] = $defaultLayout['relative'];
         }
 
-        if (is_dir($layoutDir)) {
+        if ($layoutDir !== null && is_dir($layoutDir)) {
             $resolved['storage'] = 'filesystem';
 
             $templatePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_TEMPLATE_FILE;
@@ -546,6 +558,22 @@ class PoffConfig
             $resolved['storage'] = 'inline';
         } else {
             $resolved['storage'] = 'default';
+        }
+
+        $localSectionPath = $localLayoutDir . DIRECTORY_SEPARATOR . $sectionTemplateFile;
+        if (is_file($localSectionPath)) {
+            $sectionTemplatePath = $localSectionPath;
+            $resolved['sectionDirectory'] = $localRelativeDir;
+        } elseif ($layoutDir !== null) {
+            $layoutSectionPath = $layoutDir . DIRECTORY_SEPARATOR . $sectionTemplateFile;
+            if (is_file($layoutSectionPath)) {
+                $sectionTemplatePath = $layoutSectionPath;
+                $resolved['sectionDirectory'] = $resolved['directory'];
+            }
+        }
+
+        if (is_string($sectionTemplatePath) && $sectionTemplatePath !== '') {
+            $resolved['sectionTemplate'] = (string) file_get_contents($sectionTemplatePath);
         }
 
         $resolved['assets'] = $assets;
@@ -680,6 +708,24 @@ class PoffConfig
         }
 
         return true;
+    }
+
+    private static function hasWrapperFiles(string $layoutDir): bool
+    {
+        foreach ([self::LAYOUT_TEMPLATE_FILE, self::LAYOUT_STYLE_FILE, self::LAYOUT_SCRIPT_FILE] as $fileName) {
+            if (is_file($layoutDir . DIRECTORY_SEPARATOR . $fileName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function sectionTemplateFile(string $section): string
+    {
+        return $section === 'works'
+            ? self::WORKS_SECTION_TEMPLATE_FILE
+            : self::WORK_SECTION_TEMPLATE_FILE;
     }
 
     private static function encodeRelativePath(string $path): string

@@ -175,7 +175,8 @@ export function createEditController({ elements, context, editRequested }) {
                 const layoutPayload = {
                     name: layoutName,
                     engine: 'lightncandy',
-                    template: layoutPreset === 'actual' ? '' : (elements.work_template?.value ?? ''),
+                    sectionTemplate: elements.content_template?.value ?? '',
+                    template: layoutPreset === 'actual' ? '' : (elements.layout_template?.value ?? ''),
                     css: layoutPreset === 'actual' ? '' : (elements.layout_css?.value ?? ''),
                     js: layoutPreset === 'actual' ? '' : (elements.layout_js?.value ?? ''),
                 };

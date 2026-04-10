@@ -415,6 +415,15 @@ export function bindPromptWindow({
                     ...((response && response.work && typeof response.work === 'object') ? response.work : {}),
                 };
                 const nextWork = filterAllowedWork(mergedWork, currentConfig);
+                const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, 'layout')
+                    ? nextWork.layout
+                    : null;
+                const persistedWork = nextWork && typeof nextWork === 'object'
+                    ? { ...nextWork }
+                    : null;
+                if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, 'layout')) {
+                    delete persistedWork.layout;
+                }
                 if (response.error || !templateText) {
                     stopStreaming(stream);
                     setGeneratingState(false);
@@ -460,7 +469,7 @@ export function bindPromptWindow({
                     savePromptSettings(readSettings());
                 }
                 if (drawerForm) {
-                    const templateField = drawerForm.querySelector('#edit-work-template');
+                    const templateField = drawerForm.querySelector('#edit-content-template');
                     if (templateField) {
                         templateField.value = templateText;
                     }
@@ -484,11 +493,31 @@ export function bindPromptWindow({
                     descriptionField.value = nextDescription;
                 }
                 const elements = drawerForm ? drawerForm.elements : null;
+                const resolvedLayoutName = (() => {
+                    if (typeof nextLayoutValue === 'string' && nextLayoutValue.trim()) {
+                        return nextLayoutValue.trim();
+                    }
+                    if (nextLayoutValue && typeof nextLayoutValue === 'object') {
+                        const candidate = nextLayoutValue.name || nextLayoutValue.mode || nextLayoutValue.value || '';
+                        if (typeof candidate === 'string' && candidate.trim()) {
+                            return candidate.trim();
+                        }
+                    }
+                    return (elements?.work_layout?.value || currentConfig?.work?.layout?.name || 'default-layout').trim();
+                })();
                 const layoutPayload = {
-                    name: (elements?.work_layout?.value || 'default-layout').trim(),
+                    name: resolvedLayoutName,
                     engine: 'lightncandy',
-                    template: templateText,
+                    sectionTemplate: templateText,
                 };
+                if (nextLayoutValue && typeof nextLayoutValue === 'object') {
+                    if (typeof nextLayoutValue.engine === 'string' && nextLayoutValue.engine.trim()) {
+                        layoutPayload.engine = nextLayoutValue.engine.trim();
+                    }
+                    if (typeof nextLayoutValue.model === 'string' && nextLayoutValue.model.trim()) {
+                        layoutPayload.model = nextLayoutValue.model.trim();
+                    }
+                }
                 if (response.model) {
                     layoutPayload.model = response.model;
                 }
@@ -502,8 +531,8 @@ export function bindPromptWindow({
                 if (nextDescription !== null) {
                     savePayload.description = nextDescription;
                 }
-                if (nextWork) {
-                    savePayload.work = nextWork;
+                if (persistedWork && Object.keys(persistedWork).length) {
+                    savePayload.work = persistedWork;
                 }
                 await saveConfig(savePayload, statusEl);
                 if (statusEl) {
@@ -517,7 +546,8 @@ export function bindPromptWindow({
                 const extra = [];
                 if (nextTitle !== null) extra.push('title');
                 if (nextDescription !== null) extra.push('description');
-                if (nextWork && Object.keys(nextWork).length) extra.push(`work: ${Object.keys(nextWork).join(', ')}`);
+                if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(', ')}`);
+                if (nextLayoutValue) extra.push('layout');
                 const summaryText = `Saved ${templateText.length} HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
                 renderSummary(summaryText);
                 clearAttachment();

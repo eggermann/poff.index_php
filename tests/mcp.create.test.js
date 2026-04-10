@@ -18,6 +18,7 @@ const VIEWER_FILE_NAME = 'viewer-file.txt';
 const VIEWER_FILE_PATH = path.join(POFF_DIR, VIEWER_FILE_NAME);
 const PERSIST_LAYOUT_DIR = path.join(POFF_DIR, 'persist-layout');
 const INHERITED_DEFAULT_DIR = path.join(POFF_DIR, 'inherits-default');
+const INHERITED_SECTION_DIR = path.join(POFF_DIR, 'inherits-section-default');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
 
 function copyDirSync(src, dest) {
@@ -198,12 +199,16 @@ describe('MCP create route helper (CLI)', () => {
       },
     }, null, 2));
     fs.mkdirSync(path.join(POFF_DIR, '.default', '.layout'), { recursive: true });
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{#each items}}<span class="item">{{name}}</span>{{/each}}{{else}}{{name}}{{/if}}</main><footer><img src="{{layout.baseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>');
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.defaultBaseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>');
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'works.hbs'), '{{#each items}}<span class="item">{{name}}</span>{{/each}}');
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'work.hbs'), '<span class="file-name">{{name}}</span>');
     fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'style.css'), '.default-fs-layout{display:block;}');
     fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'script.js'), 'window.__defaultFsLayout = true;');
     fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'eggman_profile-image.jpg'), 'fake image bytes');
     fs.mkdirSync(INHERITED_DEFAULT_DIR, { recursive: true });
     fs.writeFileSync(path.join(INHERITED_DEFAULT_DIR, 'child.txt'), 'child');
+    fs.mkdirSync(INHERITED_SECTION_DIR, { recursive: true });
+    fs.writeFileSync(path.join(INHERITED_SECTION_DIR, 'hero.txt'), 'hero');
     fs.mkdirSync(PERSIST_LAYOUT_DIR, { recursive: true });
     fs.mkdirSync(UPLOAD_TARGET_DIR, { recursive: true });
   });
@@ -396,6 +401,31 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });
 
+  test('keeps the inherited wrapper when a local wrapped partial override exists', async () => {
+    const payload = {
+      name: 'default-layout',
+      engine: 'lightncandy',
+      section: 'works',
+      sectionTemplate: '<div class="local-works">{{#each items}}<span class="local-item">{{name}}</span>{{/each}}</div>',
+    };
+
+    await runLayoutFilesystem('persist-folder', INHERITED_SECTION_DIR, '', payload);
+
+    expect(fs.readFileSync(path.join(INHERITED_SECTION_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('local-works');
+
+    const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_SECTION_DIR));
+    expect(ensured.work.layout.directory).toBe('tests/poff-tests/.default/.layout');
+    expect(ensured.work.layout.template).toContain('default-fs-layout');
+    expect(ensured.work.layout.sectionDirectory).toBe('.layout');
+    expect(ensured.work.layout.sectionTemplate).toContain('local-works');
+
+    const rendered = await runViewer('inherits-section-default');
+    expect(rendered).toContain('<div class="default-fs-layout">');
+    expect(rendered).toContain('<div class="local-works">');
+    expect(rendered).toContain('<span class="local-item">hero.txt</span>');
+    expect(rendered).toContain('.default/.layout/eggman_profile-image.jpg');
+  });
+
   test('renders folder previews through the typed viewer route', async () => {
     const output = await runViewer('viewer-folder');
 
@@ -449,6 +479,29 @@ describe('Worktype HBS renderer', () => {
     const ensuredConfig = JSON.parse(ensuredOutput);
     expect(ensuredConfig.work.layout.template).toContain('Persisted');
     expect(ensuredConfig.work.layout.storage).toBe('filesystem');
+  });
+
+  test('persists wrapped content partials into works.hbs without replacing the wrapper', async () => {
+    const payload = {
+      name: 'default-layout',
+      engine: 'lightncandy',
+      section: 'works',
+      sectionTemplate: '<section class="persisted-section">{{title}}</section>',
+    };
+
+    const output = await runLayoutFilesystem('persist-folder', PERSIST_LAYOUT_DIR, '', payload);
+    const serializedLayout = JSON.parse(output);
+
+    expect(serializedLayout).toMatchObject({
+      name: 'default-layout',
+      section: 'works',
+      engine: 'lightncandy',
+    });
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('persisted-section');
+
+    const ensuredOutput = await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
+    const ensuredConfig = JSON.parse(ensuredOutput);
+    expect(ensuredConfig.work.layout.sectionTemplate).toContain('persisted-section');
   });
 
   test('stores uploaded files into a folder target', async () => {

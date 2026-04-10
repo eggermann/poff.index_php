@@ -23,6 +23,9 @@ export function extractNavHtml(html) {
 
 export function getLayoutState(config) {
     const layoutValue = config?.work?.layout;
+    const inferredSection = layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue) && layoutValue.section
+        ? String(layoutValue.section)
+        : ((config?.type === 'folder' || (config?.work?.type === 'folder' && !config?.name)) ? 'works' : 'work');
     const normalize = (state) => {
         const mode = state.mode || 'default-layout';
         const storage = state.storage || '';
@@ -46,6 +49,9 @@ export function getLayoutState(config) {
             mode,
             storage,
             directory,
+            section: state.section || inferredSection,
+            sectionTemplate: state.sectionTemplate || '',
+            sectionDirectory: state.sectionDirectory || '',
             preset,
             sourceLabel,
         };
@@ -60,11 +66,14 @@ export function getLayoutState(config) {
             engine: layoutValue.engine || 'lightncandy',
             directory: layoutValue.directory || '',
             storage: layoutValue.storage || '',
+            section: layoutValue.section || inferredSection,
+            sectionTemplate: layoutValue.sectionTemplate || '',
+            sectionDirectory: layoutValue.sectionDirectory || '',
             assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : [],
         });
     }
     if (typeof layoutValue === 'string') {
-        return normalize({ mode: layoutValue, template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', assets: [] });
+        return normalize({ mode: layoutValue, template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', section: inferredSection, sectionTemplate: '', sectionDirectory: '', assets: [] });
     }
-    return normalize({ mode: 'default-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', assets: [] });
+    return normalize({ mode: 'default-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', section: inferredSection, sectionTemplate: '', sectionDirectory: '', assets: [] });
 }

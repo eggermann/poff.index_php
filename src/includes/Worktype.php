@@ -69,6 +69,10 @@ class Worktype
         $resolvedWork['layout'] = $layout;
         $template = self::layoutTemplate($kind, $resolvedWork);
         $partials = self::templates();
+        $section = (string) ($layout['section'] ?? ($kind === 'folder' ? 'works' : 'work'));
+        if (!empty($layout['sectionTemplate']) && is_string($layout['sectionTemplate'])) {
+            $partials[$section] = $layout['sectionTemplate'];
+        }
 
         if ($template) {
             if (!self::rendererAvailable()) {
@@ -141,7 +145,12 @@ class Worktype
             'stylePrompt',
             'storage',
             'directory',
+            'defaultDirectory',
             'baseHref',
+            'sectionTemplate',
+            'sectionDirectory',
+            'sectionBaseHref',
+            'defaultBaseHref',
             'cssHref',
             'jsHref',
             'assets',

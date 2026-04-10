@@ -62,7 +62,8 @@ export function renderPromptWindow(settings = {}) {
                 <div class="prompt-context-body">
                     <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                     <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
-                    <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}</div>
+                    <div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial. The outer layout wrapper stays active.</div>
+                    <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.sectionBaseHref}}</div>
                     <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
                 </div>
             </div>
@@ -91,7 +92,7 @@ export function renderPromptWindow(settings = {}) {
             </div>
             <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
             <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
-            <div class="small-note">Template responses are saved to <code>.layout/template.hbs</code> for the LightnCandy renderer.</div>
+            <div class="small-note">Template responses are saved to the wrapped partial: <code>work.hbs</code> for files and <code>works.hbs</code> for folders. The current outer layout stays active.</div>
         </div>
     `;
 }

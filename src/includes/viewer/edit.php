@@ -201,6 +201,19 @@ function cmsPromptAssetUrl(string $relativePath, bool $isFile): string
     return implode('/', $encoded);
 }
 
+function cmsPromptTemplateTarget(string $relativePath, bool $isFile, string $section): string
+{
+    $layoutPath = PoffConfig::relativeLayoutPath($relativePath, $isFile);
+    $sectionFile = $section === 'works' ? 'works.hbs' : 'work.hbs';
+
+    return $layoutPath . '/' . $sectionFile;
+}
+
+function cmsPromptLayoutTemplateTarget(string $relativePath, bool $isFile): string
+{
+    return PoffConfig::relativeLayoutPath($relativePath, $isFile) . '/template.hbs';
+}
+
 function cmsPromptRefKind(string $name, string $type): string
 {
     if ($type === 'folder') {
@@ -265,12 +278,14 @@ function cmsBuildPromptContext(string $relativePath, string $targetType, array $
         : (string) ($config['folderName'] ?? basename($normalizedPath));
     $currentPath = $normalizedPath;
     $currentIsFile = $targetType === 'file';
+    $currentSection = $currentIsFile ? 'work' : 'works';
     $currentPageLink = cmsPromptViewerUrl($currentPath, $currentIsFile);
     $currentAssetUrl = cmsPromptAssetUrl($currentPath, $currentIsFile);
 
     $context = [
         'current' => [
             'targetType' => $targetType,
+            'sectionPartial' => $currentSection,
             'name' => $currentName,
             'path' => $currentPath,
             'pageLink' => $currentPageLink,
@@ -283,6 +298,8 @@ function cmsBuildPromptContext(string $relativePath, string $targetType, array $
             'rawHref' => $currentAssetUrl,
             'srcUrl' => $currentAssetUrl,
             'sourceUrl' => $currentAssetUrl,
+            'templateTarget' => cmsPromptTemplateTarget($currentPath, $currentIsFile, $currentSection),
+            'layoutTemplateTarget' => cmsPromptLayoutTemplateTarget($currentPath, $currentIsFile),
         ],
         'items' => [],
         'allItems' => [],
@@ -481,6 +498,14 @@ function cmsHandleEditAction(): void
         }
 
         $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
+        if (isset($data['work']) && is_array($data['work'])) {
+            foreach ($data['work'] as $key => $value) {
+                if ($key === 'type') {
+                    continue;
+                }
+                $work[$key] = $value;
+            }
+        }
         $hasWorkType = false;
         $workType = '';
         if (isset($data['work']) && is_array($data['work']) && array_key_exists('type', $data['work'])) {
@@ -499,6 +524,8 @@ function cmsHandleEditAction(): void
         $layoutModel = null;
         $layoutTemplateProvided = false;
         $layoutTemplate = null;
+        $layoutSectionTemplateProvided = false;
+        $layoutSectionTemplate = null;
         $layoutCssProvided = false;
         $layoutCss = null;
         $layoutJsProvided = false;
@@ -512,6 +539,10 @@ function cmsHandleEditAction(): void
             if (array_key_exists('template', $layoutPayload)) {
                 $layoutTemplateProvided = true;
                 $layoutTemplate = (string) $layoutPayload['template'];
+            }
+            if (array_key_exists('sectionTemplate', $layoutPayload)) {
+                $layoutSectionTemplateProvided = true;
+                $layoutSectionTemplate = (string) $layoutPayload['sectionTemplate'];
             }
             if (array_key_exists('css', $layoutPayload) || array_key_exists('style', $layoutPayload)) {
                 $layoutCssProvided = true;
@@ -541,6 +572,16 @@ function cmsHandleEditAction(): void
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $data['layoutTemplate'];
         }
+        if (array_key_exists('section_template', $data)) {
+            $hasLayoutUpdate = true;
+            $layoutSectionTemplateProvided = true;
+            $layoutSectionTemplate = (string) $data['section_template'];
+        }
+        if (array_key_exists('sectionTemplate', $data)) {
+            $hasLayoutUpdate = true;
+            $layoutSectionTemplateProvided = true;
+            $layoutSectionTemplate = (string) $data['sectionTemplate'];
+        }
         if (array_key_exists('layout_css', $data)) {
             $hasLayoutUpdate = true;
             $layoutCssProvided = true;
@@ -569,6 +610,9 @@ function cmsHandleEditAction(): void
             }
             if ($layoutTemplateProvided) {
                 $layout['template'] = $layoutTemplate;
+            }
+            if ($layoutSectionTemplateProvided) {
+                $layout['sectionTemplate'] = $layoutSectionTemplate;
             }
             if ($layoutCssProvided) {
                 $layout['css'] = $layoutCss;
@@ -674,19 +718,22 @@ function cmsHandleEditAction(): void
         $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $responseFormatInstruction = implode("\n", [
             'Response format: return strict JSON.',
-            'Required key: "template" with the HBS string.',
+            'Required key: "template" with the wrapped inner HBS partial string.',
             'Optional keys: "title", "description", and "work".',
             'If the user requests work.* updates such as autoplay, loop, muted, poster, type, or layout, include them under "work".',
             'Example: {"template":"<div>{{title}}</div>","work":{"autoplay":true}}',
         ]);
         $defaultSystemPrompt = implode("\n", [
             'You are a Handlebars (HBS) template generator for this single-page CMS.',
-            'Return one HBS template string rendered through the LightnCandy renderer and saved to .layout/template.hbs.',
-            'Default layout technique: use {{> default-layout}}. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.',
+            'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
+            'The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
+            'Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.',
+            'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files.',
             'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
             'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
             'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
             'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+            'Prompt context JSON includes current.templateTarget for the wrapped partial save target and current.layoutTemplateTarget for the outer wrapper path. Edit the wrapped partial target by default.',
             'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
             'Prompt context JSON includes resolved refs for the current item and current folder contents. Use those refs directly instead of inventing paths.',
             'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',

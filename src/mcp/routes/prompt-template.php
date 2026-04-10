@@ -171,6 +171,16 @@ function mcpPromptAssetUrl(string $relativePath, bool $isFile): string
     return implode('/', $encoded);
 }
 
+function mcpPromptTemplateTarget(string $relativePath): string
+{
+    return PoffConfig::relativeLayoutPath($relativePath, false) . '/works.hbs';
+}
+
+function mcpPromptLayoutTemplateTarget(string $relativePath): string
+{
+    return PoffConfig::relativeLayoutPath($relativePath, false) . '/template.hbs';
+}
+
 function mcpPromptRefKind(string $name, string $type): string
 {
     if ($type === 'folder') {
@@ -237,6 +247,7 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     $context = [
         'current' => [
             'targetType' => 'folder',
+            'sectionPartial' => 'works',
             'name' => $currentName,
             'path' => $normalizedPath,
             'pageLink' => $currentPageLink,
@@ -249,6 +260,8 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
             'rawHref' => $currentAssetUrl,
             'srcUrl' => $currentAssetUrl,
             'sourceUrl' => $currentAssetUrl,
+            'templateTarget' => mcpPromptTemplateTarget($normalizedPath),
+            'layoutTemplateTarget' => mcpPromptLayoutTemplateTarget($normalizedPath),
         ],
         'items' => [],
         'allItems' => [],
@@ -367,18 +380,21 @@ function handlePromptTemplate(array $opts): array
     $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $responseFormatInstruction = implode("\n", [
         'Response format: return strict JSON.',
-        'Required key: "template" with the HBS string.',
+        'Required key: "template" with the wrapped inner HBS partial string.',
         'Optional keys: "title", "description", and "work".',
         'If the user requests work.* updates such as autoplay, loop, muted, poster, type, or layout, include them under "work".',
         'Example: {"template":"<div>{{title}}</div>","work":{"autoplay":true}}',
     ]);
     $systemPrompt = implode("\n", [
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
-        'Return JSON for the LightnCandy renderer and save the template to .layout/template.hbs.',
+        'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
+        'The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is works.hbs inside the active folder layout folder.',
+        'Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.',
+        'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files.',
         'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
         'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
+        'Prompt context JSON includes current.templateTarget for the wrapped partial save target and current.layoutTemplateTarget for the outer wrapper path. Edit the wrapped partial target by default.',
         'Prompt context JSON includes resolved refs for the current folder contents. Use those refs directly instead of inventing paths.',
-        'Use {{> default-layout}} as the default layout technique.',
     ]);
     $historyText = '';
     foreach ($history as $msg) {

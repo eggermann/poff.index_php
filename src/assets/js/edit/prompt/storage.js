@@ -3,6 +3,13 @@ import { defaultPromptSettings, promptHistoryKey, promptSettingsKey } from './co
 export function loadPromptSettings() {
     try {
         const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || '{}');
+        if (typeof stored.systemPrompt === 'string') {
+            const looksLikeLegacyDefault = stored.systemPrompt.includes('saved to .layout/template.hbs')
+                || stored.systemPrompt.includes('Use {{> default-layout}} as the default layout technique.');
+            if (looksLikeLegacyDefault) {
+                stored.systemPrompt = defaultPromptSettings.systemPrompt;
+            }
+        }
         return { ...defaultPromptSettings, ...stored };
     } catch (err) {
         return defaultPromptSettings;

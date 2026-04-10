@@ -49,6 +49,12 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const viewUrl = isFile
         ? `?view=1&file=${encodeURIComponent(path)}`
         : `?view=1&path=${encodeURIComponent(path)}`;
+    const templateTarget = isFile
+        ? `.works/${name || 'item'}.layout/work.hbs`
+        : '.layout/works.hbs';
+    const layoutTemplateTarget = isFile
+        ? `.works/${name || 'item'}.layout/template.hbs`
+        : '.layout/template.hbs';
     const work = (config && typeof config === 'object' && config.work) ? config.work : {};
     const tree = Array.isArray(config?.tree) ? config.tree : [];
     const folderBasePath = (selection?.isFile ? path.split('/').slice(0, -1).join('/') : path).replace(/^\/+|\/+$/g, '');
@@ -81,7 +87,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
             : `?path=${encodeURIComponent(itemPath)}`;
         return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
     }).filter(Boolean).join(' | ');
-    return { path, name, pageLink: viewUrl, viewUrl, workPreview, refPreview };
+    return { path, name, pageLink: viewUrl, viewUrl, templateTarget, layoutTemplateTarget, workPreview, refPreview };
 }
 
 export function renderPromptContext(contextEl, context) {
@@ -92,6 +98,8 @@ export function renderPromptContext(contextEl, context) {
     const name = context?.name || '';
     const pageLink = context?.pageLink || context?.viewUrl || '';
     const viewUrl = context?.viewUrl || '';
+    const templateTarget = context?.templateTarget || '';
+    const layoutTemplateTarget = context?.layoutTemplateTarget || '';
     const workPreview = context?.workPreview || '';
     const refPreview = context?.refPreview || '';
     contextEl.innerHTML = `
@@ -99,6 +107,8 @@ export function renderPromptContext(contextEl, context) {
         <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
         <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
         <div class="prompt-context-row"><strong>viewUrl</strong>: ${escapeHtml(viewUrl)}</div>
+        ${templateTarget ? `<div class="prompt-context-row"><strong>templateTarget</strong>: ${escapeHtml(templateTarget)}</div>` : ''}
+        ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ''}
         <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('default-layout, works, work')}</div>
         ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ''}
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ''}

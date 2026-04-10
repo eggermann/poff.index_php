@@ -27,6 +27,12 @@ export function renderEditDrawer({
 
     const layoutState = getLayoutState(config);
     const layoutDirectory = layoutState.directory || '.layout';
+    const sectionName = layoutState.section || (status?.target === 'file' ? 'work' : 'works');
+    const sectionFileName = `${sectionName}.hbs`;
+    const localContentDirectory = status?.target === 'file'
+        ? `.works/${config.name || config.path || 'item'}.layout`
+        : '.layout';
+    const contentTemplatePath = `${localContentDirectory}/${sectionFileName}`;
     const layoutAssets = Array.isArray(layoutState.assets) ? layoutState.assets : [];
     const layoutPresetOptions = [
         { value: 'actual', label: 'Actual' },
@@ -100,10 +106,15 @@ export function renderEditDrawer({
             <div class="small-note">Actual layout: <code>${escapeHtml(layoutState.mode)}</code> · ${escapeHtml(layoutState.sourceLabel)}</div>
             <input type="hidden" id="edit-work-layout" name="work_layout" value="${escapeHtml(layoutState.mode)}">
             <div>
-                <label class="edit-label" for="edit-work-template">Work Layout Template (HBS)</label>
-                <textarea class="form-textarea" id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
+                <label class="edit-label" for="edit-content-template">Wrapped content template (HBS)</label>
+                <textarea class="form-textarea" id="edit-content-template" name="content_template">${escapeHtml(layoutState.sectionTemplate)}</textarea>
             </div>
-            <div class="small-note">Layout files live in <code>${escapeHtml(layoutDirectory)}</code>. Put thumbnails, background images, and other layout-specific files there.</div>
+            <div class="small-note">Prompt/content edits save to <code>${escapeHtml(contentTemplatePath)}</code>. This partial is wrapped by the active layout chain.</div>
+            <div>
+                <label class="edit-label" for="edit-layout-template">Outer layout wrapper (HBS)</label>
+                <textarea class="form-textarea" id="edit-layout-template" name="layout_template">${escapeHtml(layoutState.template)}</textarea>
+            </div>
+            <div class="small-note">Wrapper layout files live in <code>${escapeHtml(layoutDirectory)}</code>. Put shared layout assets there.</div>
             <div class="edit-grid edit-grid-cols">
                 <div>
                     <label class="edit-label" for="edit-layout-css">Layout CSS</label>
@@ -136,10 +147,12 @@ export function renderEditDrawer({
     const drawerForm = editDrawer.querySelector('#editDrawerForm');
     const layoutPresetEl = editDrawer.querySelector('#edit-layout-preset');
     const layoutNameEl = editDrawer.querySelector('#edit-work-layout');
-    const templateEl = editDrawer.querySelector('#edit-work-template');
+    const contentTemplateEl = editDrawer.querySelector('#edit-content-template');
+    const layoutTemplateEl = editDrawer.querySelector('#edit-layout-template');
     const cssEl = editDrawer.querySelector('#edit-layout-css');
     const jsEl = editDrawer.querySelector('#edit-layout-js');
     const currentLayoutMode = layoutState.mode || 'default-layout';
+    const currentSectionTemplate = layoutState.sectionTemplate || '';
     const currentTemplate = layoutState.template || '';
     const currentCss = layoutState.css || '';
     const currentJs = layoutState.js || '';
@@ -152,8 +165,11 @@ export function renderEditDrawer({
             }
             if (layoutPresetEl.value === 'custom') {
                 layoutNameEl.value = currentLayoutMode === 'none' ? 'custom-layout' : currentLayoutMode;
-                if (templateEl && !templateEl.value.trim()) {
-                    templateEl.value = currentTemplate;
+                if (contentTemplateEl && !contentTemplateEl.value.trim()) {
+                    contentTemplateEl.value = currentSectionTemplate;
+                }
+                if (layoutTemplateEl && !layoutTemplateEl.value.trim()) {
+                    layoutTemplateEl.value = currentTemplate;
                 }
                 if (cssEl && !cssEl.value.trim()) {
                     cssEl.value = currentCss;
@@ -166,7 +182,7 @@ export function renderEditDrawer({
 
             layoutNameEl.value = 'default-layout';
             if (layoutState.preset === 'custom') {
-                if (templateEl) templateEl.value = '';
+                if (layoutTemplateEl) layoutTemplateEl.value = '';
                 if (cssEl) cssEl.value = '';
                 if (jsEl) jsEl.value = '';
             }

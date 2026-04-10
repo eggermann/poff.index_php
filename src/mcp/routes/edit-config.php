@@ -83,6 +83,8 @@ function handleEditConfig(array $opts): array
         $layoutPayloadMode = is_array($layoutPayload) ? ($layoutPayload['mode'] ?? $layoutPayload['name'] ?? '') : '';
         $layoutMode = trim((string) ($data['layout_mode'] ?? $layoutPayloadMode));
         $layoutModel = is_array($layoutPayload) ? ($layoutPayload['model'] ?? null) : null;
+        $layoutSectionTemplateProvided = false;
+        $layoutSectionTemplate = null;
         $layoutCssProvided = false;
         $layoutCss = null;
         $layoutJsProvided = false;
@@ -95,6 +97,10 @@ function handleEditConfig(array $opts): array
         if (is_array($layoutPayload) && array_key_exists('template', $layoutPayload)) {
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $layoutPayload['template'];
+        }
+        if (is_array($layoutPayload) && array_key_exists('sectionTemplate', $layoutPayload)) {
+            $layoutSectionTemplateProvided = true;
+            $layoutSectionTemplate = (string) $layoutPayload['sectionTemplate'];
         }
         if (is_array($layoutPayload) && (array_key_exists('css', $layoutPayload) || array_key_exists('style', $layoutPayload))) {
             $layoutCssProvided = true;
@@ -111,6 +117,14 @@ function handleEditConfig(array $opts): array
         if (array_key_exists('layoutTemplate', $data)) {
             $layoutTemplateProvided = true;
             $layoutTemplate = (string) $data['layoutTemplate'];
+        }
+        if (array_key_exists('section_template', $data)) {
+            $layoutSectionTemplateProvided = true;
+            $layoutSectionTemplate = (string) $data['section_template'];
+        }
+        if (array_key_exists('sectionTemplate', $data)) {
+            $layoutSectionTemplateProvided = true;
+            $layoutSectionTemplate = (string) $data['sectionTemplate'];
         }
         if (array_key_exists('layout_css', $data)) {
             $layoutCssProvided = true;
@@ -145,6 +159,14 @@ function handleEditConfig(array $opts): array
         }
 
         $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
+        if (isset($data['work']) && is_array($data['work'])) {
+            foreach ($data['work'] as $key => $value) {
+                if ($key === 'type') {
+                    continue;
+                }
+                $work[$key] = $value;
+            }
+        }
         if ($workType !== '') {
             $work['type'] = $workType;
         }
@@ -159,6 +181,9 @@ function handleEditConfig(array $opts): array
         if ($layoutTemplateProvided) {
             $layout['template'] = $layoutTemplate;
         }
+        if ($layoutSectionTemplateProvided) {
+            $layout['sectionTemplate'] = $layoutSectionTemplate;
+        }
         if ($layoutCssProvided) {
             $layout['css'] = $layoutCss;
         }
@@ -171,6 +196,7 @@ function handleEditConfig(array $opts): array
         $layoutSection = 'works';
         $hasLayoutUpdate = is_array($layoutPayload)
             || $layoutTemplateProvided
+            || $layoutSectionTemplateProvided
             || $layoutCssProvided
             || $layoutJsProvided
             || array_key_exists('layout_mode', $data)
