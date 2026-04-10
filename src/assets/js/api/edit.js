@@ -74,7 +74,8 @@ export async function requestPromptTemplate(payload) {
         });
         clearTimeout(timeout);
         if (!res.ok) {
-            return { error: 'Prompt endpoint unavailable.' };
+            const data = await res.json().catch(() => null);
+            return data || { error: `Prompt endpoint failed (HTTP ${res.status}).` };
         }
         return await res.json();
     } catch (err) {

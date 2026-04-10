@@ -133,6 +133,31 @@ function runUpload(targetDir, sourcePath, uploadName) {
   });
 }
 
+function runPhpJson(scriptName) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests', scriptName)], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error('php helper failed: ' + code + ' ' + stderr));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error('invalid json from ' + scriptName + ': ' + stdout));
+      }
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -258,6 +283,14 @@ describe('MCP create route helper (CLI)', () => {
     const copiedFile = path.join(POFF_DIR, destFolder, 'data.md');
     expect(fs.existsSync(copiedFile)).toBe(true);
     expect(fs.readFileSync(copiedFile, 'utf8')).toBe('nested data');
+  });
+
+  test('formats prompt provider failures with status and redacted detail', async () => {
+    const result = await runPhpJson('php_prompt_error_helpers.php');
+
+    expect(result.cmsOpenAi).toBe('OpenAI request failed (HTTP 401): Incorrect API key provided: sk-***.');
+    expect(result.cmsLocalHtml).toBe('Local endpoint request failed (HTTP 502): Bad Gateway.');
+    expect(result.mcpGemini).toBe('Gemini request failed (HTTP 429): Quota exceeded for model gemini-1.5-flash.');
   });
 });
 

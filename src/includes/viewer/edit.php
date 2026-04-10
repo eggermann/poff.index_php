@@ -791,7 +791,7 @@ function cmsHandleEditAction(): void
             if (!$response['ok']) {
                 cmsJsonResponse([
                     'allowed' => true,
-                    'error' => 'OpenAI request failed.',
+                    'error' => cmsFormatPromptHttpError('OpenAI', $response),
                 ]);
             }
             $decoded = json_decode($response['body'], true);
@@ -828,7 +828,7 @@ function cmsHandleEditAction(): void
             if (!$response['ok']) {
                 cmsJsonResponse([
                     'allowed' => true,
-                    'error' => 'Gemini request failed.',
+                    'error' => cmsFormatPromptHttpError('Gemini', $response),
                 ]);
             }
             $decoded = json_decode($response['body'], true);
@@ -851,7 +851,7 @@ function cmsHandleEditAction(): void
             if (!$response['ok']) {
                 cmsJsonResponse([
                     'allowed' => true,
-                    'error' => 'Local endpoint request failed.',
+                    'error' => cmsFormatPromptHttpError('Local endpoint', $response),
                 ]);
             }
             $decoded = json_decode($response['body'], true);

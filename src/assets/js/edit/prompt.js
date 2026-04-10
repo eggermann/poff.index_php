@@ -8,6 +8,37 @@ const PROMPT_FALLBACK_TIMEOUT_MS = 95000;
 
 let promptHistory = [];
 const stream = createStreamState();
+
+const summarizePromptRequest = (payload) => ({
+    path: typeof payload?.path === 'string' ? payload.path : '',
+    provider: typeof payload?.provider === 'string' ? payload.provider : 'local',
+    model: typeof payload?.model === 'string' ? payload.model : '',
+    endpoint: typeof payload?.endpoint === 'string' ? payload.endpoint : '',
+    promptLength: typeof payload?.prompt === 'string' ? payload.prompt.length : 0,
+    historyCount: Array.isArray(payload?.history) ? payload.history.length : 0,
+    hasApiKey: typeof payload?.apiKey === 'string' ? payload.apiKey.trim() !== '' : false,
+    hasImage: !!payload?.image,
+    systemPromptLength: typeof payload?.systemPrompt === 'string' ? payload.systemPrompt.length : 0,
+});
+
+const summarizePromptResponse = (response, requestSummary) => ({
+    path: requestSummary?.path || '',
+    provider: response?.provider || requestSummary?.provider || 'local',
+    model: response?.model || requestSummary?.model || '',
+    allowed: response?.allowed === true,
+    hasTemplate: typeof response?.template === 'string' && response.template.trim() !== '',
+    templateLength: typeof response?.template === 'string' ? response.template.trim().length : 0,
+    error: typeof response?.error === 'string' ? response.error : '',
+});
+
+const summarizePromptError = (err, requestSummary) => ({
+    path: requestSummary?.path || '',
+    provider: requestSummary?.provider || 'local',
+    model: requestSummary?.model || '',
+    name: typeof err?.name === 'string' ? err.name : 'Error',
+    message: typeof err?.message === 'string' ? err.message : String(err || 'Prompt failed.'),
+});
+
 const debugPromptLog = (label, payload) => {
     try {
         // Log quietly without breaking if console is missing
@@ -335,6 +366,7 @@ export function bindPromptWindow({
             stopStreaming(stream);
             let pendingAssistantIndex = null;
             let settled = false;
+            let requestSummary = null;
             const fallbackTimer = window.setTimeout(() => {
                 if (settled) {
                     return;
@@ -401,10 +433,11 @@ export function bindPromptWindow({
                 if (imageAttachment) {
                     payload.image = { ...imageAttachment };
                 }
-                debugPromptLog('request', payload);
+                requestSummary = summarizePromptRequest(payload);
+                debugPromptLog('request', requestSummary);
                 const response = await requestPromptTemplate(payload);
                 settled = true;
-                debugPromptLog('response', response);
+                debugPromptLog('response', summarizePromptResponse(response, requestSummary));
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
                 const nextTitle = typeof response.title === 'string' ? response.title.trim() : null;
                 const nextDescription = typeof response.description === 'string' ? response.description.trim() : null;
@@ -556,7 +589,7 @@ export function bindPromptWindow({
                 settled = true;
                 stopStreaming(stream);
                 setGeneratingState(false);
-                debugPromptLog('error', err);
+                debugPromptLog('error', summarizePromptError(err, requestSummary || (activePath ? { path: activePath } : null)));
                 if (statusEl) {
                     statusEl.textContent = 'Prompt failed.';
                     statusEl.className = 'edit-status';

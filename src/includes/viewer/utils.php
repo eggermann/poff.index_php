@@ -120,18 +120,112 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
             'header' => implode("\r\n", $headerLines),
             'content' => json_encode($payload),
             'timeout' => CMS_HTTP_TIMEOUT_SECONDS,
+            'ignore_errors' => true,
         ],
     ]);
     $response = @file_get_contents($url, false, $context);
     $status = 0;
+    $statusLine = '';
     if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
         $status = (int) $matches[1];
+        $statusLine = (string) $http_response_header[0];
     }
     return [
-        'ok' => $response !== false && $status < 400,
+        'ok' => $response !== false && $status >= 200 && $status < 400,
         'status' => $status,
+        'statusLine' => $statusLine,
         'body' => $response !== false ? $response : '',
     ];
+}
+
+function cmsPromptNormalizeErrorText(string $text): string
+{
+    $normalized = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+    $normalized = preg_replace('/sk-[A-Za-z0-9_-]{12,}/', 'sk-***', $normalized) ?? $normalized;
+    $normalized = preg_replace('/AIza[0-9A-Za-z_-]{12,}/', 'AIza***', $normalized) ?? $normalized;
+    $normalized = trim($normalized, " \t\n\r\0\x0B.:");
+    if ($normalized === '') {
+        return '';
+    }
+    if (strlen($normalized) > 220) {
+        $normalized = substr($normalized, 0, 217) . '...';
+    }
+
+    return $normalized;
+}
+
+function cmsPromptExtractErrorDetail(mixed $value): string
+{
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+        $decoded = json_decode($trimmed, true);
+        if (is_array($decoded)) {
+            $detail = cmsPromptExtractErrorDetail($decoded);
+            if ($detail !== '') {
+                return $detail;
+            }
+        }
+        if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $trimmed, $matches)) {
+            return cmsPromptNormalizeErrorText((string) $matches[1]);
+        }
+
+        return cmsPromptNormalizeErrorText($trimmed);
+    }
+
+    if (!is_array($value)) {
+        return '';
+    }
+
+    foreach (['message', 'detail'] as $key) {
+        if (array_key_exists($key, $value)) {
+            $detail = cmsPromptExtractErrorDetail($value[$key]);
+            if ($detail !== '') {
+                return $detail;
+            }
+        }
+    }
+
+    if (array_key_exists('error', $value)) {
+        $detail = cmsPromptExtractErrorDetail($value['error']);
+        if ($detail !== '') {
+            return $detail;
+        }
+    }
+
+    if (array_key_exists('details', $value)) {
+        $detail = cmsPromptExtractErrorDetail($value['details']);
+        if ($detail !== '') {
+            return $detail;
+        }
+    }
+
+    foreach ($value as $item) {
+        $detail = cmsPromptExtractErrorDetail($item);
+        if ($detail !== '') {
+            return $detail;
+        }
+    }
+
+    return '';
+}
+
+function cmsFormatPromptHttpError(string $label, array $response): string
+{
+    $status = (int) ($response['status'] ?? 0);
+    $detail = cmsPromptExtractErrorDetail($response['body'] ?? '');
+    $message = $label . ' request failed';
+    if ($status > 0) {
+        $message .= ' (HTTP ' . $status . ')';
+    }
+    if ($detail !== '') {
+        $message .= ': ' . $detail;
+    }
+
+    return $message . '.';
 }
 
 function sanitizeRelativePath(string $path): string

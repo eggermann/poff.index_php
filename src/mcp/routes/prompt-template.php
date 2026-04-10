@@ -138,18 +138,112 @@ function mcpPromptHttpPost(string $url, array $headers, array $payload): array
             'header' => implode("\r\n", $headerLines),
             'content' => json_encode($payload),
             'timeout' => MCP_PROMPT_HTTP_TIMEOUT_SECONDS,
+            'ignore_errors' => true,
         ],
     ]);
     $response = @file_get_contents($url, false, $context);
     $status = 0;
+    $statusLine = '';
     if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
         $status = (int) $matches[1];
+        $statusLine = (string) $http_response_header[0];
     }
     return [
-        'ok' => $response !== false && $status < 400,
+        'ok' => $response !== false && $status >= 200 && $status < 400,
         'status' => $status,
+        'statusLine' => $statusLine,
         'body' => $response !== false ? $response : '',
     ];
+}
+
+function mcpPromptNormalizeErrorText(string $text): string
+{
+    $normalized = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+    $normalized = preg_replace('/sk-[A-Za-z0-9_-]{12,}/', 'sk-***', $normalized) ?? $normalized;
+    $normalized = preg_replace('/AIza[0-9A-Za-z_-]{12,}/', 'AIza***', $normalized) ?? $normalized;
+    $normalized = trim($normalized, " \t\n\r\0\x0B.:");
+    if ($normalized === '') {
+        return '';
+    }
+    if (strlen($normalized) > 220) {
+        $normalized = substr($normalized, 0, 217) . '...';
+    }
+
+    return $normalized;
+}
+
+function mcpPromptExtractErrorDetail(mixed $value): string
+{
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+        $decoded = json_decode($trimmed, true);
+        if (is_array($decoded)) {
+            $detail = mcpPromptExtractErrorDetail($decoded);
+            if ($detail !== '') {
+                return $detail;
+            }
+        }
+        if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $trimmed, $matches)) {
+            return mcpPromptNormalizeErrorText((string) $matches[1]);
+        }
+
+        return mcpPromptNormalizeErrorText($trimmed);
+    }
+
+    if (!is_array($value)) {
+        return '';
+    }
+
+    foreach (['message', 'detail'] as $key) {
+        if (array_key_exists($key, $value)) {
+            $detail = mcpPromptExtractErrorDetail($value[$key]);
+            if ($detail !== '') {
+                return $detail;
+            }
+        }
+    }
+
+    if (array_key_exists('error', $value)) {
+        $detail = mcpPromptExtractErrorDetail($value['error']);
+        if ($detail !== '') {
+            return $detail;
+        }
+    }
+
+    if (array_key_exists('details', $value)) {
+        $detail = mcpPromptExtractErrorDetail($value['details']);
+        if ($detail !== '') {
+            return $detail;
+        }
+    }
+
+    foreach ($value as $item) {
+        $detail = mcpPromptExtractErrorDetail($item);
+        if ($detail !== '') {
+            return $detail;
+        }
+    }
+
+    return '';
+}
+
+function mcpPromptFormatHttpError(string $label, array $response): string
+{
+    $status = (int) ($response['status'] ?? 0);
+    $detail = mcpPromptExtractErrorDetail($response['body'] ?? '');
+    $message = $label . ' request failed';
+    if ($status > 0) {
+        $message .= ' (HTTP ' . $status . ')';
+    }
+    if ($detail !== '') {
+        $message .= ': ' . $detail;
+    }
+
+    return $message . '.';
 }
 
 function mcpPromptViewerUrl(string $relativePath, bool $isFile): string
@@ -447,7 +541,7 @@ function handlePromptTemplate(array $opts): array
             return [
                 'route' => 'prompt-template',
                 'allowed' => true,
-                'error' => 'OpenAI request failed.',
+                'error' => mcpPromptFormatHttpError('OpenAI', $response),
             ];
         }
         $decoded = json_decode($response['body'], true);
@@ -486,7 +580,7 @@ function handlePromptTemplate(array $opts): array
             return [
                 'route' => 'prompt-template',
                 'allowed' => true,
-                'error' => 'Gemini request failed.',
+                'error' => mcpPromptFormatHttpError('Gemini', $response),
             ];
         }
         $decoded = json_decode($response['body'], true);
@@ -511,7 +605,7 @@ function handlePromptTemplate(array $opts): array
             return [
                 'route' => 'prompt-template',
                 'allowed' => true,
-                'error' => 'Local endpoint request failed.',
+                'error' => mcpPromptFormatHttpError('Local endpoint', $response),
             ];
         }
         $decoded = json_decode($response['body'], true);
