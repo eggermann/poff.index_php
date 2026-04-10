@@ -29,6 +29,31 @@ export async function requestEditConfig(action, payload) {
     }
 }
 
+export async function requestEditUpload(payload) {
+    const url = buildCmsUrl('upload', payload.path || '');
+    const formData = new FormData();
+    formData.set('source', payload.source || 'upload');
+    for (const file of payload.files || []) {
+        formData.append('files[]', file);
+    }
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+            },
+            body: formData,
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            return data || { allowed: false, error: 'Upload endpoint unavailable.' };
+        }
+        return await res.json();
+    } catch (err) {
+        return { allowed: false, error: 'Upload endpoint unavailable.' };
+    }
+}
+
 export async function requestPromptTemplate(payload) {
     const url = buildCmsUrl('prompt', payload.path || '');
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;

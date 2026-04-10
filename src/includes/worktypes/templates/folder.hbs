@@ -8,7 +8,9 @@
             {{#each items}}
                 <article class="folder-view-card folder-view-card--{{type}}">
                     <span class="folder-view-card-label">{{#if isFolder}}Folder{{else}}File{{/if}}</span>
-                    <strong class="folder-view-card-name">{{name}}</strong>
+                    <strong class="folder-view-card-name">
+                        <a class="folder-view-card-link" href="{{pageLink}}">{{name}}</a>
+                    </strong>
                     <span class="folder-view-card-path">{{path}}</span>
                 </article>
             {{/each}}

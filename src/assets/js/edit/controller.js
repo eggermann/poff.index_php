@@ -1,11 +1,11 @@
-import { requestEditConfig, requestPromptTemplate } from '../api/edit.js';
+import { requestEditConfig, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
 import { getActiveSelection } from '../core/selection.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
 
 export function createEditController({ elements, context, editRequested }) {
-    const { editPanel, editDrawer, editToggle, folderMetaEl } = elements;
+    const { editPanel, editDrawer, editToggle } = elements;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, 'currentPoffConfig')
         ? context.currentPoffConfig
         : null;
@@ -16,28 +16,7 @@ export function createEditController({ elements, context, editRequested }) {
     let drawerOpen = false;
 
     function renderFolderMeta() {
-        if (!folderMetaEl) {
-            return;
-        }
-        if (folderConfig && (folderConfig.title || folderConfig.description)) {
-            let html = '';
-            if (folderConfig.title) {
-                if (folderConfig.link || folderConfig.url) {
-                    const lnk = folderConfig.link || folderConfig.url;
-                    html += `<h3 class="folder-meta-title"><a class="folder-meta-link" href="${lnk}" target="contentFrame">${folderConfig.title}</a></h3>`;
-                } else {
-                    html += `<h3 class="folder-meta-title">${folderConfig.title}</h3>`;
-                }
-            }
-            if (folderConfig.description) {
-                html += `<p class="folder-meta-desc">${folderConfig.description}</p>`;
-            }
-            folderMetaEl.innerHTML = html;
-            folderMetaEl.style.display = 'block';
-        } else if (folderMetaEl) {
-            folderMetaEl.innerHTML = '';
-            folderMetaEl.style.display = 'none';
-        }
+        return folderConfig;
     }
 
     function syncEditToggle() {
@@ -146,6 +125,34 @@ export function createEditController({ elements, context, editRequested }) {
                 drawerOpen = !drawerOpen;
                 syncDrawerVisibility();
             },
+            onUploadFiles: async ({ source, files, statusEl }) => {
+                const selection = getActiveSelection();
+                const data = await requestEditUpload({
+                    path: selection.path,
+                    source,
+                    files,
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Upload failed.');
+                }
+
+                editConfig = data.config || editConfig;
+                editTarget = data.target || editTarget;
+                if (editTarget === 'folder') {
+                    folderConfig = editConfig;
+                }
+                renderEditUI(editConfig, {
+                    allowed: data.allowed !== false,
+                    target: editTarget,
+                });
+                const inlineStatus = document.getElementById('editInlineStatus');
+                if (inlineStatus) {
+                    const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
+                    inlineStatus.textContent = count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`;
+                    inlineStatus.className = 'edit-status edit-status-success';
+                }
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            },
         });
 
         const drawerState = renderEditDrawer({
@@ -158,12 +165,19 @@ export function createEditController({ elements, context, editRequested }) {
                 syncDrawerVisibility();
             },
             onSubmit: async ({ elements, statusEl, treeVisible }) => {
+                const layoutPreset = (elements.layout_preset?.value || 'actual').trim();
+                const rawLayoutName = (elements.work_layout?.value || '').trim();
+                const layoutName = layoutPreset === 'none'
+                    ? 'none'
+                    : layoutPreset === 'custom'
+                        ? (rawLayoutName || 'custom-layout')
+                        : 'default-layout';
                 const layoutPayload = {
-                    name: (elements.work_layout?.value || '').trim(),
+                    name: layoutName,
                     engine: 'lightncandy',
-                    template: elements.work_template?.value ?? '',
-                    css: elements.layout_css?.value ?? '',
-                    js: elements.layout_js?.value ?? '',
+                    template: layoutPreset === 'actual' ? '' : (elements.work_template?.value ?? ''),
+                    css: layoutPreset === 'actual' ? '' : (elements.layout_css?.value ?? ''),
+                    js: layoutPreset === 'actual' ? '' : (elements.layout_js?.value ?? ''),
                 };
                 const selection = getActiveSelection();
                 const payload = {

@@ -2,7 +2,7 @@
 .sidebar {
     width: 280px;
     background-color: #ffffff;
-    padding: 20px;
+    padding: 92px 20px 20px;
     overflow-y: auto;
     border-right: 1px solid #d1d5db;
     box-shadow: 2px 0 8px rgba(0,0,0,0.05);
@@ -61,8 +61,12 @@
     color: #059669;
     background-color: #d1fae5;
 }
-.sidebar-tools {
-    margin-bottom: 12px;
+.app-edit-toggle-wrap {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 5;
+    width: 240px;
 }
 .edit-toggle {
     width: 100%;

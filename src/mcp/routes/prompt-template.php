@@ -22,6 +22,47 @@ function mcpPromptImagePayload(array $data): ?array
     ];
 }
 
+function mcpParsePromptModelResult(string $raw): array
+{
+    $trimmed = trim($raw);
+    if ($trimmed === '') {
+        return ['template' => ''];
+    }
+
+    $candidate = $trimmed;
+    if (preg_match('/```(?:json)?\s*(\{.*\})\s*```/si', $trimmed, $matches)) {
+        $candidate = trim((string) $matches[1]);
+    }
+
+    $decoded = json_decode($candidate, true);
+    if (!is_array($decoded)) {
+        return ['template' => $trimmed];
+    }
+
+    $template = '';
+    if (isset($decoded['template'])) {
+        $template = trim((string) $decoded['template']);
+    } elseif (isset($decoded['content'])) {
+        $template = trim((string) $decoded['content']);
+    }
+
+    if ($template === '') {
+        return ['template' => $trimmed];
+    }
+
+    $result = ['template' => $template];
+    foreach (['title', 'description', 'model'] as $key) {
+        if (isset($decoded[$key]) && is_scalar($decoded[$key])) {
+            $result[$key] = trim((string) $decoded[$key]);
+        }
+    }
+    if (isset($decoded['work']) && is_array($decoded['work'])) {
+        $result['work'] = $decoded['work'];
+    }
+
+    return $result;
+}
+
 function mcpPromptResolvePath(string $rootDir, string $relativePath): ?string
 {
     $trimmed = trim($relativePath, "/\\");
@@ -111,6 +152,162 @@ function mcpPromptHttpPost(string $url, array $headers, array $payload): array
     ];
 }
 
+function mcpPromptViewerUrl(string $relativePath, bool $isFile): string
+{
+    return $isFile
+        ? '?view=1&file=' . rawurlencode($relativePath)
+        : '?view=1&path=' . rawurlencode($relativePath);
+}
+
+function mcpPromptAssetUrl(string $relativePath, bool $isFile): string
+{
+    if (!$isFile) {
+        return '?path=' . rawurlencode($relativePath);
+    }
+
+    $parts = explode('/', $relativePath);
+    $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
+
+    return implode('/', $encoded);
+}
+
+function mcpPromptRefKind(string $name, string $type): string
+{
+    if ($type === 'folder') {
+        return 'folder';
+    }
+
+    return MediaType::classifyExtension($name);
+}
+
+function mcpBuildPromptRef(string $basePath, array $item): ?array
+{
+    $name = trim((string) ($item['name'] ?? $item['path'] ?? ''));
+    if ($name === '') {
+        return null;
+    }
+
+    $relativePath = trim((string) ($item['path'] ?? $name), "/\\");
+    if ($relativePath === '') {
+        $relativePath = $name;
+    }
+    if ($basePath !== '') {
+        $normalizedBase = trim($basePath, "/\\");
+        if (!str_starts_with($relativePath, $normalizedBase . '/') && $relativePath !== $normalizedBase) {
+            $relativePath = $normalizedBase . '/' . ltrim($relativePath, "/\\");
+        }
+    }
+
+    $type = (string) ($item['type'] ?? 'file');
+    $isFolder = $type === 'folder';
+    $kind = mcpPromptRefKind($name, $type);
+    $pageLink = mcpPromptViewerUrl($relativePath, !$isFolder);
+    $assetUrl = mcpPromptAssetUrl($relativePath, !$isFolder);
+
+    return [
+        'name' => $name,
+        'title' => (string) ($item['title'] ?? $name),
+        'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
+        'type' => $type,
+        'kind' => $kind,
+        'path' => $relativePath,
+        'pageLink' => $pageLink,
+        'pageUrl' => $pageLink,
+        'workUrl' => $pageLink,
+        'viewUrl' => $pageLink,
+        'viewerHref' => $pageLink,
+        'assetUrl' => $assetUrl,
+        'assetLink' => $assetUrl,
+        'rawHref' => $assetUrl,
+        'srcUrl' => $assetUrl,
+        'sourceUrl' => $assetUrl,
+        'isFolder' => $isFolder,
+        'isFile' => !$isFolder,
+        'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
+    ];
+}
+
+function mcpBuildPromptContext(string $relativePath, array $config): array
+{
+    $normalizedPath = trim($relativePath, "/\\");
+    $currentName = (string) ($config['folderName'] ?? basename($normalizedPath));
+    $currentPageLink = mcpPromptViewerUrl($normalizedPath, false);
+    $currentAssetUrl = mcpPromptAssetUrl($normalizedPath, false);
+
+    $context = [
+        'current' => [
+            'targetType' => 'folder',
+            'name' => $currentName,
+            'path' => $normalizedPath,
+            'pageLink' => $currentPageLink,
+            'pageUrl' => $currentPageLink,
+            'workUrl' => $currentPageLink,
+            'viewUrl' => $currentPageLink,
+            'viewerHref' => $currentPageLink,
+            'assetUrl' => $currentAssetUrl,
+            'assetLink' => $currentAssetUrl,
+            'rawHref' => $currentAssetUrl,
+            'srcUrl' => $currentAssetUrl,
+            'sourceUrl' => $currentAssetUrl,
+        ],
+        'items' => [],
+        'allItems' => [],
+        'allFiles' => [],
+        'allFolders' => [],
+        'allImages' => [],
+        'allVideos' => [],
+        'allAudio' => [],
+        'allPdfs' => [],
+        'allTexts' => [],
+        'allLinks' => [],
+        'allOther' => [],
+    ];
+
+    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    foreach ($tree as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $ref = mcpBuildPromptRef($normalizedPath, $item);
+        if ($ref === null) {
+            continue;
+        }
+        $context['items'][] = $ref;
+        $context['allItems'][] = $ref;
+        if ($ref['isFolder']) {
+            $context['allFolders'][] = $ref;
+            continue;
+        }
+
+        $context['allFiles'][] = $ref;
+        switch ($ref['kind']) {
+            case 'image':
+                $context['allImages'][] = $ref;
+                break;
+            case 'video':
+                $context['allVideos'][] = $ref;
+                break;
+            case 'audio':
+                $context['allAudio'][] = $ref;
+                break;
+            case 'pdf':
+                $context['allPdfs'][] = $ref;
+                break;
+            case 'text':
+                $context['allTexts'][] = $ref;
+                break;
+            case 'link':
+                $context['allLinks'][] = $ref;
+                break;
+            default:
+                $context['allOther'][] = $ref;
+                break;
+        }
+    }
+
+    return $context;
+}
+
 function handlePromptTemplate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
@@ -165,8 +362,24 @@ function handlePromptTemplate(array $opts): array
     }
 
     $config = PoffConfig::ensure($targetDir);
+    $promptContext = mcpBuildPromptContext((string) $path, $config);
     $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $systemPrompt = 'You are a Handlebars template generator. Return only the HBS template string for the LightnCandy renderer. Use {{> default-layout}} as the default layout technique and do not wrap in code fences.';
+    $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $responseFormatInstruction = implode("\n", [
+        'Response format: return strict JSON.',
+        'Required key: "template" with the HBS string.',
+        'Optional keys: "title", "description", and "work".',
+        'If the user requests work.* updates such as autoplay, loop, muted, poster, type, or layout, include them under "work".',
+        'Example: {"template":"<div>{{title}}</div>","work":{"autoplay":true}}',
+    ]);
+    $systemPrompt = implode("\n", [
+        'You are a Handlebars (HBS) template generator for this single-page CMS.',
+        'Return JSON for the LightnCandy renderer and save the template to .layout/template.hbs.',
+        'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
+        'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
+        'Prompt context JSON includes resolved refs for the current folder contents. Use those refs directly instead of inventing paths.',
+        'Use {{> default-layout}} as the default layout technique.',
+    ]);
     $historyText = '';
     foreach ($history as $msg) {
         if (!is_array($msg) || !isset($msg['role']) || !isset($msg['content'])) {
@@ -179,7 +392,7 @@ function handlePromptTemplate(array $opts): array
         }
         $historyText .= strtoupper($role) . ": " . $content . "\n";
     }
-    $userPrompt = "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
+    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt;
     if ($image) {
         $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
     }
@@ -298,8 +511,9 @@ function handlePromptTemplate(array $opts): array
         }
     }
 
-    $template = trim($template);
-    if ($template === '') {
+    $parsedResult = mcpParsePromptModelResult($template);
+    $templateText = trim((string) ($parsedResult['template'] ?? ''));
+    if ($templateText === '') {
         return [
             'route' => 'prompt-template',
             'allowed' => true,
@@ -307,11 +521,18 @@ function handlePromptTemplate(array $opts): array
         ];
     }
 
-    return [
+    $response = [
         'route' => 'prompt-template',
         'allowed' => true,
         'provider' => $provider,
         'model' => $usedModel,
-        'template' => $template,
+        'template' => $templateText,
     ];
+    foreach (['title', 'description', 'work'] as $key) {
+        if (array_key_exists($key, $parsedResult)) {
+            $response[$key] = $parsedResult[$key];
+        }
+    }
+
+    return $response;
 }

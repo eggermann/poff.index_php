@@ -7,6 +7,8 @@
 
 class PoffConfig
 {
+    private const DEFAULT_LAYOUT_ROOT_DIR = '.default';
+    private const DEFAULT_LAYOUT_FOLDER = '.layout';
     private const LAYOUT_TEMPLATE_FILE = 'template.hbs';
     private const LAYOUT_STYLE_FILE = 'style.css';
     private const LAYOUT_SCRIPT_FILE = 'script.js';
@@ -453,8 +455,14 @@ class PoffConfig
     public static function prepareLayoutForView(mixed $layout, string $itemPath, bool $isFile, string $section = 'work'): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
-        $basePath = self::relativeLayoutPath($itemPath, $isFile);
+        $basePath = isset($resolved['directory']) && is_string($resolved['directory']) && trim($resolved['directory']) !== ''
+            ? str_replace('\\', '/', trim($resolved['directory'], "/\\"))
+            : self::relativeLayoutPath($itemPath, $isFile);
         $resolved['baseHref'] = self::encodeRelativePath($basePath);
+        $defaultBasePath = isset($resolved['defaultDirectory']) && is_string($resolved['defaultDirectory']) && trim($resolved['defaultDirectory']) !== ''
+            ? str_replace('\\', '/', trim($resolved['defaultDirectory'], "/\\"))
+            : $basePath;
+        $resolved['defaultBaseHref'] = self::encodeRelativePath($defaultBasePath);
 
         $assets = [];
         $files = [];
@@ -492,13 +500,25 @@ class PoffConfig
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
-        $layoutDir = $fileName === null
+        $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
+        $layoutDir = $localLayoutDir;
         $resolved['directory'] = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
+        $defaultLayout = self::findDefaultLayoutDir($dir);
+        if (is_array($defaultLayout)) {
+            $resolved['defaultDirectory'] = $defaultLayout['relative'];
+        }
 
         $assets = [];
         $files = [];
+        if (!is_dir($layoutDir)) {
+            if (is_array($defaultLayout)) {
+                $layoutDir = $defaultLayout['absolute'];
+                $resolved['directory'] = $defaultLayout['relative'];
+            }
+        }
+
         if (is_dir($layoutDir)) {
             $resolved['storage'] = 'filesystem';
 
@@ -533,6 +553,55 @@ class PoffConfig
         $resolved['assetCount'] = count($assets);
 
         return $resolved;
+    }
+
+    private static function findDefaultLayoutDir(string $dir): ?array
+    {
+        $cwd = realpath(getcwd() ?: '.');
+        $current = realpath($dir);
+        if ($current === false) {
+            return null;
+        }
+
+        while ($current !== false) {
+            $candidate = $current
+                . DIRECTORY_SEPARATOR
+                . self::DEFAULT_LAYOUT_ROOT_DIR
+                . DIRECTORY_SEPARATOR
+                . self::DEFAULT_LAYOUT_FOLDER;
+            if (is_dir($candidate)) {
+                return [
+                    'absolute' => $candidate,
+                    'relative' => self::relativePathFromBase($candidate, $cwd ?: $current),
+                ];
+            }
+
+            if ($cwd && $current === $cwd) {
+                break;
+            }
+
+            $parent = dirname($current);
+            if ($parent === $current) {
+                break;
+            }
+            $current = realpath($parent);
+        }
+
+        return null;
+    }
+
+    private static function relativePathFromBase(string $path, string $base): string
+    {
+        $normalizedPath = str_replace('\\', '/', rtrim($path, DIRECTORY_SEPARATOR));
+        $normalizedBase = str_replace('\\', '/', rtrim($base, DIRECTORY_SEPARATOR));
+        if ($normalizedPath === $normalizedBase) {
+            return '.';
+        }
+        if (str_starts_with($normalizedPath, $normalizedBase . '/')) {
+            return substr($normalizedPath, strlen($normalizedBase) + 1);
+        }
+
+        return ltrim($normalizedPath, '/');
     }
 
     private static function serializeLayout(mixed $layout, string $section): array

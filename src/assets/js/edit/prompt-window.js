@@ -60,8 +60,10 @@ export function renderPromptWindow(settings = {}) {
             <div class="prompt-context" id="promptContext">
                 <div class="prompt-context-title">Placeholders</div>
                 <div class="prompt-context-body">
-                    <div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                    <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                    <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                     <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}</div>
+                    <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
                 </div>
             </div>
             <input id="prompt-image-input" type="file" accept="image/*" hidden>

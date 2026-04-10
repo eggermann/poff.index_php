@@ -24,10 +24,332 @@ function cmsPromptImagePayload(array $data): ?array
     ];
 }
 
+function cmsParsePromptModelResult(string $raw): array
+{
+    $trimmed = trim($raw);
+    if ($trimmed === '') {
+        return ['template' => ''];
+    }
+
+    $candidate = $trimmed;
+    if (preg_match('/```(?:json)?\s*(\{.*\})\s*```/si', $trimmed, $matches)) {
+        $candidate = trim((string) $matches[1]);
+    }
+
+    $decoded = json_decode($candidate, true);
+    if (!is_array($decoded)) {
+        return ['template' => $trimmed];
+    }
+
+    $template = '';
+    if (isset($decoded['template'])) {
+        $template = trim((string) $decoded['template']);
+    } elseif (isset($decoded['content'])) {
+        $template = trim((string) $decoded['content']);
+    }
+
+    if ($template === '') {
+        return ['template' => $trimmed];
+    }
+
+    $result = ['template' => $template];
+    foreach (['title', 'description', 'model'] as $key) {
+        if (isset($decoded[$key]) && is_scalar($decoded[$key])) {
+            $result[$key] = trim((string) $decoded[$key]);
+        }
+    }
+    if (isset($decoded['work']) && is_array($decoded['work'])) {
+        $result['work'] = $decoded['work'];
+    }
+
+    return $result;
+}
+
+function cmsSanitizeUploadName(string $name): string
+{
+    $base = basename(str_replace('\\', '/', trim($name)));
+    $clean = preg_replace('/[^A-Za-z0-9._ -]+/', '-', $base);
+    $clean = trim((string) $clean, " .-\t\n\r\0\x0B");
+
+    return $clean !== '' ? $clean : 'upload.bin';
+}
+
+function cmsResolveUniqueUploadPath(string $targetDir, string $name): string
+{
+    $info = pathinfo($name);
+    $filename = $info['filename'] ?? 'upload';
+    $extension = isset($info['extension']) && $info['extension'] !== '' ? '.' . $info['extension'] : '';
+    $candidate = $targetDir . DIRECTORY_SEPARATOR . $filename . $extension;
+    $index = 2;
+
+    while (file_exists($candidate)) {
+        $candidate = $targetDir . DIRECTORY_SEPARATOR . $filename . '-' . $index . $extension;
+        $index++;
+    }
+
+    return $candidate;
+}
+
+function cmsCollectUploadedEntries(array $files): array
+{
+    if (!isset($files['name'])) {
+        return [];
+    }
+
+    $entries = [];
+    $names = $files['name'];
+    $tmpNames = $files['tmp_name'] ?? [];
+    $errors = $files['error'] ?? [];
+    $sizes = $files['size'] ?? [];
+    $types = $files['type'] ?? [];
+
+    if (!is_array($names)) {
+        return [[
+            'name' => (string) $names,
+            'tmp_name' => (string) $tmpNames,
+            'error' => (int) $errors,
+            'size' => (int) $sizes,
+            'type' => (string) $types,
+        ]];
+    }
+
+    foreach ($names as $index => $name) {
+        $entries[] = [
+            'name' => (string) $name,
+            'tmp_name' => (string) ($tmpNames[$index] ?? ''),
+            'error' => (int) ($errors[$index] ?? UPLOAD_ERR_NO_FILE),
+            'size' => (int) ($sizes[$index] ?? 0),
+            'type' => (string) ($types[$index] ?? ''),
+        ];
+    }
+
+    return $entries;
+}
+
+function cmsStoreUploadEntries(string $targetDir, array $entries): array
+{
+    if (!is_dir($targetDir)) {
+        mkdir($targetDir, 0755, true);
+    }
+
+    $stored = [];
+    $errors = [];
+
+    foreach ($entries as $entry) {
+        $errorCode = (int) ($entry['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            $errors[] = 'Upload failed for ' . ((string) ($entry['name'] ?? 'file'));
+            continue;
+        }
+
+        $tmpPath = (string) ($entry['tmp_name'] ?? '');
+        if ($tmpPath === '' || !is_file($tmpPath)) {
+            $errors[] = 'Missing uploaded file for ' . ((string) ($entry['name'] ?? 'file'));
+            continue;
+        }
+
+        $safeName = cmsSanitizeUploadName((string) ($entry['name'] ?? 'upload.bin'));
+        $targetPath = cmsResolveUniqueUploadPath($targetDir, $safeName);
+        $moved = false;
+
+        if (is_uploaded_file($tmpPath)) {
+            $moved = move_uploaded_file($tmpPath, $targetPath);
+        }
+        if (!$moved) {
+            $moved = @rename($tmpPath, $targetPath);
+        }
+        if (!$moved) {
+            $moved = @copy($tmpPath, $targetPath);
+            if ($moved) {
+                @unlink($tmpPath);
+            }
+        }
+        if (!$moved) {
+            $errors[] = 'Could not store ' . $safeName;
+            continue;
+        }
+
+        $stored[] = [
+            'name' => basename($targetPath),
+            'path' => basename($targetPath),
+            'size' => filesize($targetPath) ?: 0,
+        ];
+    }
+
+    return [
+        'stored' => $stored,
+        'errors' => $errors,
+    ];
+}
+
+function cmsPromptViewerUrl(string $relativePath, bool $isFile): string
+{
+    return $isFile
+        ? '?view=1&file=' . rawurlencode($relativePath)
+        : '?view=1&path=' . rawurlencode($relativePath);
+}
+
+function cmsPromptAssetUrl(string $relativePath, bool $isFile): string
+{
+    if (!$isFile) {
+        return '?path=' . rawurlencode($relativePath);
+    }
+
+    $parts = explode('/', $relativePath);
+    $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
+
+    return implode('/', $encoded);
+}
+
+function cmsPromptRefKind(string $name, string $type): string
+{
+    if ($type === 'folder') {
+        return 'folder';
+    }
+
+    return MediaType::classifyExtension($name);
+}
+
+function cmsBuildPromptRef(string $basePath, array $item): ?array
+{
+    $name = trim((string) ($item['name'] ?? $item['path'] ?? ''));
+    if ($name === '') {
+        return null;
+    }
+
+    $relativePath = trim((string) ($item['path'] ?? $name), "/\\");
+    if ($relativePath === '') {
+        $relativePath = $name;
+    }
+    if ($basePath !== '') {
+        $normalizedBase = trim($basePath, "/\\");
+        if (!str_starts_with($relativePath, $normalizedBase . '/') && $relativePath !== $normalizedBase) {
+            $relativePath = $normalizedBase . '/' . ltrim($relativePath, "/\\");
+        }
+    }
+
+    $type = (string) ($item['type'] ?? 'file');
+    $isFolder = $type === 'folder';
+    $kind = cmsPromptRefKind($name, $type);
+    $pageLink = cmsPromptViewerUrl($relativePath, !$isFolder);
+    $assetUrl = cmsPromptAssetUrl($relativePath, !$isFolder);
+
+    return [
+        'name' => $name,
+        'title' => (string) ($item['title'] ?? $name),
+        'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
+        'type' => $type,
+        'kind' => $kind,
+        'path' => $relativePath,
+        'pageLink' => $pageLink,
+        'pageUrl' => $pageLink,
+        'workUrl' => $pageLink,
+        'viewUrl' => $pageLink,
+        'viewerHref' => $pageLink,
+        'assetUrl' => $assetUrl,
+        'assetLink' => $assetUrl,
+        'rawHref' => $assetUrl,
+        'srcUrl' => $assetUrl,
+        'sourceUrl' => $assetUrl,
+        'isFolder' => $isFolder,
+        'isFile' => !$isFolder,
+        'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
+    ];
+}
+
+function cmsBuildPromptContext(string $relativePath, string $targetType, array $config, ?string $targetFile = null): array
+{
+    $normalizedPath = trim($relativePath, "/\\");
+    $currentName = $targetType === 'file'
+        ? (string) ($targetFile ?? basename($normalizedPath))
+        : (string) ($config['folderName'] ?? basename($normalizedPath));
+    $currentPath = $normalizedPath;
+    $currentIsFile = $targetType === 'file';
+    $currentPageLink = cmsPromptViewerUrl($currentPath, $currentIsFile);
+    $currentAssetUrl = cmsPromptAssetUrl($currentPath, $currentIsFile);
+
+    $context = [
+        'current' => [
+            'targetType' => $targetType,
+            'name' => $currentName,
+            'path' => $currentPath,
+            'pageLink' => $currentPageLink,
+            'pageUrl' => $currentPageLink,
+            'workUrl' => $currentPageLink,
+            'viewUrl' => $currentPageLink,
+            'viewerHref' => $currentPageLink,
+            'assetUrl' => $currentAssetUrl,
+            'assetLink' => $currentAssetUrl,
+            'rawHref' => $currentAssetUrl,
+            'srcUrl' => $currentAssetUrl,
+            'sourceUrl' => $currentAssetUrl,
+        ],
+        'items' => [],
+        'allItems' => [],
+        'allFiles' => [],
+        'allFolders' => [],
+        'allImages' => [],
+        'allVideos' => [],
+        'allAudio' => [],
+        'allPdfs' => [],
+        'allTexts' => [],
+        'allLinks' => [],
+        'allOther' => [],
+    ];
+
+    if ($targetType !== 'folder') {
+        return $context;
+    }
+
+    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    foreach ($tree as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $ref = cmsBuildPromptRef($normalizedPath, $item);
+        if ($ref === null) {
+            continue;
+        }
+        $context['items'][] = $ref;
+        $context['allItems'][] = $ref;
+        if ($ref['isFolder']) {
+            $context['allFolders'][] = $ref;
+            continue;
+        }
+
+        $context['allFiles'][] = $ref;
+        switch ($ref['kind']) {
+            case 'image':
+                $context['allImages'][] = $ref;
+                break;
+            case 'video':
+                $context['allVideos'][] = $ref;
+                break;
+            case 'audio':
+                $context['allAudio'][] = $ref;
+                break;
+            case 'pdf':
+                $context['allPdfs'][] = $ref;
+                break;
+            case 'text':
+                $context['allTexts'][] = $ref;
+                break;
+            case 'link':
+                $context['allLinks'][] = $ref;
+                break;
+            default:
+                $context['allOther'][] = $ref;
+                break;
+        }
+    }
+
+    return $context;
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['config', 'save', 'prompt'], true)) {
+    if (!in_array($action, ['config', 'save', 'prompt', 'upload'], true)) {
         return;
     }
 
@@ -77,6 +399,53 @@ function cmsHandleEditAction(): void
             'allowed' => true,
             'target' => $targetType,
             'config' => $config,
+        ]);
+    }
+
+    if ($action === 'upload') {
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'Upload requires POST.',
+            ], 405);
+        }
+        if ($targetType !== 'folder') {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'Uploads are only supported for folders.',
+            ], 400);
+        }
+        $source = trim((string) ($data['source'] ?? 'upload'));
+        if ($source !== 'upload') {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'Only file upload is available right now.',
+            ], 400);
+        }
+
+        $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
+        if ($entries === []) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'No files selected.',
+            ], 400);
+        }
+
+        $result = cmsStoreUploadEntries($targetDir, $entries);
+        if ($result['stored'] === []) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => $result['errors'][0] ?? 'Upload failed.',
+            ], 400);
+        }
+
+        $updatedConfig = PoffConfig::ensure($targetDir);
+        cmsJsonResponse([
+            'allowed' => true,
+            'target' => 'folder',
+            'uploaded' => $result['stored'],
+            'errors' => $result['errors'],
+            'config' => $updatedConfig,
         ]);
     }
 
@@ -300,14 +669,26 @@ function cmsHandleEditAction(): void
             ]);
         }
 
+        $promptContext = cmsBuildPromptContext($path, $targetType, $config, $targetFile);
         $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $responseFormatInstruction = implode("\n", [
+            'Response format: return strict JSON.',
+            'Required key: "template" with the HBS string.',
+            'Optional keys: "title", "description", and "work".',
+            'If the user requests work.* updates such as autoplay, loop, muted, poster, type, or layout, include them under "work".',
+            'Example: {"template":"<div>{{title}}</div>","work":{"autoplay":true}}',
+        ]);
         $defaultSystemPrompt = implode("\n", [
             'You are a Handlebars (HBS) template generator for this single-page CMS.',
             'Return one HBS template string rendered through the LightnCandy renderer and saved to .layout/template.hbs.',
-            'Return only the template (no Markdown, no fences).',
             'Default layout technique: use {{> default-layout}}. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.',
-            'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-            'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
+            'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
+            'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
+            'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
+            'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+            'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
+            'Prompt context JSON includes resolved refs for the current item and current folder contents. Use those refs directly instead of inventing paths.',
             'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
             'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
             'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
@@ -326,7 +707,7 @@ function cmsHandleEditAction(): void
             }
             $historyText .= strtoupper($role) . ": " . $content . "\n";
         }
-        $userPrompt = "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
+        $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt;
         if ($image) {
             $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
         }
@@ -439,21 +820,29 @@ function cmsHandleEditAction(): void
             }
         }
 
-        $template = trim($template);
-        if ($template === '') {
+        $parsedResult = cmsParsePromptModelResult($template);
+        $templateText = trim((string) ($parsedResult['template'] ?? ''));
+        if ($templateText === '') {
             cmsJsonResponse([
                 'allowed' => true,
                 'error' => 'Template was empty.',
             ]);
         }
 
-        cmsJsonResponse([
+        $responsePayload = [
             'allowed' => true,
             'target' => $targetType,
             'provider' => $provider,
             'model' => $usedModel,
-            'template' => $template,
+            'template' => $templateText,
             'systemPrompt' => $systemPrompt,
-        ]);
+        ];
+        foreach (['title', 'description', 'work'] as $key) {
+            if (array_key_exists($key, $parsedResult)) {
+                $responsePayload[$key] = $parsedResult[$key];
+            }
+        }
+
+        cmsJsonResponse($responsePayload);
     }
 }

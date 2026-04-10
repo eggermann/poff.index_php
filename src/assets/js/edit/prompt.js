@@ -1,6 +1,6 @@
 import { defaultPromptSettings, defaultSystemPrompt } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
-import { tagHistory, filterAllowedWork } from './prompt/history.js';
+import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
 import { createStreamState, startStreaming, stopStreaming } from './prompt/stream.js';
 
@@ -409,7 +409,12 @@ export function bindPromptWindow({
                 const nextTitle = typeof response.title === 'string' ? response.title.trim() : null;
                 const nextDescription = typeof response.description === 'string' ? response.description.trim() : null;
                 const currentConfig = getConfig ? getConfig() : null;
-                const nextWork = filterAllowedWork(response.work, currentConfig);
+                const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
+                const mergedWork = {
+                    ...(inferredWork || {}),
+                    ...((response && response.work && typeof response.work === 'object') ? response.work : {}),
+                };
+                const nextWork = filterAllowedWork(mergedWork, currentConfig);
                 if (response.error || !templateText) {
                     stopStreaming(stream);
                     setGeneratingState(false);

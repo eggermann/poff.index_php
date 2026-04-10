@@ -65,6 +65,11 @@ function renderFileViewer(string $relativePath, string $fullPath): void
 
     $bodyContent = Worktype::render($type, [
         'path' => $relativePath,
+        'viewerHref' => '?view=1&file=' . rawurlencode($relativePath),
+        'viewUrl' => '?view=1&file=' . rawurlencode($relativePath),
+        'workUrl' => '?view=1&file=' . rawurlencode($relativePath),
+        'rawHref' => viewerAssetHref($relativePath),
+        'assetUrl' => viewerAssetHref($relativePath),
         'mimeType' => $mimeType ?? '',
         'name' => $rawName,
         'title' => $fileConfig['title'] ?? $rawName,
@@ -117,8 +122,19 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         $descriptionHtml = '<div class="work-description">' . nl2br(htmlspecialchars($folderConfig['description'], ENT_QUOTES, 'UTF-8')) . '</div>';
     }
 
+    $viewerHref = '?view=1&path=' . rawurlencode($relativePath);
+    $browseHref = '?path=';
+    if ($relativePath !== '') {
+        $browseHref .= rawurlencode($relativePath);
+    }
+
     $bodyContent = Worktype::render('folder', [
         'path' => $relativePath,
+        'viewerHref' => $viewerHref,
+        'viewUrl' => $viewerHref,
+        'workUrl' => $viewerHref,
+        'rawHref' => $browseHref,
+        'assetUrl' => $browseHref,
         'displayPath' => $relativePath === '' ? '.' : $relativePath,
         'name' => $rawName,
         'title' => $folderConfig['title'] ?? $rawName,
@@ -145,11 +161,6 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'allItemCount' => count($folderViewData['allItems']),
         'work' => $work,
     ]);
-
-    $browseHref = '?path=';
-    if ($relativePath !== '') {
-        $browseHref .= rawurlencode($relativePath);
-    }
 
     renderViewerShell([
         'type' => 'folder',
@@ -186,6 +197,10 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
             'path' => $relativePath,
             'displayPath' => $relativePath === '' ? '.' : $relativePath,
             'viewerHref' => '?view=1&path=' . rawurlencode($relativePath),
+            'viewUrl' => '?view=1&path=' . rawurlencode($relativePath),
+            'workUrl' => '?view=1&path=' . rawurlencode($relativePath),
+            'rawHref' => '?path=' . rawurlencode($relativePath),
+            'assetUrl' => '?path=' . rawurlencode($relativePath),
             'isFolder' => true,
             'isFile' => false,
             'childCount' => count($tree),
@@ -243,7 +258,10 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             'basename' => $entryName,
             'depth' => substr_count($entryRelativePath, '/'),
             'viewerHref' => $viewerHref,
+            'viewUrl' => $viewerHref,
+            'workUrl' => $viewerHref,
             'rawHref' => $rawHref,
+            'assetUrl' => $rawHref,
             'isFolder' => $isFolder,
             'isFile' => !$isFolder,
         ]);
@@ -362,16 +380,10 @@ function renderViewerShell(array $payload): void
 {
     $rawType = (string) ($payload['type'] ?? 'file');
     $rawName = (string) ($payload['name'] ?? '');
-    $rawPath = (string) ($payload['path'] ?? '');
     $bodyContent = (string) ($payload['bodyContent'] ?? '');
-    $openHref = isset($payload['openHref']) ? (string) $payload['openHref'] : '';
-    $openLabel = isset($payload['openLabel']) ? (string) $payload['openLabel'] : 'Open';
     $layout = isset($payload['layout']) && is_array($payload['layout']) ? $payload['layout'] : [];
 
     $safeName = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
-    $safePath = htmlspecialchars($rawPath === '' ? '.' : $rawPath, ENT_QUOTES, 'UTF-8');
-    $safeOpenHref = htmlspecialchars($openHref, ENT_QUOTES, 'UTF-8');
-    $safeOpenLabel = htmlspecialchars($openLabel, ENT_QUOTES, 'UTF-8');
     $safeType = htmlspecialchars($rawType, ENT_QUOTES, 'UTF-8');
     $layoutCssHref = trim((string) ($layout['cssHref'] ?? ''));
     $layoutJsHref = trim((string) ($layout['jsHref'] ?? ''));
@@ -390,49 +402,41 @@ function renderViewerShell(array $payload): void
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
+            min-height: 100%;
             background: #0b1021;
             color: #e5e7eb;
             font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
-        header {
-            padding: 12px 16px;
-            background: #111827;
-            border-bottom: 1px solid #1f2937;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-        }
-        header .meta { display: flex; flex-direction: column; }
-        header .meta .name { font-weight: 600; }
-        header .meta .path { font-size: 12px; color: #9ca3af; }
-        header a { color: #93c5fd; text-decoration: none; font-size: 14px; }
-        header a:hover { text-decoration: underline; }
         .viewer {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            --poff-viewport-height: 100dvh;
+            --poff-work-max-height: 100dvh;
+            min-height: var(--poff-viewport-height);
+            width: 100%;
+            display: block;
             background: #0b1021;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
-        .viewer img, .viewer video, .viewer iframe {
+        .viewer img, .viewer video, .viewer iframe, .viewer canvas, .viewer svg {
             max-width: 100%;
-            max-height: 100%;
+            max-height: var(--poff-work-max-height);
             width: auto;
             height: auto;
             box-shadow: 0 12px 30px rgba(0,0,0,0.45);
             border-radius: 6px;
             background: #111827;
         }
-        .viewer video, .viewer iframe { width: 100%; height: 100%; }
-        .viewer iframe { background: #c3cddbff; }
-        .viewer .viewer-template {
+        .viewer iframe {
             width: 100%;
-            min-height: 100%;
+            min-height: var(--poff-work-max-height);
+            background: #c3cddbff;
+        }
+        .viewer .viewer-template,
+        .viewer .poff-default-layout {
+            width: 100%;
+            min-height: var(--poff-viewport-height);
             box-sizing: border-box;
         }
         .viewer .viewer-template--folder {
@@ -475,6 +479,14 @@ function renderViewerShell(array $payload): void
             font-size: 11px;
             letter-spacing: 0.05em;
             text-transform: uppercase;
+        }
+        .folder-view-card-link {
+            color: inherit;
+            text-decoration: none;
+        }
+        .folder-view-card-link:hover,
+        .folder-view-card-link:focus-visible {
+            text-decoration: underline;
         }
         .folder-view-card--folder .folder-view-card-label {
             background: rgba(34, 197, 94, 0.16);
@@ -520,15 +532,6 @@ function renderViewerShell(array $payload): void
 <?php endif; ?>
 </head>
 <body>
-    <header>
-        <div class="meta">
-            <div class="name"><?= $safeName ?> <span style="opacity:0.7;font-size:12px;">(<?= $safeType ?>)</span></div>
-            <div class="path"><?= $safePath ?></div>
-        </div>
-        <div>
-            <a href="<?= $safeOpenHref ?>" target="_blank" rel="noopener"><?= $safeOpenLabel ?></a>
-        </div>
-    </header>
     <div class="viewer">
         <?= $bodyContent ?>
     </div>

@@ -23,8 +23,35 @@ export function extractNavHtml(html) {
 
 export function getLayoutState(config) {
     const layoutValue = config?.work?.layout;
-    if (layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue)) {
+    const normalize = (state) => {
+        const mode = state.mode || 'default-layout';
+        const storage = state.storage || '';
+        const directory = state.directory || '';
+        let preset = 'actual';
+        if (mode === 'none') {
+            preset = 'none';
+        } else if (storage === 'filesystem' && (directory === '.layout' || directory.startsWith('.works/'))) {
+            preset = 'custom';
+        }
+        const sourceLabel = mode === 'none'
+            ? 'No outer layout'
+            : storage === 'filesystem'
+                ? `Filesystem: ${directory || '.layout'}`
+                : storage === 'default'
+                    ? 'Built-in default layout'
+                    : 'Current resolved layout';
+
         return {
+            ...state,
+            mode,
+            storage,
+            directory,
+            preset,
+            sourceLabel,
+        };
+    };
+    if (layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue)) {
+        return normalize({
             mode: layoutValue.name || layoutValue.mode || layoutValue.value || '',
             template: layoutValue.template || '',
             css: layoutValue.css || '',
@@ -32,11 +59,12 @@ export function getLayoutState(config) {
             model: layoutValue.model || '',
             engine: layoutValue.engine || 'lightncandy',
             directory: layoutValue.directory || '',
+            storage: layoutValue.storage || '',
             assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : [],
-        };
+        });
     }
     if (typeof layoutValue === 'string') {
-        return { mode: layoutValue, template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', assets: [] };
+        return normalize({ mode: layoutValue, template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', assets: [] });
     }
-    return { mode: 'default-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', assets: [] };
+    return normalize({ mode: 'default-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', assets: [] });
 }

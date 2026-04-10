@@ -4,11 +4,11 @@
  */
 ?>
 <div class="container">
+    <div class="app-edit-toggle-wrap">
+        <button id="editToggle" class="edit-toggle" type="button">Edit mode</button>
+    </div>
     <!-- ---------- Sidebar ---------- -->
     <nav class="sidebar">
-        <div class="sidebar-tools">
-            <button id="editToggle" class="edit-toggle" type="button">Edit mode</button>
-        </div>
         <ul id="navList" class="nav-list">
             <div id="navLoading" class="loading-row">
                 <span class="loader"></span>
@@ -22,7 +22,6 @@
     <div class="main-content">
         <div id="editPanel" class="edit-panel" hidden></div>
         <aside id="editDrawer" class="edit-drawer" hidden></aside>
-        <div id="folderMeta" class="folder-meta"></div>
         <div id="iframeLoading" class="loading-row">
             <span class="loader"></span>
             <span class="loader-label">Loading content...</span>

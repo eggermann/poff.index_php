@@ -17,6 +17,8 @@ const VIEWER_FOLDER_DIR = path.join(POFF_DIR, 'viewer-folder');
 const VIEWER_FILE_NAME = 'viewer-file.txt';
 const VIEWER_FILE_PATH = path.join(POFF_DIR, VIEWER_FILE_NAME);
 const PERSIST_LAYOUT_DIR = path.join(POFF_DIR, 'persist-layout');
+const INHERITED_DEFAULT_DIR = path.join(POFF_DIR, 'inherits-default');
+const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -111,6 +113,25 @@ function runLayoutFilesystem(action, dir, fileName = '', payload = null) {
   });
 }
 
+function runUpload(targetDir, sourcePath, uploadName) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_upload_files.php'), targetDir, sourcePath, uploadName];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`upload helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -142,7 +163,7 @@ describe('MCP create route helper (CLI)', () => {
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'child.txt'), 'viewer child');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'nested-child', 'nested-video.mp4'), 'fake video');
     fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, '.layout'), { recursive: true });
-    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'template.hbs'), '<div class="folder-custom" data-layout="{{layout.directory}}">{{title}}|{{#each tree}}{{#if isFolder}}<span class="branch">{{name}}</span>{{#each children}}{{#if (contains name ".mp4")}}<span class="child">{{path}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type "file")}}<span class="entry">{{name}}:{{type}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class="video">{{path}}</span>{{/each}}{{#each layout.assets}}<span class="asset">{{href}}</span>{{/each}}</div>');
+    fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'template.hbs'), '<div class="folder-custom" data-layout="{{layout.directory}}">{{title}}|{{#each tree}}{{#if isFolder}}<span class="branch">{{name}}</span>{{#each children}}{{#if (contains name ".mp4")}}<span class="child">{{path}}</span><span class="child-view">{{pageLink}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type "file")}}<span class="entry">{{name}}:{{type}}</span><span class="entry-view">{{pageLink}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class="video">{{path}}</span>{{/each}}{{#each layout.assets}}<span class="asset">{{href}}</span>{{/each}}</div>');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'style.css'), '.folder-custom{color:#8ec5ff;}');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'script.js'), 'window.__folderLayout = true;');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'background.txt'), 'folder background');
@@ -176,7 +197,15 @@ describe('MCP create route helper (CLI)', () => {
         },
       },
     }, null, 2));
+    fs.mkdirSync(path.join(POFF_DIR, '.default', '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{#each items}}<span class="item">{{name}}</span>{{/each}}{{else}}{{name}}{{/if}}</main><footer><img src="{{layout.baseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>');
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'style.css'), '.default-fs-layout{display:block;}');
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'script.js'), 'window.__defaultFsLayout = true;');
+    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'eggman_profile-image.jpg'), 'fake image bytes');
+    fs.mkdirSync(INHERITED_DEFAULT_DIR, { recursive: true });
+    fs.writeFileSync(path.join(INHERITED_DEFAULT_DIR, 'child.txt'), 'child');
     fs.mkdirSync(PERSIST_LAYOUT_DIR, { recursive: true });
+    fs.mkdirSync(UPLOAD_TARGET_DIR, { recursive: true });
   });
 
   afterAll(() => {
@@ -291,9 +320,9 @@ describe('Worktype HBS renderer', () => {
       return;
     }
 
-    expect(output).toContain('<section class="viewer-template viewer-template--image">');
+    expect(output).toContain('<div class="poff-default-layout poff-default-layout--image">');
     expect(output).toContain('<img src="assets/photo.png" alt="Project Photo"');
-    expect(output).toContain('<div class="work-description">Inline description</div>');
+    expect(output).toContain('Inline description');
   });
 
   test('allows a custom HBS layout template to include the default layout partial', async () => {
@@ -324,7 +353,7 @@ describe('Worktype HBS renderer', () => {
             name: 'custom-layout',
             engine: 'lightncandy',
             section: 'works',
-            template: '<div class="custom-shell">{{#each items}}{{#if (eq type "file")}}<span class="entry">{{name}}</span>{{/if}}{{/each}}{{> default-layout}}</div>',
+            template: '<div class="custom-shell"><a class="self-link" href="{{pageLink}}">{{title}}</a>{{#each items}}{{#if (eq type "file")}}<span class="entry">{{name}}</span>{{/if}}{{/each}}{{> default-layout}}</div>',
           },
         },
       },
@@ -336,25 +365,51 @@ describe('Worktype HBS renderer', () => {
     }
 
     expect(output).toContain('<div class="custom-shell">');
-    expect(output).toContain('<section class="viewer-template viewer-template--folder">');
+    expect(output).toContain('href="?view&#x3D;1&amp;path&#x3D;projects"');
+    expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder">');
     expect(output).toContain('<span class="entry">notes.txt</span>');
     expect(output).toContain('projects');
     expect(output).toContain('alpha');
     expect(output).toContain('notes.txt');
   });
 
+  test('inherits a filesystem default layout from .default/.layout', async () => {
+    const output = await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR);
+    const config = JSON.parse(output);
+
+    expect(config.work.layout).toMatchObject({
+      storage: 'filesystem',
+      directory: 'tests/poff-tests/.default/.layout',
+    });
+    expect(config.work.layout.template).toContain('default-fs-layout');
+    expect(config.work.layout.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'eggman_profile-image.jpg' }),
+      ]),
+    );
+
+    const rendered = await runViewer('inherits-default');
+    expect(rendered).toContain('<div class="default-fs-layout">');
+    expect(rendered).toContain('.default/.layout/style.css');
+    expect(rendered).toContain('.default/.layout/script.js');
+    expect(rendered).toContain('.default/.layout/eggman_profile-image.jpg');
+    expect(rendered).toContain('<span class="item">child.txt</span>');
+  });
+
   test('renders folder previews through the typed viewer route', async () => {
     const output = await runViewer('viewer-folder');
 
     expect(output).toContain('<title>Viewer - viewer-folder</title>');
-    expect(output).toContain('viewer-folder/.layout/style.css');
-    expect(output).toContain('viewer-folder/.layout/script.js');
+    expect(output).toContain('.layout/style.css');
+    expect(output).toContain('.layout/script.js');
     expect(output).toContain('<div class="folder-custom"');
     expect(output).toContain('Folder Preview');
     expect(output).toContain('nested-child');
     expect(output).toContain('nested-child/nested-video.mp4');
+    expect(output).toContain('?view&#x3D;1&amp;file&#x3D;viewer-folder%2Fnested-child%2Fnested-video.mp4');
+    expect(output).toContain('?view&#x3D;1&amp;file&#x3D;viewer-folder%2Fchild.txt');
     expect(output).toContain('child.txt:file');
-    expect(output).toContain('viewer-folder/.layout/background.txt');
+    expect(output).toContain('.layout/background.txt');
   });
 
   test('renders file previews from .works/<file>.layout', async () => {
@@ -394,5 +449,22 @@ describe('Worktype HBS renderer', () => {
     const ensuredConfig = JSON.parse(ensuredOutput);
     expect(ensuredConfig.work.layout.template).toContain('Persisted');
     expect(ensuredConfig.work.layout.storage).toBe('filesystem');
+  });
+
+  test('stores uploaded files into a folder target', async () => {
+    const sourcePath = path.join(POFF_SOURCE_DIR, 'note.txt');
+    const output = await runUpload(UPLOAD_TARGET_DIR, sourcePath, 'slides.pdf');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.stored).toEqual([
+      expect.objectContaining({ name: 'slides.pdf', path: 'slides.pdf' }),
+    ]);
+    expect(fs.existsSync(path.join(UPLOAD_TARGET_DIR, 'slides.pdf'))).toBe(true);
+    expect(result.config.tree).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'slides.pdf', type: 'file' }),
+      ]),
+    );
   });
 });

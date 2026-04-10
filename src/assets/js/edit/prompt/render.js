@@ -45,7 +45,13 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const config = typeof getConfig === 'function' ? (getConfig() || {}) : {};
     const path = selection?.path || '';
     const name = path ? path.split(/[\\/]/).pop() : '';
+    const isFile = selection?.isFile ?? /\.[^\\/]+$/.test(path);
+    const viewUrl = isFile
+        ? `?view=1&file=${encodeURIComponent(path)}`
+        : `?view=1&path=${encodeURIComponent(path)}`;
     const work = (config && typeof config === 'object' && config.work) ? config.work : {};
+    const tree = Array.isArray(config?.tree) ? config.tree : [];
+    const folderBasePath = (selection?.isFile ? path.split('/').slice(0, -1).join('/') : path).replace(/^\/+|\/+$/g, '');
     const ellipsis = '\u2026';
     const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
         if (typeof value === 'boolean') {
@@ -57,7 +63,25 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         const str = String(value);
         return `${key}: ${str.length > 28 ? str.slice(0, 25) + ellipsis : str}`;
     }).join(', ');
-    return { path, name, workPreview };
+    const refPreview = tree.slice(0, 4).map((item) => {
+        const itemName = item?.name || item?.path || '';
+        if (!itemName) {
+            return '';
+        }
+        const rawItemPath = item?.path || itemName;
+        const itemPath = folderBasePath
+            ? (String(rawItemPath).startsWith(`${folderBasePath}/`) ? String(rawItemPath) : `${folderBasePath}/${rawItemPath}`)
+            : String(rawItemPath);
+        const isItemFile = (item?.type || 'file') !== 'folder';
+        const itemPageLink = isItemFile
+            ? `?view=1&file=${encodeURIComponent(itemPath)}`
+            : `?view=1&path=${encodeURIComponent(itemPath)}`;
+        const itemAssetUrl = isItemFile
+            ? itemPath.split('/').map((part) => encodeURIComponent(part)).join('/')
+            : `?path=${encodeURIComponent(itemPath)}`;
+        return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
+    }).filter(Boolean).join(' | ');
+    return { path, name, pageLink: viewUrl, viewUrl, workPreview, refPreview };
 }
 
 export function renderPromptContext(contextEl, context) {
@@ -66,11 +90,17 @@ export function renderPromptContext(contextEl, context) {
     }
     const path = context?.path || '';
     const name = context?.name || '';
+    const pageLink = context?.pageLink || context?.viewUrl || '';
+    const viewUrl = context?.viewUrl || '';
     const workPreview = context?.workPreview || '';
+    const refPreview = context?.refPreview || '';
     contextEl.innerHTML = `
+        <div class="prompt-context-row"><strong>pageLink</strong>: ${escapeHtml(pageLink)}</div>
         <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
         <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
+        <div class="prompt-context-row"><strong>viewUrl</strong>: ${escapeHtml(viewUrl)}</div>
         <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('default-layout, works, work')}</div>
+        ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ''}
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ''}
     `;
 }

@@ -10,7 +10,6 @@ if (window.location.hash === '#mcp') {
 const elements = {
     navList: document.getElementById('navList'),
     contentFrame: document.getElementById('contentFrame'),
-    folderMetaEl: document.getElementById('folderMeta'),
     editPanel: document.getElementById('editPanel'),
     editDrawer: document.getElementById('editDrawer'),
     editToggle: document.getElementById('editToggle'),
@@ -47,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     editController.bindEditToggle();
 
     if (window.location.hash && window.location.hash.length > 1) {
-        navigation.handleInitialHash();
+        navigation.syncFromLocation();
     } else {
         navigation.loadCurrentFolderInIframe();
     }
@@ -55,6 +54,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('hashchange', () => {
+    if (!navigation.consumeHashSync()) {
+        navigation.syncFromLocation();
+    }
+    if (editRequested) {
+        editController.initEditMode();
+    }
+});
+
+window.addEventListener('poff:content-updated', () => {
+    navigation.refreshCurrentLocation();
     if (editRequested) {
         editController.initEditMode();
     }
