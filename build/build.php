@@ -184,7 +184,7 @@ PHP;
     );
     $content = str_replace(
         'const currentPathForIframe = /* POFF_IFRAME_PATH */ null;',
-        'const currentPathForIframe = <?php echo !empty($currentRelativePath) ? json_encode($currentRelativePath) : "null"; ?>;',
+        'const currentPathForIframe = <?php echo json_encode($currentRelativePath); ?>;',
         $content
     );
     $buildContent .= trim($content);

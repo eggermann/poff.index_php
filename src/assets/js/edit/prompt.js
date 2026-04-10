@@ -269,12 +269,19 @@ export function bindPromptWindow({
     const reloadViewer = () => {
         const frame = document.getElementById('contentFrame');
         const selection = getActiveSelection ? getActiveSelection() : { path: '', isFile: false };
-        const activeViewerPath = selection?.path || activePath;
-        if (frame && activeViewerPath) {
+        const selectionPath = selection && Object.prototype.hasOwnProperty.call(selection, 'path')
+            ? selection.path
+            : undefined;
+        const activeViewerPath = selectionPath ?? activePath;
+        if (frame && activeViewerPath !== null && activeViewerPath !== undefined) {
             const isFile = selection?.isFile ?? /\.[^\\/]+$/.test(activeViewerPath);
-            frame.src = isFile
-                ? `?view=1&file=${encodeURIComponent(activeViewerPath)}`
-                : `?view=1&path=${encodeURIComponent(activeViewerPath)}`;
+            const url = new URL(window.location.href);
+            url.search = '';
+            url.hash = '';
+            url.searchParams.set('view', '1');
+            url.searchParams.set(isFile ? 'file' : 'path', activeViewerPath);
+            url.searchParams.set('_refresh', String(Date.now()));
+            frame.src = url.pathname + url.search;
             return;
         }
         if (frame && frame.contentWindow) {

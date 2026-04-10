@@ -41,7 +41,7 @@ export function initNavigation({
     }
 
     function loadCurrentFolderInIframe() {
-        if (currentPathForIframe && contentFrame) {
+        if (contentFrame && currentPathForIframe !== null && currentPathForIframe !== undefined) {
             const isFile = /\.[^\\/]+$/.test(currentPathForIframe);
             contentFrame.src = isFile
                 ? `?view=1&file=${encodeURIComponent(currentPathForIframe)}`
@@ -130,14 +130,17 @@ export function initNavigation({
             return;
         }
         let relPath = '';
+        let resolvedPath = false;
         if (target.hasAttribute('href') && target.getAttribute('href').startsWith('?path=')) {
             const href = target.getAttribute('href') || '';
             const params = new URLSearchParams(href.replace(/^\?/, ''));
             relPath = params.get('path') || '';
+            resolvedPath = true;
         } else if (target.dataset.src) {
             relPath = target.dataset.src;
+            resolvedPath = true;
         }
-        if (!relPath) {
+        if (!resolvedPath) {
             return;
         }
         event.preventDefault();

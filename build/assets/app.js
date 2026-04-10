@@ -90,7 +90,7 @@
   var promptHistoryKey = "poffEditPromptHistory";
   var defaultSystemPrompt = [
     "You are a Handlebars (HBS) template generator for this single-page CMS.",
-    "Transform the user description into one HBS template string that will be saved to work.layout.template and rendered by LightnCandy.",
+    "Transform the user description into one HBS template string that will be saved to .layout/template.hbs and rendered by LightnCandy.",
     "Return only the template (no Markdown, no fences).",
     "Use {{> default-layout}} as the default layout technique. Inside that layout, the section includes {{> works}} for folders and {{> work}} for files.",
     "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
@@ -196,14 +196,18 @@
       return {
         mode: layoutValue.name || layoutValue.mode || layoutValue.value || "",
         template: layoutValue.template || "",
+        css: layoutValue.css || "",
+        js: layoutValue.js || "",
         model: layoutValue.model || "",
-        engine: layoutValue.engine || "lightncandy"
+        engine: layoutValue.engine || "lightncandy",
+        directory: layoutValue.directory || "",
+        assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : []
       };
     }
     if (typeof layoutValue === "string") {
-      return { mode: layoutValue, template: "", model: "", engine: "lightncandy" };
+      return { mode: layoutValue, template: "", css: "", js: "", model: "", engine: "lightncandy", directory: "", assets: [] };
     }
-    return { mode: "default-layout", template: "", model: "", engine: "lightncandy" };
+    return { mode: "default-layout", template: "", css: "", js: "", model: "", engine: "lightncandy", directory: "", assets: [] };
   }
 
   // src/assets/js/edit/prompt/render.js
@@ -567,10 +571,17 @@
       var _a;
       const frame = document.getElementById("contentFrame");
       const selection = getActiveSelection2 ? getActiveSelection2() : { path: "", isFile: false };
-      const activeViewerPath = (selection == null ? void 0 : selection.path) || activePath;
-      if (frame && activeViewerPath) {
+      const selectionPath = selection && Object.prototype.hasOwnProperty.call(selection, "path") ? selection.path : void 0;
+      const activeViewerPath = selectionPath != null ? selectionPath : activePath;
+      if (frame && activeViewerPath !== null && activeViewerPath !== void 0) {
         const isFile = (_a = selection == null ? void 0 : selection.isFile) != null ? _a : /\.[^\\/]+$/.test(activeViewerPath);
-        frame.src = isFile ? `?view=1&file=${encodeURIComponent(activeViewerPath)}` : `?view=1&path=${encodeURIComponent(activeViewerPath)}`;
+        const url = new URL(window.location.href);
+        url.search = "";
+        url.hash = "";
+        url.searchParams.set("view", "1");
+        url.searchParams.set(isFile ? "file" : "path", activeViewerPath);
+        url.searchParams.set("_refresh", String(Date.now()));
+        frame.src = url.pathname + url.search;
         return;
       }
       if (frame && frame.contentWindow) {
@@ -899,6 +910,8 @@
       return { drawerForm: null, drawerStatus: null };
     }
     const layoutState = getLayoutState(config);
+    const layoutDirectory = layoutState.directory || ".layout";
+    const layoutAssets = Array.isArray(layoutState.assets) ? layoutState.assets : [];
     let treeHtml = "";
     if ((status == null ? void 0 : status.target) !== "file") {
       const treeItems = Array.isArray(config.tree) ? config.tree : [];
@@ -915,6 +928,18 @@
                 `;
       }).join("") : '<div class="edit-tree-item">No items found.</div>';
     }
+    const layoutAssetsHtml = layoutAssets.length ? `
+            <div>
+                <label class="edit-label">Layout assets</label>
+                <div class="edit-tree">
+                    ${layoutAssets.map((asset) => `
+                        <div class="edit-tree-item">
+                            <span>${escapeHtml(asset.path || asset.name || "")}</span>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        ` : "";
     editDrawer.innerHTML = `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -946,6 +971,18 @@
                 <label class="edit-label" for="edit-work-template">Work Layout Template (HBS)</label>
                 <textarea class="form-textarea" id="edit-work-template" name="work_template">${escapeHtml(layoutState.template)}</textarea>
             </div>
+            <div class="small-note">Layout files live in <code>${escapeHtml(layoutDirectory)}</code>. Put thumbnails, background images, and other layout-specific files there.</div>
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-layout-css">Layout CSS</label>
+                    <textarea class="form-textarea" id="edit-layout-css" name="layout_css">${escapeHtml(layoutState.css)}</textarea>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-layout-js">Layout JS</label>
+                    <textarea class="form-textarea" id="edit-layout-js" name="layout_js">${escapeHtml(layoutState.js)}</textarea>
+                </div>
+            </div>
+            ${layoutAssetsHtml}
             ${(status == null ? void 0 : status.target) !== "file" ? `
             <div>
                 <label class="edit-label">Visible items</label>
@@ -1067,7 +1104,7 @@
             </div>
             <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
             <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
-            <div class="small-note">Template responses are saved to <code>work.layout.template</code> as HBS for the LightnCandy renderer.</div>
+            <div class="small-note">Template responses are saved to <code>.layout/template.hbs</code> for the LightnCandy renderer.</div>
         </div>
     `;
   }
@@ -1315,19 +1352,21 @@
           syncDrawerVisibility();
         },
         onSubmit: async ({ elements: elements3, statusEl, treeVisible }) => {
-          var _a, _b, _c, _d, _e, _f;
+          var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
           const layoutPayload = {
             name: (((_a = elements3.work_layout) == null ? void 0 : _a.value) || "").trim(),
             engine: "lightncandy",
-            template: (_c = (_b = elements3.work_template) == null ? void 0 : _b.value) != null ? _c : ""
+            template: (_c = (_b = elements3.work_template) == null ? void 0 : _b.value) != null ? _c : "",
+            css: (_e = (_d = elements3.layout_css) == null ? void 0 : _d.value) != null ? _e : "",
+            js: (_g = (_f = elements3.layout_js) == null ? void 0 : _f.value) != null ? _g : ""
           };
           const selection = getActiveSelection();
           const payload = {
             path: selection.path,
-            link: (((_d = elements3.link) == null ? void 0 : _d.value) || "").trim(),
-            url: (((_e = elements3.url) == null ? void 0 : _e.value) || "").trim(),
+            link: (((_h = elements3.link) == null ? void 0 : _h.value) || "").trim(),
+            url: (((_i = elements3.url) == null ? void 0 : _i.value) || "").trim(),
             work: {
-              type: (((_f = elements3.work_type) == null ? void 0 : _f.value) || "").trim()
+              type: (((_j = elements3.work_type) == null ? void 0 : _j.value) || "").trim()
             },
             layout: layoutPayload
           };
@@ -1414,7 +1453,7 @@
       });
     }
     function loadCurrentFolderInIframe() {
-      if (currentPathForIframe2 && contentFrame) {
+      if (contentFrame && currentPathForIframe2 !== null && currentPathForIframe2 !== void 0) {
         const isFile = /\.[^\\/]+$/.test(currentPathForIframe2);
         contentFrame.src = isFile ? `?view=1&file=${encodeURIComponent(currentPathForIframe2)}` : `?view=1&path=${encodeURIComponent(currentPathForIframe2)}`;
         if (activeLink) {
@@ -1492,14 +1531,17 @@
         return;
       }
       let relPath = "";
+      let resolvedPath = false;
       if (target.hasAttribute("href") && target.getAttribute("href").startsWith("?path=")) {
         const href = target.getAttribute("href") || "";
         const params = new URLSearchParams(href.replace(/^\?/, ""));
         relPath = params.get("path") || "";
+        resolvedPath = true;
       } else if (target.dataset.src) {
         relPath = target.dataset.src;
+        resolvedPath = true;
       }
-      if (!relPath) {
+      if (!resolvedPath) {
         return;
       }
       event.preventDefault();

@@ -111,6 +111,7 @@
 .absolute{position:absolute;}
 .static{position:static;}
 .grid{display:grid;}
+.inline{display:inline;}
 .block{display:block;}
 .contents{display:contents;}
 .hidden{display:none;}
