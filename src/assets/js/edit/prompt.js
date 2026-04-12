@@ -1,4 +1,5 @@
-import { defaultPromptSettings, defaultSystemPrompt } from './prompt/constants.js';
+import { getLayoutState } from '../core/utils.js';
+import { defaultPromptSettings, getDefaultSystemPrompt } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
 import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
@@ -39,6 +40,44 @@ const summarizePromptError = (err, requestSummary) => ({
     message: typeof err?.message === 'string' ? err.message : String(err || 'Prompt failed.'),
 });
 
+const updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget }) => {
+    const templateSelectors = isLayoutTarget
+        ? ['#edit-layout-primary-template']
+        : ['#edit-content-template'];
+
+    templateSelectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((field) => {
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+                field.value = templateText;
+            }
+        });
+    });
+
+    if (nextTitle !== null) {
+        document.querySelectorAll('#edit-title').forEach((field) => {
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+                field.value = nextTitle;
+            }
+        });
+    }
+
+    if (nextDescription !== null) {
+        document.querySelectorAll('#edit-description').forEach((field) => {
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+                field.value = nextDescription;
+            }
+        });
+    }
+
+    if (nextWork && typeof nextWork.type === 'string') {
+        document.querySelectorAll('#edit-work-type').forEach((field) => {
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+                field.value = nextWork.type;
+            }
+        });
+    }
+};
+
 const debugPromptLog = (label, payload) => {
     try {
         // Log quietly without breaking if console is missing
@@ -49,6 +88,11 @@ const debugPromptLog = (label, payload) => {
         // ignore
     }
 };
+
+const builtInSystemPrompts = new Set([
+    getDefaultSystemPrompt('work'),
+    getDefaultSystemPrompt('layout'),
+]);
 
 export function bindPromptWindow({
     root,
@@ -91,6 +135,23 @@ export function bindPromptWindow({
     let activePath = getActiveSelection ? getActiveSelection().path : '';
     let imageAttachment = null;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
+    const currentPromptMode = () => (getActiveSelection?.().isLayout ? 'layout' : 'work');
+    const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+
+    const syncModeAwareSystemPrompt = () => {
+        if (!systemPromptEl) {
+            return;
+        }
+        const currentValue = (systemPromptEl.value || '').trim();
+        if (currentValue !== '' && !builtInSystemPrompts.has(currentValue)) {
+            return;
+        }
+        const nextValue = currentDefaultSystemPrompt();
+        if (systemPromptEl.value !== nextValue) {
+            systemPromptEl.value = nextValue;
+            savePromptSettings(readSettings());
+        }
+    };
 
     const setHistory = (nextHistory) => {
         const list = Array.isArray(nextHistory) ? nextHistory : [];
@@ -210,7 +271,7 @@ export function bindPromptWindow({
         providerEl.value = settings.provider || 'local';
     }
     if (systemPromptEl) {
-        systemPromptEl.value = settings.systemPrompt || defaultSystemPrompt;
+        systemPromptEl.value = settings.systemPrompt || currentDefaultSystemPrompt();
     }
     if (streamToggleEl) {
         streamToggleEl.checked = settings.streamPreview !== false;
@@ -221,7 +282,7 @@ export function bindPromptWindow({
         model: modelEl ? modelEl.value : '',
         endpoint: endpointEl ? endpointEl.value : '',
         apiKey: apiKeyEl ? apiKeyEl.value : '',
-        systemPrompt: (systemPromptEl?.value || '').trim() || defaultSystemPrompt,
+        systemPrompt: (systemPromptEl?.value || '').trim() || currentDefaultSystemPrompt(),
         streamPreview: streamToggleEl ? !!streamToggleEl.checked : true,
     });
     let suppressSave = false;
@@ -232,7 +293,7 @@ export function bindPromptWindow({
         if (modelEl) modelEl.value = s.model || '';
         if (endpointEl) endpointEl.value = s.endpoint || '';
         if (apiKeyEl) apiKeyEl.value = s.apiKey || '';
-        if (systemPromptEl) systemPromptEl.value = s.systemPrompt || defaultSystemPrompt;
+        if (systemPromptEl) systemPromptEl.value = s.systemPrompt || currentDefaultSystemPrompt();
         if (streamToggleEl) streamToggleEl.checked = s.streamPreview !== false;
         suppressSave = false;
         updateProviderUi();
@@ -278,19 +339,24 @@ export function bindPromptWindow({
     }
     if (systemResetEl && systemPromptEl) {
         systemResetEl.addEventListener('click', () => {
-            systemPromptEl.value = defaultSystemPrompt;
+            systemPromptEl.value = currentDefaultSystemPrompt();
             savePromptSettings(readSettings());
         });
     }
     if (settingsResetEl) {
         settingsResetEl.addEventListener('click', () => {
-            applySettingsToUi(defaultPromptSettings);
-            savePromptSettings(defaultPromptSettings);
+            const nextSettings = {
+                ...defaultPromptSettings,
+                systemPrompt: currentDefaultSystemPrompt(),
+            };
+            applySettingsToUi(nextSettings);
+            savePromptSettings(nextSettings);
             renderContext();
         });
     }
 
     updateProviderUi();
+    syncModeAwareSystemPrompt();
     setHistory(readStoredHistory(activePath));
     renderHistory();
     renderContext();
@@ -300,12 +366,12 @@ export function bindPromptWindow({
     const reloadViewer = () => {
         const frame = document.getElementById('contentFrame');
         const selection = getActiveSelection ? getActiveSelection() : { path: '', isFile: false };
-        const selectionPath = selection && Object.prototype.hasOwnProperty.call(selection, 'path')
-            ? selection.path
+        const selectionPath = selection && Object.prototype.hasOwnProperty.call(selection, 'previewPath')
+            ? selection.previewPath
             : undefined;
         const activeViewerPath = selectionPath ?? activePath;
         if (frame && activeViewerPath !== null && activeViewerPath !== undefined) {
-            const isFile = selection?.isFile ?? /\.[^\\/]+$/.test(activeViewerPath);
+            const isFile = selection?.previewIsFile ?? /\.[^\\/]+$/.test(activeViewerPath);
             const url = new URL(window.location.href);
             url.search = '';
             url.hash = '';
@@ -334,12 +400,20 @@ export function bindPromptWindow({
         if (nextPath !== activePath) {
             activePath = nextPath;
             setHistory(readStoredHistory(activePath));
+            syncModeAwareSystemPrompt();
             renderHistory();
             renderContext();
             renderSummary('Waiting for response...');
         }
     };
     window.addEventListener('hashchange', syncHistoryForPath);
+
+    const layoutPresetEl = document.getElementById('edit-layout-preset');
+    if (layoutPresetEl) {
+        layoutPresetEl.addEventListener('change', () => {
+            renderContext();
+        });
+    }
 
     if (promptClearEl) {
         promptClearEl.addEventListener('click', () => {
@@ -420,6 +494,7 @@ export function bindPromptWindow({
                     content: item.content,
                 }));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
+                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
                     path: activePath,
                     provider: providerEl ? providerEl.value : 'local',
@@ -430,6 +505,12 @@ export function bindPromptWindow({
                     history: historyForRequest,
                     systemPrompt: systemPromptValue,
                 };
+                if (selection?.isLayout) {
+                    const layoutPresetEl = document.getElementById('edit-layout-preset');
+                    if (layoutPresetEl && typeof layoutPresetEl.value === 'string' && layoutPresetEl.value.trim() !== '') {
+                        payload.layoutPreset = layoutPresetEl.value.trim();
+                    }
+                }
                 if (imageAttachment) {
                     payload.image = { ...imageAttachment };
                 }
@@ -441,6 +522,7 @@ export function bindPromptWindow({
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
                 const nextTitle = typeof response.title === 'string' ? response.title.trim() : null;
                 const nextDescription = typeof response.description === 'string' ? response.description.trim() : null;
+                const isLayoutTarget = !!selection.isLayout;
                 const currentConfig = getConfig ? getConfig() : null;
                 const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
                 const mergedWork = {
@@ -501,9 +583,16 @@ export function bindPromptWindow({
                     systemPromptEl.value = response.systemPrompt;
                     savePromptSettings(readSettings());
                 }
+                updatePromptEditorFields({
+                    templateText,
+                    nextTitle,
+                    nextDescription,
+                    nextWork,
+                    isLayoutTarget,
+                });
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
-                    if (templateField) {
+                    if (!isLayoutTarget && templateField) {
                         templateField.value = templateText;
                     }
                     const layoutNameField = drawerForm.querySelector('#edit-work-layout');
@@ -516,14 +605,6 @@ export function bindPromptWindow({
                             workTypeField.value = nextWork.type;
                         }
                     }
-                }
-                const titleField = document.getElementById('edit-title');
-                if (titleField && nextTitle !== null) {
-                    titleField.value = nextTitle;
-                }
-                const descriptionField = document.getElementById('edit-description');
-                if (descriptionField && nextDescription !== null) {
-                    descriptionField.value = nextDescription;
                 }
                 const elements = drawerForm ? drawerForm.elements : null;
                 const resolvedLayoutName = (() => {
@@ -541,7 +622,6 @@ export function bindPromptWindow({
                 const layoutPayload = {
                     name: resolvedLayoutName,
                     engine: 'lightncandy',
-                    sectionTemplate: templateText,
                 };
                 if (nextLayoutValue && typeof nextLayoutValue === 'object') {
                     if (typeof nextLayoutValue.engine === 'string' && nextLayoutValue.engine.trim()) {
@@ -553,6 +633,38 @@ export function bindPromptWindow({
                 }
                 if (response.model) {
                     layoutPayload.model = response.model;
+                }
+                if (isLayoutTarget) {
+                    const layoutState = getLayoutState(currentConfig || {});
+                    const layoutPresetEl = document.getElementById('edit-layout-preset');
+                    const preset = (layoutPresetEl?.value || layoutState.preset || 'actual').trim();
+                    const layoutPathName = (selection.previewPath || '').split('/').pop() || 'item';
+                    const localLayoutDirectory = selection.layoutIsFile
+                        ? `.works/${layoutPathName}.layout`
+                        : '.layout';
+                    const resolvedLayoutDirectory = typeof layoutState.directory === 'string'
+                        ? layoutState.directory.trim()
+                        : '';
+                    const canEditResolvedFilesystemTarget = layoutState.storage === 'filesystem' && resolvedLayoutDirectory !== '';
+                    const shouldPersistToLocalWrapper = preset === 'custom'
+                        || !canEditResolvedFilesystemTarget
+                        || resolvedLayoutDirectory === localLayoutDirectory;
+                    layoutPayload.name = preset === 'none'
+                        ? 'none'
+                        : preset === 'custom'
+                            ? 'custom-layout'
+                            : 'default-layout';
+                    if (shouldPersistToLocalWrapper) {
+                        layoutPayload.template = templateText;
+                    } else if (canEditResolvedFilesystemTarget) {
+                        layoutPayload.originalTarget = resolvedLayoutDirectory;
+                        layoutPayload.originalTemplate = templateText;
+                    } else {
+                        layoutPayload.name = 'custom-layout';
+                        layoutPayload.template = templateText;
+                    }
+                } else {
+                    layoutPayload.sectionTemplate = templateText;
                 }
                 const savePayload = {
                     path: activePath,
@@ -568,10 +680,11 @@ export function bindPromptWindow({
                     savePayload.work = persistedWork;
                 }
                 await saveConfig(savePayload, statusEl);
+                renderContext();
                 if (statusEl) {
                     const providerLabel = response.provider || payload.provider;
                     const modelLabel = response.model || payload.model;
-                    statusEl.textContent = `Template updated via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}`;
+                    statusEl.textContent = `${isLayoutTarget ? 'Layout' : 'Template'} updated via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}`;
                     statusEl.className = 'edit-status edit-status-success';
                 }
                 const providerLabel = response.provider || payload.provider;
@@ -581,7 +694,7 @@ export function bindPromptWindow({
                 if (nextDescription !== null) extra.push('description');
                 if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(', ')}`);
                 if (nextLayoutValue) extra.push('layout');
-                const summaryText = `Saved ${templateText.length} HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
+                const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? 'layout ' : ''}HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
                 renderSummary(summaryText);
                 clearAttachment();
                 reloadViewer();

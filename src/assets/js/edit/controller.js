@@ -1,5 +1,5 @@
 import { requestEditConfig, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
-import { getActiveSelection } from '../core/selection.js';
+import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
@@ -55,7 +55,7 @@ export function createEditController({ elements, context, editRequested }) {
             }
             editConfig = data.config || editConfig;
             editTarget = data.target || editTarget;
-            if (editTarget === 'folder') {
+            if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
@@ -63,6 +63,13 @@ export function createEditController({ elements, context, editRequested }) {
                 statusEl.textContent = 'Config saved.';
                 statusEl.className = 'edit-status edit-status-success';
             }
+            window.dispatchEvent(new CustomEvent('poff:content-updated', {
+                detail: {
+                    path: payload?.path || '',
+                    target: editTarget,
+                    subjectTarget: data.subjectTarget || editTarget,
+                },
+            }));
             return data.config;
         } catch (err) {
             if (statusEl) {
@@ -125,10 +132,64 @@ export function createEditController({ elements, context, editRequested }) {
                 drawerOpen = !drawerOpen;
                 syncDrawerVisibility();
             },
+            onOpenLayoutPage: () => {
+                const selection = getActiveSelection();
+                const nextPath = buildVirtualLayoutPath(selection.previewPath ?? selection.path);
+                drawerOpen = false;
+                syncDrawerVisibility();
+                window.location.hash = `#/${nextPath}`;
+            },
+            onReturnToWork: () => {
+                const selection = getActiveSelection();
+                const nextPath = selection.previewPath || '';
+                drawerOpen = false;
+                syncDrawerVisibility();
+                if (nextPath) {
+                    window.location.hash = `#/${nextPath}`;
+                    return;
+                }
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                window.dispatchEvent(new Event('hashchange'));
+            },
+            onSubmitLayout: async ({ payload, statusEl }) => {
+                const selection = getActiveSelection();
+                const layoutPreset = (payload.layoutPreset || 'actual').trim();
+                const layoutName = layoutPreset === 'none'
+                    ? 'none'
+                    : layoutPreset === 'custom'
+                        ? 'custom-layout'
+                        : 'default-layout';
+                const layoutPayload = {
+                    name: layoutName,
+                    engine: 'lightncandy',
+                };
+                if (Object.prototype.hasOwnProperty.call(payload, 'contentTemplate')) {
+                    layoutPayload.sectionTemplate = payload.contentTemplate ?? '';
+                }
+                if (Object.prototype.hasOwnProperty.call(payload, 'layoutTemplate')) {
+                    layoutPayload.template = payload.layoutTemplate ?? '';
+                }
+                if (Object.prototype.hasOwnProperty.call(payload, 'layoutCss')) {
+                    layoutPayload.css = payload.layoutCss ?? '';
+                }
+                if (Object.prototype.hasOwnProperty.call(payload, 'layoutJs')) {
+                    layoutPayload.js = payload.layoutJs ?? '';
+                }
+                if (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget')) {
+                    layoutPayload.originalTarget = payload.originalLayoutTarget ?? '';
+                    layoutPayload.originalTemplate = payload.originalLayoutTemplate ?? '';
+                    layoutPayload.originalCss = payload.originalLayoutCss ?? '';
+                    layoutPayload.originalJs = payload.originalLayoutJs ?? '';
+                }
+                await saveConfig({
+                    path: selection.path,
+                    layout: layoutPayload,
+                }, statusEl);
+            },
             onUploadFiles: async ({ source, files, statusEl }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
-                    path: selection.path,
+                    path: selection.previewPath || selection.path,
                     source,
                     files,
                 });
@@ -165,21 +226,6 @@ export function createEditController({ elements, context, editRequested }) {
                 syncDrawerVisibility();
             },
             onSubmit: async ({ elements, statusEl, treeVisible }) => {
-                const layoutPreset = (elements.layout_preset?.value || 'actual').trim();
-                const rawLayoutName = (elements.work_layout?.value || '').trim();
-                const layoutName = layoutPreset === 'none'
-                    ? 'none'
-                    : layoutPreset === 'custom'
-                        ? (rawLayoutName || 'custom-layout')
-                        : 'default-layout';
-                const layoutPayload = {
-                    name: layoutName,
-                    engine: 'lightncandy',
-                    sectionTemplate: elements.content_template?.value ?? '',
-                    template: layoutPreset === 'actual' ? '' : (elements.layout_template?.value ?? ''),
-                    css: layoutPreset === 'actual' ? '' : (elements.layout_css?.value ?? ''),
-                    js: layoutPreset === 'actual' ? '' : (elements.layout_js?.value ?? ''),
-                };
                 const selection = getActiveSelection();
                 const payload = {
                     path: selection.path,
@@ -188,7 +234,6 @@ export function createEditController({ elements, context, editRequested }) {
                     work: {
                         type: (elements.work_type?.value || '').trim(),
                     },
-                    layout: layoutPayload,
                 };
                 if (status?.target !== 'file') {
                     payload.treeVisible = treeVisible;
@@ -220,7 +265,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (data.config) {
             editConfig = data.config;
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');
-            if (editTarget === 'folder') {
+            if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }

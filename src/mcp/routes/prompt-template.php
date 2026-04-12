@@ -415,6 +415,147 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     return $context;
 }
 
+function mcpPromptTrimText(string $text, int $maxLength = 240): string
+{
+    $normalized = preg_replace('/\s+/', ' ', trim($text)) ?? trim($text);
+    if (strlen($normalized) <= $maxLength) {
+        return $normalized;
+    }
+
+    return substr($normalized, 0, max(0, $maxLength - 3)) . '...';
+}
+
+function mcpPromptCompactRef(array $ref): array
+{
+    $compact = [];
+    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
+        if (!array_key_exists($key, $ref)) {
+            continue;
+        }
+        $value = $ref[$key];
+        $compact[$key] = is_string($value) ? mcpPromptTrimText($value, 160) : $value;
+    }
+
+    return $compact;
+}
+
+function mcpPromptCompactConfig(array $config): array
+{
+    $summary = [];
+
+    foreach (['title', 'description', 'folderName', 'updatedAt', 'treeHash'] as $key) {
+        if (array_key_exists($key, $config) && is_scalar($config[$key])) {
+            $summary[$key] = is_string($config[$key])
+                ? mcpPromptTrimText((string) $config[$key], 240)
+                : $config[$key];
+        }
+    }
+
+    $work = is_array($config['work'] ?? null) ? $config['work'] : [];
+    if ($work !== []) {
+        $summary['work'] = [];
+        foreach ($work as $key => $value) {
+            if ($key === 'layout' && is_array($value)) {
+                $layoutSummary = [];
+                foreach (['name', 'mode', 'value', 'engine', 'section', 'storage', 'directory', 'defaultDirectory', 'sectionDirectory', 'phpTemplate'] as $layoutKey) {
+                    if (array_key_exists($layoutKey, $value) && is_scalar($value[$layoutKey])) {
+                        $layoutSummary[$layoutKey] = is_string($value[$layoutKey])
+                            ? mcpPromptTrimText((string) $value[$layoutKey], 180)
+                            : $value[$layoutKey];
+                    }
+                }
+                foreach (['template', 'sectionTemplate', 'css', 'style', 'js', 'script'] as $layoutKey) {
+                    if (isset($value[$layoutKey]) && is_string($value[$layoutKey]) && $value[$layoutKey] !== '') {
+                        $layoutSummary[$layoutKey . 'Length'] = strlen($value[$layoutKey]);
+                    }
+                }
+                if (is_array($value['assets'] ?? null)) {
+                    $layoutSummary['assetCount'] = count($value['assets']);
+                }
+                $summary['work']['layout'] = $layoutSummary;
+                continue;
+            }
+
+            if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
+                $summary['work'][$key] = $value;
+                continue;
+            }
+
+            if (is_string($value)) {
+                $summary['work'][$key] = mcpPromptTrimText($value, 180);
+            }
+        }
+    }
+
+    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    if ($tree !== []) {
+        $sample = [];
+        foreach (array_slice($tree, 0, 24) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $sample[] = [
+                'name' => mcpPromptTrimText((string) ($item['name'] ?? $item['path'] ?? ''), 120),
+                'type' => (string) ($item['type'] ?? 'file'),
+                'path' => mcpPromptTrimText((string) ($item['path'] ?? ''), 160),
+                'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
+            ];
+        }
+        $summary['tree'] = [
+            'count' => count($tree),
+            'sample' => $sample,
+        ];
+    }
+
+    return $summary;
+}
+
+function mcpPromptCompactContext(array $context): array
+{
+    $items = array_values(array_filter(array_map(
+        static fn(array $ref): array => mcpPromptCompactRef($ref),
+        array_slice(is_array($context['items'] ?? null) ? $context['items'] : [], 0, 24)
+    )));
+
+    $counts = [
+        'items' => count(is_array($context['items'] ?? null) ? $context['items'] : []),
+        'files' => count(is_array($context['allFiles'] ?? null) ? $context['allFiles'] : []),
+        'folders' => count(is_array($context['allFolders'] ?? null) ? $context['allFolders'] : []),
+        'images' => count(is_array($context['allImages'] ?? null) ? $context['allImages'] : []),
+        'videos' => count(is_array($context['allVideos'] ?? null) ? $context['allVideos'] : []),
+        'audio' => count(is_array($context['allAudio'] ?? null) ? $context['allAudio'] : []),
+        'pdfs' => count(is_array($context['allPdfs'] ?? null) ? $context['allPdfs'] : []),
+        'texts' => count(is_array($context['allTexts'] ?? null) ? $context['allTexts'] : []),
+        'links' => count(is_array($context['allLinks'] ?? null) ? $context['allLinks'] : []),
+        'other' => count(is_array($context['allOther'] ?? null) ? $context['allOther'] : []),
+    ];
+
+    return [
+        'current' => $context['current'] ?? [],
+        'counts' => $counts,
+        'items' => $items,
+    ];
+}
+
+function mcpPromptHistoryText(array $history): string
+{
+    $recentHistory = array_slice($history, -6);
+    $historyText = '';
+    foreach ($recentHistory as $msg) {
+        if (!is_array($msg) || !isset($msg['role']) || !isset($msg['content'])) {
+            continue;
+        }
+        $role = strtolower((string) $msg['role']);
+        $content = mcpPromptTrimText((string) $msg['content'], 800);
+        if ($content === '') {
+            continue;
+        }
+        $historyText .= strtoupper($role) . ": " . $content . "\n";
+    }
+
+    return $historyText;
+}
+
 function handlePromptTemplate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
@@ -470,8 +611,8 @@ function handlePromptTemplate(array $opts): array
 
     $config = PoffConfig::ensure($targetDir);
     $promptContext = mcpBuildPromptContext((string) $path, $config);
-    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $configJson = json_encode(mcpPromptCompactConfig($config), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $promptContextJson = json_encode(mcpPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $responseFormatInstruction = implode("\n", [
         'Response format: return strict JSON.',
         'Required key: "template" with the wrapped inner HBS partial string.',
@@ -490,18 +631,7 @@ function handlePromptTemplate(array $opts): array
         'Prompt context JSON includes current.templateTarget for the wrapped partial save target and current.layoutTemplateTarget for the outer wrapper path. Edit the wrapped partial target by default.',
         'Prompt context JSON includes resolved refs for the current folder contents. Use those refs directly instead of inventing paths.',
     ]);
-    $historyText = '';
-    foreach ($history as $msg) {
-        if (!is_array($msg) || !isset($msg['role']) || !isset($msg['content'])) {
-            continue;
-        }
-        $role = strtolower((string) $msg['role']);
-        $content = trim((string) $msg['content']);
-        if ($content === '') {
-            continue;
-        }
-        $historyText .= strtoupper($role) . ": " . $content . "\n";
-    }
+    $historyText = mcpPromptHistoryText($history);
     $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt;
     if ($image) {
         $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
