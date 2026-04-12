@@ -2,10 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 const esbuild = require('esbuild');
+const sass = require('sass');
 const { createGenerator } = require('@unocss/core');
 
 const rootDir = path.resolve(__dirname, '..');
 const jsEntry = path.join(rootDir, 'src', 'assets', 'js', 'app.js');
+const scssEntry = path.join(rootDir, 'src', 'assets', 'scss', 'main.scss');
 const headerPath = path.join(rootDir, 'src', 'includes', 'header.built.php');
 const scriptsPath = path.join(rootDir, 'src', 'includes', 'scripts.built.php');
 const distDir = path.join(rootDir, 'build', 'assets');
@@ -68,8 +70,12 @@ async function buildCss() {
   const uno = createGenerator(unoConfig);
   const files = collectContentFiles(srcDir);
   const contents = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
-  const { css } = await uno.generate(contents, { preflights: true });
-  return css.trim();
+  const { css: unoCss } = await uno.generate(contents, { preflights: true });
+  const scssCss = sass.compile(scssEntry, {
+    style: 'expanded',
+    loadPaths: [path.dirname(scssEntry)],
+  }).css;
+  return [unoCss.trim(), scssCss.trim()].filter(Boolean).join('\n\n').trim();
 }
 
 function writeIfChanged(targetPath, nextContent) {

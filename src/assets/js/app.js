@@ -8,11 +8,14 @@ if (window.location.hash === '#mcp') {
 }
 
 const elements = {
+    appShell: document.getElementById('appShell'),
+    appSidebar: document.getElementById('appSidebar'),
     navList: document.getElementById('navList'),
     contentFrame: document.getElementById('contentFrame'),
     editPanel: document.getElementById('editPanel'),
     editDrawer: document.getElementById('editDrawer'),
     editToggle: document.getElementById('editToggle'),
+    sidebarToggle: document.getElementById('sidebarToggle'),
     iframeLoading: document.getElementById('iframeLoading'),
     sidebarLoading: document.getElementById('sidebarLoading'),
 };
@@ -41,7 +44,31 @@ const navigation = initNavigation({
     initEditMode: editController.initEditMode,
 });
 
+function bindSidebarToggle() {
+    const { appShell, appSidebar, sidebarToggle } = elements;
+    if (!appShell || !appSidebar || !sidebarToggle) {
+        return;
+    }
+
+    const syncSidebarState = (isOpen) => {
+        appShell.classList.toggle('sidebar-collapsed', !isOpen);
+        appSidebar.hidden = !isOpen;
+        appSidebar.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        sidebarToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        sidebarToggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+        sidebarToggle.setAttribute('title', isOpen ? 'Close navigation' : 'Open navigation');
+    };
+
+    syncSidebarState(true);
+
+    sidebarToggle.addEventListener('click', () => {
+        const isOpen = !appShell.classList.contains('sidebar-collapsed');
+        syncSidebarState(!isOpen);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    bindSidebarToggle();
     editController.syncEditToggle();
     editController.bindEditToggle();
 

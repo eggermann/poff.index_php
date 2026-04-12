@@ -3,8 +3,22 @@
  * HTML layout structure for the file browser
  */
 ?>
-<div class="container">
-    <aside class="sidebar" aria-label="Navigation">
+<div id="appShell" class="container">
+    <button
+        id="sidebarToggle"
+        class="sidebar-toggle"
+        type="button"
+        aria-controls="appSidebar"
+        aria-expanded="true"
+        aria-label="Close navigation"
+    >
+        <span class="sidebar-toggle__icon" aria-hidden="true">
+            <span class="sidebar-toggle__bar"></span>
+            <span class="sidebar-toggle__bar"></span>
+            <span class="sidebar-toggle__bar"></span>
+        </span>
+    </button>
+    <aside id="appSidebar" class="sidebar" aria-label="Navigation">
         <div class="app-edit-toggle-wrap">
             <button id="editToggle" class="edit-toggle" type="button">Edit mode</button>
         </div>
@@ -12,7 +26,7 @@
             <span class="loader"></span>
             <span class="loader-label">Loading navigation...</span>
         </div>
-        <ul id="navList">
+        <ul id="navList" class="nav-list">
             <!-- NAV_PLACEHOLDER -->
         </ul>
     </aside>
