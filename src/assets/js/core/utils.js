@@ -49,9 +49,11 @@ export function getLayoutState(config) {
             mode,
             storage,
             directory,
+            defaultDirectory: state.defaultDirectory || '',
             section: state.section || inferredSection,
             sectionTemplate: state.sectionTemplate || '',
             sectionDirectory: state.sectionDirectory || '',
+            phpTemplate: state.phpTemplate || '',
             preset,
             sourceLabel,
         };
@@ -66,9 +68,11 @@ export function getLayoutState(config) {
             engine: layoutValue.engine || 'lightncandy',
             directory: layoutValue.directory || '',
             storage: layoutValue.storage || '',
+            defaultDirectory: layoutValue.defaultDirectory || '',
             section: layoutValue.section || inferredSection,
             sectionTemplate: layoutValue.sectionTemplate || '',
             sectionDirectory: layoutValue.sectionDirectory || '',
+            phpTemplate: layoutValue.phpTemplate || '',
             assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : [],
         });
     }

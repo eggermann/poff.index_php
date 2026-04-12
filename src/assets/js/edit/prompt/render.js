@@ -43,19 +43,45 @@ export function renderPromptSummary(summaryEl, content) {
 export function buildPromptContext({ getActiveSelection, getConfig }) {
     const selection = typeof getActiveSelection === 'function' ? getActiveSelection() : { path: '', isFile: false };
     const config = typeof getConfig === 'function' ? (getConfig() || {}) : {};
-    const path = selection?.path || '';
+    const isLayout = !!selection?.isLayout;
+    const path = selection?.previewPath ?? selection?.path ?? '';
+    const virtualPath = selection?.path || '';
     const name = path ? path.split(/[\\/]/).pop() : '';
-    const isFile = selection?.isFile ?? /\.[^\\/]+$/.test(path);
+    const isFile = isLayout
+        ? !!selection?.layoutIsFile
+        : (selection?.isFile ?? /\.[^\\/]+$/.test(path));
     const viewUrl = isFile
         ? `?view=1&file=${encodeURIComponent(path)}`
         : `?view=1&path=${encodeURIComponent(path)}`;
-    const templateTarget = isFile
-        ? `.works/${name || 'item'}.layout/work.hbs`
-        : '.layout/works.hbs';
-    const layoutTemplateTarget = isFile
-        ? `.works/${name || 'item'}.layout/template.hbs`
-        : '.layout/template.hbs';
+    const localLayoutDirectory = isFile
+        ? `.works/${name || 'item'}.layout`
+        : '.layout';
+    const sectionTemplateTarget = isFile
+        ? `${localLayoutDirectory}/work.hbs`
+        : `${localLayoutDirectory}/works.hbs`;
+    const layoutTemplateTarget = `${localLayoutDirectory}/template.hbs`;
     const work = (config && typeof config === 'object' && config.work) ? config.work : {};
+    const layout = work && typeof work.layout === 'object' ? work.layout : {};
+    const layoutStorage = typeof layout?.storage === 'string' ? String(layout.storage) : '';
+    const resolvedLayoutDirectory = layout?.directory ? String(layout.directory) : '';
+    const defaultLayoutDirectory = layout?.defaultDirectory ? String(layout.defaultDirectory) : '';
+    const presetEl = isLayout ? document.getElementById('edit-layout-preset') : null;
+    const layoutPreset = isLayout && presetEl ? String(presetEl.value || '').trim() : '';
+    const activeLayoutDirectory = (() => {
+        if (!isLayout) {
+            return resolvedLayoutDirectory || localLayoutDirectory;
+        }
+        if (layoutPreset === 'custom') {
+            return localLayoutDirectory;
+        }
+        if (layoutStorage === 'filesystem' && resolvedLayoutDirectory) {
+            return resolvedLayoutDirectory;
+        }
+        return localLayoutDirectory;
+    })();
+    const templateTarget = isLayout
+        ? `${activeLayoutDirectory}/template.hbs`
+        : sectionTemplateTarget;
     const tree = Array.isArray(config?.tree) ? config.tree : [];
     const folderBasePath = (selection?.isFile ? path.split('/').slice(0, -1).join('/') : path).replace(/^\/+|\/+$/g, '');
     const ellipsis = '\u2026';
@@ -87,7 +113,34 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
             : `?path=${encodeURIComponent(itemPath)}`;
         return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
     }).filter(Boolean).join(' | ');
-    return { path, name, pageLink: viewUrl, viewUrl, templateTarget, layoutTemplateTarget, workPreview, refPreview };
+    const layoutBaseHref = activeLayoutDirectory;
+    const layoutDefaultBaseHref = defaultLayoutDirectory || resolvedLayoutDirectory || layoutBaseHref;
+    const layoutAssetsPreview = Array.isArray(layout?.assets)
+        ? layout.assets.slice(0, 4).map((asset) => {
+            const assetPath = asset?.path ? String(asset.path) : '';
+            if (!assetPath) {
+                return '';
+            }
+            return `${assetPath} -> ${layoutBaseHref}/${assetPath}`;
+        }).filter(Boolean).join(' | ')
+        : '';
+    return {
+        path,
+        virtualPath,
+        isLayout,
+        layoutPreset,
+        name,
+        pageLink: viewUrl,
+        viewUrl,
+        templateTarget,
+        layoutTemplateTarget,
+        sectionTemplateTarget,
+        layoutBaseHref,
+        layoutDefaultBaseHref,
+        layoutAssetsPreview,
+        workPreview,
+        refPreview,
+    };
 }
 
 export function renderPromptContext(contextEl, context) {
@@ -95,21 +148,33 @@ export function renderPromptContext(contextEl, context) {
         return;
     }
     const path = context?.path || '';
+    const virtualPath = context?.virtualPath || '';
+    const layoutPreset = context?.layoutPreset || '';
     const name = context?.name || '';
     const pageLink = context?.pageLink || context?.viewUrl || '';
     const viewUrl = context?.viewUrl || '';
     const templateTarget = context?.templateTarget || '';
     const layoutTemplateTarget = context?.layoutTemplateTarget || '';
+    const sectionTemplateTarget = context?.sectionTemplateTarget || '';
+    const layoutBaseHref = context?.layoutBaseHref || '';
+    const layoutDefaultBaseHref = context?.layoutDefaultBaseHref || '';
+    const layoutAssetsPreview = context?.layoutAssetsPreview || '';
     const workPreview = context?.workPreview || '';
     const refPreview = context?.refPreview || '';
     contextEl.innerHTML = `
+        ${context?.isLayout ? `<div class="prompt-context-row"><strong>virtualPath</strong>: ${escapeHtml(virtualPath)}</div>` : ''}
+        ${context?.isLayout && layoutPreset ? `<div class="prompt-context-row"><strong>layoutPreset</strong>: ${escapeHtml(layoutPreset)}</div>` : ''}
         <div class="prompt-context-row"><strong>pageLink</strong>: ${escapeHtml(pageLink)}</div>
         <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
         <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
         <div class="prompt-context-row"><strong>viewUrl</strong>: ${escapeHtml(viewUrl)}</div>
         ${templateTarget ? `<div class="prompt-context-row"><strong>templateTarget</strong>: ${escapeHtml(templateTarget)}</div>` : ''}
-        ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ''}
+        ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget (custom)</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ''}
+        ${sectionTemplateTarget ? `<div class="prompt-context-row"><strong>sectionTemplateTarget</strong>: ${escapeHtml(sectionTemplateTarget)}</div>` : ''}
+        ${layoutBaseHref ? `<div class="prompt-context-row"><strong>layoutBaseHref</strong>: ${escapeHtml(layoutBaseHref)}</div>` : ''}
+        ${layoutDefaultBaseHref ? `<div class="prompt-context-row"><strong>layoutDefaultBaseHref</strong>: ${escapeHtml(layoutDefaultBaseHref)}</div>` : ''}
         <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('default-layout, works, work')}</div>
+        ${layoutAssetsPreview ? `<div class="prompt-context-row"><strong>layoutAssets</strong>: ${escapeHtml(layoutAssetsPreview)}</div>` : ''}
         ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ''}
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ''}
     `;

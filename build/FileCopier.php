@@ -19,6 +19,15 @@ class FileCopier {
         }
     }
 
+    public static function mirrorDirectory(string $sourceDir, string $targetDir): void {
+        if (!is_dir($sourceDir)) {
+            throw new Exception("Source directory not found: $sourceDir");
+        }
+
+        self::removeDirectory($targetDir);
+        self::copyDirectory($sourceDir, $targetDir);
+    }
+
     private static function findAllDirectories($root) {
         $dirs = [];
         $iterator = new RecursiveIteratorIterator(
@@ -47,5 +56,52 @@ class FileCopier {
         }
         
         return $dirs;
+    }
+
+    private static function copyDirectory(string $sourceDir, string $targetDir): void {
+        if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+            throw new Exception("Failed to create target directory: $targetDir");
+        }
+
+        $iterator = new DirectoryIterator($sourceDir);
+        foreach ($iterator as $item) {
+            if ($item->isDot()) {
+                continue;
+            }
+
+            $sourcePath = $item->getPathname();
+            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $item->getFilename();
+
+            if ($item->isDir()) {
+                self::copyDirectory($sourcePath, $targetPath);
+                continue;
+            }
+
+            if (!copy($sourcePath, $targetPath)) {
+                throw new Exception("Failed to copy asset: $sourcePath");
+            }
+        }
+    }
+
+    private static function removeDirectory(string $dir): void {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $path = $item->getPathname();
+            if ($item->isDir()) {
+                rmdir($path);
+            } else {
+                unlink($path);
+            }
+        }
+
+        rmdir($dir);
     }
 }

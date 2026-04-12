@@ -1,0 +1,27 @@
+{
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "name": "viewer-file.txt",
+    "slug": "viewer-file-txt",
+    "type": "file",
+    "kind": "text",
+    "path": "viewer-file.txt",
+    "size": 11,
+    "modifiedAt": "2026-04-11T16:50:20+00:00",
+    "visible": true,
+    "mimeType": "text/plain",
+    "hash": "8b4631863e641129aaabb2182593bde45ab020ea3e8a41b141778eba7a1cc5ce",
+    "updatedAt": "2026-04-11T16:50:21+00:00",
+    "id": "poff_69eb25804a2636e9",
+    "work": {
+        "type": "text",
+        "syntax": "text/plain",
+        "layout": {
+            "mode": "filesystem-file-layout",
+            "name": "filesystem-file-layout",
+            "engine": "lightncandy",
+            "section": "work"
+        }
+    },
+    "title": "Viewer File",
+    "description": "File layout from filesystem"
+}

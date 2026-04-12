@@ -1,0 +1,30 @@
+{
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "folderName": "upload-target",
+    "slug": "upload-target",
+    "title": "upload-target",
+    "description": "",
+    "type": "folder",
+    "id": "poff_cc494084fb17febb",
+    "tree": [
+        {
+            "name": "slides.pdf",
+            "slug": "slides-pdf",
+            "type": "file",
+            "path": "slides.pdf",
+            "modifiedAt": "2026-04-11T16:50:20+00:00",
+            "visible": true
+        }
+    ],
+    "treeHash": "53c61242162af7bca92c5849e16828967e9ce8d56af1a9b60049b27b2f25c4ce",
+    "updatedAt": "2026-04-11T16:50:22+00:00",
+    "work": {
+        "type": "folder",
+        "layout": {
+            "mode": "default-layout",
+            "name": "default-layout",
+            "engine": "lightncandy",
+            "section": "works"
+        }
+    }
+}

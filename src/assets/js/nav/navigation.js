@@ -1,3 +1,4 @@
+import { getSelectionFromPath, inferFilePath } from '../core/selection.js';
 import { extractNavHtml } from '../core/utils.js';
 
 export function initNavigation({
@@ -11,10 +12,6 @@ export function initNavigation({
     let activeLink = null;
     let ignoreNextHashSync = false;
     const initialQueryPath = new URLSearchParams(window.location.search).get('path') || '';
-
-    function inferFilePath(path = '') {
-        return /\.[^\\/]+$/.test(path);
-    }
 
     function parseCmsLinkValue(value = '') {
         const trimmed = (value || '').trim();
@@ -82,10 +79,10 @@ export function initNavigation({
         if (!anchor) {
             return null;
         }
-        const currentContextPath = readHashPath() || initialQueryPath || '';
-        const currentFolderPath = inferFilePath(currentContextPath)
-            ? currentContextPath.split('/').slice(0, -1).join('/')
-            : currentContextPath;
+        const currentSelection = getSelectionFromPath(readHashPath() || initialQueryPath || '');
+        const currentFolderPath = currentSelection.previewIsFile
+            ? currentSelection.previewPath.split('/').slice(0, -1).join('/')
+            : currentSelection.previewPath;
         const candidates = [
             anchor.getAttribute('data-page-link'),
             anchor.getAttribute('data-work-url'),
@@ -236,22 +233,30 @@ export function initNavigation({
     }
 
     function navigateToPath(path = '', options = {}) {
+        const selection = getSelectionFromPath(path);
+        navigateToSelection(selection, options);
+    }
+
+    function navigateToSelection(selectionInput, options = {}) {
+        const selection = selectionInput && typeof selectionInput === 'object' && Object.prototype.hasOwnProperty.call(selectionInput, 'path')
+            ? selectionInput
+            : getSelectionFromPath(selectionInput || '');
         const {
-            isFile = inferFilePath(path),
             updateHash = true,
             forceRefresh = false,
         } = options;
-        const relPath = path || '';
-        const folderPath = isFile ? relPath.split('/').slice(0, -1).join('/') : relPath;
+        const previewPath = selection.previewPath || '';
+        const previewIsFile = !!selection.previewIsFile;
+        const folderPath = previewIsFile ? previewPath.split('/').slice(0, -1).join('/') : previewPath;
 
         if (iframeLoading) {
             iframeLoading.style.display = 'block';
         }
         if (contentFrame) {
-            contentFrame.src = buildViewerUrl(relPath, isFile, forceRefresh);
+            contentFrame.src = buildViewerUrl(previewPath, previewIsFile, forceRefresh);
         }
         if (updateHash) {
-            writeHashPath(relPath);
+            writeHashPath(selection.path || '');
         }
         if (navList) {
             if (sidebarLoading) {
@@ -259,13 +264,13 @@ export function initNavigation({
             }
             loadNav(folderPath)
                 .then(() => {
-                    syncSidebarSelection(relPath, isFile);
+                    syncSidebarSelection(previewPath, previewIsFile);
                     if (sidebarLoading) {
                         sidebarLoading.style.display = 'none';
                     }
                 })
                 .catch(() => {
-                    syncSidebarSelection(relPath, isFile);
+                    syncSidebarSelection(previewPath, previewIsFile);
                     if (sidebarLoading) {
                         sidebarLoading.style.display = 'none';
                     }
@@ -364,8 +369,8 @@ export function initNavigation({
     }
 
     function loadCurrentFolderInIframe() {
-        const path = currentPathForIframe ?? initialQueryPath;
-        navigateToPath(path, { isFile: inferFilePath(path), updateHash: false });
+        const selection = getSelectionFromPath(currentPathForIframe ?? initialQueryPath ?? '');
+        navigateToSelection(selection, { updateHash: false });
         if (renderFolderMeta) {
             renderFolderMeta();
         }
@@ -375,16 +380,13 @@ export function initNavigation({
         const { forceRefresh = false } = options;
         const hashPath = readHashPath();
         if (hashPath || window.location.hash) {
-            navigateToPath(hashPath, {
-                isFile: inferFilePath(hashPath),
+            navigateToSelection(getSelectionFromPath(hashPath), {
                 updateHash: false,
                 forceRefresh,
             });
             return;
         }
-        const path = currentPathForIframe ?? initialQueryPath;
-        navigateToPath(path, {
-            isFile: inferFilePath(path),
+        navigateToSelection(getSelectionFromPath(currentPathForIframe ?? initialQueryPath ?? ''), {
             updateHash: false,
             forceRefresh,
         });

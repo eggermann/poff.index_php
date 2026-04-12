@@ -199,6 +199,14 @@ PHP;
     // Copy the built index.php to all directories
     FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
 
+    // Mirror shared default layout assets into the generated site root
+    $defaultLayoutSource = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.default';
+    $defaultLayoutTarget = $outputDir . '.default';
+    if (is_dir($defaultLayoutSource)) {
+        FileCopier::mirrorDirectory($defaultLayoutSource, $defaultLayoutTarget);
+        echo "Copied default layout assets to: $defaultLayoutTarget\n";
+    }
+
     // Trigger SSH upload using SSHUploader
     require_once __DIR__ . '/SSHUploader.php';
     //--> SSHUploader::upload();

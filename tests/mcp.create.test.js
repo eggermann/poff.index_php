@@ -146,13 +146,13 @@ function runPhpJson(scriptName) {
     proc.stderr.on('data', (d) => (stderr += d.toString()));
     proc.on('exit', (code) => {
       if (code !== 0) {
-        reject(new Error('php helper failed: ' + code + ' ' + stderr));
+        reject(new Error(`php helper failed: ${code} ${stderr}`));
         return;
       }
       try {
         resolve(JSON.parse(stdout));
       } catch (err) {
-        reject(new Error('invalid json from ' + scriptName + ': ' + stdout));
+        reject(new Error(`invalid json from ${scriptName}: ${stdout}`));
       }
     });
   });
@@ -434,6 +434,44 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });
 
+  test('can persist edits back into the inherited original filesystem layout source', async () => {
+    const originalTarget = path.relative(ROOT, path.join(POFF_DIR, '.default', '.layout'));
+    await runLayoutFilesystem('persist-original', originalTarget, '', {
+      template: '<div class="default-fs-layout default-fs-layout--edited"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.defaultBaseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>',
+      css: '.default-fs-layout--edited{color:#ff5f5f;}',
+      js: 'window.__editedDefaultFsLayout = true;',
+    });
+
+    expect(fs.readFileSync(path.join(POFF_DIR, '.default', '.layout', 'template.hbs'), 'utf8')).toContain('default-fs-layout--edited');
+    expect(fs.readFileSync(path.join(POFF_DIR, '.default', '.layout', 'style.css'), 'utf8')).toContain('#ff5f5f');
+    expect(fs.readFileSync(path.join(POFF_DIR, '.default', '.layout', 'script.js'), 'utf8')).toContain('__editedDefaultFsLayout');
+
+    const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(ensured.work.layout.directory).toBe('tests/poff-tests/.default/.layout');
+    expect(ensured.work.layout.template).toContain('default-fs-layout--edited');
+    expect(ensured.work.layout.css).toContain('#ff5f5f');
+    expect(ensured.work.layout.js).toContain('__editedDefaultFsLayout');
+  });
+
+  test('resolves virtual .layout targets separately from real file and folder targets', async () => {
+    const folderTarget = JSON.parse(await runLayoutFilesystem('resolve-target', POFF_DIR, 'inherits-default/.layout'));
+    expect(folderTarget).toMatchObject({
+      type: 'layout',
+      subjectType: 'folder',
+      subjectRelativePath: 'inherits-default',
+      virtualPath: 'inherits-default/.layout',
+    });
+
+    const fileTarget = JSON.parse(await runLayoutFilesystem('resolve-target', POFF_DIR, 'viewer-file.txt/.layout'));
+    expect(fileTarget).toMatchObject({
+      type: 'layout',
+      subjectType: 'file',
+      subjectRelativePath: 'viewer-file.txt',
+      virtualPath: 'viewer-file.txt/.layout',
+      file: 'viewer-file.txt',
+    });
+  });
+
   test('keeps the inherited wrapper when a local wrapped partial override exists', async () => {
     const payload = {
       name: 'default-layout',
@@ -453,7 +491,7 @@ describe('Worktype HBS renderer', () => {
     expect(ensured.work.layout.sectionTemplate).toContain('local-works');
 
     const rendered = await runViewer('inherits-section-default');
-    expect(rendered).toContain('<div class="default-fs-layout">');
+    expect(rendered).toContain('class="default-fs-layout');
     expect(rendered).toContain('<div class="local-works">');
     expect(rendered).toContain('<span class="local-item">hero.txt</span>');
     expect(rendered).toContain('.default/.layout/eggman_profile-image.jpg');

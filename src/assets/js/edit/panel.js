@@ -2,6 +2,353 @@ import { escapeHtml, getLayoutState } from '../core/utils.js';
 import { loadPromptSettings } from './prompt/storage.js';
 import { renderPromptWindow } from './prompt-window.js';
 
+function layoutOverlayState(config, status) {
+    const layoutState = getLayoutState(config);
+    const isFile = status?.target === 'file';
+    const sectionName = layoutState.section || (isFile ? 'work' : 'works');
+    const localLayoutDirectory = isFile
+        ? `.works/${config.name || config.path || 'item'}.layout`
+        : '.layout';
+    const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
+    const sectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
+    const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
+    const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
+    const hasFilesystemDefault = !!layoutState.defaultDirectory;
+    const originalTarget = layoutState.storage === 'filesystem'
+        ? (layoutState.directory || localLayoutDirectory)
+        : (layoutState.defaultDirectory || '');
+    const originalEditable = originalTarget !== '';
+    const originalUsesLocal = originalTarget === localLayoutDirectory;
+
+    const localWrapperTemplate = wrapperWasLocal
+        ? (layoutState.template || '')
+        : '';
+    const localWrapperCss = wrapperWasLocal
+        ? (layoutState.css || '')
+        : '';
+    const localWrapperJs = wrapperWasLocal
+        ? (layoutState.js || '')
+        : '';
+
+    let originalTemplate = '';
+    let originalCss = '';
+    let originalJs = '';
+    if (originalEditable && layoutState.storage === 'filesystem') {
+        originalTemplate = layoutState.template || '';
+        originalCss = layoutState.css || '';
+        originalJs = layoutState.js || '';
+    } else if (!originalEditable) {
+        originalTemplate = layoutState.phpTemplate || '';
+    }
+
+    const wrapperSourceLabel = layoutState.storage === 'filesystem'
+        ? `Filesystem: ${layoutState.directory || localLayoutDirectory}`
+        : 'PHP built-in default-layout';
+    const filesystemDefaultLabel = hasFilesystemDefault
+        ? layoutState.defaultDirectory
+        : 'No filesystem default yet';
+    const originalLabel = originalEditable
+        ? `Editable source: ${originalTarget}`
+        : 'PHP built-in original is read-only until a filesystem default exists';
+
+    return {
+        layoutState,
+        sectionName,
+        localLayoutDirectory,
+        wrapperTarget,
+        sectionTarget,
+        wrapperWasLocal,
+        sectionWasLocal,
+        hasFilesystemDefault,
+        originalTarget,
+        originalEditable,
+        originalUsesLocal,
+        localWrapperTemplate,
+        localWrapperCss,
+        localWrapperJs,
+        originalTemplate,
+        originalCss,
+        originalJs,
+        wrapperSourceLabel,
+        filesystemDefaultLabel,
+        originalLabel,
+    };
+}
+
+function renderEditLayoutPanel({
+    editPanel,
+    config,
+    status,
+    onSubmitLayout,
+    onReturnToWork,
+}) {
+    const settings = loadPromptSettings();
+    const subjectStatus = {
+        ...status,
+        target: status?.subjectTarget || status?.target,
+    };
+    const overlayState = layoutOverlayState(config, subjectStatus);
+    const {
+        layoutState,
+        sectionName,
+        wrapperTarget,
+        sectionTarget,
+        sectionWasLocal,
+        originalTarget,
+        originalEditable,
+        originalUsesLocal,
+        localWrapperTemplate,
+        localWrapperCss,
+        localWrapperJs,
+        originalTemplate,
+        originalCss,
+        originalJs,
+        wrapperSourceLabel,
+        filesystemDefaultLabel,
+        originalLabel,
+    } = overlayState;
+    const subjectLabel = subjectStatus.target === 'file' ? 'file' : 'folder';
+    const layoutPresetOptions = [
+        { value: 'actual', label: 'Actual' },
+        { value: 'none', label: 'None' },
+        { value: 'custom', label: 'Custom' },
+    ];
+    const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
+
+    editPanel.innerHTML = `
+        <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
+        <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
+        <div class="edit-status" id="editLayoutStatus"></div>
+        <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
+            <div class="edit-layout-launch edit-layout-summary">
+                <div class="edit-layout-copy">
+                    <div class="edit-layout-title">Layout</div>
+                    <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
+                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
+                    <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
+                </div>
+                <div class="edit-inline-actions edit-layout-header-actions">
+                    <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
+                    <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
+                    <button class="btn" type="submit">Save layout</button>
+                </div>
+            </div>
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-layout-preset">Layout select</label>
+                    <select class="form-select" id="edit-layout-preset" name="layout_preset">
+                        ${layoutPresetOptions.map((option) => `
+                            <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="edit-layout-copy edit-layout-section-note">
+                    <div class="edit-layout-title" id="edit-layout-primary-title"></div>
+                    <div class="small-note" id="edit-layout-primary-hint"></div>
+                </div>
+            </div>
+        </form>
+        ${renderPromptWindow(settings, {
+            mode: 'layout',
+            subjectType: subjectLabel,
+            templateTarget: wrapperTarget,
+            sectionTarget,
+        })}
+        <details class="edit-layout-advanced edit-layout-manual" id="editLayoutManual" ${sectionWasLocal ? 'open' : ''}>
+            <summary class="edit-layout-advanced-summary">More layout files</summary>
+            <div class="edit-layout-overlay-grid">
+                <div class="edit-layout-meta-card">
+                    <div class="edit-layout-meta-title">Sources</div>
+                    <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
+                    <div class="small-note">PHP default: <code>default-layout.hbs</code> from the bundled templates</div>
+                    <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
+                    <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
+                    <div class="small-note">Inner section target: <code>${escapeHtml(sectionTarget)}</code></div>
+                </div>
+            </div>
+            <div class="edit-layout-editor">
+                <div class="edit-layout-editor-head">
+                    <div>
+                        <div class="edit-layout-meta-title">Layout template</div>
+                        <div class="small-note">Manual editor for the outer wrapper template used by this virtual <code>.layout</code> page.</div>
+                    </div>
+                </div>
+                <textarea class="form-textarea" id="edit-layout-primary-template" name="layout_primary_template"></textarea>
+                <div class="edit-layout-overlay-grid">
+                    <div>
+                        <label class="edit-label" for="edit-layout-primary-css">Layout CSS</label>
+                        <textarea class="form-textarea" id="edit-layout-primary-css" name="layout_primary_css"></textarea>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-layout-primary-js">Layout JS</label>
+                        <textarea class="form-textarea" id="edit-layout-primary-js" name="layout_primary_js"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <details class="edit-layout-advanced" ${sectionWasLocal ? 'open' : ''}>
+                <summary class="edit-layout-advanced-summary">Inner work section (advanced)</summary>
+                <div class="edit-layout-editor">
+                    <div class="edit-layout-editor-head">
+                        <div>
+                            <div class="edit-layout-meta-title">Inner section partial</div>
+                            <div class="small-note">Edit the wrapped <code>{{> ${escapeHtml(sectionName)}}</code> partial only when you need item-specific content inside the current layout.</div>
+                        </div>
+                    </div>
+                    <textarea class="form-textarea" id="edit-content-template" name="content_template">${escapeHtml(layoutState.sectionTemplate || '')}</textarea>
+                </div>
+            </details>
+        </details>
+    `;
+
+    const form = editPanel.querySelector('#editLayoutPanelForm');
+    const statusEl = editPanel.querySelector('#editLayoutStatus');
+    const backButton = editPanel.querySelector('#editLayoutBack');
+    const moreButton = editPanel.querySelector('#editLayoutMore');
+    const manualDetailsEl = editPanel.querySelector('#editLayoutManual');
+    const presetEl = editPanel.querySelector('#edit-layout-preset');
+    const modePreviewEl = editPanel.querySelector('#edit-layout-mode-preview');
+    const sourcePreviewEl = editPanel.querySelector('#edit-layout-source-preview');
+    const primaryTitleEl = editPanel.querySelector('#edit-layout-primary-title');
+    const primaryHintEl = editPanel.querySelector('#edit-layout-primary-hint');
+    const primaryTemplateEl = editPanel.querySelector('#edit-layout-primary-template');
+    const primaryCssEl = editPanel.querySelector('#edit-layout-primary-css');
+    const primaryJsEl = editPanel.querySelector('#edit-layout-primary-js');
+    const contentTemplateEl = editPanel.querySelector('#edit-content-template');
+    const promptRoot = editPanel.querySelector('#promptWindow');
+
+    const currentSectionTemplate = layoutState.sectionTemplate || '';
+    const drafts = {
+        virtualTemplate: originalTemplate || '',
+        virtualCss: originalCss || '',
+        virtualJs: originalJs || '',
+        localTemplate: localWrapperTemplate || '',
+        localCss: localWrapperCss || '',
+        localJs: localWrapperJs || '',
+    };
+
+    const currentPrimaryMode = () => {
+        const preset = (presetEl?.value || 'actual').trim();
+        if (preset === 'custom') {
+            return 'local';
+        }
+        return hasVirtualSource ? 'virtual' : 'local';
+    };
+
+    const syncLayoutMode = () => {
+        const preset = (presetEl?.value || 'actual').trim();
+        const nextMode = preset === 'none'
+            ? 'none'
+            : preset === 'custom'
+                ? 'custom-layout'
+                : 'default-layout';
+        const primaryMode = currentPrimaryMode();
+        const isVirtual = primaryMode === 'virtual';
+        const sourcePreview = isVirtual
+            ? (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in default-layout')
+            : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, '')}`;
+
+        if (modePreviewEl) {
+            modePreviewEl.textContent = nextMode;
+        }
+        if (sourcePreviewEl) {
+            sourcePreviewEl.textContent = sourcePreview;
+        }
+        if (primaryTitleEl) {
+            primaryTitleEl.textContent = isVirtual ? 'Virtual layout' : 'Custom layout';
+        }
+        if (primaryHintEl) {
+            if (isVirtual) {
+                primaryHintEl.innerHTML = originalEditable
+                    ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    : 'Showing the bundled PHP default. It stays read-only until a filesystem default layout exists.';
+            } else {
+                primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
+            }
+        }
+        if (primaryTemplateEl) {
+            primaryTemplateEl.value = isVirtual ? drafts.virtualTemplate : drafts.localTemplate;
+            primaryTemplateEl.disabled = isVirtual && !originalEditable;
+        }
+        if (primaryCssEl) {
+            primaryCssEl.value = isVirtual ? drafts.virtualCss : drafts.localCss;
+            primaryCssEl.disabled = isVirtual && !originalEditable;
+        }
+        if (primaryJsEl) {
+            primaryJsEl.value = isVirtual ? drafts.virtualJs : drafts.localJs;
+            primaryJsEl.disabled = isVirtual && !originalEditable;
+        }
+    };
+
+    const storePrimaryDraft = () => {
+        const primaryMode = currentPrimaryMode();
+        if (primaryMode === 'virtual') {
+            drafts.virtualTemplate = primaryTemplateEl?.value ?? '';
+            drafts.virtualCss = primaryCssEl?.value ?? '';
+            drafts.virtualJs = primaryJsEl?.value ?? '';
+            return;
+        }
+        drafts.localTemplate = primaryTemplateEl?.value ?? '';
+        drafts.localCss = primaryCssEl?.value ?? '';
+        drafts.localJs = primaryJsEl?.value ?? '';
+    };
+
+    if (presetEl) {
+        presetEl.addEventListener('change', () => {
+            storePrimaryDraft();
+            syncLayoutMode();
+        });
+    }
+    [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
+        if (field) {
+            field.addEventListener('input', storePrimaryDraft);
+        }
+    });
+    if (backButton && typeof onReturnToWork === 'function') {
+        backButton.addEventListener('click', () => onReturnToWork());
+    }
+    if (moreButton && manualDetailsEl) {
+        moreButton.addEventListener('click', () => {
+            manualDetailsEl.open = true;
+            manualDetailsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+    syncLayoutMode();
+
+    if (form && typeof onSubmitLayout === 'function') {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            storePrimaryDraft();
+            const payload = {
+                layoutPreset: (presetEl?.value || 'actual').trim(),
+            };
+            const contentTemplateValue = contentTemplateEl?.value ?? '';
+            if (sectionWasLocal || contentTemplateValue !== currentSectionTemplate) {
+                payload.contentTemplate = contentTemplateValue;
+            }
+            if (currentPrimaryMode() === 'virtual') {
+                if (originalEditable) {
+                    payload.originalLayoutTarget = originalTarget;
+                    payload.originalLayoutTemplate = drafts.virtualTemplate;
+                    payload.originalLayoutCss = drafts.virtualCss;
+                    payload.originalLayoutJs = drafts.virtualJs;
+                }
+            } else {
+                payload.layoutTemplate = drafts.localTemplate;
+                payload.layoutCss = drafts.localCss;
+                payload.layoutJs = drafts.localJs;
+            }
+
+            await onSubmitLayout({
+                payload,
+                statusEl,
+            });
+        });
+    }
+
+    return { statusEl, promptRoot };
+}
+
 export function renderEditPanel({
     editPanel,
     editRequested,
@@ -11,6 +358,9 @@ export function renderEditPanel({
     onDescriptionInput,
     onSubmit,
     onToggleDrawer,
+    onOpenLayoutPage,
+    onReturnToWork,
+    onSubmitLayout,
     onUploadFiles,
 }) {
     if (!editPanel) {
@@ -37,11 +387,22 @@ export function renderEditPanel({
         return { statusEl: null, promptRoot: null };
     }
 
+    if (status?.target === 'layout') {
+        return renderEditLayoutPanel({
+            editPanel,
+            config,
+            status,
+            onSubmitLayout,
+            onReturnToWork,
+        });
+    }
+
     const label = status?.target === 'file' ? 'Edit mode (file)' : 'Edit mode (folder)';
     const settings = loadPromptSettings();
-    const layoutState = getLayoutState(config);
+    const overlayState = layoutOverlayState(config, status);
     const treeItems = Array.isArray(config.tree) ? config.tree : [];
     const isEmptyFolder = status?.target !== 'file' && treeItems.length === 0;
+
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
         <div class="edit-status" id="editInlineStatus"></div>
@@ -62,8 +423,9 @@ export function renderEditPanel({
         <div class="edit-layout-launch">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
-                <div class="small-note">${escapeHtml(layoutState.sourceLabel)}</div>
-                <div class="small-note">Current mode: <code>${escapeHtml(layoutState.mode)}</code></div>
+                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
+                <div class="small-note">Filesystem default: <code>${escapeHtml(overlayState.filesystemDefaultLabel)}</code></div>
+                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
             </div>
             <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
         </div>
@@ -143,9 +505,10 @@ export function renderEditPanel({
     if (moreToggle && typeof onToggleDrawer === 'function') {
         moreToggle.addEventListener('click', () => onToggleDrawer());
     }
-    if (changeLayoutButton && typeof onToggleDrawer === 'function') {
-        changeLayoutButton.addEventListener('click', () => onToggleDrawer());
+    if (changeLayoutButton && typeof onOpenLayoutPage === 'function') {
+        changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
     }
+
     if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
@@ -213,4 +576,279 @@ export function renderEditPanel({
     }
 
     return { statusEl, promptRoot };
+}
+
+export function renderEditLayoutOverlay({
+    editLayoutOverlay,
+    editRequested,
+    open,
+    config,
+    status,
+    onClose,
+    onSubmit,
+}) {
+    if (!editLayoutOverlay) {
+        return { overlayStatus: null };
+    }
+    if (!editRequested || !open) {
+        editLayoutOverlay.hidden = true;
+        editLayoutOverlay.innerHTML = '';
+        return { overlayStatus: null };
+    }
+    if (!config || status?.error || !status?.allowed) {
+        editLayoutOverlay.hidden = true;
+        editLayoutOverlay.innerHTML = '';
+        return { overlayStatus: null };
+    }
+
+    const overlayState = layoutOverlayState(config, status);
+    const {
+        layoutState,
+        sectionName,
+        localLayoutDirectory,
+        wrapperTarget,
+        sectionTarget,
+        wrapperWasLocal,
+        sectionWasLocal,
+        originalTarget,
+        originalEditable,
+        originalUsesLocal,
+        localWrapperTemplate,
+        localWrapperCss,
+        localWrapperJs,
+        originalTemplate,
+        originalCss,
+        originalJs,
+        wrapperSourceLabel,
+        filesystemDefaultLabel,
+        originalLabel,
+    } = overlayState;
+
+    const layoutPresetOptions = [
+        { value: 'actual', label: 'Actual' },
+        { value: 'none', label: 'None' },
+        { value: 'custom', label: 'Custom' },
+    ];
+    const hasVirtualSource = !wrapperWasLocal && !originalUsesLocal;
+
+    editLayoutOverlay.hidden = false;
+    editLayoutOverlay.innerHTML = `
+        <div class="edit-layout-overlay-shell">
+            <div class="drawer-header">
+                <div>
+                    <h4 class="drawer-title">Layout overlay</h4>
+                    <div class="small-note">Inherited layouts open as one virtual layout target until a real local <code>.layout</code> exists.</div>
+                </div>
+                <button type="button" class="drawer-close" id="editLayoutOverlayClose">&times;</button>
+            </div>
+            <div class="edit-status" id="editLayoutOverlayStatus"></div>
+            <form id="editLayoutOverlayForm" class="edit-layout-overlay-form">
+                <div class="edit-layout-overlay-grid">
+                    <div class="edit-layout-meta-card">
+                        <div class="edit-layout-meta-title">Mode</div>
+                        <label class="edit-label" for="edit-layout-preset">Layout select</label>
+                        <select class="form-select" id="edit-layout-preset" name="layout_preset">
+                            ${layoutPresetOptions.map((option) => `
+                                <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
+                            `).join('')}
+                        </select>
+                        <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
+                        <div class="small-note">Resolved wrapper: <code>${escapeHtml(wrapperSourceLabel)}</code></div>
+                    </div>
+                    <div class="edit-layout-meta-card">
+                        <div class="edit-layout-meta-title">Inheritance</div>
+                        <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
+                        <div class="small-note">PHP default: <code>default-layout.hbs</code> from the bundled templates</div>
+                        <div class="small-note">Wrapped inner partial: <code>${escapeHtml(layoutState.sectionDirectory ? `${layoutState.sectionDirectory}/${sectionName}.hbs` : `built-in ${sectionName}.hbs`)}</code></div>
+                    </div>
+                    <div class="edit-layout-meta-card">
+                        <div class="edit-layout-meta-title">Targets</div>
+                        <div class="small-note">Virtual/original target: <code>${escapeHtml(originalLabel)}</code></div>
+                        <div class="small-note">Custom layout target: <code>${escapeHtml(wrapperTarget)}</code></div>
+                        <div class="small-note">Advanced inner partial target: <code>${escapeHtml(sectionTarget)}</code></div>
+                    </div>
+                </div>
+
+                <div class="edit-layout-editor">
+                    <div class="edit-layout-editor-head">
+                        <div>
+                            <div class="edit-layout-meta-title" id="edit-layout-primary-title"></div>
+                            <div class="small-note" id="edit-layout-primary-hint"></div>
+                        </div>
+                    </div>
+                    <textarea class="form-textarea" id="edit-layout-primary-template" name="layout_primary_template"></textarea>
+                    <div class="edit-layout-overlay-grid">
+                        <div>
+                            <label class="edit-label" for="edit-layout-primary-css">Layout CSS</label>
+                            <textarea class="form-textarea" id="edit-layout-primary-css" name="layout_primary_css"></textarea>
+                        </div>
+                        <div>
+                            <label class="edit-label" for="edit-layout-primary-js">Layout JS</label>
+                            <textarea class="form-textarea" id="edit-layout-primary-js" name="layout_primary_js"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="edit-layout-advanced" ${sectionWasLocal ? 'open' : ''}>
+                    <summary class="edit-layout-advanced-summary">Inner work section (advanced)</summary>
+                    <div class="edit-layout-editor">
+                        <div class="edit-layout-editor-head">
+                            <div>
+                                <div class="edit-layout-meta-title">Inner section partial</div>
+                                <div class="small-note">Edit the wrapped <code>{{> ${escapeHtml(sectionName)}}</code> partial only when you need item-specific content inside the current layout.</div>
+                            </div>
+                        </div>
+                        <textarea class="form-textarea" id="edit-content-template" name="content_template">${escapeHtml(layoutState.sectionTemplate || '')}</textarea>
+                    </div>
+                </details>
+
+                <div class="edit-inline-actions">
+                    <button class="btn" type="submit">Save layout</button>
+                    <button class="btn btn-secondary" type="button" id="editLayoutOverlayCancel">Close</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    const form = editLayoutOverlay.querySelector('#editLayoutOverlayForm');
+    const statusEl = editLayoutOverlay.querySelector('#editLayoutOverlayStatus');
+    const closeButton = editLayoutOverlay.querySelector('#editLayoutOverlayClose');
+    const cancelButton = editLayoutOverlay.querySelector('#editLayoutOverlayCancel');
+    const presetEl = editLayoutOverlay.querySelector('#edit-layout-preset');
+    const modePreviewEl = editLayoutOverlay.querySelector('#edit-layout-mode-preview');
+    const primaryTitleEl = editLayoutOverlay.querySelector('#edit-layout-primary-title');
+    const primaryHintEl = editLayoutOverlay.querySelector('#edit-layout-primary-hint');
+    const primaryTemplateEl = editLayoutOverlay.querySelector('#edit-layout-primary-template');
+    const primaryCssEl = editLayoutOverlay.querySelector('#edit-layout-primary-css');
+    const primaryJsEl = editLayoutOverlay.querySelector('#edit-layout-primary-js');
+    const contentTemplateEl = editLayoutOverlay.querySelector('#edit-content-template');
+
+    const currentSectionTemplate = layoutState.sectionTemplate || '';
+    const drafts = {
+        virtualTemplate: originalTemplate || '',
+        virtualCss: originalCss || '',
+        virtualJs: originalJs || '',
+        localTemplate: localWrapperTemplate || '',
+        localCss: localWrapperCss || '',
+        localJs: localWrapperJs || '',
+    };
+
+    const currentPrimaryMode = () => {
+        const preset = (presetEl?.value || 'actual').trim();
+        if (preset === 'custom') {
+            return 'local';
+        }
+        return hasVirtualSource ? 'virtual' : 'local';
+    };
+
+    const syncLayoutMode = () => {
+        const preset = (presetEl?.value || 'actual').trim();
+        const nextMode = preset === 'none'
+            ? 'none'
+            : preset === 'custom'
+                ? 'custom-layout'
+                : 'default-layout';
+        const primaryMode = currentPrimaryMode();
+        const isVirtual = primaryMode === 'virtual';
+
+        if (modePreviewEl) {
+            modePreviewEl.textContent = nextMode;
+        }
+        if (primaryTitleEl) {
+            primaryTitleEl.textContent = isVirtual ? 'Virtual layout' : 'Custom layout';
+        }
+        if (primaryHintEl) {
+            if (isVirtual) {
+                primaryHintEl.innerHTML = originalEditable
+                    ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    : 'Showing the bundled PHP default. It stays read-only until a filesystem default layout exists.';
+            } else {
+                primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
+            }
+        }
+        if (primaryTemplateEl) {
+            primaryTemplateEl.value = isVirtual ? drafts.virtualTemplate : drafts.localTemplate;
+            primaryTemplateEl.disabled = isVirtual && !originalEditable;
+        }
+        if (primaryCssEl) {
+            primaryCssEl.value = isVirtual ? drafts.virtualCss : drafts.localCss;
+            primaryCssEl.disabled = isVirtual && !originalEditable;
+        }
+        if (primaryJsEl) {
+            primaryJsEl.value = isVirtual ? drafts.virtualJs : drafts.localJs;
+            primaryJsEl.disabled = isVirtual && !originalEditable;
+        }
+    };
+
+    const storePrimaryDraft = () => {
+        const primaryMode = currentPrimaryMode();
+        if (primaryMode === 'virtual') {
+            drafts.virtualTemplate = primaryTemplateEl?.value ?? '';
+            drafts.virtualCss = primaryCssEl?.value ?? '';
+            drafts.virtualJs = primaryJsEl?.value ?? '';
+            return;
+        }
+        drafts.localTemplate = primaryTemplateEl?.value ?? '';
+        drafts.localCss = primaryCssEl?.value ?? '';
+        drafts.localJs = primaryJsEl?.value ?? '';
+    };
+
+    if (presetEl) {
+        presetEl.addEventListener('change', () => {
+            storePrimaryDraft();
+            syncLayoutMode();
+        });
+    }
+    [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
+        if (field) {
+            field.addEventListener('input', storePrimaryDraft);
+        }
+    });
+    syncLayoutMode();
+
+    if (closeButton && typeof onClose === 'function') {
+        closeButton.addEventListener('click', () => onClose());
+    }
+    if (cancelButton && typeof onClose === 'function') {
+        cancelButton.addEventListener('click', () => onClose());
+    }
+
+    if (form && typeof onSubmit === 'function') {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            storePrimaryDraft();
+            const preset = (presetEl?.value || 'actual').trim();
+            const payload = {
+                layoutPreset: preset,
+            };
+
+            const contentTemplateValue = contentTemplateEl?.value ?? '';
+            if (sectionWasLocal || contentTemplateValue !== currentSectionTemplate) {
+                payload.contentTemplate = contentTemplateValue;
+            }
+
+            if (currentPrimaryMode() === 'virtual') {
+                if (originalEditable) {
+                    payload.originalLayoutTarget = originalTarget;
+                    payload.originalLayoutTemplate = drafts.virtualTemplate;
+                    payload.originalLayoutCss = drafts.virtualCss;
+                    payload.originalLayoutJs = drafts.virtualJs;
+                }
+            } else {
+                payload.layoutTemplate = drafts.localTemplate;
+                payload.layoutCss = drafts.localCss;
+                payload.layoutJs = drafts.localJs;
+            }
+
+            await onSubmit({
+                payload,
+                statusEl,
+            });
+            if (typeof onClose === 'function') {
+                onClose();
+            }
+        });
+    }
+
+    return { overlayStatus: statusEl };
 }

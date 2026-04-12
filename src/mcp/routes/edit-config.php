@@ -89,6 +89,13 @@ function handleEditConfig(array $opts): array
         $layoutCss = null;
         $layoutJsProvided = false;
         $layoutJs = null;
+        $originalLayoutTarget = '';
+        $originalLayoutTemplateProvided = false;
+        $originalLayoutTemplate = null;
+        $originalLayoutCssProvided = false;
+        $originalLayoutCss = null;
+        $originalLayoutJsProvided = false;
+        $originalLayoutJs = null;
         if ($layoutModel === null && array_key_exists('layout_model', $data)) {
             $layoutModel = $data['layout_model'];
         }
@@ -109,6 +116,21 @@ function handleEditConfig(array $opts): array
         if (is_array($layoutPayload) && (array_key_exists('js', $layoutPayload) || array_key_exists('script', $layoutPayload))) {
             $layoutJsProvided = true;
             $layoutJs = (string) ($layoutPayload['js'] ?? $layoutPayload['script'] ?? '');
+        }
+        if (is_array($layoutPayload) && array_key_exists('originalTarget', $layoutPayload)) {
+            $originalLayoutTarget = trim((string) $layoutPayload['originalTarget']);
+        }
+        if (is_array($layoutPayload) && array_key_exists('originalTemplate', $layoutPayload)) {
+            $originalLayoutTemplateProvided = true;
+            $originalLayoutTemplate = (string) $layoutPayload['originalTemplate'];
+        }
+        if (is_array($layoutPayload) && (array_key_exists('originalCss', $layoutPayload) || array_key_exists('originalStyle', $layoutPayload))) {
+            $originalLayoutCssProvided = true;
+            $originalLayoutCss = (string) ($layoutPayload['originalCss'] ?? $layoutPayload['originalStyle'] ?? '');
+        }
+        if (is_array($layoutPayload) && (array_key_exists('originalJs', $layoutPayload) || array_key_exists('originalScript', $layoutPayload))) {
+            $originalLayoutJsProvided = true;
+            $originalLayoutJs = (string) ($layoutPayload['originalJs'] ?? $layoutPayload['originalScript'] ?? '');
         }
         if (array_key_exists('layout_template', $data)) {
             $layoutTemplateProvided = true;
@@ -133,6 +155,36 @@ function handleEditConfig(array $opts): array
         if (array_key_exists('layout_js', $data)) {
             $layoutJsProvided = true;
             $layoutJs = (string) $data['layout_js'];
+        }
+        if (array_key_exists('original_layout_target', $data)) {
+            $originalLayoutTarget = trim((string) $data['original_layout_target']);
+        }
+        if (array_key_exists('originalLayoutTarget', $data)) {
+            $originalLayoutTarget = trim((string) $data['originalLayoutTarget']);
+        }
+        if (array_key_exists('original_layout_template', $data)) {
+            $originalLayoutTemplateProvided = true;
+            $originalLayoutTemplate = (string) $data['original_layout_template'];
+        }
+        if (array_key_exists('originalLayoutTemplate', $data)) {
+            $originalLayoutTemplateProvided = true;
+            $originalLayoutTemplate = (string) $data['originalLayoutTemplate'];
+        }
+        if (array_key_exists('original_layout_css', $data)) {
+            $originalLayoutCssProvided = true;
+            $originalLayoutCss = (string) $data['original_layout_css'];
+        }
+        if (array_key_exists('originalLayoutCss', $data)) {
+            $originalLayoutCssProvided = true;
+            $originalLayoutCss = (string) $data['originalLayoutCss'];
+        }
+        if (array_key_exists('original_layout_js', $data)) {
+            $originalLayoutJsProvided = true;
+            $originalLayoutJs = (string) $data['original_layout_js'];
+        }
+        if (array_key_exists('originalLayoutJs', $data)) {
+            $originalLayoutJsProvided = true;
+            $originalLayoutJs = (string) $data['originalLayoutJs'];
         }
         $treeVisible = $data['treeVisible'] ?? $data['tree_visible'] ?? null;
         $visibleKeys = [];
@@ -207,6 +259,24 @@ function handleEditConfig(array $opts): array
             $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
         $work['layout'] = PoffConfig::persistLayoutFiles($targetDir, null, $work['layout'] ?? null, $layoutSection);
+        if (
+            $originalLayoutTarget !== ''
+            && ($originalLayoutTemplateProvided || $originalLayoutCssProvided || $originalLayoutJsProvided)
+        ) {
+            try {
+                PoffConfig::persistOriginalLayoutFiles($originalLayoutTarget, [
+                    'template' => $originalLayoutTemplateProvided ? $originalLayoutTemplate : null,
+                    'css' => $originalLayoutCssProvided ? $originalLayoutCss : null,
+                    'js' => $originalLayoutJsProvided ? $originalLayoutJs : null,
+                ]);
+            } catch (InvalidArgumentException $error) {
+                return [
+                    'route' => 'edit-config',
+                    'allowed' => true,
+                    'error' => $error->getMessage(),
+                ];
+            }
+        }
         $config['work'] = $work;
 
         if ($hasTreeUpdate && isset($config['tree']) && is_array($config['tree'])) {

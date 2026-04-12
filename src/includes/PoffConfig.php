@@ -410,39 +410,30 @@ class PoffConfig
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
-
-        $managedFiles = [
+        self::writeManagedLayoutFiles($layoutDir, [
             self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,
             self::LAYOUT_STYLE_FILE => array_key_exists('css', $normalized) ? (string) $normalized['css'] : null,
             self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $normalized) ? (string) $normalized['js'] : null,
             self::sectionTemplateFile($section) => array_key_exists('sectionTemplate', $normalized) ? (string) $normalized['sectionTemplate'] : null,
-        ];
-
-        foreach ($managedFiles as $name => $contents) {
-            if ($contents === null) {
-                continue;
-            }
-
-            $targetPath = $layoutDir . DIRECTORY_SEPARATOR . $name;
-            if (trim($contents) === '') {
-                if (is_file($targetPath)) {
-                    unlink($targetPath);
-                }
-                continue;
-            }
-
-            if (!is_dir($layoutDir)) {
-                mkdir($layoutDir, 0755, true);
-            }
-
-            file_put_contents($targetPath, $contents);
-        }
-
-        if (self::isDirectoryEmpty($layoutDir)) {
-            @rmdir($layoutDir);
-        }
+        ]);
 
         return self::serializeLayout($normalized, $section);
+    }
+
+    public static function persistOriginalLayoutFiles(string $relativeDir, array $payload): string
+    {
+        $layoutDir = self::resolveRelativeDirectory($relativeDir);
+        if ($layoutDir === null) {
+            throw new InvalidArgumentException('Invalid layout source path.');
+        }
+
+        self::writeManagedLayoutFiles($layoutDir, [
+            self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $payload) ? (string) $payload['template'] : null,
+            self::LAYOUT_STYLE_FILE => array_key_exists('css', $payload) ? (string) $payload['css'] : null,
+            self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $payload) ? (string) $payload['js'] : null,
+        ]);
+
+        return str_replace('\\', '/', trim($relativeDir, "/\\"));
     }
 
     public static function hydrateConfigLayout(array $config, string $dir, ?string $fileName = null): array
@@ -507,6 +498,7 @@ class PoffConfig
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
+        $resolved['phpTemplate'] = Worktype::template('default-layout') ?? '';
         $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
@@ -726,6 +718,55 @@ class PoffConfig
         return $section === 'works'
             ? self::WORKS_SECTION_TEMPLATE_FILE
             : self::WORK_SECTION_TEMPLATE_FILE;
+    }
+
+    private static function writeManagedLayoutFiles(string $layoutDir, array $managedFiles): void
+    {
+        foreach ($managedFiles as $name => $contents) {
+            if ($contents === null) {
+                continue;
+            }
+
+            $targetPath = $layoutDir . DIRECTORY_SEPARATOR . $name;
+            if (trim($contents) === '') {
+                if (is_file($targetPath)) {
+                    unlink($targetPath);
+                }
+                continue;
+            }
+
+            if (!is_dir($layoutDir)) {
+                mkdir($layoutDir, 0755, true);
+            }
+
+            file_put_contents($targetPath, $contents);
+        }
+
+        if (self::isDirectoryEmpty($layoutDir)) {
+            @rmdir($layoutDir);
+        }
+    }
+
+    private static function resolveRelativeDirectory(string $relativeDir): ?string
+    {
+        $base = realpath(getcwd() ?: '.');
+        if ($base === false) {
+            return null;
+        }
+
+        $normalized = str_replace('\\', '/', trim($relativeDir, "/\\"));
+        if ($normalized === '') {
+            return null;
+        }
+
+        $parts = array_filter(explode('/', $normalized), static fn(string $part): bool => $part !== '');
+        foreach ($parts as $part) {
+            if ($part === '.' || $part === '..') {
+                return null;
+            }
+        }
+
+        return $base . DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, $parts);
     }
 
     private static function encodeRelativePath(string $path): string

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "folderName": "inherits-section-default",
+    "slug": "inherits-section-default",
+    "title": "inherits-section-default",
+    "description": "",
+    "type": "folder",
+    "id": "poff_487287323d215b11",
+    "tree": [
+        {
+            "name": "hero.txt",
+            "slug": "hero-txt",
+            "type": "file",
+            "path": "hero.txt",
+            "modifiedAt": "2026-04-11T16:50:20+00:00",
+            "visible": true
+        }
+    ],
+    "treeHash": "d6c6cea70da6f70c1f207a8d442af259902b05d6d6b2a9233b832844ae359d48",
+    "updatedAt": "2026-04-11T16:50:21+00:00",
+    "work": {
+        "type": "folder",
+        "layout": {
+            "mode": "default-layout",
+            "name": "default-layout",
+            "engine": "lightncandy",
+            "section": "works"
+        }
+    }
+}

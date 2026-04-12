@@ -23,7 +23,26 @@ function cmsReadJsonBody(): array
     return is_array($data) ? $data : [];
 }
 
-function cmsResolveTarget(string $rootDir, string $relativePath): ?array
+function cmsIsVirtualLayoutPath(string $relativePath): bool
+{
+    $trimmed = trim($relativePath, "/\\");
+    return $trimmed === '.layout' || str_ends_with($trimmed, '/.layout');
+}
+
+function cmsVirtualLayoutSubjectPath(string $relativePath): string
+{
+    $trimmed = trim($relativePath, "/\\");
+    if ($trimmed === '.layout') {
+        return '';
+    }
+    if (str_ends_with($trimmed, '/.layout')) {
+        return substr($trimmed, 0, -strlen('/.layout'));
+    }
+
+    return $trimmed;
+}
+
+function cmsResolvePhysicalTarget(string $rootDir, string $relativePath): ?array
 {
     $trimmed = trim($relativePath, "/\\");
     if (strpos($trimmed, '..') !== false) {
@@ -73,6 +92,30 @@ function cmsResolveTarget(string $rootDir, string $relativePath): ?array
         ];
     }
     return null;
+}
+
+function cmsResolveTarget(string $rootDir, string $relativePath): ?array
+{
+    $trimmed = trim($relativePath, "/\\");
+    if (cmsIsVirtualLayoutPath($trimmed)) {
+        $subjectRelativePath = cmsVirtualLayoutSubjectPath($trimmed);
+        $subject = cmsResolvePhysicalTarget($rootDir, $subjectRelativePath);
+        if ($subject === null) {
+            return null;
+        }
+
+        return [
+            'type' => 'layout',
+            'dir' => $subject['dir'],
+            'file' => $subject['file'] ?? null,
+            'path' => $subject['path'] ?? null,
+            'subjectType' => $subject['type'],
+            'subjectRelativePath' => $subjectRelativePath,
+            'virtualPath' => $trimmed,
+        ];
+    }
+
+    return cmsResolvePhysicalTarget($rootDir, $trimmed);
 }
 
 function cmsLoadEnv(string $rootDir): array
