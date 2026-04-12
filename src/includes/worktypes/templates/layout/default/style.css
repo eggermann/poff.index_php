@@ -1,0 +1,215 @@
+.poff-default-layout {
+    --poff-shell-bg: #f0f2f5;
+    --poff-shell-panel: #ffffff;
+    --poff-shell-sidebar: #ffffff;
+    --poff-shell-color: #374151;
+    --poff-shell-header-border: #e5e7eb;
+    --poff-shell-footer-border: #e5e7eb;
+    --poff-shell-eyebrow-color: #6b7280;
+    --poff-shell-title-color: #111827;
+    --poff-shell-description-color: #4b5563;
+    --poff-shell-footer-color: #6b7280;
+    --poff-shell-card-bg: #ffffff;
+    --poff-shell-card-border: #d1d5db;
+    --poff-shell-nav-border: transparent;
+    --poff-shell-nav-current: #3b82f6;
+    --poff-shell-nav-kind: #374151;
+    --poff-shell-main-padding: 24px;
+    --poff-work-max-height: calc(100dvh - 8rem);
+    min-height: 100dvh;
+    height: 100dvh;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    background: var(--poff-shell-bg);
+    color: var(--poff-shell-color);
+}
+
+.poff-default-layout__sidebar {
+    padding: 92px 20px 20px;
+    background: var(--poff-shell-sidebar);
+    border-right: 1px solid var(--poff-shell-header-border);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    overflow-y: auto;
+}
+
+.poff-default-layout__nav {
+    display: grid;
+    gap: 6px;
+}
+
+.poff-default-layout__nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--poff-shell-nav-border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--poff-shell-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.poff-default-layout__nav-link:hover {
+    background: #e5e7eb;
+    color: #111827;
+}
+
+.poff-default-layout__nav-link--current {
+    background: var(--poff-shell-nav-current);
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.poff-default-layout__nav-link--up {
+    color: #10b981;
+    font-weight: 500;
+}
+
+.poff-default-layout__nav-link--up:hover {
+    color: #059669;
+    background: #d1fae5;
+}
+
+.poff-default-layout__nav-icon {
+    width: 18px;
+    flex: 0 0 18px;
+    text-align: center;
+    color: var(--poff-shell-nav-kind);
+    font-size: 0.92rem;
+}
+
+.poff-default-layout__nav-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.poff-default-layout__stage {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 0;
+    background: var(--poff-shell-panel);
+}
+
+.poff-default-layout__header {
+    display: grid;
+    gap: 0.5rem;
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid var(--poff-shell-header-border);
+    background: #ffffff;
+}
+
+.poff-default-layout__header-copy {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 44rem;
+}
+
+.poff-default-layout__eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--poff-shell-eyebrow-color);
+}
+
+.poff-default-layout__title {
+    margin: 0;
+    font-size: clamp(2rem, 3vw, 3rem);
+    line-height: 1;
+    color: var(--poff-shell-title-color);
+}
+
+.poff-default-layout__description {
+    margin: 0;
+    max-width: 38rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--poff-shell-description-color);
+}
+
+.poff-default-layout__main {
+    padding: var(--poff-shell-main-padding);
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.poff-default-layout__main > * {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.poff-default-layout__main img,
+.poff-default-layout__main video,
+.poff-default-layout__main iframe,
+.poff-default-layout__main canvas,
+.poff-default-layout__main svg {
+    display: block;
+    max-width: 100%;
+    max-height: var(--poff-work-max-height);
+    margin-inline: auto;
+}
+
+.poff-default-layout__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--poff-shell-footer-border);
+    color: var(--poff-shell-footer-color);
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.poff-default-layout .folder-view {
+    gap: 1.5rem;
+}
+
+.poff-default-layout .folder-view-summary {
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.poff-default-layout .folder-view-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.poff-default-layout .folder-view-card {
+    border: 1px solid var(--poff-shell-card-border);
+    background: var(--poff-shell-card-bg);
+}
+
+@media (max-width: 720px) {
+    .poff-default-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+    }
+
+    .poff-default-layout__sidebar {
+        padding: 76px 14px 14px;
+        border-right: 0;
+        border-bottom: 1px solid var(--poff-shell-header-border);
+    }
+
+    .poff-default-layout__header {
+        padding: 20px 18px 14px;
+    }
+
+    .poff-default-layout__main {
+        --poff-shell-main-padding: 18px;
+    }
+
+    .poff-default-layout__footer {
+        justify-content: flex-start;
+        padding: 14px 18px 18px;
+    }
+}

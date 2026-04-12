@@ -449,6 +449,20 @@ class PoffConfig
     public static function prepareLayoutForView(mixed $layout, string $itemPath, bool $isFile, string $section = 'work'): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
+        if (($resolved['storage'] ?? '') !== 'filesystem') {
+            if (!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') {
+                $bundleCss = Worktype::layoutBundleAsset((string) ($resolved['name'] ?? ''), self::LAYOUT_STYLE_FILE);
+                if (is_string($bundleCss) && $bundleCss !== '') {
+                    $resolved['css'] = $bundleCss;
+                }
+            }
+            if (!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') {
+                $bundleJs = Worktype::layoutBundleAsset((string) ($resolved['name'] ?? ''), self::LAYOUT_SCRIPT_FILE);
+                if (is_string($bundleJs) && $bundleJs !== '') {
+                    $resolved['js'] = $bundleJs;
+                }
+            }
+        }
         $basePath = isset($resolved['directory']) && is_string($resolved['directory']) && trim($resolved['directory']) !== ''
             ? str_replace('\\', '/', trim($resolved['directory'], "/\\"))
             : self::relativeLayoutPath($itemPath, $isFile);
@@ -498,7 +512,7 @@ class PoffConfig
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
-        $resolved['phpTemplate'] = Worktype::template('default-layout') ?? '';
+        $resolved['phpTemplate'] = Worktype::template((string) ($resolved['name'] ?? Worktype::defaultLayoutName())) ?? '';
         $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
@@ -525,6 +539,10 @@ class PoffConfig
 
         if ($layoutDir !== null && is_dir($layoutDir)) {
             $resolved['storage'] = 'filesystem';
+            if (in_array($resolved['name'] ?? '', [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)) {
+                $resolved['mode'] = Worktype::filesystemLayoutName();
+                $resolved['name'] = Worktype::filesystemLayoutName();
+            }
 
             $templatePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_TEMPLATE_FILE;
             if (is_file($templatePath)) {
@@ -550,6 +568,10 @@ class PoffConfig
             $resolved['storage'] = 'inline';
         } else {
             $resolved['storage'] = 'default';
+            if (in_array($resolved['name'] ?? '', [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)) {
+                $resolved['mode'] = Worktype::defaultLayoutName();
+                $resolved['name'] = Worktype::defaultLayoutName();
+            }
         }
 
         $localSectionPath = $localLayoutDir . DIRECTORY_SEPARATOR . $sectionTemplateFile;

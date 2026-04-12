@@ -7,18 +7,8 @@
     <div class="app-edit-toggle-wrap">
         <button id="editToggle" class="edit-toggle" type="button">Edit mode</button>
     </div>
-    <!-- ---------- Sidebar ---------- -->
-    <nav class="sidebar">
-        <ul id="navList" class="nav-list">
-            <div id="navLoading" class="loading-row">
-                <span class="loader"></span>
-                <span class="loader-label">Loading...</span>
-            </div>
-            <!-- NAV_PLACEHOLDER -->
-        </ul>
-    </nav>
-
-    <!-- ---------- Main Content (header + iframe) ---------- -->
+  
+    <!-- Visible app shell: edit UI + direct preview surface. The page/sidebar chrome should come from the active HBS layout. -->
     <div class="main-content">
         <div id="editPanel" class="edit-panel" hidden></div>
         <aside id="editDrawer" class="edit-drawer" hidden></aside>
@@ -26,6 +16,6 @@
             <span class="loader"></span>
             <span class="loader-label">Loading content...</span>
         </div>
-        <iframe id="contentFrame" name="contentFrame" class="content-frame" src="about:blank"></iframe>
+        <div id="contentFrame" class="content-frame" role="document" aria-live="polite"></div>
     </div>
 </div>

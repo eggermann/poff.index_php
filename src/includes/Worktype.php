@@ -7,6 +7,9 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 
 class Worktype
 {
+    private const DEFAULT_LAYOUT_NAME = 'poff-layout';
+    private const FILESYSTEM_LAYOUT_NAME = 'filesystem-layout';
+
     private static array $embedded = [];
     private static array $embeddedTemplates = [];
     private static array $bundleDefinitions = [];
@@ -67,49 +70,41 @@ class Worktype
         $layout = self::normalizeLayout(is_array($work) ? ($work['layout'] ?? null) : null, $kind === 'folder' ? 'works' : 'work');
         $resolvedWork = is_array($work) ? $work : [];
         $resolvedWork['layout'] = $layout;
-        $template = self::layoutTemplate($kind, $resolvedWork);
-        $partials = self::templates();
-        $section = (string) ($layout['section'] ?? ($kind === 'folder' ? 'works' : 'work'));
-        if (!empty($layout['sectionTemplate']) && is_string($layout['sectionTemplate'])) {
-            $partials[$section] = $layout['sectionTemplate'];
+        $rendered = self::renderTemplate($kind, $ctx, $resolvedWork, $layout);
+        if ($rendered !== null) {
+            return $rendered;
         }
 
-        if ($template) {
-            if (!self::rendererAvailable()) {
-                return self::fallbackRender($ctx);
-            }
-            try {
-                $compiled = \LightnCandy\LightnCandy::compile($template, [
-                    'partials' => $partials,
-                    'helpers' => self::helpers(),
-                    'flags' => \LightnCandy\LightnCandy::FLAG_HANDLEBARSJS
-                        | \LightnCandy\LightnCandy::FLAG_RUNTIMEPARTIAL
-                        | \LightnCandy\LightnCandy::FLAG_ERROR_LOG,
-                ]);
-                $renderer = \LightnCandy\LightnCandy::prepare($compiled);
+        $fallbackLayout = self::normalizeLayout([
+            'mode' => self::DEFAULT_LAYOUT_NAME,
+            'name' => self::DEFAULT_LAYOUT_NAME,
+            'engine' => 'lightncandy',
+            'section' => $kind === 'folder' ? 'works' : 'work',
+        ], $kind === 'folder' ? 'works' : 'work');
+        $fallbackWork = $resolvedWork;
+        $fallbackWork['layout'] = $fallbackLayout;
 
-                return $renderer(self::buildRenderContext($kind, $ctx, $resolvedWork, $layout));
-            } catch (\Throwable $error) {
-                return self::fallbackRender($ctx);
-            }
+        $fallbackRendered = self::renderTemplate($kind, $ctx, $fallbackWork, $fallbackLayout);
+        if ($fallbackRendered !== null) {
+            return $fallbackRendered;
         }
 
-        return self::fallbackRender($ctx);
+        return self::fallbackRender($kind, $ctx);
     }
 
     public static function normalizeLayout(mixed $value, string $section = 'work'): array
     {
         $layout = [
-            'mode' => 'default',
-            'name' => 'default-layout',
+            'mode' => self::DEFAULT_LAYOUT_NAME,
+            'name' => self::DEFAULT_LAYOUT_NAME,
             'engine' => 'lightncandy',
             'section' => $section,
         ];
 
         if (is_string($value) && trim($value) !== '') {
             $name = trim($value);
-            $layout['mode'] = $name;
-            $layout['name'] = $name === 'default' ? 'default-layout' : $name;
+            $layout['mode'] = self::normalizeLayoutMode($name);
+            $layout['name'] = self::canonicalLayoutName($name);
             return $layout;
         }
 
@@ -119,8 +114,8 @@ class Worktype
 
         $candidate = trim((string) ($value['name'] ?? $value['mode'] ?? $value['value'] ?? ''));
         if ($candidate !== '') {
-            $layout['mode'] = $candidate;
-            $layout['name'] = $candidate === 'default' ? 'default-layout' : $candidate;
+            $layout['mode'] = self::normalizeLayoutMode($candidate);
+            $layout['name'] = self::canonicalLayoutName($candidate);
         }
 
         if (isset($value['engine']) && is_string($value['engine']) && trim($value['engine']) !== '') {
@@ -174,12 +169,11 @@ class Worktype
             $templates[$key] = $template;
         }
 
-        foreach ((glob(__DIR__ . '/worktypes/templates/*.hbs') ?: []) as $path) {
-            $templates[pathinfo($path, PATHINFO_FILENAME)] = (string) file_get_contents($path);
+        foreach (self::templateEntries('hbs') as $key => $path) {
+            $templates[$key] = (string) file_get_contents($path);
         }
 
-        foreach ((glob(__DIR__ . '/worktypes/templates/*.tpl') ?: []) as $path) {
-            $key = pathinfo($path, PATHINFO_FILENAME);
+        foreach (self::templateEntries('tpl') as $key => $path) {
             if (!isset($templates[$key])) {
                 $templates[$key] = (string) file_get_contents($path);
             }
@@ -207,9 +201,9 @@ class Worktype
             return self::$bundleTemplates[$name];
         }
         foreach (['.hbs', '.tpl'] as $extension) {
-            $path = __DIR__ . '/worktypes/templates/' . $name . $extension;
-            if (file_exists($path)) {
-                return (string) file_get_contents($path);
+            $entryMap = self::templateEntries(ltrim($extension, '.'), $name);
+            if (isset($entryMap[$name]) && file_exists($entryMap[$name])) {
+                return (string) file_get_contents($entryMap[$name]);
             }
         }
         if (isset(self::$embeddedTemplates[$name])) {
@@ -234,7 +228,7 @@ class Worktype
             return $namedTemplate;
         }
 
-        $defaultTemplate = self::template('default-layout');
+        $defaultTemplate = self::template(self::DEFAULT_LAYOUT_NAME);
         if (is_string($defaultTemplate) && $defaultTemplate !== '') {
             return $defaultTemplate;
         }
@@ -242,9 +236,109 @@ class Worktype
         return '';
     }
 
+    public static function defaultLayoutName(): string
+    {
+        return self::DEFAULT_LAYOUT_NAME;
+    }
+
+    public static function filesystemLayoutName(): string
+    {
+        return self::FILESYSTEM_LAYOUT_NAME;
+    }
+
+    public static function layoutBundleAsset(string $name, string $file): ?string
+    {
+        $path = self::layoutBundleAssetPath($name, $file);
+        if ($path === null || !is_file($path)) {
+            return null;
+        }
+
+        return (string) file_get_contents($path);
+    }
+
+    public static function canonicalLayoutName(?string $name): string
+    {
+        $candidate = trim((string) $name);
+        if ($candidate === '') {
+            return self::DEFAULT_LAYOUT_NAME;
+        }
+
+        return match ($candidate) {
+            'poff', self::DEFAULT_LAYOUT_NAME => self::DEFAULT_LAYOUT_NAME,
+            'filesystem', self::FILESYSTEM_LAYOUT_NAME => self::FILESYSTEM_LAYOUT_NAME,
+            default => $candidate,
+        };
+    }
+
+    private static function normalizeLayoutMode(string $mode): string
+    {
+        $candidate = trim($mode);
+        if ($candidate === '') {
+            return self::DEFAULT_LAYOUT_NAME;
+        }
+
+        return match ($candidate) {
+            'poff' => self::DEFAULT_LAYOUT_NAME,
+            'filesystem' => self::FILESYSTEM_LAYOUT_NAME,
+            default => $candidate,
+        };
+    }
+
     private static function rendererAvailable(): bool
     {
         return class_exists('\LightnCandy\LightnCandy');
+    }
+
+    private static function templateEntries(string $extension, ?string $name = null): array
+    {
+        $base = __DIR__ . '/worktypes/templates';
+        $normalizedExtension = ltrim($extension, '.');
+        $entries = [];
+
+        foreach ((glob($base . '/*.' . $normalizedExtension) ?: []) as $path) {
+            $entries[pathinfo($path, PATHINFO_FILENAME)] = $path;
+        }
+
+        foreach (self::layoutBundleTemplateMap($normalizedExtension) as $key => $path) {
+            if (file_exists($path)) {
+                $entries[$key] = $path;
+            }
+        }
+
+        if ($name !== null) {
+            return isset($entries[$name]) ? [$name => $entries[$name]] : [];
+        }
+
+        return $entries;
+    }
+
+    private static function layoutBundleTemplateMap(string $extension): array
+    {
+        $base = __DIR__ . '/worktypes/templates/layout';
+
+        return [
+            self::DEFAULT_LAYOUT_NAME => $base . '/default/template.' . $extension,
+            self::FILESYSTEM_LAYOUT_NAME => $base . '/file-system/template.' . $extension,
+        ];
+    }
+
+    private static function layoutBundleDirectory(string $name): ?string
+    {
+        return match (self::canonicalLayoutName($name)) {
+            self::DEFAULT_LAYOUT_NAME => __DIR__ . '/worktypes/templates/layout/default',
+            self::FILESYSTEM_LAYOUT_NAME => __DIR__ . '/worktypes/templates/layout/file-system',
+            default => null,
+        };
+    }
+
+    private static function layoutBundleAssetPath(string $name, string $file): ?string
+    {
+        $directory = self::layoutBundleDirectory($name);
+        if ($directory === null) {
+            return null;
+        }
+
+        return $directory . '/' . ltrim($file, '/');
     }
 
     private static function helpers(): array
@@ -301,10 +395,23 @@ class Worktype
         $path = (string) ($ctx['path'] ?? '');
         $viewerHref = (string) ($ctx['viewerHref'] ?? self::defaultViewerHref($kind, $path));
         $rawHref = (string) ($ctx['rawHref'] ?? self::defaultAssetHref($kind, $path));
+        $directoryPath = $kind === 'folder'
+            ? trim($path, '/')
+            : trim((string) preg_replace('~/[^/]+$~', '', $path), '/');
+        $parentPath = '';
+        if ($directoryPath !== '') {
+            $parentPath = trim(dirname($directoryPath), '/.');
+        }
+        $directoryPageLink = self::defaultViewerHref('folder', $directoryPath);
+        $parentPageLink = $directoryPath !== '' ? self::defaultViewerHref('folder', $parentPath) : '';
 
         $context = [
             'kind' => $kind,
             'path' => $path,
+            'directoryPath' => $directoryPath,
+            'directoryPageLink' => $directoryPageLink,
+            'parentPath' => $parentPath,
+            'parentPageLink' => $parentPageLink,
             'mimeType' => (string) ($ctx['mimeType'] ?? ''),
             'name' => (string) ($ctx['name'] ?? ''),
             'title' => (string) ($ctx['title'] ?? ($ctx['name'] ?? '')),
@@ -452,12 +559,136 @@ class Worktype
         return $item;
     }
 
-    private static function fallbackRender(array $ctx): string
+    private static function renderTemplate(string $kind, array $ctx, array $work, array $layout): ?string
     {
+        $template = self::layoutTemplate($kind, $work);
+        if ($template === '' || !self::rendererAvailable()) {
+            return null;
+        }
+
+        $partials = self::templates();
+        $section = (string) ($layout['section'] ?? ($kind === 'folder' ? 'works' : 'work'));
+        if (!empty($layout['sectionTemplate']) && is_string($layout['sectionTemplate'])) {
+            $partials[$section] = $layout['sectionTemplate'];
+        }
+
+        try {
+            $compiled = \LightnCandy\LightnCandy::compile($template, [
+                'partials' => $partials,
+                'helpers' => self::helpers(),
+                'flags' => \LightnCandy\LightnCandy::FLAG_HANDLEBARSJS
+                    | \LightnCandy\LightnCandy::FLAG_RUNTIMEPARTIAL
+                    | \LightnCandy\LightnCandy::FLAG_ERROR_LOG,
+            ]);
+            $renderer = \LightnCandy\LightnCandy::prepare($compiled);
+
+            return $renderer(self::buildRenderContext($kind, $ctx, $work, $layout));
+        } catch (\Throwable $error) {
+            return null;
+        }
+    }
+
+    private static function fallbackRender(string $kind, array $ctx): string
+    {
+        if ($kind === 'folder') {
+            return self::fallbackFolderRender($ctx);
+        }
+
         $path = htmlspecialchars((string) ($ctx['path'] ?? ''), ENT_QUOTES, 'UTF-8');
         $name = htmlspecialchars((string) ($ctx['name'] ?? ''), ENT_QUOTES, 'UTF-8');
 
         return '<iframe src="' . $path . '" title="' . $name . '"></iframe>';
+    }
+
+    private static function fallbackFolderRender(array $ctx): string
+    {
+        $items = [];
+        if (isset($ctx['items']) && is_array($ctx['items'])) {
+            $items = self::hydrateRenderItems($ctx['items']);
+        } elseif (isset($ctx['tree']) && is_array($ctx['tree'])) {
+            $items = self::hydrateRenderItems($ctx['tree']);
+        }
+
+        $title = htmlspecialchars((string) ($ctx['title'] ?? $ctx['name'] ?? 'Folder'), ENT_QUOTES, 'UTF-8');
+        $displayPath = htmlspecialchars((string) ($ctx['displayPath'] ?? $ctx['path'] ?? '.'), ENT_QUOTES, 'UTF-8');
+        $navLinks = [];
+
+        $parentLink = trim((string) ($ctx['parentPageLink'] ?? ''));
+        if ($parentLink !== '') {
+            $navLinks[] = '<a class="poff-folder-fallback__nav-link poff-folder-fallback__nav-link--up" href="'
+                . htmlspecialchars($parentLink, ENT_QUOTES, 'UTF-8')
+                . '">Go Up</a>';
+        }
+
+        $directoryLink = trim((string) ($ctx['directoryPageLink'] ?? $ctx['pageLink'] ?? ''));
+        if ($directoryLink !== '') {
+            $navLinks[] = '<a class="poff-folder-fallback__nav-link poff-folder-fallback__nav-link--current" href="'
+                . htmlspecialchars($directoryLink, ENT_QUOTES, 'UTF-8')
+                . '">./</a>';
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $name = htmlspecialchars((string) ($item['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $href = htmlspecialchars((string) ($item['pageLink'] ?? $item['viewerHref'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $label = !empty($item['isFolder']) ? 'Folder' : 'File';
+            $navLinks[] = '<a class="poff-folder-fallback__nav-link" href="' . $href . '">'
+                . '<span class="poff-folder-fallback__nav-kind">' . $label . '</span>'
+                . '<span>' . $name . '</span>'
+                . '</a>';
+        }
+
+        $cards = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $name = htmlspecialchars((string) ($item['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $path = htmlspecialchars((string) ($item['path'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $href = htmlspecialchars((string) ($item['pageLink'] ?? $item['viewerHref'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $label = !empty($item['isFolder']) ? 'Folder' : 'File';
+            $cards[] = '<article class="poff-folder-fallback__card">'
+                . '<span class="poff-folder-fallback__card-label">' . $label . '</span>'
+                . '<a class="poff-folder-fallback__card-link" href="' . $href . '">' . $name . '</a>'
+                . '<span class="poff-folder-fallback__card-path">' . $path . '</span>'
+                . '</article>';
+        }
+
+        $emptyState = $cards === []
+            ? '<div class="poff-folder-fallback__empty">This folder is empty.</div>'
+            : implode('', $cards);
+
+        return '<div class="poff-folder-fallback">'
+            . '<style>'
+            . '.poff-folder-fallback{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100dvh;background:#f0f2f5;color:#111827;font-family:Arial,sans-serif;}'
+            . '.poff-folder-fallback__sidebar{padding:92px 20px 20px;background:#fff;border-right:1px solid #e5e7eb;display:grid;gap:8px;align-content:start;}'
+            . '.poff-folder-fallback__nav-link{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;text-decoration:none;color:#374151;background:transparent;}'
+            . '.poff-folder-fallback__nav-link:hover{background:#e5e7eb;color:#111827;}'
+            . '.poff-folder-fallback__nav-link--up{color:#059669;font-weight:600;}'
+            . '.poff-folder-fallback__nav-link--current{background:#3b82f6;color:#fff;font-weight:600;}'
+            . '.poff-folder-fallback__nav-kind{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;}'
+            . '.poff-folder-fallback__stage{display:grid;grid-template-rows:auto 1fr;min-width:0;background:#fff;}'
+            . '.poff-folder-fallback__header{padding:28px 32px 18px;border-bottom:1px solid #e5e7eb;background:#fff;}'
+            . '.poff-folder-fallback__eyebrow{margin:0;font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:#6b7280;}'
+            . '.poff-folder-fallback__title{margin:8px 0 0;font-size:clamp(2rem,3vw,3rem);line-height:1;}'
+            . '.poff-folder-fallback__path{margin:10px 0 0;color:#4b5563;}'
+            . '.poff-folder-fallback__body{padding:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;align-content:start;background:#f9fafb;}'
+            . '.poff-folder-fallback__card{padding:16px;border:1px solid #d1d5db;border-radius:16px;background:#fff;display:grid;gap:10px;}'
+            . '.poff-folder-fallback__card-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;}'
+            . '.poff-folder-fallback__card-link{font-size:16px;font-weight:600;color:#111827;text-decoration:none;word-break:break-word;}'
+            . '.poff-folder-fallback__card-link:hover{text-decoration:underline;}'
+            . '.poff-folder-fallback__card-path{font-size:12px;color:#6b7280;word-break:break-word;}'
+            . '.poff-folder-fallback__empty{padding:24px;border:1px dashed #cbd5e1;border-radius:16px;background:#fff;color:#475569;}'
+            . '@media (max-width:720px){.poff-folder-fallback{grid-template-columns:1fr;grid-template-rows:auto 1fr;}.poff-folder-fallback__sidebar{padding:76px 14px 14px;border-right:0;border-bottom:1px solid #e5e7eb;}.poff-folder-fallback__header{padding:20px 18px 14px;}.poff-folder-fallback__body{padding:18px;}}'
+            . '</style>'
+            . '<aside class="poff-folder-fallback__sidebar">' . implode('', $navLinks) . '</aside>'
+            . '<section class="poff-folder-fallback__stage">'
+            . '<header class="poff-folder-fallback__header"><p class="poff-folder-fallback__eyebrow">Folder</p><h1 class="poff-folder-fallback__title">' . $title . '</h1><p class="poff-folder-fallback__path">' . $displayPath . '</p></header>'
+            . '<div class="poff-folder-fallback__body">' . $emptyState . '</div>'
+            . '</section>'
+            . '</div>';
     }
 
     /**

@@ -173,7 +173,7 @@ export function renderPromptContext(contextEl, context) {
         ${sectionTemplateTarget ? `<div class="prompt-context-row"><strong>sectionTemplateTarget</strong>: ${escapeHtml(sectionTemplateTarget)}</div>` : ''}
         ${layoutBaseHref ? `<div class="prompt-context-row"><strong>layoutBaseHref</strong>: ${escapeHtml(layoutBaseHref)}</div>` : ''}
         ${layoutDefaultBaseHref ? `<div class="prompt-context-row"><strong>layoutDefaultBaseHref</strong>: ${escapeHtml(layoutDefaultBaseHref)}</div>` : ''}
-        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('default-layout, works, work')}</div>
+        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('poff-layout, filesystem-layout, works, work')}</div>
         ${layoutAssetsPreview ? `<div class="prompt-context-row"><strong>layoutAssets</strong>: ${escapeHtml(layoutAssetsPreview)}</div>` : ''}
         ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ''}
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ''}

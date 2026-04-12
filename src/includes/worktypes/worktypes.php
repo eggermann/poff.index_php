@@ -25,6 +25,15 @@ foreach ((glob(__DIR__ . '/templates/*.hbs') ?: []) as $tplPath) {
     $templates[pathinfo($tplPath, PATHINFO_FILENAME)] = (string) file_get_contents($tplPath);
 }
 
+foreach ([
+    'poff-layout' => __DIR__ . '/templates/layout/default/template.hbs',
+    'filesystem-layout' => __DIR__ . '/templates/layout/file-system/template.hbs',
+] as $name => $tplPath) {
+    if (is_file($tplPath)) {
+        $templates[$name] = (string) file_get_contents($tplPath);
+    }
+}
+
 if ($templates === []) {
     foreach ((glob(__DIR__ . '/templates/*.tpl') ?: []) as $tplPath) {
         $templates[pathinfo($tplPath, PATHINFO_FILENAME)] = (string) file_get_contents($tplPath);

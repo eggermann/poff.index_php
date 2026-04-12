@@ -37,7 +37,7 @@ function handleWorkPrompt(array $opts): array
             dirname($absPath),
             basename($absPath),
             [
-                'name' => 'default-layout',
+                'name' => 'filesystem-layout',
                 'engine' => 'lightncandy',
                 'section' => 'work',
                 'model' => $model,
@@ -66,6 +66,6 @@ function handleWorkPrompt(array $opts): array
         'partials' => $partials,
         'config' => $fileConfig,
         'configPath' => $configPath,
-        'instruction' => 'Use the default-layout HBS template and partials as a base. The section includes works for folders and work for files. Save updates into the item layout filesystem (.layout/template.hbs, style.css, script.js) with the LightnCandy renderer.',
+        'instruction' => 'Use the filesystem-layout HBS template and partials as a base. The section includes works for folders and work for files. The bundled poff-layout remains available as a fallback. Save updates into the item layout filesystem (.layout/template.hbs, style.css, script.js) with the LightnCandy renderer.',
     ];
 }

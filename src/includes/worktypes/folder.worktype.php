@@ -3,8 +3,8 @@ return [
     'model' => [
         'type' => 'folder',
         'layout' => [
-            'mode' => 'default',
-            'name' => 'default-layout',
+            'mode' => 'poff-layout',
+            'name' => 'poff-layout',
             'engine' => 'lightncandy',
             'section' => 'works',
         ],

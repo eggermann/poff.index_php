@@ -5,7 +5,7 @@ export function loadPromptSettings() {
         const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || '{}');
         if (typeof stored.systemPrompt === 'string') {
             const looksLikeLegacyDefault = stored.systemPrompt.includes('saved to .layout/template.hbs')
-                || stored.systemPrompt.includes('Use {{> default-layout}} as the default layout technique.');
+                || stored.systemPrompt.includes('Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}');
             if (looksLikeLegacyDefault) {
                 stored.systemPrompt = defaultPromptSettings.systemPrompt;
             }

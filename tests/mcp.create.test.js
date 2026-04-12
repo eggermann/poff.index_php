@@ -300,8 +300,8 @@ describe('Worktype HBS renderer', () => {
     const definition = JSON.parse(output);
 
     expect(definition.layout).toMatchObject({
-      mode: 'default',
-      name: 'default-layout',
+      mode: 'poff-layout',
+      name: 'poff-layout',
       engine: 'lightncandy',
       section: 'work',
     });
@@ -345,7 +345,7 @@ describe('Worktype HBS renderer', () => {
           background: '#111111',
           caption: '',
           layout: {
-            name: 'default-layout',
+            name: 'poff-layout',
             engine: 'lightncandy',
             section: 'work',
           },
@@ -359,6 +359,7 @@ describe('Worktype HBS renderer', () => {
     }
 
     expect(output).toContain('<div class="poff-default-layout poff-default-layout--image">');
+    expect(output).toContain('poff-default-layout__sidebar');
     expect(output).toContain('<img src="assets/photo.png" alt="Project Photo"');
     expect(output).toContain('Inline description');
   });
@@ -391,14 +392,16 @@ describe('Worktype HBS renderer', () => {
             name: 'custom-layout',
             engine: 'lightncandy',
             section: 'works',
-            template: '<div class="custom-shell"><a class="self-link" href="{{pageLink}}">{{title}}</a>{{#each items}}{{#if (eq type "file")}}<span class="entry">{{name}}</span>{{/if}}{{/each}}{{> default-layout}}</div>',
+            template: '<div class="custom-shell"><a class="self-link" href="{{pageLink}}">{{title}}</a>{{#each items}}{{#if (eq type "file")}}<span class="entry">{{name}}</span>{{/if}}{{/each}}{{> poff-layout}}</div>',
           },
         },
       },
     });
 
     if (!lightnCandyInstalled) {
-      expect(output).toBe('<iframe src="projects" title="projects"></iframe>');
+      expect(output).toContain('<div class="poff-folder-fallback">');
+      expect(output).toContain('projects');
+      expect(output).toContain('notes.txt');
       return;
     }
 
@@ -411,11 +414,59 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('notes.txt');
   });
 
+  test('falls back to a non-iframe folder view when a layout template is invalid', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
+    const output = await runWorktype('render', 'folder', {
+      ctx: {
+        path: 'projects',
+        name: 'projects',
+        title: 'Projects',
+        description: '',
+        descriptionHtml: '',
+        linkUrl: '',
+        slug: 'projects',
+        displayPath: 'projects',
+        parentPageLink: '?view=1&path=',
+        directoryPageLink: '?view=1&path=projects',
+        hasItems: true,
+        itemCount: 2,
+        items: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        tree: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        work: {
+          type: 'folder',
+          layout: {
+            name: 'broken-layout',
+            engine: 'lightncandy',
+            section: 'works',
+            template: '{{#if hasItems}}{{/unless}}',
+          },
+        },
+      },
+    });
+
+    expect(output).not.toContain('<iframe ');
+    if (lightnCandyInstalled) {
+      expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+    } else {
+      expect(output).toContain('<div class="poff-folder-fallback">');
+    }
+    expect(output).toContain('projects');
+    expect(output).toContain('alpha');
+    expect(output).toContain('notes.txt');
+  });
+
   test('inherits a filesystem default layout from .default/.layout', async () => {
     const output = await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR);
     const config = JSON.parse(output);
 
     expect(config.work.layout).toMatchObject({
+      name: 'filesystem-layout',
       storage: 'filesystem',
       directory: 'tests/poff-tests/.default/.layout',
     });
@@ -474,7 +525,7 @@ describe('Worktype HBS renderer', () => {
 
   test('keeps the inherited wrapper when a local wrapped partial override exists', async () => {
     const payload = {
-      name: 'default-layout',
+      name: 'poff-layout',
       engine: 'lightncandy',
       section: 'works',
       sectionTemplate: '<div class="local-works">{{#each items}}<span class="local-item">{{name}}</span>{{/each}}</div>',
@@ -554,7 +605,7 @@ describe('Worktype HBS renderer', () => {
 
   test('persists wrapped content partials into works.hbs without replacing the wrapper', async () => {
     const payload = {
-      name: 'default-layout',
+      name: 'poff-layout',
       engine: 'lightncandy',
       section: 'works',
       sectionTemplate: '<section class="persisted-section">{{title}}</section>',
@@ -564,7 +615,7 @@ describe('Worktype HBS renderer', () => {
     const serializedLayout = JSON.parse(output);
 
     expect(serializedLayout).toMatchObject({
-      name: 'default-layout',
+      name: 'poff-layout',
       section: 'works',
       engine: 'lightncandy',
     });

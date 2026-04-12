@@ -158,7 +158,7 @@ export function createEditController({ elements, context, editRequested }) {
                     ? 'none'
                     : layoutPreset === 'custom'
                         ? 'custom-layout'
-                        : 'default-layout';
+                        : (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget') ? 'filesystem-layout' : 'poff-layout');
                 const layoutPayload = {
                     name: layoutName,
                     engine: 'lightncandy',

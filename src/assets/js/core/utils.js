@@ -27,7 +27,12 @@ export function getLayoutState(config) {
         ? String(layoutValue.section)
         : ((config?.type === 'folder' || (config?.work?.type === 'folder' && !config?.name)) ? 'works' : 'work');
     const normalize = (state) => {
-        const mode = state.mode || 'default-layout';
+        const rawMode = state.mode || state.name || 'poff-layout';
+        const mode = rawMode === 'poff'
+            ? 'poff-layout'
+            : rawMode === 'filesystem'
+                ? 'filesystem-layout'
+                : rawMode;
         const storage = state.storage || '';
         const directory = state.directory || '';
         let preset = 'actual';
@@ -41,7 +46,7 @@ export function getLayoutState(config) {
             : storage === 'filesystem'
                 ? `Filesystem: ${directory || '.layout'}`
                 : storage === 'default'
-                    ? 'Built-in default layout'
+                    ? 'Built-in poff-layout'
                     : 'Current resolved layout';
 
         return {
@@ -79,5 +84,5 @@ export function getLayoutState(config) {
     if (typeof layoutValue === 'string') {
         return normalize({ mode: layoutValue, template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', section: inferredSection, sectionTemplate: '', sectionDirectory: '', assets: [] });
     }
-    return normalize({ mode: 'default-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', section: inferredSection, sectionTemplate: '', sectionDirectory: '', assets: [] });
+    return normalize({ mode: 'poff-layout', template: '', css: '', js: '', model: '', engine: 'lightncandy', directory: '', storage: '', section: inferredSection, sectionTemplate: '', sectionDirectory: '', assets: [] });
 }

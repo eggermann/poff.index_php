@@ -1042,7 +1042,7 @@ function cmsHandleEditAction(): void
                 'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
                 'The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
                 'Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.',
-                'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files.',
+                'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files. Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}.',
                 'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
                 'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
                 'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',

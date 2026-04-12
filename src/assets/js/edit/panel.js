@@ -43,13 +43,13 @@ function layoutOverlayState(config, status) {
 
     const wrapperSourceLabel = layoutState.storage === 'filesystem'
         ? `Filesystem: ${layoutState.directory || localLayoutDirectory}`
-        : 'PHP built-in default-layout';
+        : 'PHP built-in poff-layout';
     const filesystemDefaultLabel = hasFilesystemDefault
         ? layoutState.defaultDirectory
         : 'No filesystem default yet';
     const originalLabel = originalEditable
         ? `Editable source: ${originalTarget}`
-        : 'PHP built-in original is read-only until a filesystem default exists';
+        : 'PHP built-in poff-layout is read-only until a filesystem default exists';
 
     return {
         layoutState,
@@ -160,7 +160,7 @@ function renderEditLayoutPanel({
                 <div class="edit-layout-meta-card">
                     <div class="edit-layout-meta-title">Sources</div>
                     <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
-                    <div class="small-note">PHP default: <code>default-layout.hbs</code> from the bundled templates</div>
+                    <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
                     <div class="small-note">Inner section target: <code>${escapeHtml(sectionTarget)}</code></div>
@@ -241,11 +241,11 @@ function renderEditLayoutPanel({
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
-                : 'default-layout';
+                : (originalEditable ? 'filesystem-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
         const sourcePreview = isVirtual
-            ? (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in default-layout')
+            ? (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout')
             : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, '')}`;
 
         if (modePreviewEl) {
@@ -261,7 +261,7 @@ function renderEditLayoutPanel({
             if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
                     ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
-                    : 'Showing the bundled PHP default. It stays read-only until a filesystem default layout exists.';
+                    : 'Showing the bundled poff-layout. It stays read-only until a filesystem default layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
             }
@@ -658,7 +658,7 @@ export function renderEditLayoutOverlay({
                     <div class="edit-layout-meta-card">
                         <div class="edit-layout-meta-title">Inheritance</div>
                         <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
-                        <div class="small-note">PHP default: <code>default-layout.hbs</code> from the bundled templates</div>
+                        <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                         <div class="small-note">Wrapped inner partial: <code>${escapeHtml(layoutState.sectionDirectory ? `${layoutState.sectionDirectory}/${sectionName}.hbs` : `built-in ${sectionName}.hbs`)}</code></div>
                     </div>
                     <div class="edit-layout-meta-card">
@@ -747,7 +747,7 @@ export function renderEditLayoutOverlay({
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
-                : 'default-layout';
+                : (originalEditable ? 'filesystem-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
 
@@ -761,7 +761,7 @@ export function renderEditLayoutOverlay({
             if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
                     ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
-                    : 'Showing the bundled PHP default. It stays read-only until a filesystem default layout exists.';
+                    : 'Showing the bundled poff-layout. It stays read-only until a filesystem default layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
             }

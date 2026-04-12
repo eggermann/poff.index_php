@@ -77,7 +77,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                     <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                     <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                     ${contextCopy}
-                    <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.defaultBaseHref}}, {{layout.sectionBaseHref}}</div>
+                    <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.defaultBaseHref}}, {{layout.sectionBaseHref}}</div>
                     <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
                 </div>
             </div>

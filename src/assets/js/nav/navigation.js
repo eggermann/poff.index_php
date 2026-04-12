@@ -11,7 +11,9 @@ export function initNavigation({
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements;
     let activeLink = null;
     let ignoreNextHashSync = false;
+    let previewRequestId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get('path') || '';
+    let previewClickBound = false;
 
     function parseCmsLinkValue(value = '') {
         const trimmed = (value || '').trim();
@@ -253,7 +255,7 @@ export function initNavigation({
             iframeLoading.style.display = 'block';
         }
         if (contentFrame) {
-            contentFrame.src = buildViewerUrl(previewPath, previewIsFile, forceRefresh);
+            renderPreview(buildViewerUrl(previewPath, previewIsFile, forceRefresh));
         }
         if (updateHash) {
             writeHashPath(selection.path || '');
@@ -281,12 +283,12 @@ export function initNavigation({
         }
     }
 
-    function resolveIframeTarget(anchor) {
+    function resolvePreviewTarget(anchor) {
         if (!anchor) {
             return null;
         }
         const targetAttr = (anchor.getAttribute('target') || '').trim();
-        if (targetAttr && targetAttr !== '_self' && targetAttr !== contentFrame?.name) {
+        if (targetAttr && targetAttr !== '_self') {
             return null;
         }
         let url;
@@ -335,20 +337,12 @@ export function initNavigation({
         return null;
     }
 
-    function bindIframeNavigation() {
-        if (!contentFrame) {
+    function bindPreviewNavigation() {
+        if (!contentFrame || previewClickBound) {
             return;
         }
-        let doc;
-        try {
-            doc = contentFrame.contentDocument;
-        } catch (err) {
-            doc = null;
-        }
-        if (!doc) {
-            return;
-        }
-        doc.addEventListener('click', (event) => {
+        previewClickBound = true;
+        contentFrame.addEventListener('click', (event) => {
             if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
                 return;
             }
@@ -359,13 +353,62 @@ export function initNavigation({
             if (!target || target.tagName !== 'A') {
                 return;
             }
-            const nextTarget = resolveIframeTarget(target);
+            const nextTarget = resolvePreviewTarget(target);
             if (!nextTarget) {
                 return;
             }
             event.preventDefault();
             navigateToPath(nextTarget.path, { isFile: nextTarget.isFile });
         });
+    }
+
+    async function renderPreview(url) {
+        if (!contentFrame) {
+            return;
+        }
+
+        const requestId = ++previewRequestId;
+        try {
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'fetch-preview',
+                },
+            });
+            const html = await response.text();
+            if (requestId !== previewRequestId) {
+                return;
+            }
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const fragments = [];
+            doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+                fragments.push(node.outerHTML);
+            });
+            doc.querySelectorAll('script').forEach((node) => node.remove());
+            const bodyHtml = doc.body ? doc.body.innerHTML : html;
+            contentFrame.innerHTML = `${fragments.join('')}${bodyHtml}`;
+
+            doc.querySelectorAll('script').forEach((oldScript) => {
+                const script = document.createElement('script');
+                for (const attribute of oldScript.attributes) {
+                    script.setAttribute(attribute.name, attribute.value);
+                }
+                script.textContent = oldScript.textContent || '';
+                contentFrame.appendChild(script);
+            });
+            bindPreviewNavigation();
+        } catch (error) {
+            if (requestId !== previewRequestId) {
+                return;
+            }
+            contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
+        } finally {
+            if (requestId === previewRequestId && iframeLoading) {
+                iframeLoading.style.display = 'none';
+            }
+        }
     }
 
     function loadCurrentFolderInIframe() {
@@ -397,7 +440,7 @@ export function initNavigation({
     }
 
     function handleNavClick(event) {
-        if (!navList || !contentFrame) {
+        if (!navList) {
             return;
         }
         let target = event.target;
@@ -434,12 +477,7 @@ export function initNavigation({
         navList.addEventListener('click', handleNavClick);
     }
     if (contentFrame) {
-        contentFrame.addEventListener('load', () => {
-            if (iframeLoading) {
-                iframeLoading.style.display = 'none';
-            }
-            bindIframeNavigation();
-        });
+        bindPreviewNavigation();
     }
 
     return {

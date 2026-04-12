@@ -371,26 +371,12 @@ export function bindPromptWindow({
             : undefined;
         const activeViewerPath = selectionPath ?? activePath;
         if (frame && activeViewerPath !== null && activeViewerPath !== undefined) {
-            const isFile = selection?.previewIsFile ?? /\.[^\\/]+$/.test(activeViewerPath);
-            const url = new URL(window.location.href);
-            url.search = '';
-            url.hash = '';
-            url.searchParams.set('view', '1');
-            url.searchParams.set(isFile ? 'file' : 'path', activeViewerPath);
-            url.searchParams.set('_refresh', String(Date.now()));
-            frame.src = url.pathname + url.search;
-            return;
-        }
-        if (frame && frame.contentWindow) {
-            try {
-                frame.contentWindow.location.reload();
-                return;
-            } catch (err) {
-                // ignore and fall back
-            }
-        }
-        if (frame && frame.src) {
-            frame.src = frame.src;
+            window.dispatchEvent(new CustomEvent('poff:content-updated', {
+                detail: {
+                    path: activeViewerPath,
+                    target: selection?.previewIsFile ? 'file' : 'folder',
+                },
+            }));
         }
     };
 
@@ -597,7 +583,7 @@ export function bindPromptWindow({
                     }
                     const layoutNameField = drawerForm.querySelector('#edit-work-layout');
                     if (layoutNameField && !layoutNameField.value.trim()) {
-                        layoutNameField.value = 'default-layout';
+                        layoutNameField.value = 'poff-layout';
                     }
                     if (nextWork && typeof nextWork.type === 'string') {
                         const workTypeField = drawerForm.querySelector('#edit-work-type');
@@ -617,7 +603,7 @@ export function bindPromptWindow({
                             return candidate.trim();
                         }
                     }
-                    return (elements?.work_layout?.value || currentConfig?.work?.layout?.name || 'default-layout').trim();
+                    return (elements?.work_layout?.value || currentConfig?.work?.layout?.name || 'poff-layout').trim();
                 })();
                 const layoutPayload = {
                     name: resolvedLayoutName,
@@ -653,7 +639,7 @@ export function bindPromptWindow({
                         ? 'none'
                         : preset === 'custom'
                             ? 'custom-layout'
-                            : 'default-layout';
+                            : (canEditResolvedFilesystemTarget ? 'filesystem-layout' : 'poff-layout');
                     if (shouldPersistToLocalWrapper) {
                         layoutPayload.template = templateText;
                     } else if (canEditResolvedFilesystemTarget) {

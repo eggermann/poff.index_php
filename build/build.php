@@ -91,11 +91,20 @@ try {
     }
     if (!$embeddedTemplates) {
         $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.hbs') ?: [];
+        $templateFiles = array_merge($templateFiles, [
+            'poff-layout' => $sourceDir . '/includes/worktypes/templates/layout/default/template.hbs',
+            'filesystem-layout' => $sourceDir . '/includes/worktypes/templates/layout/file-system/template.hbs',
+        ]);
         if (!$templateFiles) {
             $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.tpl') ?: [];
         }
-        foreach ($templateFiles as $tplFile) {
-            $key = pathinfo($tplFile, PATHINFO_FILENAME);
+        foreach ($templateFiles as $key => $tplFile) {
+            if (!is_file($tplFile)) {
+                continue;
+            }
+            if (!is_string($key)) {
+                $key = pathinfo($tplFile, PATHINFO_FILENAME);
+            }
             $embeddedTemplates[$key] = file_get_contents($tplFile);
         }
     }
