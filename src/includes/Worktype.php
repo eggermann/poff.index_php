@@ -135,17 +135,17 @@ class Worktype
         }
 
         foreach ([
+            'preset',
             'template',
             'model',
             'stylePrompt',
             'storage',
             'directory',
-            'defaultDirectory',
+            'inheritedDirectory',
             'baseHref',
             'sectionTemplate',
             'sectionDirectory',
             'sectionBaseHref',
-            'defaultBaseHref',
             'cssHref',
             'jsHref',
             'assets',
@@ -388,10 +388,6 @@ class Worktype
 
     private static function buildRenderContext(string $kind, array $ctx, array $work, array $layout): array
     {
-        if (!isset($layout['defaultBaseHref']) && isset($layout['baseHref'])) {
-            $layout['defaultBaseHref'] = $layout['baseHref'];
-        }
-
         $path = (string) ($ctx['path'] ?? '');
         $viewerHref = (string) ($ctx['viewerHref'] ?? self::defaultViewerHref($kind, $path));
         $rawHref = (string) ($ctx['rawHref'] ?? self::defaultAssetHref($kind, $path));
@@ -410,6 +406,7 @@ class Worktype
             'path' => $path,
             'directoryPath' => $directoryPath,
             'directoryPageLink' => $directoryPageLink,
+            'showDirectoryPageLink' => $directoryPath !== '',
             'parentPath' => $parentPath,
             'parentPageLink' => $parentPageLink,
             'mimeType' => (string) ($ctx['mimeType'] ?? ''),
@@ -570,6 +567,7 @@ class Worktype
         $section = (string) ($layout['section'] ?? ($kind === 'folder' ? 'works' : 'work'));
         if (!empty($layout['sectionTemplate']) && is_string($layout['sectionTemplate'])) {
             $partials[$section] = $layout['sectionTemplate'];
+            $template = self::ensureTemplateIncludesSectionPartial($template, $section, $layout);
         }
 
         try {
@@ -586,6 +584,28 @@ class Worktype
         } catch (\Throwable $error) {
             return null;
         }
+    }
+
+    private static function ensureTemplateIncludesSectionPartial(string $template, string $section, array $layout): string
+    {
+        if (($layout['storage'] ?? '') !== 'filesystem') {
+            return $template;
+        }
+
+        $partialPattern = '/\{\{\s*>\s*' . preg_quote($section, '/') . '\b/';
+        if (preg_match($partialPattern, $template) === 1) {
+            return $template;
+        }
+
+        $partialMarkup = '{{> ' . $section . '}}';
+        foreach (['</main>', '</section>', '</article>', '</div>'] as $closingTag) {
+            $position = strripos($template, $closingTag);
+            if ($position !== false) {
+                return substr($template, 0, $position) . $partialMarkup . substr($template, $position);
+            }
+        }
+
+        return $template . $partialMarkup;
     }
 
     private static function fallbackRender(string $kind, array $ctx): string
@@ -621,7 +641,8 @@ class Worktype
         }
 
         $directoryLink = trim((string) ($ctx['directoryPageLink'] ?? $ctx['pageLink'] ?? ''));
-        if ($directoryLink !== '') {
+        $showDirectoryLink = (bool) ($ctx['showDirectoryPageLink'] ?? true);
+        if ($directoryLink !== '' && $showDirectoryLink) {
             $navLinks[] = '<a class="poff-folder-fallback__nav-link poff-folder-fallback__nav-link--current" href="'
                 . htmlspecialchars($directoryLink, ENT_QUOTES, 'UTF-8')
                 . '">./</a>';

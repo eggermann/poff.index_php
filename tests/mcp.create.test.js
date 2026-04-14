@@ -223,13 +223,13 @@ describe('MCP create route helper (CLI)', () => {
         },
       },
     }, null, 2));
-    fs.mkdirSync(path.join(POFF_DIR, '.default', '.layout'), { recursive: true });
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.defaultBaseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>');
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'works.hbs'), '{{#each items}}<span class="item">{{name}}</span>{{/each}}');
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'work.hbs'), '<span class="file-name">{{name}}</span>');
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'style.css'), '.default-fs-layout{display:block;}');
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'script.js'), 'window.__defaultFsLayout = true;');
-    fs.writeFileSync(path.join(POFF_DIR, '.default', '.layout', 'eggman_profile-image.jpg'), 'fake image bytes');
+    fs.mkdirSync(path.join(POFF_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.baseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'works.hbs'), '{{#each items}}<span class="item">{{name}}</span>{{/each}}');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'work.hbs'), '<span class="file-name">{{name}}</span>');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'style.css'), '.default-fs-layout{display:block;}');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'script.js'), 'window.__defaultFsLayout = true;');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'eggman_profile-image.jpg'), 'fake image bytes');
     fs.mkdirSync(INHERITED_DEFAULT_DIR, { recursive: true });
     fs.writeFileSync(path.join(INHERITED_DEFAULT_DIR, 'child.txt'), 'child');
     fs.mkdirSync(INHERITED_SECTION_DIR, { recursive: true });
@@ -461,14 +461,14 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('notes.txt');
   });
 
-  test('inherits a filesystem default layout from .default/.layout', async () => {
+  test('inherits a parent folder layout from the nearest ancestor .layout', async () => {
     const output = await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR);
     const config = JSON.parse(output);
 
     expect(config.work.layout).toMatchObject({
       name: 'filesystem-layout',
       storage: 'filesystem',
-      directory: 'tests/poff-tests/.default/.layout',
+      directory: 'tests/poff-tests/.layout',
     });
     expect(config.work.layout.template).toContain('default-fs-layout');
     expect(config.work.layout.assets).toEqual(
@@ -479,26 +479,26 @@ describe('Worktype HBS renderer', () => {
 
     const rendered = await runViewer('inherits-default');
     expect(rendered).toContain('<div class="default-fs-layout">');
-    expect(rendered).toContain('.default/.layout/style.css');
-    expect(rendered).toContain('.default/.layout/script.js');
-    expect(rendered).toContain('.default/.layout/eggman_profile-image.jpg');
+    expect(rendered).toContain('tests/poff-tests/.layout/style.css');
+    expect(rendered).toContain('tests/poff-tests/.layout/script.js');
+    expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });
 
   test('can persist edits back into the inherited original filesystem layout source', async () => {
-    const originalTarget = path.relative(ROOT, path.join(POFF_DIR, '.default', '.layout'));
+    const originalTarget = path.relative(ROOT, path.join(POFF_DIR, '.layout'));
     await runLayoutFilesystem('persist-original', originalTarget, '', {
-      template: '<div class="default-fs-layout default-fs-layout--edited"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.defaultBaseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>',
+      template: '<div class="default-fs-layout default-fs-layout--edited"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.baseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>',
       css: '.default-fs-layout--edited{color:#ff5f5f;}',
       js: 'window.__editedDefaultFsLayout = true;',
     });
 
-    expect(fs.readFileSync(path.join(POFF_DIR, '.default', '.layout', 'template.hbs'), 'utf8')).toContain('default-fs-layout--edited');
-    expect(fs.readFileSync(path.join(POFF_DIR, '.default', '.layout', 'style.css'), 'utf8')).toContain('#ff5f5f');
-    expect(fs.readFileSync(path.join(POFF_DIR, '.default', '.layout', 'script.js'), 'utf8')).toContain('__editedDefaultFsLayout');
+    expect(fs.readFileSync(path.join(POFF_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('default-fs-layout--edited');
+    expect(fs.readFileSync(path.join(POFF_DIR, '.layout', 'style.css'), 'utf8')).toContain('#ff5f5f');
+    expect(fs.readFileSync(path.join(POFF_DIR, '.layout', 'script.js'), 'utf8')).toContain('__editedDefaultFsLayout');
 
     const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
-    expect(ensured.work.layout.directory).toBe('tests/poff-tests/.default/.layout');
+    expect(ensured.work.layout.directory).toBe('tests/poff-tests/.layout');
     expect(ensured.work.layout.template).toContain('default-fs-layout--edited');
     expect(ensured.work.layout.css).toContain('#ff5f5f');
     expect(ensured.work.layout.js).toContain('__editedDefaultFsLayout');
@@ -536,7 +536,7 @@ describe('Worktype HBS renderer', () => {
     expect(fs.readFileSync(path.join(INHERITED_SECTION_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('local-works');
 
     const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_SECTION_DIR));
-    expect(ensured.work.layout.directory).toBe('tests/poff-tests/.default/.layout');
+    expect(ensured.work.layout.directory).toBe('tests/poff-tests/.layout');
     expect(ensured.work.layout.template).toContain('default-fs-layout');
     expect(ensured.work.layout.sectionDirectory).toBe('.layout');
     expect(ensured.work.layout.sectionTemplate).toContain('local-works');
@@ -545,7 +545,7 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('class="default-fs-layout');
     expect(rendered).toContain('<div class="local-works">');
     expect(rendered).toContain('<span class="local-item">hero.txt</span>');
-    expect(rendered).toContain('.default/.layout/eggman_profile-image.jpg');
+    expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
   });
 
   test('renders folder previews through the typed viewer route', async () => {
@@ -575,11 +575,28 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
   });
 
+  test('injects the wrapped work partial when a filesystem file wrapper forgets to include it', async () => {
+    await runLayoutFilesystem('persist-file', POFF_DIR, VIEWER_FILE_NAME, {
+      name: 'filesystem-layout',
+      engine: 'lightncandy',
+      section: 'work',
+      template: '<div class="broken-file-wrapper"><header>{{title}}</header><main><p>Wrapper only</p></main></div>',
+      sectionTemplate: '<video class="wrapped-video" src="{{srcUrl}}" controls></video>',
+    });
+
+    const output = await runViewer(VIEWER_FILE_NAME);
+
+    expect(output).toContain('<div class="broken-file-wrapper">');
+    expect(output).toContain('<p>Wrapper only</p>');
+    expect(output).toContain('<video class="wrapped-video" src="viewer-file.txt" controls></video>');
+  });
+
   test('persists edited folder layout files into .layout', async () => {
     const payload = {
       name: 'persisted-layout',
       engine: 'lightncandy',
       section: 'works',
+      preset: 'actual',
       template: '<div class="persisted-layout">Persisted</div>',
       css: '.persisted-layout{color:#fff;}',
       js: 'window.__persistedLayout = true;',
@@ -592,15 +609,25 @@ describe('Worktype HBS renderer', () => {
       name: 'persisted-layout',
       section: 'works',
       engine: 'lightncandy',
+      preset: 'actual',
     });
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('Persisted');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.persisted-layout');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__persistedLayout');
+    await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
+    const persistConfigPath = path.join(PERSIST_LAYOUT_DIR, 'poff.config.json');
+    const persistConfig = JSON.parse(fs.readFileSync(persistConfigPath, 'utf8'));
+    persistConfig.work = {
+      ...(persistConfig.work || {}),
+      layout: serializedLayout,
+    };
+    fs.writeFileSync(persistConfigPath, JSON.stringify(persistConfig, null, 2));
 
     const ensuredOutput = await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
     const ensuredConfig = JSON.parse(ensuredOutput);
     expect(ensuredConfig.work.layout.template).toContain('Persisted');
     expect(ensuredConfig.work.layout.storage).toBe('filesystem');
+    expect(ensuredConfig.work.layout.preset).toBe('actual');
   });
 
   test('persists wrapped content partials into works.hbs without replacing the wrapper', async () => {
