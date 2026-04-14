@@ -162,6 +162,7 @@ export function createEditController({ elements, context, editRequested }) {
                 const layoutPayload = {
                     name: layoutName,
                     engine: 'lightncandy',
+                    preset: layoutPreset,
                 };
                 if (Object.prototype.hasOwnProperty.call(payload, 'contentTemplate')) {
                     layoutPayload.sectionTemplate = payload.contentTemplate ?? '';

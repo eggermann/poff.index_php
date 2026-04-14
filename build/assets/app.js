@@ -162,24 +162,31 @@
   function getLayoutState(config) {
     var _a, _b;
     const layoutValue = (_a = config == null ? void 0 : config.work) == null ? void 0 : _a.layout;
+    const normalizePreset = (value) => {
+      const preset = String(value || "").trim();
+      return ["actual", "none", "custom"].includes(preset) ? preset : "";
+    };
     const inferredSection = layoutValue && typeof layoutValue === "object" && !Array.isArray(layoutValue) && layoutValue.section ? String(layoutValue.section) : (config == null ? void 0 : config.type) === "folder" || ((_b = config == null ? void 0 : config.work) == null ? void 0 : _b.type) === "folder" && !(config == null ? void 0 : config.name) ? "works" : "work";
     const normalize = (state) => {
-      const mode = state.mode || "default-layout";
+      const rawMode = state.mode || state.name || "poff-layout";
+      const mode = rawMode === "poff" ? "poff-layout" : rawMode === "filesystem" ? "filesystem-layout" : rawMode;
       const storage = state.storage || "";
       const directory = state.directory || "";
-      let preset = "actual";
-      if (mode === "none") {
-        preset = "none";
-      } else if (storage === "filesystem" && (directory === ".layout" || directory.startsWith(".works/"))) {
-        preset = "custom";
+      let preset = normalizePreset(state.preset) || "actual";
+      if (!normalizePreset(state.preset)) {
+        if (mode === "none") {
+          preset = "none";
+        } else if (storage === "filesystem" && (directory === ".layout" || directory.startsWith(".works/"))) {
+          preset = "custom";
+        }
       }
-      const sourceLabel = mode === "none" ? "No outer layout" : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in default layout" : "Current resolved layout";
+      const sourceLabel = mode === "none" ? "No outer layout" : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in poff-layout" : "Current resolved layout";
       return {
         ...state,
         mode,
         storage,
         directory,
-        defaultDirectory: state.defaultDirectory || "",
+        inheritedDirectory: state.inheritedDirectory || "",
         section: state.section || inferredSection,
         sectionTemplate: state.sectionTemplate || "",
         sectionDirectory: state.sectionDirectory || "",
@@ -198,18 +205,19 @@
         engine: layoutValue.engine || "lightncandy",
         directory: layoutValue.directory || "",
         storage: layoutValue.storage || "",
-        defaultDirectory: layoutValue.defaultDirectory || "",
+        inheritedDirectory: layoutValue.inheritedDirectory || "",
         section: layoutValue.section || inferredSection,
         sectionTemplate: layoutValue.sectionTemplate || "",
         sectionDirectory: layoutValue.sectionDirectory || "",
         phpTemplate: layoutValue.phpTemplate || "",
+        preset: layoutValue.preset || "",
         assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : []
       });
     }
     if (typeof layoutValue === "string") {
       return normalize({ mode: layoutValue, template: "", css: "", js: "", model: "", engine: "lightncandy", directory: "", storage: "", section: inferredSection, sectionTemplate: "", sectionDirectory: "", assets: [] });
     }
-    return normalize({ mode: "default-layout", template: "", css: "", js: "", model: "", engine: "lightncandy", directory: "", storage: "", section: inferredSection, sectionTemplate: "", sectionDirectory: "", assets: [] });
+    return normalize({ mode: "poff-layout", template: "", css: "", js: "", model: "", engine: "lightncandy", directory: "", storage: "", section: inferredSection, sectionTemplate: "", sectionDirectory: "", assets: [] });
   }
 
   // src/assets/js/edit/prompt/constants.js
@@ -222,7 +230,10 @@
     'When the user asks to change work.* values such as autoplay, loop, muted, poster, type, or layout, include those updates in "work".',
     "The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.",
     "Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.",
-    "Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files.",
+    "Important: return only the inner partial fragment. Do not return <html>, <body>, full page shells, app sidebars, or an outer wrapper that duplicates template.hbs.",
+    "For files, work.hbs should render only the inner media/content block that the wrapper inserts into {{> work}}.",
+    "For folders, works.hbs should render only the inner listing/content block that the wrapper inserts into {{> works}}. Do not replace the folder wrapper unless the user is explicitly editing layout mode.",
+    "Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files. Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}.",
     "Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.",
     "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
     "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
@@ -240,11 +251,12 @@
     'Return a JSON object with a required "template" string and optional "work" object.',
     "The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.",
     "Keep the wrapped content chain active: use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.",
+    "The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.",
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
-    "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local/custom layout assets and {{layout.defaultBaseHref}}/file.ext for inherited default layout assets. Reusing the default profile image should look like {{layout.defaultBaseHref}}/eggman_profile-image.jpg.",
-    "Prompt context JSON includes current.layoutBaseHref, current.layoutDefaultBaseHref, and current.layoutAssets so you can choose the right asset path.",
+    "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
+    "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
     "Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.",
     "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
     "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
@@ -271,7 +283,7 @@
     try {
       const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
       if (typeof stored.systemPrompt === "string") {
-        const looksLikeLegacyDefault = stored.systemPrompt.includes("saved to .layout/template.hbs") || stored.systemPrompt.includes("Use {{> default-layout}} as the default layout technique.");
+        const looksLikeLegacyDefault = stored.systemPrompt.includes("saved to .layout/template.hbs") || stored.systemPrompt.includes("Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}");
         if (looksLikeLegacyDefault) {
           stored.systemPrompt = defaultPromptSettings.systemPrompt;
         }
@@ -443,7 +455,7 @@
     const layout = work && typeof work.layout === "object" ? work.layout : {};
     const layoutStorage = typeof (layout == null ? void 0 : layout.storage) === "string" ? String(layout.storage) : "";
     const resolvedLayoutDirectory = (layout == null ? void 0 : layout.directory) ? String(layout.directory) : "";
-    const defaultLayoutDirectory = (layout == null ? void 0 : layout.defaultDirectory) ? String(layout.defaultDirectory) : "";
+    const inheritedLayoutDirectory = (layout == null ? void 0 : layout.inheritedDirectory) ? String(layout.inheritedDirectory) : "";
     const presetEl = isLayout ? document.getElementById("edit-layout-preset") : null;
     const layoutPreset = isLayout && presetEl ? String(presetEl.value || "").trim() : "";
     const activeLayoutDirectory = (() => {
@@ -485,7 +497,6 @@
       return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
     }).filter(Boolean).join(" | ");
     const layoutBaseHref = activeLayoutDirectory;
-    const layoutDefaultBaseHref = defaultLayoutDirectory || resolvedLayoutDirectory || layoutBaseHref;
     const layoutAssetsPreview = Array.isArray(layout == null ? void 0 : layout.assets) ? layout.assets.slice(0, 4).map((asset) => {
       const assetPath = (asset == null ? void 0 : asset.path) ? String(asset.path) : "";
       if (!assetPath) {
@@ -505,7 +516,7 @@
       layoutTemplateTarget,
       sectionTemplateTarget,
       layoutBaseHref,
-      layoutDefaultBaseHref,
+      inheritedLayoutDirectory,
       layoutAssetsPreview,
       workPreview,
       refPreview
@@ -525,7 +536,7 @@
     const layoutTemplateTarget = (context == null ? void 0 : context.layoutTemplateTarget) || "";
     const sectionTemplateTarget = (context == null ? void 0 : context.sectionTemplateTarget) || "";
     const layoutBaseHref = (context == null ? void 0 : context.layoutBaseHref) || "";
-    const layoutDefaultBaseHref = (context == null ? void 0 : context.layoutDefaultBaseHref) || "";
+    const inheritedLayoutDirectory = (context == null ? void 0 : context.inheritedLayoutDirectory) || "";
     const layoutAssetsPreview = (context == null ? void 0 : context.layoutAssetsPreview) || "";
     const workPreview = (context == null ? void 0 : context.workPreview) || "";
     const refPreview = (context == null ? void 0 : context.refPreview) || "";
@@ -540,8 +551,8 @@
         ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget (custom)</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ""}
         ${sectionTemplateTarget ? `<div class="prompt-context-row"><strong>sectionTemplateTarget</strong>: ${escapeHtml(sectionTemplateTarget)}</div>` : ""}
         ${layoutBaseHref ? `<div class="prompt-context-row"><strong>layoutBaseHref</strong>: ${escapeHtml(layoutBaseHref)}</div>` : ""}
-        ${layoutDefaultBaseHref ? `<div class="prompt-context-row"><strong>layoutDefaultBaseHref</strong>: ${escapeHtml(layoutDefaultBaseHref)}</div>` : ""}
-        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml("default-layout, works, work")}</div>
+        ${inheritedLayoutDirectory ? `<div class="prompt-context-row"><strong>inheritedLayoutDirectory</strong>: ${escapeHtml(inheritedLayoutDirectory)}</div>` : ""}
+        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml("poff-layout, filesystem-layout, works, work")}</div>
         ${layoutAssetsPreview ? `<div class="prompt-context-row"><strong>layoutAssets</strong>: ${escapeHtml(layoutAssetsPreview)}</div>` : ""}
         ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ""}
         ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ""}
@@ -691,6 +702,8 @@
     const promptSummaryEl = root.querySelector("#promptSummary");
     const promptGenerationEl = root.querySelector("#promptGeneration");
     const promptGenerationLabelEl = root.querySelector("#promptGenerationLabel");
+    const promptTemplateLabelEl = root.querySelector("#promptTemplateLabel");
+    const promptTemplateCodeEl = root.querySelector("#promptTemplateCode");
     const promptInputEl = root.querySelector("#prompt-input");
     const promptSendEl = root.querySelector("#prompt-send");
     const promptAttachEl = root.querySelector("#prompt-attach");
@@ -728,10 +741,27 @@
     const renderHistory = (options = {}) => {
       renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
+    const getCurrentTemplateField = () => {
+      const selection = getActiveSelection2 ? getActiveSelection2() : null;
+      const selector = (selection == null ? void 0 : selection.isLayout) ? "#edit-layout-primary-template" : "#edit-content-template";
+      return document.querySelector(selector);
+    };
+    const renderTemplatePreview = () => {
+      if (!promptTemplateCodeEl) {
+        return;
+      }
+      const selection = getActiveSelection2 ? getActiveSelection2() : null;
+      const templateField = getCurrentTemplateField();
+      promptTemplateCodeEl.value = templateField && typeof templateField.value === "string" ? templateField.value : "";
+      if (promptTemplateLabelEl) {
+        promptTemplateLabelEl.textContent = (selection == null ? void 0 : selection.isLayout) ? "Current layout wrapper template" : "Current wrapped partial template";
+      }
+    };
     const renderContext = () => {
       const context = buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig });
       activePath = context.path;
       renderPromptContext(promptContextEl, context);
+      renderTemplatePreview();
     };
     const renderSummary = (content) => {
       renderPromptSummary(promptSummaryEl, content);
@@ -916,31 +946,17 @@
     renderSummary("Waiting for response...");
     updateAttachmentUi();
     const reloadViewer = () => {
-      var _a;
       const frame = document.getElementById("contentFrame");
       const selection = getActiveSelection2 ? getActiveSelection2() : { path: "", isFile: false };
       const selectionPath = selection && Object.prototype.hasOwnProperty.call(selection, "previewPath") ? selection.previewPath : void 0;
       const activeViewerPath = selectionPath != null ? selectionPath : activePath;
       if (frame && activeViewerPath !== null && activeViewerPath !== void 0) {
-        const isFile = (_a = selection == null ? void 0 : selection.previewIsFile) != null ? _a : /\.[^\\/]+$/.test(activeViewerPath);
-        const url = new URL(window.location.href);
-        url.search = "";
-        url.hash = "";
-        url.searchParams.set("view", "1");
-        url.searchParams.set(isFile ? "file" : "path", activeViewerPath);
-        url.searchParams.set("_refresh", String(Date.now()));
-        frame.src = url.pathname + url.search;
-        return;
-      }
-      if (frame && frame.contentWindow) {
-        try {
-          frame.contentWindow.location.reload();
-          return;
-        } catch (err) {
-        }
-      }
-      if (frame && frame.src) {
-        frame.src = frame.src;
+        window.dispatchEvent(new CustomEvent("poff:content-updated", {
+          detail: {
+            path: activeViewerPath,
+            target: (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder"
+          }
+        }));
       }
     };
     const syncHistoryForPath = () => {
@@ -956,6 +972,15 @@
       }
     };
     window.addEventListener("hashchange", syncHistoryForPath);
+    document.addEventListener("input", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)) {
+        return;
+      }
+      if (target.matches("#edit-content-template, #edit-layout-primary-template")) {
+        renderTemplatePreview();
+      }
+    });
     const layoutPresetEl = document.getElementById("edit-layout-preset");
     if (layoutPresetEl) {
       layoutPresetEl.addEventListener("change", () => {
@@ -1136,7 +1161,7 @@
             }
             const layoutNameField = drawerForm.querySelector("#edit-work-layout");
             if (layoutNameField && !layoutNameField.value.trim()) {
-              layoutNameField.value = "default-layout";
+              layoutNameField.value = "poff-layout";
             }
             if (nextWork && typeof nextWork.type === "string") {
               const workTypeField = drawerForm.querySelector("#edit-work-type");
@@ -1157,7 +1182,7 @@
                 return candidate.trim();
               }
             }
-            return (((_a = elements2 == null ? void 0 : elements2.work_layout) == null ? void 0 : _a.value) || ((_c = (_b = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _b.layout) == null ? void 0 : _c.name) || "default-layout").trim();
+            return (((_a = elements2 == null ? void 0 : elements2.work_layout) == null ? void 0 : _a.value) || ((_c = (_b = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _b.layout) == null ? void 0 : _c.name) || "poff-layout").trim();
           })();
           const layoutPayload = {
             name: resolvedLayoutName,
@@ -1178,12 +1203,13 @@
             const layoutState = getLayoutState(currentConfig || {});
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
+            layoutPayload.preset = preset;
             const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
             const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
             const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
             const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
             const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
-            layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : "default-layout";
+            layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
             if (shouldPersistToLocalWrapper) {
               layoutPayload.template = templateText;
             } else if (canEditResolvedFilesystemTarget) {
@@ -1402,7 +1428,7 @@
     const mode = options.mode === "layout" ? "layout" : "work";
     const promptTargetCopy = mode === "layout" ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : "Prompt edits the wrapped work.hbs / works.hbs partial. The outer layout wrapper stays active.";
     const footerCopy = mode === "layout" ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || "work.hbs")}</code>.` : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files and <code>works.hbs</code> for folders. The current outer layout stays active.";
-    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> / <code>{{layout.defaultBaseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> / <code>current.layoutDefaultBaseHref</code> in the prompt context.</div>` : "<div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial. The outer layout wrapper stays active.</div>";
+    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : "<div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial. The outer layout wrapper stays active.</div>";
     const editableCopy = mode === "layout" ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.*</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>';
     return `
         <div class="prompt-window prompt-inline" id="promptWindow">
@@ -1466,10 +1492,17 @@
                     <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                     <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                     ${contextCopy}
-                    <div>{{> default-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.defaultBaseHref}}, {{layout.sectionBaseHref}}</div>
+                    <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
                     <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
                 </div>
             </div>
+            <details class="prompt-template-viewer" id="promptTemplateViewer">
+                <summary class="prompt-template-viewer-summary">Current template code</summary>
+                <div class="prompt-template-viewer-body">
+                    <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                    <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
+                </div>
+            </details>
             <input id="prompt-image-input" type="file" accept="image/*" hidden>
             <div class="prompt-attachment" id="promptAttachment" hidden>
                 <div class="prompt-attachment-preview-wrap">
@@ -1511,8 +1544,8 @@
     const sectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
-    const hasFilesystemDefault = !!layoutState.defaultDirectory;
-    const originalTarget = layoutState.storage === "filesystem" ? layoutState.directory || localLayoutDirectory : layoutState.defaultDirectory || "";
+    const hasInheritedLayout = !!layoutState.inheritedDirectory;
+    const originalTarget = layoutState.storage === "filesystem" ? layoutState.directory || localLayoutDirectory : layoutState.inheritedDirectory || "";
     const originalEditable = originalTarget !== "";
     const originalUsesLocal = originalTarget === localLayoutDirectory;
     const localWrapperTemplate = wrapperWasLocal ? layoutState.template || "" : "";
@@ -1528,9 +1561,9 @@
     } else if (!originalEditable) {
       originalTemplate = layoutState.phpTemplate || "";
     }
-    const wrapperSourceLabel = layoutState.storage === "filesystem" ? `Filesystem: ${layoutState.directory || localLayoutDirectory}` : "PHP built-in default-layout";
-    const filesystemDefaultLabel = hasFilesystemDefault ? layoutState.defaultDirectory : "No filesystem default yet";
-    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : "PHP built-in original is read-only until a filesystem default exists";
+    const wrapperSourceLabel = layoutState.storage === "filesystem" ? `Filesystem: ${layoutState.directory || localLayoutDirectory}` : "PHP built-in poff-layout";
+    const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
+    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
     return {
       layoutState,
       sectionName,
@@ -1539,7 +1572,7 @@
       sectionTarget,
       wrapperWasLocal,
       sectionWasLocal,
-      hasFilesystemDefault,
+      hasInheritedLayout,
       originalTarget,
       originalEditable,
       originalUsesLocal,
@@ -1550,7 +1583,7 @@
       originalCss,
       originalJs,
       wrapperSourceLabel,
-      filesystemDefaultLabel,
+      inheritedLayoutLabel,
       originalLabel
     };
   }
@@ -1583,7 +1616,7 @@
       originalCss,
       originalJs,
       wrapperSourceLabel,
-      filesystemDefaultLabel,
+      inheritedLayoutLabel,
       originalLabel
     } = overlayState;
     const subjectLabel = subjectStatus.target === "file" ? "file" : "folder";
@@ -1637,8 +1670,8 @@
             <div class="edit-layout-overlay-grid">
                 <div class="edit-layout-meta-card">
                     <div class="edit-layout-meta-title">Sources</div>
-                    <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
-                    <div class="small-note">PHP default: <code>default-layout.hbs</code> from the bundled templates</div>
+                    <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
+                    <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
                     <div class="small-note">Inner section target: <code>${escapeHtml(sectionTarget)}</code></div>
@@ -1711,10 +1744,10 @@
     };
     const syncLayoutMode = () => {
       const preset = ((presetEl == null ? void 0 : presetEl.value) || "actual").trim();
-      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : "default-layout";
+      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : originalEditable ? "filesystem-layout" : "poff-layout";
       const primaryMode = currentPrimaryMode();
       const isVirtual = primaryMode === "virtual";
-      const sourcePreview = isVirtual ? originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in default-layout" : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, "")}`;
+      const sourcePreview = isVirtual ? originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, "")}`;
       if (modePreviewEl) {
         modePreviewEl.textContent = nextMode;
       }
@@ -1726,7 +1759,7 @@
       }
       if (primaryHintEl) {
         if (isVirtual) {
-          primaryHintEl.innerHTML = originalEditable ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled PHP default. It stays read-only until a filesystem default layout exists.";
+          primaryHintEl.innerHTML = originalEditable ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled poff-layout. It stays read-only until a parent .layout exists.";
         } else {
           primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
         }
@@ -1882,7 +1915,7 @@
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
                 <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                <div class="small-note">Filesystem default: <code>${escapeHtml(overlayState.filesystemDefaultLabel)}</code></div>
+                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
                 <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
             </div>
             <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
@@ -1922,6 +1955,13 @@
                 </form>
             </dialog>
         ` : ""}
+        <details class="prompt-template-viewer">
+            <summary class="prompt-template-viewer-summary">Current template code</summary>
+            <div class="prompt-template-viewer-body">
+                <div class="small-note">${(status == null ? void 0 : status.target) === "file" ? "Current wrapped file partial" : "Current wrapped folder partial"}</div>
+                <textarea class="form-textarea prompt-template-code" readonly spellcheck="false" placeholder="No template loaded yet.">${escapeHtml(overlayState.layoutState.sectionTemplate || "")}</textarea>
+            </div>
+        </details>
         ${renderPromptWindow(settings)}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
@@ -2174,10 +2214,11 @@
           var _a, _b, _c, _d, _e, _f, _g, _h;
           const selection = getActiveSelection();
           const layoutPreset = (payload.layoutPreset || "actual").trim();
-          const layoutName = layoutPreset === "none" ? "none" : layoutPreset === "custom" ? "custom-layout" : "default-layout";
+          const layoutName = layoutPreset === "none" ? "none" : layoutPreset === "custom" ? "custom-layout" : Object.prototype.hasOwnProperty.call(payload, "originalLayoutTarget") ? "filesystem-layout" : "poff-layout";
           const layoutPayload = {
             name: layoutName,
-            engine: "lightncandy"
+            engine: "lightncandy",
+            preset: layoutPreset
           };
           if (Object.prototype.hasOwnProperty.call(payload, "contentTemplate")) {
             layoutPayload.sectionTemplate = (_a = payload.contentTemplate) != null ? _a : "";
@@ -2308,7 +2349,9 @@
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
     let activeLink = null;
     let ignoreNextHashSync = false;
+    let previewRequestId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get("path") || "";
+    let previewClickBound = false;
     function parseCmsLinkValue(value = "") {
       const trimmed = (value || "").trim();
       if (!trimmed) {
@@ -2451,6 +2494,19 @@
         }
       });
     }
+    function setActiveLayoutLink(layoutPath = "") {
+      clearActiveLink();
+      if (!navList || !layoutPath) {
+        return;
+      }
+      const layoutEls = navList.querySelectorAll("a[data-layout-path]");
+      layoutEls.forEach((el) => {
+        if (el.getAttribute("data-layout-path") === layoutPath) {
+          el.classList.add("nav-link-active");
+          activeLink = el;
+        }
+      });
+    }
     function showNavLoading() {
       if (!navList) return;
       navList.innerHTML = `
@@ -2502,7 +2558,11 @@
       ignoreNextHashSync = true;
       window.location.hash = nextHash;
     }
-    function syncSidebarSelection(path = "", isFile = false) {
+    function syncSidebarSelection(path = "", isFile = false, isLayout = false) {
+      if (isLayout) {
+        setActiveLayoutLink(path);
+        return;
+      }
       if (!isFile) {
         clearActiveLink();
         return;
@@ -2528,7 +2588,7 @@
         iframeLoading.style.display = "block";
       }
       if (contentFrame) {
-        contentFrame.src = buildViewerUrl(previewPath, previewIsFile, forceRefresh);
+        renderPreview(buildViewerUrl(previewPath, previewIsFile, forceRefresh));
       }
       if (updateHash) {
         writeHashPath(selection.path || "");
@@ -2538,12 +2598,12 @@
           sidebarLoading.style.display = "block";
         }
         loadNav(folderPath).then(() => {
-          syncSidebarSelection(previewPath, previewIsFile);
+          syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
           if (sidebarLoading) {
             sidebarLoading.style.display = "none";
           }
         }).catch(() => {
-          syncSidebarSelection(previewPath, previewIsFile);
+          syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
           if (sidebarLoading) {
             sidebarLoading.style.display = "none";
           }
@@ -2553,12 +2613,12 @@
         initEditMode();
       }
     }
-    function resolveIframeTarget(anchor) {
+    function resolvePreviewTarget(anchor) {
       if (!anchor) {
         return null;
       }
       const targetAttr = (anchor.getAttribute("target") || "").trim();
-      if (targetAttr && targetAttr !== "_self" && targetAttr !== (contentFrame == null ? void 0 : contentFrame.name)) {
+      if (targetAttr && targetAttr !== "_self") {
         return null;
       }
       let url;
@@ -2606,20 +2666,12 @@
       }
       return null;
     }
-    function bindIframeNavigation() {
-      if (!contentFrame) {
+    function bindPreviewNavigation() {
+      if (!contentFrame || previewClickBound) {
         return;
       }
-      let doc;
-      try {
-        doc = contentFrame.contentDocument;
-      } catch (err) {
-        doc = null;
-      }
-      if (!doc) {
-        return;
-      }
-      doc.addEventListener("click", (event) => {
+      previewClickBound = true;
+      contentFrame.addEventListener("click", (event) => {
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
           return;
         }
@@ -2630,13 +2682,58 @@
         if (!target || target.tagName !== "A") {
           return;
         }
-        const nextTarget = resolveIframeTarget(target);
+        const nextTarget = resolvePreviewTarget(target);
         if (!nextTarget) {
           return;
         }
         event.preventDefault();
         navigateToPath(nextTarget.path, { isFile: nextTarget.isFile });
       });
+    }
+    async function renderPreview(url) {
+      if (!contentFrame) {
+        return;
+      }
+      const requestId = ++previewRequestId;
+      try {
+        const response = await fetch(url, {
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "fetch-preview"
+          }
+        });
+        const html = await response.text();
+        if (requestId !== previewRequestId) {
+          return;
+        }
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const fragments = [];
+        doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+          fragments.push(node.outerHTML);
+        });
+        doc.querySelectorAll("script").forEach((node) => node.remove());
+        const bodyHtml = doc.body ? doc.body.innerHTML : html;
+        contentFrame.innerHTML = `${fragments.join("")}${bodyHtml}`;
+        doc.querySelectorAll("script").forEach((oldScript) => {
+          const script = document.createElement("script");
+          for (const attribute of oldScript.attributes) {
+            script.setAttribute(attribute.name, attribute.value);
+          }
+          script.textContent = oldScript.textContent || "";
+          contentFrame.appendChild(script);
+        });
+        bindPreviewNavigation();
+      } catch (error) {
+        if (requestId !== previewRequestId) {
+          return;
+        }
+        contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
+      } finally {
+        if (requestId === previewRequestId && iframeLoading) {
+          iframeLoading.style.display = "none";
+        }
+      }
     }
     function loadCurrentFolderInIframe() {
       var _a;
@@ -2666,7 +2763,7 @@
       syncFromLocation({ forceRefresh: true });
     }
     function handleNavClick(event) {
-      if (!navList || !contentFrame) {
+      if (!navList) {
         return;
       }
       let target = event.target;
@@ -2686,6 +2783,9 @@
       } else if (target.dataset.src) {
         relPath = target.dataset.src;
         resolvedPath = true;
+      } else if (target.dataset.layoutPath) {
+        relPath = target.dataset.layoutPath;
+        resolvedPath = true;
       }
       if (!resolvedPath) {
         return;
@@ -2695,19 +2795,14 @@
         window.open(relPath, "_blank");
         return;
       }
-      const isFile = !(target.hasAttribute("href") && target.getAttribute("href").startsWith("?path="));
+      const isFile = target.dataset.layoutPath ? false : !(target.hasAttribute("href") && target.getAttribute("href").startsWith("?path="));
       navigateToPath(relPath, { isFile });
     }
     if (navList) {
       navList.addEventListener("click", handleNavClick);
     }
     if (contentFrame) {
-      contentFrame.addEventListener("load", () => {
-        if (iframeLoading) {
-          iframeLoading.style.display = "none";
-        }
-        bindIframeNavigation();
-      });
+      bindPreviewNavigation();
     }
     return {
       consumeHashSync() {
@@ -2729,11 +2824,14 @@
     window.location.href = `${basePath}?mcp=1`;
   }
   var elements = {
+    appShell: document.getElementById("appShell"),
+    appSidebar: document.getElementById("appSidebar"),
     navList: document.getElementById("navList"),
     contentFrame: document.getElementById("contentFrame"),
     editPanel: document.getElementById("editPanel"),
     editDrawer: document.getElementById("editDrawer"),
     editToggle: document.getElementById("editToggle"),
+    sidebarToggle: document.getElementById("sidebarToggle"),
     iframeLoading: document.getElementById("iframeLoading"),
     sidebarLoading: document.getElementById("sidebarLoading")
   };
@@ -2753,7 +2851,27 @@
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode
   });
+  function bindSidebarToggle() {
+    const { appShell, appSidebar, sidebarToggle } = elements;
+    if (!appShell || !appSidebar || !sidebarToggle) {
+      return;
+    }
+    const syncSidebarState = (isOpen) => {
+      appShell.classList.toggle("sidebar-collapsed", !isOpen);
+      appSidebar.hidden = !isOpen;
+      appSidebar.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      sidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      sidebarToggle.setAttribute("aria-label", isOpen ? "Close navigation" : "Open navigation");
+      sidebarToggle.setAttribute("title", isOpen ? "Close navigation" : "Open navigation");
+    };
+    syncSidebarState(true);
+    sidebarToggle.addEventListener("click", () => {
+      const isOpen = !appShell.classList.contains("sidebar-collapsed");
+      syncSidebarState(!isOpen);
+    });
+  }
   document.addEventListener("DOMContentLoaded", () => {
+    bindSidebarToggle();
     editController.syncEditToggle();
     editController.bindEditToggle();
     if (window.location.hash && window.location.hash.length > 1) {

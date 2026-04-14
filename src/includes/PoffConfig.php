@@ -7,7 +7,6 @@
 
 class PoffConfig
 {
-    private const DEFAULT_LAYOUT_ROOT_DIR = '.default';
     private const DEFAULT_LAYOUT_FOLDER = '.layout';
     private const LAYOUT_TEMPLATE_FILE = 'template.hbs';
     private const LAYOUT_STYLE_FILE = 'style.css';
@@ -471,11 +470,6 @@ class PoffConfig
             ? str_replace('\\', '/', trim($resolved['sectionDirectory'], "/\\"))
             : $basePath;
         $resolved['sectionBaseHref'] = self::encodeRelativePath($sectionBasePath);
-        $defaultBasePath = isset($resolved['defaultDirectory']) && is_string($resolved['defaultDirectory']) && trim($resolved['defaultDirectory']) !== ''
-            ? str_replace('\\', '/', trim($resolved['defaultDirectory'], "/\\"))
-            : $basePath;
-        $resolved['defaultBaseHref'] = self::encodeRelativePath($defaultBasePath);
-
         $assets = [];
         $files = [];
         foreach (($resolved['assets'] ?? []) as $asset) {
@@ -519,9 +513,9 @@ class PoffConfig
         $localRelativeDir = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
         $layoutDir = null;
         $resolved['directory'] = $localRelativeDir;
-        $defaultLayout = self::findDefaultLayoutDir($dir);
-        if (is_array($defaultLayout)) {
-            $resolved['defaultDirectory'] = $defaultLayout['relative'];
+        $inheritedLayout = self::findInheritedLayoutDir($dir, $localLayoutDir);
+        if (is_array($inheritedLayout)) {
+            $resolved['inheritedDirectory'] = $inheritedLayout['relative'];
         }
 
         $assets = [];
@@ -532,9 +526,9 @@ class PoffConfig
 
         if (self::hasWrapperFiles($localLayoutDir)) {
             $layoutDir = $localLayoutDir;
-        } elseif (is_array($defaultLayout) && self::hasWrapperFiles($defaultLayout['absolute'])) {
-            $layoutDir = $defaultLayout['absolute'];
-            $resolved['directory'] = $defaultLayout['relative'];
+        } elseif (is_array($inheritedLayout) && self::hasWrapperFiles($inheritedLayout['absolute'])) {
+            $layoutDir = $inheritedLayout['absolute'];
+            $resolved['directory'] = $inheritedLayout['relative'];
         }
 
         if ($layoutDir !== null && is_dir($layoutDir)) {
@@ -597,7 +591,7 @@ class PoffConfig
         return $resolved;
     }
 
-    private static function findDefaultLayoutDir(string $dir): ?array
+    private static function findInheritedLayoutDir(string $dir, string $localLayoutDir): ?array
     {
         $cwd = realpath(getcwd() ?: '.');
         $current = realpath($dir);
@@ -605,13 +599,11 @@ class PoffConfig
             return null;
         }
 
+        $localLayoutRealpath = realpath($localLayoutDir) ?: $localLayoutDir;
+
         while ($current !== false) {
-            $candidate = $current
-                . DIRECTORY_SEPARATOR
-                . self::DEFAULT_LAYOUT_ROOT_DIR
-                . DIRECTORY_SEPARATOR
-                . self::DEFAULT_LAYOUT_FOLDER;
-            if (is_dir($candidate)) {
+            $candidate = $current . DIRECTORY_SEPARATOR . self::DEFAULT_LAYOUT_FOLDER;
+            if ($candidate !== $localLayoutRealpath && is_dir($candidate)) {
                 return [
                     'absolute' => $candidate,
                     'relative' => self::relativePathFromBase($candidate, $cwd ?: $current),
@@ -656,7 +648,7 @@ class PoffConfig
             'section' => $resolved['section'],
         ];
 
-        foreach (['model', 'stylePrompt'] as $key) {
+        foreach (['preset', 'model', 'stylePrompt'] as $key) {
             if (array_key_exists($key, $resolved)) {
                 $serialized[$key] = $resolved[$key];
             }

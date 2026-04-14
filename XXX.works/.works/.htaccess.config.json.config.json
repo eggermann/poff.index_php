@@ -1,0 +1,27 @@
+{
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "name": ".htaccess.config.json",
+    "slug": "htaccess-config-json",
+    "type": "file",
+    "kind": "text",
+    "path": ".htaccess.config.json",
+    "size": 722,
+    "modifiedAt": "2026-04-09T21:49:20+00:00",
+    "visible": true,
+    "mimeType": "application/json",
+    "hash": "9e31deadd62f3e8fe453e977bc41ac4ea1e110258a3a7662b7ebdaa66a11e365",
+    "updatedAt": "2026-04-12T11:42:12+00:00",
+    "id": "poff_055c2caf319cf949",
+    "work": {
+        "type": "text",
+        "syntax": "text/plain",
+        "layout": {
+            "mode": "default-layout",
+            "name": "default-layout",
+            "engine": "lightncandy",
+            "section": "work"
+        }
+    },
+    "title": "",
+    "description": ""
+}

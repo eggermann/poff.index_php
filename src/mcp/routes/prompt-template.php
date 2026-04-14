@@ -457,7 +457,7 @@ function mcpPromptCompactConfig(array $config): array
         foreach ($work as $key => $value) {
             if ($key === 'layout' && is_array($value)) {
                 $layoutSummary = [];
-                foreach (['name', 'mode', 'value', 'engine', 'section', 'storage', 'directory', 'defaultDirectory', 'sectionDirectory', 'phpTemplate'] as $layoutKey) {
+                foreach (['name', 'mode', 'value', 'engine', 'section', 'storage', 'directory', 'inheritedDirectory', 'sectionDirectory', 'phpTemplate'] as $layoutKey) {
                     if (array_key_exists($layoutKey, $value) && is_scalar($value[$layoutKey])) {
                         $layoutSummary[$layoutKey] = is_string($value[$layoutKey])
                             ? mcpPromptTrimText((string) $value[$layoutKey], 180)

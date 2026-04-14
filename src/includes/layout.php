@@ -4,6 +4,7 @@
  */
 ?>
 <div id="appShell" class="container">
+    XX
     <button
         id="sidebarToggle"
         class="sidebar-toggle"

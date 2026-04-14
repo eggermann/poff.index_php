@@ -551,6 +551,32 @@
     margin: 2px 0;
     word-break: break-word;
 }
+.prompt-template-viewer {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    padding: 8px 10px 10px;
+}
+.prompt-template-viewer-summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #111827;
+}
+.prompt-template-viewer-body {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
+.prompt-template-code {
+    min-height: 180px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.88em;
+    line-height: 1.45;
+    white-space: pre;
+    overflow: auto;
+    background: #f8fafc;
+}
 .prompt-inline-toggle {
     display: inline-flex;
     gap: 6px;

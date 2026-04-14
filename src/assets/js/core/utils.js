@@ -23,6 +23,10 @@ export function extractNavHtml(html) {
 
 export function getLayoutState(config) {
     const layoutValue = config?.work?.layout;
+    const normalizePreset = (value) => {
+        const preset = String(value || '').trim();
+        return ['actual', 'none', 'custom'].includes(preset) ? preset : '';
+    };
     const inferredSection = layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue) && layoutValue.section
         ? String(layoutValue.section)
         : ((config?.type === 'folder' || (config?.work?.type === 'folder' && !config?.name)) ? 'works' : 'work');
@@ -35,11 +39,13 @@ export function getLayoutState(config) {
                 : rawMode;
         const storage = state.storage || '';
         const directory = state.directory || '';
-        let preset = 'actual';
-        if (mode === 'none') {
-            preset = 'none';
-        } else if (storage === 'filesystem' && (directory === '.layout' || directory.startsWith('.works/'))) {
-            preset = 'custom';
+        let preset = normalizePreset(state.preset) || 'actual';
+        if (!normalizePreset(state.preset)) {
+            if (mode === 'none') {
+                preset = 'none';
+            } else if (storage === 'filesystem' && (directory === '.layout' || directory.startsWith('.works/'))) {
+                preset = 'custom';
+            }
         }
         const sourceLabel = mode === 'none'
             ? 'No outer layout'
@@ -54,7 +60,7 @@ export function getLayoutState(config) {
             mode,
             storage,
             directory,
-            defaultDirectory: state.defaultDirectory || '',
+            inheritedDirectory: state.inheritedDirectory || '',
             section: state.section || inferredSection,
             sectionTemplate: state.sectionTemplate || '',
             sectionDirectory: state.sectionDirectory || '',
@@ -73,11 +79,12 @@ export function getLayoutState(config) {
             engine: layoutValue.engine || 'lightncandy',
             directory: layoutValue.directory || '',
             storage: layoutValue.storage || '',
-            defaultDirectory: layoutValue.defaultDirectory || '',
+            inheritedDirectory: layoutValue.inheritedDirectory || '',
             section: layoutValue.section || inferredSection,
             sectionTemplate: layoutValue.sectionTemplate || '',
             sectionDirectory: layoutValue.sectionDirectory || '',
             phpTemplate: layoutValue.phpTemplate || '',
+            preset: layoutValue.preset || '',
             assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : [],
         });
     }

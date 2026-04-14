@@ -9,7 +9,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
         ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || 'work.hbs')}</code>.`
         : 'Template responses are saved to the wrapped partial: <code>work.hbs</code> for files and <code>works.hbs</code> for folders. The current outer layout stays active.';
     const contextCopy = mode === 'layout'
-        ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> / <code>{{layout.defaultBaseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> / <code>current.layoutDefaultBaseHref</code> in the prompt context.</div>`
+        ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>`
         : '<div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial. The outer layout wrapper stays active.</div>';
     const editableCopy = mode === 'layout'
         ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.*</strong>'
@@ -77,10 +77,17 @@ export function renderPromptWindow(settings = {}, options = {}) {
                     <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                     <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                     ${contextCopy}
-                    <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.defaultBaseHref}}, {{layout.sectionBaseHref}}</div>
+                    <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
                     <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
                 </div>
             </div>
+            <details class="prompt-template-viewer" id="promptTemplateViewer">
+                <summary class="prompt-template-viewer-summary">Current template code</summary>
+                <div class="prompt-template-viewer-body">
+                    <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                    <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
+                </div>
+            </details>
             <input id="prompt-image-input" type="file" accept="image/*" hidden>
             <div class="prompt-attachment" id="promptAttachment" hidden>
                 <div class="prompt-attachment-preview-wrap">

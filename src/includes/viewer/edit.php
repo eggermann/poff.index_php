@@ -318,10 +318,6 @@ function cmsBuildPromptContext(
     }
     $currentLayoutTarget = trim($activeLayoutDirectory, "/\\") . '/template.hbs';
     $layoutBasePath = $activeLayoutDirectory;
-    $layoutDefaultBasePath = trim((string) ($layoutValue['defaultDirectory'] ?? ''), "/\\");
-    if ($layoutDefaultBasePath === '') {
-        $layoutDefaultBasePath = $resolvedLayoutDirectory !== '' ? $resolvedLayoutDirectory : $layoutBasePath;
-    }
     $layoutSectionBasePath = trim((string) ($layoutValue['sectionDirectory'] ?? $layoutBasePath), "/\\");
     $layoutAssets = [];
     foreach (($layoutValue['assets'] ?? []) as $asset) {
@@ -362,7 +358,7 @@ function cmsBuildPromptContext(
             'layoutTemplateTarget' => $currentLocalLayoutTarget,
             'sectionTemplateTarget' => $currentSectionTarget,
             'layoutBaseHref' => cmsPromptEncodeRelativePath($layoutBasePath),
-            'layoutDefaultBaseHref' => cmsPromptEncodeRelativePath($layoutDefaultBasePath),
+            'inheritedLayoutDirectory' => trim((string) ($layoutValue['inheritedDirectory'] ?? ''), "/\\"),
             'layoutSectionBaseHref' => cmsPromptEncodeRelativePath($layoutSectionBasePath),
             'layoutAssets' => $layoutAssets,
         ],
@@ -470,7 +466,7 @@ function cmsPromptCompactConfig(array $config): array
         foreach ($work as $key => $value) {
             if ($key === 'layout' && is_array($value)) {
                 $layoutSummary = [];
-                foreach (['name', 'mode', 'value', 'engine', 'section', 'storage', 'directory', 'defaultDirectory', 'sectionDirectory', 'phpTemplate'] as $layoutKey) {
+                foreach (['name', 'mode', 'value', 'engine', 'section', 'storage', 'directory', 'inheritedDirectory', 'sectionDirectory', 'phpTemplate'] as $layoutKey) {
                     if (array_key_exists($layoutKey, $value) && is_scalar($value[$layoutKey])) {
                         $layoutSummary[$layoutKey] = is_string($value[$layoutKey])
                             ? cmsPromptTrimText((string) $value[$layoutKey], 180)
@@ -736,6 +732,7 @@ function cmsHandleEditAction(): void
 
         $layoutPayload = isset($data['layout']) && is_array($data['layout']) ? $data['layout'] : null;
         $layoutMode = '';
+        $layoutPreset = '';
         $layoutModel = null;
         $layoutTemplateProvided = false;
         $layoutTemplate = null;
@@ -757,6 +754,7 @@ function cmsHandleEditAction(): void
         if (is_array($layoutPayload)) {
             $hasLayoutUpdate = true;
             $layoutMode = trim((string) ($layoutPayload['mode'] ?? $layoutPayload['name'] ?? ''));
+            $layoutPreset = trim((string) ($layoutPayload['preset'] ?? ''));
             $layoutModel = $layoutPayload['model'] ?? null;
             if (array_key_exists('template', $layoutPayload)) {
                 $layoutTemplateProvided = true;
@@ -794,6 +792,14 @@ function cmsHandleEditAction(): void
         if (array_key_exists('layout_mode', $data)) {
             $hasLayoutUpdate = true;
             $layoutMode = trim((string) $data['layout_mode']);
+        }
+        if (array_key_exists('layout_preset', $data)) {
+            $hasLayoutUpdate = true;
+            $layoutPreset = trim((string) $data['layout_preset']);
+        }
+        if (array_key_exists('layoutPreset', $data)) {
+            $hasLayoutUpdate = true;
+            $layoutPreset = trim((string) $data['layoutPreset']);
         }
         if (array_key_exists('layout_model', $data)) {
             $hasLayoutUpdate = true;
@@ -874,6 +880,9 @@ function cmsHandleEditAction(): void
             }
             if ($layoutMode !== '') {
                 $layout['mode'] = $layoutMode;
+            }
+            if (in_array($layoutPreset, ['actual', 'none', 'custom'], true)) {
+                $layout['preset'] = $layoutPreset;
             }
             if ($layoutTemplateProvided) {
                 $layout['template'] = $layoutTemplate;
@@ -1022,12 +1031,13 @@ function cmsHandleEditAction(): void
                 'Return one HBS template string for the outer layout wrapper rendered through LightnCandy.',
                 'The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.',
                 'Keep the wrapped content chain active: use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.',
+                'The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.',
                 'When the current layout mode stays inherited or actual, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
                 'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.',
                 'current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.',
                 'For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.',
-                'Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local/custom layout assets and {{layout.defaultBaseHref}}/file.ext for inherited default layout assets. Reusing the default profile image should look like {{layout.defaultBaseHref}}/eggman_profile-image.jpg.',
-                'Prompt context JSON includes current.layoutBaseHref, current.layoutDefaultBaseHref, and current.layoutAssets to help you choose the right asset path.',
+                'Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.',
+                'Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets to help you choose the right asset path and understand whether the wrapper comes from a parent folder .layout.',
                 'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
                 'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
                 'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
@@ -1042,6 +1052,9 @@ function cmsHandleEditAction(): void
                 'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
                 'The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
                 'Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.',
+                'Important: return only the inner partial fragment. Do not return <html>, <body>, full page shells, app sidebars, or an outer wrapper that duplicates template.hbs.',
+                'For files, work.hbs should render only the inner media/content block that the wrapper inserts into {{> work}}.',
+                'For folders, works.hbs should render only the inner listing/content block that the wrapper inserts into {{> works}}. Do not replace the folder wrapper unless the user is explicitly editing layout mode.',
                 'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files. Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}.',
                 'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
                 'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',

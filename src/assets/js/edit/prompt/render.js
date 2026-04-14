@@ -64,7 +64,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const layout = work && typeof work.layout === 'object' ? work.layout : {};
     const layoutStorage = typeof layout?.storage === 'string' ? String(layout.storage) : '';
     const resolvedLayoutDirectory = layout?.directory ? String(layout.directory) : '';
-    const defaultLayoutDirectory = layout?.defaultDirectory ? String(layout.defaultDirectory) : '';
+    const inheritedLayoutDirectory = layout?.inheritedDirectory ? String(layout.inheritedDirectory) : '';
     const presetEl = isLayout ? document.getElementById('edit-layout-preset') : null;
     const layoutPreset = isLayout && presetEl ? String(presetEl.value || '').trim() : '';
     const activeLayoutDirectory = (() => {
@@ -114,7 +114,6 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
     }).filter(Boolean).join(' | ');
     const layoutBaseHref = activeLayoutDirectory;
-    const layoutDefaultBaseHref = defaultLayoutDirectory || resolvedLayoutDirectory || layoutBaseHref;
     const layoutAssetsPreview = Array.isArray(layout?.assets)
         ? layout.assets.slice(0, 4).map((asset) => {
             const assetPath = asset?.path ? String(asset.path) : '';
@@ -136,7 +135,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         layoutTemplateTarget,
         sectionTemplateTarget,
         layoutBaseHref,
-        layoutDefaultBaseHref,
+        inheritedLayoutDirectory,
         layoutAssetsPreview,
         workPreview,
         refPreview,
@@ -157,7 +156,7 @@ export function renderPromptContext(contextEl, context) {
     const layoutTemplateTarget = context?.layoutTemplateTarget || '';
     const sectionTemplateTarget = context?.sectionTemplateTarget || '';
     const layoutBaseHref = context?.layoutBaseHref || '';
-    const layoutDefaultBaseHref = context?.layoutDefaultBaseHref || '';
+    const inheritedLayoutDirectory = context?.inheritedLayoutDirectory || '';
     const layoutAssetsPreview = context?.layoutAssetsPreview || '';
     const workPreview = context?.workPreview || '';
     const refPreview = context?.refPreview || '';
@@ -172,7 +171,7 @@ export function renderPromptContext(contextEl, context) {
         ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget (custom)</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ''}
         ${sectionTemplateTarget ? `<div class="prompt-context-row"><strong>sectionTemplateTarget</strong>: ${escapeHtml(sectionTemplateTarget)}</div>` : ''}
         ${layoutBaseHref ? `<div class="prompt-context-row"><strong>layoutBaseHref</strong>: ${escapeHtml(layoutBaseHref)}</div>` : ''}
-        ${layoutDefaultBaseHref ? `<div class="prompt-context-row"><strong>layoutDefaultBaseHref</strong>: ${escapeHtml(layoutDefaultBaseHref)}</div>` : ''}
+        ${inheritedLayoutDirectory ? `<div class="prompt-context-row"><strong>inheritedLayoutDirectory</strong>: ${escapeHtml(inheritedLayoutDirectory)}</div>` : ''}
         <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('poff-layout, filesystem-layout, works, work')}</div>
         ${layoutAssetsPreview ? `<div class="prompt-context-row"><strong>layoutAssets</strong>: ${escapeHtml(layoutAssetsPreview)}</div>` : ''}
         ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ''}

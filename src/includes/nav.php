@@ -20,7 +20,9 @@ if (!empty($navFolder)) {
 }
 
 // Current directory link
-echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars($navFolder ? '?path=' . urlencode($navFolder) . $editQuery : '?path=' . $editQuery) . '">./</a></li>';
+if ($navFolder !== '') {
+    echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '">./</a></li>';
+}
 
 $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
 $directories = $files = [];
@@ -105,6 +107,15 @@ usort($files, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 foreach ($directories as $dir) {
     echo '<li><a class="nav-link" href="' . htmlspecialchars($dir['link']) . '">' . $dir['icon'] . htmlspecialchars($dir['name']) . '</a></li>';
 }
+
+if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
+    $layoutVirtualPath = $navFolder !== '' ? rtrim($navFolder, "/\\") . '/.layout' : '.layout';
+    $layoutHash = '#/' . str_replace('%2F', '/', rawurlencode($layoutVirtualPath));
+    echo '<li><a class="nav-link nav-link-layout" href="' . htmlspecialchars($layoutHash) . '" data-layout-path="' . htmlspecialchars($layoutVirtualPath) . '">'
+        . '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zm2 1a.75.75 0 000 1.5h10a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h7a.75.75 0 000-1.5H5z" clip-rule="evenodd"/></svg>'
+        . '.layout</a></li>';
+}
+
 foreach ($files as $file) {
     echo '<li><a class="nav-link" href="#" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '">' . $file['icon'] . htmlspecialchars($file['name']) . '</a></li>';
 }

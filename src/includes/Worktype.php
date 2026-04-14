@@ -611,105 +611,13 @@ class Worktype
     private static function fallbackRender(string $kind, array $ctx): string
     {
         if ($kind === 'folder') {
-            return self::fallbackFolderRender($ctx);
+            return '';
         }
 
         $path = htmlspecialchars((string) ($ctx['path'] ?? ''), ENT_QUOTES, 'UTF-8');
         $name = htmlspecialchars((string) ($ctx['name'] ?? ''), ENT_QUOTES, 'UTF-8');
 
         return '<iframe src="' . $path . '" title="' . $name . '"></iframe>';
-    }
-
-    private static function fallbackFolderRender(array $ctx): string
-    {
-        $items = [];
-        if (isset($ctx['items']) && is_array($ctx['items'])) {
-            $items = self::hydrateRenderItems($ctx['items']);
-        } elseif (isset($ctx['tree']) && is_array($ctx['tree'])) {
-            $items = self::hydrateRenderItems($ctx['tree']);
-        }
-
-        $title = htmlspecialchars((string) ($ctx['title'] ?? $ctx['name'] ?? 'Folder'), ENT_QUOTES, 'UTF-8');
-        $displayPath = htmlspecialchars((string) ($ctx['displayPath'] ?? $ctx['path'] ?? '.'), ENT_QUOTES, 'UTF-8');
-        $navLinks = [];
-
-        $parentLink = trim((string) ($ctx['parentPageLink'] ?? ''));
-        if ($parentLink !== '') {
-            $navLinks[] = '<a class="poff-folder-fallback__nav-link poff-folder-fallback__nav-link--up" href="'
-                . htmlspecialchars($parentLink, ENT_QUOTES, 'UTF-8')
-                . '">Go Up</a>';
-        }
-
-        $directoryLink = trim((string) ($ctx['directoryPageLink'] ?? $ctx['pageLink'] ?? ''));
-        $showDirectoryLink = (bool) ($ctx['showDirectoryPageLink'] ?? true);
-        if ($directoryLink !== '' && $showDirectoryLink) {
-            $navLinks[] = '<a class="poff-folder-fallback__nav-link poff-folder-fallback__nav-link--current" href="'
-                . htmlspecialchars($directoryLink, ENT_QUOTES, 'UTF-8')
-                . '">./</a>';
-        }
-
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $name = htmlspecialchars((string) ($item['name'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $href = htmlspecialchars((string) ($item['pageLink'] ?? $item['viewerHref'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $label = !empty($item['isFolder']) ? 'Folder' : 'File';
-            $navLinks[] = '<a class="poff-folder-fallback__nav-link" href="' . $href . '">'
-                . '<span class="poff-folder-fallback__nav-kind">' . $label . '</span>'
-                . '<span>' . $name . '</span>'
-                . '</a>';
-        }
-
-        $cards = [];
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $name = htmlspecialchars((string) ($item['name'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $path = htmlspecialchars((string) ($item['path'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $href = htmlspecialchars((string) ($item['pageLink'] ?? $item['viewerHref'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $label = !empty($item['isFolder']) ? 'Folder' : 'File';
-            $cards[] = '<article class="poff-folder-fallback__card">'
-                . '<span class="poff-folder-fallback__card-label">' . $label . '</span>'
-                . '<a class="poff-folder-fallback__card-link" href="' . $href . '">' . $name . '</a>'
-                . '<span class="poff-folder-fallback__card-path">' . $path . '</span>'
-                . '</article>';
-        }
-
-        $emptyState = $cards === []
-            ? '<div class="poff-folder-fallback__empty">This folder is empty.</div>'
-            : implode('', $cards);
-
-        return '<div class="poff-folder-fallback">'
-            . '<style>'
-            . '.poff-folder-fallback{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100dvh;background:#f0f2f5;color:#111827;font-family:Arial,sans-serif;}'
-            . '.poff-folder-fallback__sidebar{padding:92px 20px 20px;background:#fff;border-right:1px solid #e5e7eb;display:grid;gap:8px;align-content:start;}'
-            . '.poff-folder-fallback__nav-link{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;text-decoration:none;color:#374151;background:transparent;}'
-            . '.poff-folder-fallback__nav-link:hover{background:#e5e7eb;color:#111827;}'
-            . '.poff-folder-fallback__nav-link--up{color:#059669;font-weight:600;}'
-            . '.poff-folder-fallback__nav-link--current{background:#3b82f6;color:#fff;font-weight:600;}'
-            . '.poff-folder-fallback__nav-kind{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;}'
-            . '.poff-folder-fallback__stage{display:grid;grid-template-rows:auto 1fr;min-width:0;background:#fff;}'
-            . '.poff-folder-fallback__header{padding:28px 32px 18px;border-bottom:1px solid #e5e7eb;background:#fff;}'
-            . '.poff-folder-fallback__eyebrow{margin:0;font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:#6b7280;}'
-            . '.poff-folder-fallback__title{margin:8px 0 0;font-size:clamp(2rem,3vw,3rem);line-height:1;}'
-            . '.poff-folder-fallback__path{margin:10px 0 0;color:#4b5563;}'
-            . '.poff-folder-fallback__body{padding:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;align-content:start;background:#f9fafb;}'
-            . '.poff-folder-fallback__card{padding:16px;border:1px solid #d1d5db;border-radius:16px;background:#fff;display:grid;gap:10px;}'
-            . '.poff-folder-fallback__card-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;}'
-            . '.poff-folder-fallback__card-link{font-size:16px;font-weight:600;color:#111827;text-decoration:none;word-break:break-word;}'
-            . '.poff-folder-fallback__card-link:hover{text-decoration:underline;}'
-            . '.poff-folder-fallback__card-path{font-size:12px;color:#6b7280;word-break:break-word;}'
-            . '.poff-folder-fallback__empty{padding:24px;border:1px dashed #cbd5e1;border-radius:16px;background:#fff;color:#475569;}'
-            . '@media (max-width:720px){.poff-folder-fallback{grid-template-columns:1fr;grid-template-rows:auto 1fr;}.poff-folder-fallback__sidebar{padding:76px 14px 14px;border-right:0;border-bottom:1px solid #e5e7eb;}.poff-folder-fallback__header{padding:20px 18px 14px;}.poff-folder-fallback__body{padding:18px;}}'
-            . '</style>'
-            . '<aside class="poff-folder-fallback__sidebar">' . implode('', $navLinks) . '</aside>'
-            . '<section class="poff-folder-fallback__stage">'
-            . '<header class="poff-folder-fallback__header"><p class="poff-folder-fallback__eyebrow">Folder</p><h1 class="poff-folder-fallback__title">' . $title . '</h1><p class="poff-folder-fallback__path">' . $displayPath . '</p></header>'
-            . '<div class="poff-folder-fallback__body">' . $emptyState . '</div>'
-            . '</section>'
-            . '</div>';
     }
 
     /**

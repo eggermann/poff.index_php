@@ -166,6 +166,20 @@ export function initNavigation({
         });
     }
 
+    function setActiveLayoutLink(layoutPath = '') {
+        clearActiveLink();
+        if (!navList || !layoutPath) {
+            return;
+        }
+        const layoutEls = navList.querySelectorAll('a[data-layout-path]');
+        layoutEls.forEach((el) => {
+            if (el.getAttribute('data-layout-path') === layoutPath) {
+                el.classList.add('nav-link-active');
+                activeLink = el;
+            }
+        });
+    }
+
     function showNavLoading() {
         if (!navList) return;
         navList.innerHTML = `
@@ -224,7 +238,11 @@ export function initNavigation({
         window.location.hash = nextHash;
     }
 
-    function syncSidebarSelection(path = '', isFile = false) {
+    function syncSidebarSelection(path = '', isFile = false, isLayout = false) {
+        if (isLayout) {
+            setActiveLayoutLink(path);
+            return;
+        }
         if (!isFile) {
             clearActiveLink();
             return;
@@ -266,13 +284,13 @@ export function initNavigation({
             }
             loadNav(folderPath)
                 .then(() => {
-                    syncSidebarSelection(previewPath, previewIsFile);
+                    syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
                     if (sidebarLoading) {
                         sidebarLoading.style.display = 'none';
                     }
                 })
                 .catch(() => {
-                    syncSidebarSelection(previewPath, previewIsFile);
+                    syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
                     if (sidebarLoading) {
                         sidebarLoading.style.display = 'none';
                     }
@@ -460,6 +478,9 @@ export function initNavigation({
         } else if (target.dataset.src) {
             relPath = target.dataset.src;
             resolvedPath = true;
+        } else if (target.dataset.layoutPath) {
+            relPath = target.dataset.layoutPath;
+            resolvedPath = true;
         }
         if (!resolvedPath) {
             return;
@@ -469,7 +490,9 @@ export function initNavigation({
             window.open(relPath, '_blank');
             return;
         }
-        const isFile = !(target.hasAttribute('href') && target.getAttribute('href').startsWith('?path='));
+        const isFile = target.dataset.layoutPath
+            ? false
+            : !(target.hasAttribute('href') && target.getAttribute('href').startsWith('?path='));
         navigateToPath(relPath, { isFile });
     }
 

@@ -1,33 +1,7 @@
-<div class="poff-default-layout poff-default-layout--{{kind}}">
-    <aside class="poff-default-layout__sidebar">
-        <nav class="poff-default-layout__nav" aria-label="Current work navigation">
-            {{#if parentPageLink}}
-                <a class="poff-default-layout__nav-link poff-default-layout__nav-link--up" href="{{parentPageLink}}">
-                    <span class="poff-default-layout__nav-icon">↑</span>
-                    <span class="poff-default-layout__nav-name">Go Up</span>
-                </a>
-            {{/if}}
+<div style="border:13px solid red" class="poff-default-layout poff-default-layout--{{kind}}">
 
-            <a class="poff-default-layout__nav-link {{#if isFolder}}poff-default-layout__nav-link--current{{/if}}" href="{{directoryPageLink}}">
-                <span class="poff-default-layout__nav-icon">./</span>
-                <span class="poff-default-layout__nav-name">./</span>
-            </a>
+    ???**
 
-            {{#if isFolder}}
-                {{#each items}}
-                    <a class="poff-default-layout__nav-link" href="{{pageLink}}">
-                        <span class="poff-default-layout__nav-icon">{{#if isFolder}}▣{{else}}◧{{/if}}</span>
-                        <span class="poff-default-layout__nav-name">{{name}}</span>
-                    </a>
-                {{/each}}
-            {{else}}
-                <a class="poff-default-layout__nav-link poff-default-layout__nav-link--current" href="{{pageLink}}">
-                    <span class="poff-default-layout__nav-icon">◧</span>
-                    <span class="poff-default-layout__nav-name">{{name}}</span>
-                </a>
-            {{/if}}
-        </nav>
-    </aside>
 
     <div class="poff-default-layout__stage">
         <header class="poff-default-layout__header">
@@ -40,7 +14,7 @@
             </div>
         </header>
 
-        <main class="poff-default-layout__main">
+        <main style="border:13px solid blue"  class="poff-default-layout__main">
             {{#if isFolder}}
                 {{> works}}
             {{else}}

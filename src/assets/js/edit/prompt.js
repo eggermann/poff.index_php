@@ -121,6 +121,8 @@ export function bindPromptWindow({
     const promptSummaryEl = root.querySelector('#promptSummary');
     const promptGenerationEl = root.querySelector('#promptGeneration');
     const promptGenerationLabelEl = root.querySelector('#promptGenerationLabel');
+    const promptTemplateLabelEl = root.querySelector('#promptTemplateLabel');
+    const promptTemplateCodeEl = root.querySelector('#promptTemplateCode');
     const promptInputEl = root.querySelector('#prompt-input');
     const promptSendEl = root.querySelector('#prompt-send');
     const promptAttachEl = root.querySelector('#prompt-attach');
@@ -162,10 +164,33 @@ export function bindPromptWindow({
         renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
 
+    const getCurrentTemplateField = () => {
+        const selection = getActiveSelection ? getActiveSelection() : null;
+        const selector = selection?.isLayout ? '#edit-layout-primary-template' : '#edit-content-template';
+        return document.querySelector(selector);
+    };
+
+    const renderTemplatePreview = () => {
+        if (!promptTemplateCodeEl) {
+            return;
+        }
+        const selection = getActiveSelection ? getActiveSelection() : null;
+        const templateField = getCurrentTemplateField();
+        promptTemplateCodeEl.value = templateField && typeof templateField.value === 'string'
+            ? templateField.value
+            : '';
+        if (promptTemplateLabelEl) {
+            promptTemplateLabelEl.textContent = selection?.isLayout
+                ? 'Current layout wrapper template'
+                : 'Current wrapped partial template';
+        }
+    };
+
     const renderContext = () => {
         const context = buildPromptContext({ getActiveSelection, getConfig });
         activePath = context.path;
         renderPromptContext(promptContextEl, context);
+        renderTemplatePreview();
     };
 
     const renderSummary = (content) => {
@@ -393,6 +418,15 @@ export function bindPromptWindow({
         }
     };
     window.addEventListener('hashchange', syncHistoryForPath);
+    document.addEventListener('input', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)) {
+            return;
+        }
+        if (target.matches('#edit-content-template, #edit-layout-primary-template')) {
+            renderTemplatePreview();
+        }
+    });
 
     const layoutPresetEl = document.getElementById('edit-layout-preset');
     if (layoutPresetEl) {
@@ -624,6 +658,7 @@ export function bindPromptWindow({
                     const layoutState = getLayoutState(currentConfig || {});
                     const layoutPresetEl = document.getElementById('edit-layout-preset');
                     const preset = (layoutPresetEl?.value || layoutState.preset || 'actual').trim();
+                    layoutPayload.preset = preset;
                     const layoutPathName = (selection.previewPath || '').split('/').pop() || 'item';
                     const localLayoutDirectory = selection.layoutIsFile
                         ? `.works/${layoutPathName}.layout`

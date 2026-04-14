@@ -13,10 +13,10 @@ function layoutOverlayState(config, status) {
     const sectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
-    const hasFilesystemDefault = !!layoutState.defaultDirectory;
+    const hasInheritedLayout = !!layoutState.inheritedDirectory;
     const originalTarget = layoutState.storage === 'filesystem'
         ? (layoutState.directory || localLayoutDirectory)
-        : (layoutState.defaultDirectory || '');
+        : (layoutState.inheritedDirectory || '');
     const originalEditable = originalTarget !== '';
     const originalUsesLocal = originalTarget === localLayoutDirectory;
 
@@ -44,12 +44,12 @@ function layoutOverlayState(config, status) {
     const wrapperSourceLabel = layoutState.storage === 'filesystem'
         ? `Filesystem: ${layoutState.directory || localLayoutDirectory}`
         : 'PHP built-in poff-layout';
-    const filesystemDefaultLabel = hasFilesystemDefault
-        ? layoutState.defaultDirectory
-        : 'No filesystem default yet';
+    const inheritedLayoutLabel = hasInheritedLayout
+        ? layoutState.inheritedDirectory
+        : 'No parent .layout found';
     const originalLabel = originalEditable
         ? `Editable source: ${originalTarget}`
-        : 'PHP built-in poff-layout is read-only until a filesystem default exists';
+        : 'PHP built-in poff-layout is read-only until a parent .layout exists';
 
     return {
         layoutState,
@@ -59,7 +59,7 @@ function layoutOverlayState(config, status) {
         sectionTarget,
         wrapperWasLocal,
         sectionWasLocal,
-        hasFilesystemDefault,
+        hasInheritedLayout,
         originalTarget,
         originalEditable,
         originalUsesLocal,
@@ -70,7 +70,7 @@ function layoutOverlayState(config, status) {
         originalCss,
         originalJs,
         wrapperSourceLabel,
-        filesystemDefaultLabel,
+        inheritedLayoutLabel,
         originalLabel,
     };
 }
@@ -104,7 +104,7 @@ function renderEditLayoutPanel({
         originalCss,
         originalJs,
         wrapperSourceLabel,
-        filesystemDefaultLabel,
+        inheritedLayoutLabel,
         originalLabel,
     } = overlayState;
     const subjectLabel = subjectStatus.target === 'file' ? 'file' : 'folder';
@@ -159,7 +159,7 @@ function renderEditLayoutPanel({
             <div class="edit-layout-overlay-grid">
                 <div class="edit-layout-meta-card">
                     <div class="edit-layout-meta-title">Sources</div>
-                    <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
+                    <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
                     <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
@@ -260,8 +260,8 @@ function renderEditLayoutPanel({
         if (primaryHintEl) {
             if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
-                    ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
-                    : 'Showing the bundled poff-layout. It stays read-only until a filesystem default layout exists.';
+                    ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
             }
@@ -424,7 +424,7 @@ export function renderEditPanel({
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
                 <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                <div class="small-note">Filesystem default: <code>${escapeHtml(overlayState.filesystemDefaultLabel)}</code></div>
+                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
                 <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
             </div>
             <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
@@ -464,6 +464,13 @@ export function renderEditPanel({
                 </form>
             </dialog>
         ` : ''}
+        <details class="prompt-template-viewer">
+            <summary class="prompt-template-viewer-summary">Current template code</summary>
+            <div class="prompt-template-viewer-body">
+                <div class="small-note">${status?.target === 'file' ? 'Current wrapped file partial' : 'Current wrapped folder partial'}</div>
+                <textarea class="form-textarea prompt-template-code" readonly spellcheck="false" placeholder="No template loaded yet.">${escapeHtml(overlayState.layoutState.sectionTemplate || '')}</textarea>
+            </div>
+        </details>
         ${renderPromptWindow(settings)}
     `;
 
@@ -620,7 +627,7 @@ export function renderEditLayoutOverlay({
         originalCss,
         originalJs,
         wrapperSourceLabel,
-        filesystemDefaultLabel,
+        inheritedLayoutLabel,
         originalLabel,
     } = overlayState;
 
@@ -657,7 +664,7 @@ export function renderEditLayoutOverlay({
                     </div>
                     <div class="edit-layout-meta-card">
                         <div class="edit-layout-meta-title">Inheritance</div>
-                        <div class="small-note">Filesystem default: <code>${escapeHtml(filesystemDefaultLabel)}</code></div>
+                        <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
                         <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                         <div class="small-note">Wrapped inner partial: <code>${escapeHtml(layoutState.sectionDirectory ? `${layoutState.sectionDirectory}/${sectionName}.hbs` : `built-in ${sectionName}.hbs`)}</code></div>
                     </div>
@@ -760,8 +767,8 @@ export function renderEditLayoutOverlay({
         if (primaryHintEl) {
             if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
-                    ? `Editing the inherited layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
-                    : 'Showing the bundled poff-layout. It stays read-only until a filesystem default layout exists.';
+                    ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
             }
