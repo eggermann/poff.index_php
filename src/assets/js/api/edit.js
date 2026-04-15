@@ -50,13 +50,28 @@ export async function requestEditUpload(payload) {
             },
             body: formData,
         });
-        if (!res.ok) {
-            const data = await res.json().catch(() => null);
-            return data || { allowed: false, error: 'Upload endpoint unavailable.' };
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
         }
-        return await res.json();
+        if (!res.ok) {
+            return data || {
+                allowed: false,
+                error: responseText.trim() || `Upload endpoint failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || {
+            allowed: false,
+            error: responseText.trim() || 'Upload endpoint returned invalid JSON.',
+        };
     } catch (err) {
-        return { allowed: false, error: 'Upload endpoint unavailable.' };
+        return {
+            allowed: false,
+            error: err?.message || 'Upload endpoint unavailable.',
+        };
     }
 }
 

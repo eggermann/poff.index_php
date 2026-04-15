@@ -662,6 +662,38 @@ function cmsPromptHistoryText(array $history): string
     return $historyText;
 }
 
+function cmsIniBytes(string $value): int
+{
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return 0;
+    }
+
+    $unit = strtolower(substr($trimmed, -1));
+    $number = (float) $trimmed;
+
+    return match ($unit) {
+        'g' => (int) round($number * 1024 * 1024 * 1024),
+        'm' => (int) round($number * 1024 * 1024),
+        'k' => (int) round($number * 1024),
+        default => (int) round((float) $trimmed),
+    };
+}
+
+function cmsUploadLimits(): array
+{
+    $postMax = (string) ini_get('post_max_size');
+    $uploadMax = (string) ini_get('upload_max_filesize');
+
+    return [
+        'postMax' => $postMax,
+        'postMaxBytes' => cmsIniBytes($postMax),
+        'uploadMax' => $uploadMax,
+        'uploadMaxBytes' => cmsIniBytes($uploadMax),
+        'maxFileUploads' => (int) ini_get('max_file_uploads'),
+    ];
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
@@ -723,6 +755,7 @@ function cmsHandleEditAction(): void
             'target' => $isLayoutTarget ? 'layout' : $subjectType,
             'subjectTarget' => $subjectType,
             'config' => $config,
+            'uploadLimits' => cmsUploadLimits(),
         ]);
     }
 
@@ -733,11 +766,17 @@ function cmsHandleEditAction(): void
                 'error' => 'Upload requires POST.',
             ], 405);
         }
-        if ($subjectType !== 'folder') {
+        if (!$isLayoutTarget && $subjectType !== 'folder') {
             cmsJsonResponse([
                 'allowed' => true,
                 'error' => 'Uploads are only supported for folders.',
             ], 400);
+        }
+        $uploadTargetDir = $targetDir;
+        if ($isLayoutTarget) {
+            $uploadTargetDir = $subjectType === 'file'
+                ? PoffConfig::fileLayoutDir($targetDir, (string) $targetFile)
+                : PoffConfig::folderLayoutDir($targetDir);
         }
         $source = trim((string) ($data['source'] ?? 'upload'));
         if (!in_array($source, ['upload', 'blank'], true)) {
@@ -750,7 +789,7 @@ function cmsHandleEditAction(): void
         if ($source === 'blank') {
             $fileName = (string) ($data['fileName'] ?? $data['filename'] ?? '');
             $contents = (string) ($data['contents'] ?? '');
-            $result = cmsCreateBlankFile($targetDir, $fileName, $contents);
+            $result = cmsCreateBlankFile($uploadTargetDir, $fileName, $contents);
         } else {
             $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
             if ($entries === []) {
@@ -760,7 +799,7 @@ function cmsHandleEditAction(): void
                 ], 400);
             }
 
-            $result = cmsStoreUploadEntries($targetDir, $entries);
+            $result = cmsStoreUploadEntries($uploadTargetDir, $entries);
         }
 
         if ($result['stored'] === []) {
@@ -770,14 +809,17 @@ function cmsHandleEditAction(): void
             ], 400);
         }
 
-        $updatedConfig = PoffConfig::ensure($targetDir);
+        $updatedConfig = $subjectType === 'file'
+            ? PoffConfig::ensureFileConfig($targetDir, (string) $targetFile)
+            : PoffConfig::ensure($targetDir);
         cmsJsonResponse([
             'allowed' => true,
-            'target' => 'folder',
-            'subjectTarget' => 'folder',
+            'target' => $isLayoutTarget ? 'layout' : 'folder',
+            'subjectTarget' => $subjectType,
             'uploaded' => $result['stored'],
             'errors' => $result['errors'],
             'config' => $updatedConfig,
+            'uploadLimits' => cmsUploadLimits(),
         ]);
     }
 

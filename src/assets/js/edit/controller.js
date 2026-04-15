@@ -16,6 +16,9 @@ export function createEditController({ elements, context, editRequested }) {
     let drawerOpen = false;
 
     function getContentTargetPath(selection = getActiveSelection()) {
+        if (selection?.isLayout) {
+            return selection.path || '';
+        }
         const previewPath = selection?.previewPath || selection?.path || '';
         if (selection?.previewIsFile) {
             return previewPath.split('/').slice(0, -1).join('/');
@@ -116,6 +119,7 @@ export function createEditController({ elements, context, editRequested }) {
             error: refreshed?.error,
             target: refreshed?.target || editTarget,
             subjectTarget: refreshed?.subjectTarget,
+            uploadLimits: refreshed?.uploadLimits,
         });
     }
 
@@ -317,6 +321,7 @@ export function createEditController({ elements, context, editRequested }) {
             allowed: data.allowed !== false,
             error: data.error,
             target: editTarget,
+            uploadLimits: data.uploadLimits,
         });
     }
 

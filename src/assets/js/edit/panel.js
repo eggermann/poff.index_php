@@ -2,6 +2,45 @@ import { escapeHtml, getLayoutState } from '../core/utils.js';
 import { loadPromptSettings } from './prompt/storage.js';
 import { renderPromptWindow } from './prompt-window.js';
 
+function formatUploadBytes(value = 0) {
+    const bytes = Number(value) || 0;
+    if (bytes <= 0) {
+        return '0 B';
+    }
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+        size /= 1024;
+        index += 1;
+    }
+    const rounded = size >= 10 || index === 0 ? Math.round(size) : Math.round(size * 10) / 10;
+    return `${rounded} ${units[index]}`;
+}
+
+function uploadValidationError(files = [], uploadLimits = null) {
+    if (!Array.isArray(files) || files.length === 0) {
+        return null;
+    }
+
+    const perFileLimit = Number(uploadLimits?.uploadMaxBytes || 0);
+    const postLimit = Number(uploadLimits?.postMaxBytes || 0);
+    const totalSize = files.reduce((sum, file) => sum + (Number(file?.size) || 0), 0);
+
+    if (perFileLimit > 0) {
+        const oversizedFile = files.find((file) => (Number(file?.size) || 0) > perFileLimit);
+        if (oversizedFile) {
+            return `${oversizedFile.name} is too large. Max file size is ${uploadLimits?.uploadMax || formatUploadBytes(perFileLimit)}.`;
+        }
+    }
+
+    if (postLimit > 0 && totalSize > postLimit) {
+        return `Selected files are too large together. Max upload payload is ${uploadLimits?.postMax || formatUploadBytes(postLimit)}.`;
+    }
+
+    return null;
+}
+
 function layoutOverlayState(config, status) {
     const layoutState = getLayoutState(config);
     const isFile = status?.target === 'file';
@@ -272,6 +311,7 @@ function renderEditLayoutPanel({
     const uploadFilesWrapEl = editPanel.querySelector('#editUploadFilesWrap');
     const blankFileWrapEl = editPanel.querySelector('#editBlankFileWrap');
     const blankFileNameEl = editPanel.querySelector('#edit-blank-file-name');
+    const uploadLimits = status?.uploadLimits || null;
 
     const currentSectionTemplate = layoutState.sectionTemplate || '';
     const drafts = {
@@ -413,6 +453,11 @@ function renderEditLayoutPanel({
                 uploadSummaryEl.textContent = name ? `Will create: ${name}` : 'Enter a file name.';
                 return;
             }
+            const validationError = uploadValidationError(files, uploadLimits);
+            if (validationError) {
+                uploadSummaryEl.textContent = validationError;
+                return;
+            }
             uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(', ') : 'No files selected.';
         };
         const syncUploadMode = () => {
@@ -481,6 +526,14 @@ function renderEditLayoutPanel({
                         if (files.length === 0) {
                             if (statusEl) {
                                 statusEl.textContent = 'Choose at least one file.';
+                                statusEl.className = 'edit-status';
+                            }
+                            return;
+                        }
+                        const validationError = uploadValidationError(files, uploadLimits);
+                        if (validationError) {
+                            if (statusEl) {
+                                statusEl.textContent = validationError;
                                 statusEl.className = 'edit-status';
                             }
                             return;
@@ -661,6 +714,7 @@ export function renderEditPanel({
     const uploadFilesWrapEl = editPanel.querySelector('#editUploadFilesWrap');
     const blankFileWrapEl = editPanel.querySelector('#editBlankFileWrap');
     const blankFileNameEl = editPanel.querySelector('#edit-blank-file-name');
+    const uploadLimits = status?.uploadLimits || null;
 
     if (titleInput && typeof onTitleInput === 'function') {
         titleInput.addEventListener('input', () => {
@@ -697,6 +751,11 @@ export function renderEditPanel({
             if ((uploadSourceEl?.value || 'upload') === 'blank') {
                 const name = blankFileNameEl?.value?.trim() || '';
                 uploadSummaryEl.textContent = name ? `Will create: ${name}` : 'Enter a file name.';
+                return;
+            }
+            const validationError = uploadValidationError(files, uploadLimits);
+            if (validationError) {
+                uploadSummaryEl.textContent = validationError;
                 return;
             }
             uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(', ') : 'No files selected.';
@@ -771,6 +830,14 @@ export function renderEditPanel({
                         if (files.length === 0) {
                             if (statusEl) {
                                 statusEl.textContent = 'Choose at least one file.';
+                                statusEl.className = 'edit-status';
+                            }
+                            return;
+                        }
+                        const validationError = uploadValidationError(files, uploadLimits);
+                        if (validationError) {
+                            if (statusEl) {
+                                statusEl.textContent = validationError;
                                 statusEl.className = 'edit-status';
                             }
                             return;
