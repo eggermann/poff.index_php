@@ -15,6 +15,14 @@ export function createEditController({ elements, context, editRequested }) {
     let editTarget = 'folder';
     let drawerOpen = false;
 
+    function getContentTargetPath(selection = getActiveSelection()) {
+        const previewPath = selection?.previewPath || selection?.path || '';
+        if (selection?.previewIsFile) {
+            return previewPath.split('/').slice(0, -1).join('/');
+        }
+        return previewPath;
+    }
+
     function renderFolderMeta() {
         return folderConfig;
     }
@@ -93,12 +101,31 @@ export function createEditController({ elements, context, editRequested }) {
         editDrawer.classList.add('edit-drawer-open');
     }
 
+    async function refreshCurrentEditState(selection = getActiveSelection()) {
+        const refreshed = await requestEditConfig('config', { path: selection.path });
+        if (refreshed?.config) {
+            editConfig = refreshed.config;
+            editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
+            if (editTarget === 'folder' || (editTarget === 'layout' && refreshed.subjectTarget === 'folder')) {
+                folderConfig = editConfig;
+                renderFolderMeta();
+            }
+        }
+        renderEditUI(refreshed?.config || editConfig, {
+            allowed: refreshed?.allowed !== false,
+            error: refreshed?.error,
+            target: refreshed?.target || editTarget,
+            subjectTarget: refreshed?.subjectTarget,
+        });
+    }
+
     function renderEditUI(config, status) {
         const panelState = renderEditPanel({
             editPanel,
             editRequested,
             config,
             status,
+            contentTargetLabel: getContentTargetPath(),
             onTitleInput: (value) => {
                 if (!editConfig) {
                     return;
@@ -190,7 +217,7 @@ export function createEditController({ elements, context, editRequested }) {
             onUploadFiles: async ({ source, files, statusEl }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
-                    path: selection.previewPath || selection.path,
+                    path: getContentTargetPath(selection),
                     source,
                     files,
                 });
@@ -198,19 +225,34 @@ export function createEditController({ elements, context, editRequested }) {
                     throw new Error(data?.error || 'Upload failed.');
                 }
 
-                editConfig = data.config || editConfig;
-                editTarget = data.target || editTarget;
-                if (editTarget === 'folder') {
-                    folderConfig = editConfig;
-                }
-                renderEditUI(editConfig, {
-                    allowed: data.allowed !== false,
-                    target: editTarget,
-                });
+                await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
                     inlineStatus.textContent = count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`;
+                    inlineStatus.className = 'edit-status edit-status-success';
+                }
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            },
+            onCreateBlankFile: async ({ source, fileName, statusEl }) => {
+                const selection = getActiveSelection();
+                const data = await requestEditUpload({
+                    path: getContentTargetPath(selection),
+                    source,
+                    fileName,
+                    files: [],
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Create blank file failed.');
+                }
+
+                await refreshCurrentEditState(selection);
+                const inlineStatus = document.getElementById('editInlineStatus');
+                if (inlineStatus) {
+                    const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
+                        ? data.uploaded[0].name
+                        : fileName;
+                    inlineStatus.textContent = `Created ${createdName}.`;
                     inlineStatus.className = 'edit-status edit-status-success';
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));

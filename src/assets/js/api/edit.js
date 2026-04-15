@@ -33,6 +33,12 @@ export async function requestEditUpload(payload) {
     const url = buildCmsUrl('upload', payload.path || '');
     const formData = new FormData();
     formData.set('source', payload.source || 'upload');
+    if (typeof payload.fileName === 'string') {
+        formData.set('fileName', payload.fileName);
+    }
+    if (typeof payload.contents === 'string') {
+        formData.set('contents', payload.contents);
+    }
     for (const file of payload.files || []) {
         formData.append('files[]', file);
     }

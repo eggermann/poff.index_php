@@ -238,6 +238,47 @@ function cmsStoreUploadEntries(string $targetDir, array $entries): array
     ];
 }
 
+function cmsCreateBlankFile(string $targetDir, string $name, string $contents = ''): array
+{
+    $trimmedName = trim($name);
+    if ($trimmedName === '') {
+        return [
+            'stored' => [],
+            'errors' => ['Enter a file name.'],
+        ];
+    }
+
+    $safeName = cmsSanitizeUploadName($trimmedName);
+    if ($safeName === 'upload.bin' && trim($trimmedName) !== 'upload.bin') {
+        return [
+            'stored' => [],
+            'errors' => ['Enter a valid file name.'],
+        ];
+    }
+
+    if (!is_dir($targetDir)) {
+        mkdir($targetDir, 0755, true);
+    }
+
+    $targetPath = cmsResolveUniqueUploadPath($targetDir, $safeName);
+    $written = @file_put_contents($targetPath, $contents);
+    if ($written === false) {
+        return [
+            'stored' => [],
+            'errors' => ['Could not create ' . basename($targetPath) . '.'],
+        ];
+    }
+
+    return [
+        'stored' => [[
+            'name' => basename($targetPath),
+            'path' => basename($targetPath),
+            'size' => filesize($targetPath) ?: 0,
+        ]],
+        'errors' => [],
+    ];
+}
+
 function cmsPromptViewerUrl(string $relativePath, bool $isFile): string
 {
     return $isFile
@@ -699,22 +740,29 @@ function cmsHandleEditAction(): void
             ], 400);
         }
         $source = trim((string) ($data['source'] ?? 'upload'));
-        if ($source !== 'upload') {
+        if (!in_array($source, ['upload', 'blank'], true)) {
             cmsJsonResponse([
                 'allowed' => true,
-                'error' => 'Only file upload is available right now.',
+                'error' => 'Unsupported add-content source.',
             ], 400);
         }
 
-        $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
-        if ($entries === []) {
-            cmsJsonResponse([
-                'allowed' => true,
-                'error' => 'No files selected.',
-            ], 400);
+        if ($source === 'blank') {
+            $fileName = (string) ($data['fileName'] ?? $data['filename'] ?? '');
+            $contents = (string) ($data['contents'] ?? '');
+            $result = cmsCreateBlankFile($targetDir, $fileName, $contents);
+        } else {
+            $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
+            if ($entries === []) {
+                cmsJsonResponse([
+                    'allowed' => true,
+                    'error' => 'No files selected.',
+                ], 400);
+            }
+
+            $result = cmsStoreUploadEntries($targetDir, $entries);
         }
 
-        $result = cmsStoreUploadEntries($targetDir, $entries);
         if ($result['stored'] === []) {
             cmsJsonResponse([
                 'allowed' => true,

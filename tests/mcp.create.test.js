@@ -133,6 +133,25 @@ function runUpload(targetDir, sourcePath, uploadName) {
   });
 }
 
+function runBlankFile(targetDir, fileName, contents = '') {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_blank_file.php'), targetDir, fileName, contents];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`blank file helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runPhpJson(scriptName) {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [path.join(ROOT, 'tests', scriptName)], {
@@ -706,6 +725,23 @@ describe('Worktype HBS renderer', () => {
     expect(result.config.tree).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'slides.pdf', type: 'file' }),
+      ]),
+    );
+  });
+
+  test('creates a blank file in a folder target', async () => {
+    const output = await runBlankFile(UPLOAD_TARGET_DIR, 'draft.txt');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.stored).toEqual([
+      expect.objectContaining({ name: 'draft.txt', path: 'draft.txt' }),
+    ]);
+    expect(fs.existsSync(path.join(UPLOAD_TARGET_DIR, 'draft.txt'))).toBe(true);
+    expect(fs.readFileSync(path.join(UPLOAD_TARGET_DIR, 'draft.txt'), 'utf8')).toBe('');
+    expect(result.config.tree).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'draft.txt', type: 'file' }),
       ]),
     );
   });
