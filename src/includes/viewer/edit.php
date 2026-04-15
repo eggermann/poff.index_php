@@ -24,7 +24,53 @@ function cmsPromptImagePayload(array $data): ?array
     ];
 }
 
-function cmsParsePromptModelResult(string $raw): array
+function cmsDefaultLayoutMainBlock(): string
+{
+    return <<<HBS
+<main class="poff-default-layout__main">
+    {{#if isFolder}}
+        {{> works}}
+    {{else}}
+        {{> work}}
+    {{/if}}
+</main>
+HBS;
+}
+
+function cmsNormalizeLayoutPromptTemplate(string $template): string
+{
+    $trimmed = trim($template);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $requiredPartials = str_contains($trimmed, '{{> works}}') && str_contains($trimmed, '{{> work}}');
+    $mainPattern = '/<main\b[^>]*class\s*=\s*["\'][^"\']*\bpoff-default-layout__main\b[^"\']*["\'][^>]*>.*?<\/main>/is';
+    $mainBlock = cmsDefaultLayoutMainBlock();
+
+    if (preg_match($mainPattern, $trimmed) === 1) {
+        if ($requiredPartials) {
+            return $trimmed;
+        }
+
+        return preg_replace($mainPattern, $mainBlock, $trimmed, 1) ?? $trimmed;
+    }
+
+    if ($requiredPartials) {
+        return $trimmed;
+    }
+
+    foreach (['</footer>', '</div>'] as $closingTag) {
+        $position = strripos($trimmed, $closingTag);
+        if ($position !== false) {
+            return substr($trimmed, 0, $position) . $mainBlock . "\n\n" . substr($trimmed, $position);
+        }
+    }
+
+    return $trimmed . "\n\n" . $mainBlock;
+}
+
+function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): array
 {
     $trimmed = trim($raw);
     if ($trimmed === '') {
@@ -52,11 +98,21 @@ function cmsParsePromptModelResult(string $raw): array
         return ['template' => $trimmed];
     }
 
+    if ($isLayoutTarget) {
+        $template = cmsNormalizeLayoutPromptTemplate($template);
+    }
+
     $result = ['template' => $template];
     foreach (['title', 'description', 'model'] as $key) {
         if (isset($decoded[$key]) && is_scalar($decoded[$key])) {
             $result[$key] = trim((string) $decoded[$key]);
         }
+    }
+    if (array_key_exists('css', $decoded) || array_key_exists('style', $decoded)) {
+        $result['css'] = (string) ($decoded['css'] ?? $decoded['style'] ?? '');
+    }
+    if (array_key_exists('js', $decoded) || array_key_exists('script', $decoded)) {
+        $result['js'] = (string) ($decoded['js'] ?? $decoded['script'] ?? '');
     }
     if (isset($decoded['work']) && is_array($decoded['work'])) {
         $result['work'] = $decoded['work'];
@@ -1015,8 +1071,10 @@ function cmsHandleEditAction(): void
             ? [
                 'Response format: return strict JSON.',
                 'Required key: "template" with the outer layout wrapper HBS string.',
+                'Optional keys: "css" and "js" for sibling style.css and script.js content.',
                 'Optional key: "work" for work.* updates when the user explicitly requests them.',
-                'Example: {"template":"<div>{{> work}}</div>","work":{"layout":"custom-layout"}}',
+                'Template requirement: keep a <main class="poff-default-layout__main"> block that renders {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}.',
+                'Example: {"template":"<div class=\"poff-default-layout\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","css":".poff-default-layout{min-height:100dvh;}","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
             ]
             : [
                 'Response format: return strict JSON.',
@@ -1029,9 +1087,12 @@ function cmsHandleEditAction(): void
             ? [
                 'You are a Handlebars (HBS) layout generator for this single-page CMS.',
                 'Return one HBS template string for the outer layout wrapper rendered through LightnCandy.',
+                'When generating a custom layout, use src/includes/worktypes/templates/layout/default/template.hbs as the scaffold and keep the same wrapper behavior unless the user explicitly asks otherwise.',
                 'The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.',
                 'Keep the wrapped content chain active: use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.',
                 'The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.',
+                'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
+                'Prefer returning sibling "css" and "js" strings too, so the custom layout can create template.hbs, style.css, and script.js together.',
                 'When the current layout mode stays inherited or actual, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
                 'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.',
                 'current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.',
@@ -1184,7 +1245,7 @@ function cmsHandleEditAction(): void
             }
         }
 
-        $parsedResult = cmsParsePromptModelResult($template);
+        $parsedResult = cmsParsePromptModelResult($template, $isLayoutTarget);
         $templateText = trim((string) ($parsedResult['template'] ?? ''));
         if ($templateText === '') {
             cmsJsonResponse([
@@ -1202,7 +1263,7 @@ function cmsHandleEditAction(): void
             'template' => $templateText,
             'systemPrompt' => $systemPrompt,
         ];
-        foreach (['title', 'description', 'work'] as $key) {
+        foreach (['title', 'description', 'work', 'css', 'js'] as $key) {
             if (array_key_exists($key, $parsedResult)) {
                 $responsePayload[$key] = $parsedResult[$key];
             }

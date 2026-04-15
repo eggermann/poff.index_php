@@ -40,7 +40,7 @@ const summarizePromptError = (err, requestSummary) => ({
     message: typeof err?.message === 'string' ? err.message : String(err || 'Prompt failed.'),
 });
 
-const updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget }) => {
+const updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget, nextCss = null, nextJs = null }) => {
     const templateSelectors = isLayoutTarget
         ? ['#edit-layout-primary-template']
         : ['#edit-content-template'];
@@ -73,6 +73,22 @@ const updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, ne
         document.querySelectorAll('#edit-work-type').forEach((field) => {
             if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
                 field.value = nextWork.type;
+            }
+        });
+    }
+
+    if (isLayoutTarget && nextCss !== null) {
+        document.querySelectorAll('#edit-layout-primary-css').forEach((field) => {
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+                field.value = nextCss;
+            }
+        });
+    }
+
+    if (isLayoutTarget && nextJs !== null) {
+        document.querySelectorAll('#edit-layout-primary-js').forEach((field) => {
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+                field.value = nextJs;
             }
         });
     }
@@ -542,6 +558,8 @@ export function bindPromptWindow({
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
                 const nextTitle = typeof response.title === 'string' ? response.title.trim() : null;
                 const nextDescription = typeof response.description === 'string' ? response.description.trim() : null;
+                const nextCss = typeof response.css === 'string' ? response.css : null;
+                const nextJs = typeof response.js === 'string' ? response.js : null;
                 const isLayoutTarget = !!selection.isLayout;
                 const currentConfig = getConfig ? getConfig() : null;
                 const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
@@ -609,6 +627,8 @@ export function bindPromptWindow({
                     nextDescription,
                     nextWork,
                     isLayoutTarget,
+                    nextCss,
+                    nextJs,
                 });
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
@@ -677,12 +697,30 @@ export function bindPromptWindow({
                             : (canEditResolvedFilesystemTarget ? 'filesystem-layout' : 'poff-layout');
                     if (shouldPersistToLocalWrapper) {
                         layoutPayload.template = templateText;
+                        if (nextCss !== null) {
+                            layoutPayload.css = nextCss;
+                        }
+                        if (nextJs !== null) {
+                            layoutPayload.js = nextJs;
+                        }
                     } else if (canEditResolvedFilesystemTarget) {
                         layoutPayload.originalTarget = resolvedLayoutDirectory;
                         layoutPayload.originalTemplate = templateText;
+                        if (nextCss !== null) {
+                            layoutPayload.originalCss = nextCss;
+                        }
+                        if (nextJs !== null) {
+                            layoutPayload.originalJs = nextJs;
+                        }
                     } else {
                         layoutPayload.name = 'custom-layout';
                         layoutPayload.template = templateText;
+                        if (nextCss !== null) {
+                            layoutPayload.css = nextCss;
+                        }
+                        if (nextJs !== null) {
+                            layoutPayload.js = nextJs;
+                        }
                     }
                 } else {
                     layoutPayload.sectionTemplate = templateText;
@@ -715,6 +753,8 @@ export function bindPromptWindow({
                 if (nextDescription !== null) extra.push('description');
                 if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(', ')}`);
                 if (nextLayoutValue) extra.push('layout');
+                if (nextCss !== null) extra.push('css');
+                if (nextJs !== null) extra.push('js');
                 const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? 'layout ' : ''}HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
                 renderSummary(summaryText);
                 clearAttachment();

@@ -158,6 +158,31 @@ function runPhpJson(scriptName) {
   });
 }
 
+function runPromptModelParse(mode, raw) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_prompt_model_parse.php'), mode, raw], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`prompt parse helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from prompt parse helper: ${stdout}`));
+      }
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -291,6 +316,21 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.cmsOpenAi).toBe('OpenAI request failed (HTTP 401): Incorrect API key provided: sk-***.');
     expect(result.cmsLocalHtml).toBe('Local endpoint request failed (HTTP 502): Bad Gateway.');
     expect(result.mcpGemini).toBe('Gemini request failed (HTTP 429): Quota exceeded for model gemini-1.5-flash.');
+  });
+
+  test('parses layout prompt JSON with css/js and restores the required default main block', async () => {
+    const result = await runPromptModelParse('layout', JSON.stringify({
+      template: '<div class="poff-default-layout poff-default-layout--file"><header class="poff-default-layout__header"></header><footer class="poff-default-layout__footer"></footer></div>',
+      css: '.poff-default-layout{outline:0;}',
+      js: 'document.documentElement.dataset.promptLayout = "on";',
+    }));
+
+    expect(result.css).toContain('.poff-default-layout{outline:0;}');
+    expect(result.js).toContain('dataset.promptLayout');
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(result.template).toContain('{{#if isFolder}}');
+    expect(result.template).toContain('{{> works}}');
+    expect(result.template).toContain('{{> work}}');
   });
 });
 
