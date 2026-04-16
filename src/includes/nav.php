@@ -21,7 +21,7 @@ if (!empty($navFolder)) {
 
 // Current directory link
 if ($navFolder !== '') {
-    echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '">./</a></li>';
+    echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '">./ ' . htmlspecialchars((string) ($config['folderName'] ?? basename($navFolder))) . '</a></li>';
 }
 
 $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
