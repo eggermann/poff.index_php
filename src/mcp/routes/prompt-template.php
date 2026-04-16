@@ -610,29 +610,21 @@ function handlePromptTemplate(array $opts): array
     }
 
     $config = PoffConfig::ensure($targetDir);
-    $promptContext = mcpBuildPromptContext((string) $path, $config);
-    $configJson = json_encode(mcpPromptCompactConfig($config), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $promptContextJson = json_encode(mcpPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $responseFormatInstruction = implode("\n", [
-        'Response format: return strict JSON.',
-        'Required key: "template" with the wrapped inner HBS partial string.',
-        'Optional keys: "title", "description", and "work".',
-        'If the user requests work.* updates such as autoplay, loop, muted, poster, type, or layout, include them under "work".',
-        'Example: {"template":"<div>{{title}}</div>","work":{"autoplay":true}}',
-    ]);
+    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $systemPrompt = implode("\n", [
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
         'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
-        'The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is works.hbs inside the active folder layout folder.',
-        'Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.',
-        'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files.',
-        'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
-        'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
-        'Prompt context JSON includes current.templateTarget for the wrapped partial save target and current.layoutTemplateTarget for the outer wrapper path. Edit the wrapped partial target by default.',
-        'Prompt context JSON includes resolved refs for the current folder contents. Use those refs directly instead of inventing paths.',
+        'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
+        'Return only the template (no Markdown, no fences).',
+        'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+        'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
+        'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
+        'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+        'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
+        'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
     ]);
     $historyText = mcpPromptHistoryText($history);
-    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt;
+    $userPrompt = "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
     if ($image) {
         $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
     }

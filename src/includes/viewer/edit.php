@@ -1156,7 +1156,7 @@ function cmsHandleEditAction(): void
 
         $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $isLayoutTarget, $layoutPreset);
         $promptContextJson = json_encode(cmsPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $configJson = json_encode(cmsPromptCompactConfig($config), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $configJson = json_encode($isLayoutTarget ? cmsPromptCompactConfig($config) : $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $responseFormatInstruction = implode("\n", $isLayoutTarget
             ? [
                 'Response format: return strict JSON.',
@@ -1166,13 +1166,7 @@ function cmsHandleEditAction(): void
                 'Template requirement: keep a <main class="poff-default-layout__main"> block that renders {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}.',
                 'Example: {"template":"<div class=\"poff-default-layout\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","css":".poff-default-layout{min-height:100dvh;}","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
             ]
-            : [
-                'Response format: return strict JSON.',
-                'Required key: "template" with the wrapped inner HBS partial string.',
-                'Optional keys: "title", "description", and "work".',
-                'If the user requests work.* updates such as autoplay, loop, muted, poster, type, or layout, include them under "work".',
-                'Example: {"template":"<div>{{title}}</div>","work":{"autoplay":true}}',
-            ]);
+            : []);
         $defaultSystemPrompt = implode("\n", $isLayoutTarget
             ? [
                 'You are a Handlebars (HBS) layout generator for this single-page CMS.',
@@ -1201,19 +1195,10 @@ function cmsHandleEditAction(): void
             : [
                 'You are a Handlebars (HBS) template generator for this single-page CMS.',
                 'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
-                'The prompt edits the wrapped content partial, not the outer layout wrapper. Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
-                'Keep the current outer layout chain active unless the user explicitly changes layout mode separately. Do not return the outer wrapper template here.',
-                'Important: return only the inner partial fragment. Do not return <html>, <body>, full page shells, app sidebars, or an outer wrapper that duplicates template.hbs.',
-                'For files, work.hbs should render only the inner media/content block that the wrapper inserts into {{> work}}.',
-                'For folders, works.hbs should render only the inner listing/content block that the wrapper inserts into {{> works}}. Do not replace the folder wrapper unless the user is explicitly editing layout mode.',
-                'Default layout technique: the outer layout stays in template.hbs and wraps {{> works}} for folders or {{> work}} for files. Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}.',
-                'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
-                'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
-                'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
-                'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-                'Prompt context JSON includes current.templateTarget for the wrapped partial save target and current.layoutTemplateTarget for the outer wrapper path. Edit the wrapped partial target by default.',
+                'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
+                'Return only the template (no Markdown, no fences).',
+                'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
                 'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
-                'Prompt context JSON includes resolved refs for the current item and current folder contents. Use those refs directly instead of inventing paths.',
                 'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
                 'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
                 'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
@@ -1221,7 +1206,9 @@ function cmsHandleEditAction(): void
             ]);
         $systemPrompt = $systemPromptValue !== '' ? $systemPromptValue : $defaultSystemPrompt;
         $historyText = cmsPromptHistoryText($history);
-        $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt;
+        $userPrompt = $isLayoutTarget
+            ? "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt
+            : "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
         if ($image) {
             $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
         }
@@ -1311,10 +1298,12 @@ function cmsHandleEditAction(): void
                 'prompt' => $prompt,
                 'history' => $history,
                 'config' => $config,
-                'promptContext' => $promptContext,
                 'instruction' => $systemPrompt,
                 'image' => $image,
             ];
+            if ($isLayoutTarget) {
+                $payload['promptContext'] = $promptContext;
+            }
             $response = cmsHttpPost($endpoint, [], $payload);
             if (!$response['ok']) {
                 cmsJsonResponse([
