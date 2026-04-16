@@ -440,6 +440,11 @@ class PoffConfig
         $section = $fileName === null ? 'works' : 'work';
         $work = isset($config['work']) && is_array($config['work']) ? $config['work'] : [];
         $work['layout'] = self::hydrateLayoutFilesystem($work['layout'] ?? null, $dir, $fileName, $section);
+        $workType = trim((string) ($work['type'] ?? ($fileName === null ? 'folder' : 'other')));
+        $defaultSectionTemplate = Worktype::template($workType);
+        if (is_string($defaultSectionTemplate) && $defaultSectionTemplate !== '') {
+            $work['layout']['defaultSectionTemplate'] = $defaultSectionTemplate;
+        }
         $config['work'] = $work;
 
         return $config;

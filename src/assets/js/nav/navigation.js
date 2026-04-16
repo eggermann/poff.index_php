@@ -14,6 +14,27 @@ export function initNavigation({
     let previewRequestId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get('path') || '';
     let previewClickBound = false;
+    let previewDisabled = false;
+    let lastPreviewKey = '';
+
+    function previewStateFromUrl(url) {
+        try {
+            const parsed = new URL(url, window.location.href);
+            const isFile = parsed.searchParams.get('view') === '1' && parsed.searchParams.has('file');
+            const path = parsed.searchParams.get(isFile ? 'file' : 'path') || '';
+            return {
+                key: `${isFile ? 'file' : 'path'}:${path}`,
+                path,
+                isFile,
+            };
+        } catch (err) {
+            return {
+                key: '',
+                path: '',
+                isFile: false,
+            };
+        }
+    }
 
     function parseCmsLinkValue(value = '') {
         const trimmed = (value || '').trim();
@@ -223,6 +244,39 @@ export function initNavigation({
         return url.pathname + url.search;
     }
 
+    function syncPreviewDisabledState(disabled = false) {
+        if (!contentFrame) {
+            return;
+        }
+        previewDisabled = !!disabled;
+        contentFrame.setAttribute('aria-disabled', previewDisabled ? 'true' : 'false');
+        contentFrame.dataset.disabled = previewDisabled ? 'true' : 'false';
+
+        if (!previewDisabled) {
+            return;
+        }
+
+        contentFrame.querySelectorAll('a, button, input, select, textarea, summary, iframe, video, audio, [contenteditable="true"], [tabindex]').forEach((node) => {
+            if (node instanceof HTMLElement) {
+                node.setAttribute('tabindex', '-1');
+                node.setAttribute('aria-disabled', 'true');
+            }
+            if ('disabled' in node) {
+                try {
+                    node.disabled = true;
+                } catch (err) {
+                    // Ignore nodes with readonly disabled semantics.
+                }
+            }
+            if (node instanceof HTMLMediaElement) {
+                node.controls = false;
+            }
+            if (node instanceof HTMLDetailsElement) {
+                node.open = false;
+            }
+        });
+    }
+
     function writeHashPath(path = '') {
         const nextHash = path ? `#/${path.replace(/^\/+/, '')}` : '';
         if (window.location.hash === nextHash) {
@@ -273,6 +327,8 @@ export function initNavigation({
             iframeLoading.style.display = 'block';
         }
         if (contentFrame) {
+            contentFrame.classList.toggle('content-frame-layout-target', !!selection.isLayout);
+            syncPreviewDisabledState(!!selection.isLayout);
             renderPreview(buildViewerUrl(previewPath, previewIsFile, forceRefresh));
         }
         if (updateHash) {
@@ -361,6 +417,11 @@ export function initNavigation({
         }
         previewClickBound = true;
         contentFrame.addEventListener('click', (event) => {
+            if (previewDisabled || contentFrame.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
             if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
                 return;
             }
@@ -386,6 +447,10 @@ export function initNavigation({
         }
 
         const requestId = ++previewRequestId;
+        const nextPreview = previewStateFromUrl(url);
+        const shouldPreserveScroll = !!nextPreview.key && nextPreview.key === lastPreviewKey;
+        const preservedScrollTop = shouldPreserveScroll ? contentFrame.scrollTop : 0;
+        const preservedScrollLeft = shouldPreserveScroll ? contentFrame.scrollLeft : 0;
         try {
             const response = await fetch(url, {
                 credentials: 'same-origin',
@@ -416,7 +481,20 @@ export function initNavigation({
                 script.textContent = oldScript.textContent || '';
                 contentFrame.appendChild(script);
             });
+            syncPreviewDisabledState(previewDisabled);
             bindPreviewNavigation();
+            lastPreviewKey = nextPreview.key;
+            if (shouldPreserveScroll) {
+                const restoreScroll = () => {
+                    contentFrame.scrollTop = preservedScrollTop;
+                    contentFrame.scrollLeft = preservedScrollLeft;
+                };
+                restoreScroll();
+                requestAnimationFrame(restoreScroll);
+            } else {
+                contentFrame.scrollTop = 0;
+                contentFrame.scrollLeft = 0;
+            }
         } catch (error) {
             if (requestId !== previewRequestId) {
                 return;
@@ -474,6 +552,9 @@ export function initNavigation({
             const href = target.getAttribute('href') || '';
             const params = new URLSearchParams(href.replace(/^\?/, ''));
             relPath = params.get('path') || '';
+            resolvedPath = true;
+        } else if (target.dataset.path) {
+            relPath = target.dataset.path;
             resolvedPath = true;
         } else if (target.dataset.src) {
             relPath = target.dataset.src;

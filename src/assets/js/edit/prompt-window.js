@@ -21,6 +21,9 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>`
         : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                         <div>{{> works}}, {{> work}}, {{work.key}}</div>`;
+    const inputPlaceholder = mode === 'layout'
+        ? 'Describe the layout you want...'
+        : 'Describe the component you want...';
 
     return `
         <div class="prompt-layer" id="promptLayer">
@@ -97,7 +100,10 @@ export function renderPromptWindow(settings = {}, options = {}) {
                 <details class="prompt-template-viewer" id="promptTemplateViewer">
                     <summary class="prompt-template-viewer-summary">Current template code</summary>
                     <div class="prompt-template-viewer-body">
-                        <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                        <div class="prompt-template-viewer-head">
+                            <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                            <button class="btn btn-secondary" type="button" id="prompt-template-reset">Reset to default template</button>
+                        </div>
                         <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
                     </div>
                 </details>
@@ -112,7 +118,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                     </div>
                     <button class="btn btn-secondary" type="button" id="prompt-attachment-remove">Remove image</button>
                 </div>
-                <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
+                <textarea class="prompt-input" id="prompt-input" placeholder="${escapeHtml(inputPlaceholder)}"></textarea>
                 <div class="prompt-actions">
                     <div class="prompt-actions-left">
                         <button class="btn" type="button" id="prompt-send">Send</button>

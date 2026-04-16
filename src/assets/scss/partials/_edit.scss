@@ -355,6 +355,7 @@
     font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.03em;
+    transform: rotate(180deg);
 }
 .prompt-layer-toggle[hidden] {
     display: none !important;
@@ -373,7 +374,7 @@
     backdrop-filter: blur(16px);
 }
 .prompt-layer-collapsed {
-    min-height: 60px;
+    min-height: 100%;
 }
 .prompt-layer-collapsed .prompt-window {
     display: none;
@@ -717,6 +718,13 @@
     gap: 8px;
     margin-top: 8px;
 }
+.prompt-template-viewer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
 .prompt-template-code {
     min-height: 180px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -788,6 +796,9 @@
     .prompt-attachment-preview-wrap {
         width: 100%;
         height: 160px;
+    }
+    .prompt-template-viewer-head {
+        align-items: stretch;
     }
     .prompt-dock {
         top: 12px;

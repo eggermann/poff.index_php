@@ -139,6 +139,7 @@ export function bindPromptWindow({
     const promptGenerationEl = root.querySelector('#promptGeneration');
     const promptGenerationLabelEl = root.querySelector('#promptGenerationLabel');
     const promptTemplateLabelEl = root.querySelector('#promptTemplateLabel');
+    const promptTemplateResetEl = root.querySelector('#prompt-template-reset');
     const promptTemplateCodeEl = root.querySelector('#promptTemplateCode');
     const promptAttachmentEl = root.querySelector('#promptAttachment');
     const promptWindowEl = root.querySelector('#promptWindow');
@@ -158,6 +159,9 @@ export function bindPromptWindow({
     let imageAttachment = null;
     let promptLayerCollapsed = false;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
+    const currentPromptPlaceholder = () => (currentPromptMode() === 'layout'
+        ? 'Describe the layout you want...'
+        : defaultPromptPlaceholder);
     const currentPromptMode = () => (getActiveSelection?.().isLayout ? 'layout' : 'work');
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
 
@@ -208,6 +212,9 @@ export function bindPromptWindow({
             systemPromptEl.value = nextValue;
             savePromptSettings(readSettings());
         }
+        if (promptInputEl && !isSending) {
+            promptInputEl.placeholder = currentPromptPlaceholder();
+        }
     };
 
     const setHistory = (nextHistory) => {
@@ -231,9 +238,17 @@ export function bindPromptWindow({
         }
         const selection = getActiveSelection ? getActiveSelection() : null;
         const templateField = getCurrentTemplateField();
-        promptTemplateCodeEl.value = templateField && typeof templateField.value === 'string'
+        const currentConfig = getConfig ? (getConfig() || {}) : {};
+        const layout = currentConfig?.work?.layout && typeof currentConfig.work.layout === 'object'
+            ? currentConfig.work.layout
+            : {};
+        const explicitTemplate = templateField && typeof templateField.value === 'string'
             ? templateField.value
             : '';
+        const fallbackTemplate = selection?.isLayout
+            ? ((typeof layout.template === 'string' && layout.template) || (typeof layout.phpTemplate === 'string' ? layout.phpTemplate : ''))
+            : ((typeof layout.sectionTemplate === 'string' && layout.sectionTemplate) || (typeof layout.defaultSectionTemplate === 'string' ? layout.defaultSectionTemplate : ''));
+        promptTemplateCodeEl.value = explicitTemplate || fallbackTemplate || '';
         if (promptTemplateLabelEl) {
             promptTemplateLabelEl.textContent = selection?.isLayout
                 ? 'Current layout wrapper template'
@@ -516,6 +531,107 @@ export function bindPromptWindow({
             if (statusEl) {
                 statusEl.textContent = 'Chat cleared.';
                 statusEl.className = 'edit-status';
+            }
+        });
+    }
+
+    if (promptTemplateResetEl) {
+        promptTemplateResetEl.addEventListener('click', async () => {
+            if (isSending) {
+                return;
+            }
+
+            const selection = getActiveSelection ? getActiveSelection() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
+            const isLayoutTarget = !!selection?.isLayout;
+            const resetLabel = isLayoutTarget ? 'current layout wrapper template' : 'current wrapped partial template';
+            if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
+                return;
+            }
+
+            try {
+                isSending = true;
+                setGeneratingState(true, 'Resetting template...');
+                if (statusEl) {
+                    statusEl.textContent = 'Resetting template...';
+                    statusEl.className = 'edit-status';
+                }
+
+                const currentConfig = getConfig ? (getConfig() || {}) : {};
+                const layoutState = getLayoutState(currentConfig || {});
+                const layoutPayload = {
+                    name: currentConfig?.work?.layout?.name || 'poff-layout',
+                    engine: currentConfig?.work?.layout?.engine || 'lightncandy',
+                };
+
+                if (isLayoutTarget) {
+                    const layoutPresetEl = document.getElementById('edit-layout-preset');
+                    const preset = (layoutPresetEl?.value || layoutState.preset || 'actual').trim();
+                    const layoutPathName = (selection.previewPath || '').split('/').pop() || 'item';
+                    const localLayoutDirectory = selection.layoutIsFile
+                        ? `.works/${layoutPathName}.layout`
+                        : '.layout';
+                    const resolvedLayoutDirectory = typeof layoutState.directory === 'string'
+                        ? layoutState.directory.trim()
+                        : '';
+                    const canEditResolvedFilesystemTarget = layoutState.storage === 'filesystem' && resolvedLayoutDirectory !== '';
+                    const shouldPersistToLocalWrapper = preset === 'custom'
+                        || !canEditResolvedFilesystemTarget
+                        || resolvedLayoutDirectory === localLayoutDirectory;
+
+                    layoutPayload.preset = preset;
+                    layoutPayload.name = preset === 'none'
+                        ? 'none'
+                        : preset === 'custom'
+                            ? 'custom-layout'
+                            : (canEditResolvedFilesystemTarget ? 'filesystem-layout' : 'poff-layout');
+
+                    if (shouldPersistToLocalWrapper) {
+                        layoutPayload.template = '';
+                    } else if (canEditResolvedFilesystemTarget) {
+                        layoutPayload.originalTarget = resolvedLayoutDirectory;
+                        layoutPayload.originalTemplate = '';
+                    } else {
+                        layoutPayload.template = '';
+                    }
+                    updatePromptEditorFields({
+                        templateText: '',
+                        nextTitle: null,
+                        nextDescription: null,
+                        nextWork: null,
+                        isLayoutTarget: true,
+                    });
+                } else {
+                    layoutPayload.sectionTemplate = '';
+                    updatePromptEditorFields({
+                        templateText: '',
+                        nextTitle: null,
+                        nextDescription: null,
+                        nextWork: null,
+                        isLayoutTarget: false,
+                    });
+                }
+
+                await saveConfig({
+                    path: activePath,
+                    layout: layoutPayload,
+                }, statusEl);
+
+                renderContext();
+                renderSummary(`Reset ${isLayoutTarget ? 'layout wrapper' : 'wrapped partial'} to inherited/default template.`);
+                reloadViewer();
+                if (statusEl) {
+                    statusEl.textContent = `${isLayoutTarget ? 'Layout wrapper' : 'Wrapped partial'} reset to inherited/default template.`;
+                    statusEl.className = 'edit-status edit-status-success';
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.textContent = err?.message || 'Template reset failed.';
+                    statusEl.className = 'edit-status';
+                }
+                renderSummary('Template reset failed.');
+            } finally {
+                setGeneratingState(false);
+                isSending = false;
             }
         });
     }
