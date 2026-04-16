@@ -44,6 +44,19 @@ const navigation = initNavigation({
     initEditMode: editController.initEditMode,
 });
 
+function previewHashActive() {
+    return window.location.hash === '#preview';
+}
+
+function scrollToPreview() {
+    const previewEl = document.getElementById('preview');
+    if (!previewEl) {
+        return;
+    }
+
+    previewEl.scrollIntoView({ block: 'start' });
+}
+
 function bindSidebarToggle() {
     const { appShell, appSidebar, sidebarToggle } = elements;
     if (!appShell || !appSidebar || !sidebarToggle) {
@@ -72,7 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
     editController.syncEditToggle();
     editController.bindEditToggle();
 
-    if (window.location.hash && window.location.hash.length > 1) {
+    if (previewHashActive()) {
+        navigation.loadCurrentFolderInIframe();
+        requestAnimationFrame(() => scrollToPreview());
+    } else if (window.location.hash && window.location.hash.length > 1) {
         navigation.syncFromLocation();
     } else {
         navigation.loadCurrentFolderInIframe();
@@ -81,6 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('hashchange', () => {
+    if (previewHashActive()) {
+        scrollToPreview();
+        if (editRequested) {
+            editController.initEditMode();
+        }
+        return;
+    }
+
     if (!navigation.consumeHashSync()) {
         navigation.syncFromLocation();
     }

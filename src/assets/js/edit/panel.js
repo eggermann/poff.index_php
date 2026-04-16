@@ -41,6 +41,20 @@ function uploadValidationError(files = [], uploadLimits = null) {
     return null;
 }
 
+function syncPromptDock(promptRoot = null) {
+    const promptDock = document.querySelector('#promptDock');
+    if (!promptDock) {
+        return;
+    }
+
+    if (promptRoot) {
+        promptDock.replaceChildren(promptRoot);
+        return;
+    }
+
+    promptDock.replaceChildren();
+}
+
 function layoutOverlayState(config, status) {
     const layoutState = getLayoutState(config);
     const isFile = status?.target === 'file';
@@ -299,8 +313,9 @@ function renderEditLayoutPanel({
     const primaryCssEl = editPanel.querySelector('#edit-layout-primary-css');
     const primaryJsEl = editPanel.querySelector('#edit-layout-primary-js');
     const contentTemplateEl = editPanel.querySelector('#edit-content-template');
-    const promptRoot = editPanel.querySelector('#promptWindow');
+    const promptRoot = editPanel.querySelector('#promptLayer');
     const uploadDialog = editPanel.querySelector('#editUploadDialog');
+    syncPromptDock(promptRoot);
     const openUploadDialogButton = editPanel.querySelector('#editOpenUploadDialog');
     const uploadCloseButton = editPanel.querySelector('#editUploadClose');
     const uploadCancelButton = editPanel.querySelector('#editUploadCancel');
@@ -574,10 +589,12 @@ export function renderEditPanel({
     onCreateBlankFile,
 }) {
     if (!editPanel) {
+        syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
     if (!editRequested) {
         editPanel.hidden = true;
+        syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
     editPanel.hidden = false;
@@ -587,6 +604,7 @@ export function renderEditPanel({
             <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status">${escapeHtml(message)}</div>
         `;
+        syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
     if (!status?.allowed) {
@@ -594,6 +612,7 @@ export function renderEditPanel({
             <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status">Create a file named <code>.edit.allow</code> in the site root to enable edit mode.</div>
         `;
+        syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
 
@@ -686,13 +705,6 @@ export function renderEditPanel({
                 </div>
             </form>
         </dialog>
-        <details class="prompt-template-viewer">
-            <summary class="prompt-template-viewer-summary">Current template code</summary>
-            <div class="prompt-template-viewer-body">
-                <div class="small-note">${status?.target === 'file' ? 'Current wrapped file partial' : 'Current wrapped folder partial'}</div>
-                <textarea class="form-textarea prompt-template-code" readonly spellcheck="false" placeholder="No template loaded yet.">${escapeHtml(overlayState.layoutState.sectionTemplate || '')}</textarea>
-            </div>
-        </details>
         ${renderPromptWindow(settings)}
     `;
 
@@ -702,8 +714,9 @@ export function renderEditPanel({
     const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
-    const promptRoot = editPanel.querySelector('#promptWindow');
+    const promptRoot = editPanel.querySelector('#promptLayer');
     const uploadDialog = editPanel.querySelector('#editUploadDialog');
+    syncPromptDock(promptRoot);
     const openUploadDialogButton = editPanel.querySelector('#editOpenUploadDialog');
     const uploadCloseButton = editPanel.querySelector('#editUploadClose');
     const uploadCancelButton = editPanel.querySelector('#editUploadCancel');

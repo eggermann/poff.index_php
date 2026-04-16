@@ -6,6 +6,7 @@ import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPro
 import { createStreamState, startStreaming, stopStreaming } from './prompt/stream.js';
 
 const PROMPT_FALLBACK_TIMEOUT_MS = 95000;
+const PROMPT_LAYER_STATE_KEY = 'poffEditPromptLayerState';
 
 let promptHistory = [];
 const stream = createStreamState();
@@ -139,12 +140,15 @@ export function bindPromptWindow({
     const promptGenerationLabelEl = root.querySelector('#promptGenerationLabel');
     const promptTemplateLabelEl = root.querySelector('#promptTemplateLabel');
     const promptTemplateCodeEl = root.querySelector('#promptTemplateCode');
+    const promptAttachmentEl = root.querySelector('#promptAttachment');
+    const promptWindowEl = root.querySelector('#promptWindow');
+    const promptLayerCloseEl = root.querySelector('#promptLayerClose');
+    const promptLayerOpenEl = root.querySelector('#promptLayerOpen');
     const promptInputEl = root.querySelector('#prompt-input');
     const promptSendEl = root.querySelector('#prompt-send');
     const promptAttachEl = root.querySelector('#prompt-attach');
     const promptClearEl = root.querySelector('#prompt-clear');
     const promptImageInputEl = root.querySelector('#prompt-image-input');
-    const promptAttachmentEl = root.querySelector('#promptAttachment');
     const promptAttachmentPreviewEl = root.querySelector('#promptAttachmentPreview');
     const promptAttachmentNameEl = root.querySelector('#promptAttachmentName');
     const promptAttachmentRemoveEl = root.querySelector('#prompt-attachment-remove');
@@ -152,9 +156,44 @@ export function bindPromptWindow({
     let isSending = false;
     let activePath = getActiveSelection ? getActiveSelection().path : '';
     let imageAttachment = null;
+    let promptLayerCollapsed = false;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
     const currentPromptMode = () => (getActiveSelection?.().isLayout ? 'layout' : 'work');
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+
+    const readPromptLayerState = () => {
+        try {
+            const stored = JSON.parse(localStorage.getItem(PROMPT_LAYER_STATE_KEY) || '{}');
+            return !!stored.collapsed;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    const writePromptLayerState = (collapsed) => {
+        try {
+            localStorage.setItem(PROMPT_LAYER_STATE_KEY, JSON.stringify({ collapsed: !!collapsed }));
+        } catch (err) {
+            // Ignore storage failures.
+        }
+    };
+
+    const applyPromptLayerState = (collapsed, options = {}) => {
+        promptLayerCollapsed = !!collapsed;
+        root.classList.toggle('prompt-layer-collapsed', promptLayerCollapsed);
+        if (promptWindowEl) {
+            promptWindowEl.hidden = promptLayerCollapsed;
+        }
+        if (promptLayerCloseEl) {
+            promptLayerCloseEl.hidden = promptLayerCollapsed;
+        }
+        if (promptLayerOpenEl) {
+            promptLayerOpenEl.hidden = !promptLayerCollapsed;
+        }
+        if (!options.skipPersist) {
+            writePromptLayerState(promptLayerCollapsed);
+        }
+    };
 
     const syncModeAwareSystemPrompt = () => {
         if (!systemPromptEl) {
@@ -307,6 +346,21 @@ export function bindPromptWindow({
             promptInputEl.placeholder = active ? 'Generating answer...' : defaultPromptPlaceholder;
         }
     };
+
+    promptLayerCollapsed = readPromptLayerState();
+    applyPromptLayerState(promptLayerCollapsed, { skipPersist: true });
+
+    if (promptLayerCloseEl) {
+        promptLayerCloseEl.addEventListener('click', () => {
+            applyPromptLayerState(true);
+        });
+    }
+
+    if (promptLayerOpenEl) {
+        promptLayerOpenEl.addEventListener('click', () => {
+            applyPromptLayerState(false);
+        });
+    }
 
     if (providerEl) {
         providerEl.value = settings.provider || 'local';

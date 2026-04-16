@@ -137,6 +137,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         layoutBaseHref,
         inheritedLayoutDirectory,
         layoutAssetsPreview,
+        workData: work,
         workPreview,
         refPreview,
     };
@@ -146,6 +147,62 @@ export function renderPromptContext(contextEl, context) {
     if (!contextEl) {
         return;
     }
+    const renderValue = (value = '', depth = 0) => {
+        if (value === null || value === undefined || value === '') {
+            return '<code class="prompt-context-code">-</code>';
+        }
+        if (Array.isArray(value)) {
+            const filtered = value.filter((item) => item !== null && item !== undefined && item !== '');
+            if (!filtered.length) {
+                return '<code class="prompt-context-code">[]</code>';
+            }
+            return `
+                <div class="prompt-context-list prompt-context-list--nested">
+                    ${filtered.map((item) => `<div class="prompt-context-list-item">${renderValue(item, depth + 1)}</div>`).join('')}
+                </div>
+            `;
+        }
+        if (typeof value === 'object') {
+            const entries = Object.entries(value).filter(([, entryValue]) => entryValue !== undefined);
+            if (!entries.length) {
+                return '<code class="prompt-context-code">{}</code>';
+            }
+            return `
+                <div class="prompt-context-object${depth > 0 ? ' prompt-context-object--nested' : ''}">
+                    ${entries.map(([entryKey, entryValue]) => `
+                        <div class="prompt-context-object-row">
+                            <div class="prompt-context-object-key">${escapeHtml(entryKey)}</div>
+                            <div class="prompt-context-object-value">${renderValue(entryValue, depth + 1)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        return `<code class="prompt-context-code">${escapeHtml(String(value))}</code>`;
+    };
+    const renderRow = (label, value) => `
+        <div class="prompt-context-item">
+            <div class="prompt-context-key">${escapeHtml(label)}</div>
+            <div class="prompt-context-value">${renderValue(value)}</div>
+        </div>
+    `;
+    const renderList = (label, values = []) => {
+        const filtered = Array.isArray(values) ? values.filter(Boolean) : [];
+        if (!filtered.length) {
+            return '';
+        }
+        return `
+            <div class="prompt-context-item">
+                <div class="prompt-context-key">${escapeHtml(label)}</div>
+                <div class="prompt-context-value">
+                    <div class="prompt-context-list">
+                        ${filtered.map((value) => `<div class="prompt-context-list-item">${renderValue(value)}</div>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
     const path = context?.path || '';
     const virtualPath = context?.virtualPath || '';
     const layoutPreset = context?.layoutPreset || '';
@@ -158,23 +215,28 @@ export function renderPromptContext(contextEl, context) {
     const layoutBaseHref = context?.layoutBaseHref || '';
     const inheritedLayoutDirectory = context?.inheritedLayoutDirectory || '';
     const layoutAssetsPreview = context?.layoutAssetsPreview || '';
-    const workPreview = context?.workPreview || '';
+    const workData = (context?.workData && typeof context.workData === 'object') ? context.workData : {};
     const refPreview = context?.refPreview || '';
+    const partials = ['poff-layout', 'filesystem-layout', 'works', 'work'];
+    const refItems = refPreview ? refPreview.split(' | ').filter(Boolean) : [];
+    const layoutAssetItems = layoutAssetsPreview ? layoutAssetsPreview.split(' | ').filter(Boolean) : [];
     contextEl.innerHTML = `
-        ${context?.isLayout ? `<div class="prompt-context-row"><strong>virtualPath</strong>: ${escapeHtml(virtualPath)}</div>` : ''}
-        ${context?.isLayout && layoutPreset ? `<div class="prompt-context-row"><strong>layoutPreset</strong>: ${escapeHtml(layoutPreset)}</div>` : ''}
-        <div class="prompt-context-row"><strong>pageLink</strong>: ${escapeHtml(pageLink)}</div>
-        <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
-        <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
-        <div class="prompt-context-row"><strong>viewUrl</strong>: ${escapeHtml(viewUrl)}</div>
-        ${templateTarget ? `<div class="prompt-context-row"><strong>templateTarget</strong>: ${escapeHtml(templateTarget)}</div>` : ''}
-        ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget (custom)</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ''}
-        ${sectionTemplateTarget ? `<div class="prompt-context-row"><strong>sectionTemplateTarget</strong>: ${escapeHtml(sectionTemplateTarget)}</div>` : ''}
-        ${layoutBaseHref ? `<div class="prompt-context-row"><strong>layoutBaseHref</strong>: ${escapeHtml(layoutBaseHref)}</div>` : ''}
-        ${inheritedLayoutDirectory ? `<div class="prompt-context-row"><strong>inheritedLayoutDirectory</strong>: ${escapeHtml(inheritedLayoutDirectory)}</div>` : ''}
-        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml('poff-layout, filesystem-layout, works, work')}</div>
-        ${layoutAssetsPreview ? `<div class="prompt-context-row"><strong>layoutAssets</strong>: ${escapeHtml(layoutAssetsPreview)}</div>` : ''}
-        ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ''}
-        ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ''}
+        <div class="prompt-context-grid">
+            ${context?.isLayout ? renderRow('virtualPath', virtualPath) : ''}
+            ${context?.isLayout && layoutPreset ? renderRow('layoutPreset', layoutPreset) : ''}
+            ${renderRow('pageLink', pageLink)}
+            ${renderRow('path', path)}
+            ${renderRow('name', name)}
+            ${renderRow('viewUrl', viewUrl)}
+            ${templateTarget ? renderRow('templateTarget', templateTarget) : ''}
+            ${layoutTemplateTarget ? renderRow('layoutTemplateTarget', layoutTemplateTarget) : ''}
+            ${sectionTemplateTarget ? renderRow('sectionTemplateTarget', sectionTemplateTarget) : ''}
+            ${layoutBaseHref ? renderRow('layoutBaseHref', layoutBaseHref) : ''}
+            ${inheritedLayoutDirectory ? renderRow('inheritedLayoutDirectory', inheritedLayoutDirectory) : ''}
+        </div>
+        ${renderList('partials', partials)}
+        ${renderList('layoutAssets', layoutAssetItems)}
+        ${renderList('refs', refItems)}
+        ${Object.keys(workData).length ? renderRow('work.*', workData) : ''}
     `;
 }

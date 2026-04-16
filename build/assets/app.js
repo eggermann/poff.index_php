@@ -32,6 +32,12 @@
     const url = buildCmsUrl("upload", payload.path || "");
     const formData = new FormData();
     formData.set("source", payload.source || "upload");
+    if (typeof payload.fileName === "string") {
+      formData.set("fileName", payload.fileName);
+    }
+    if (typeof payload.contents === "string") {
+      formData.set("contents", payload.contents);
+    }
     for (const file of payload.files || []) {
       formData.append("files[]", file);
     }
@@ -43,13 +49,28 @@
         },
         body: formData
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        return data || { allowed: false, error: "Upload endpoint unavailable." };
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
       }
-      return await res.json();
+      if (!res.ok) {
+        return data || {
+          allowed: false,
+          error: responseText.trim() || `Upload endpoint failed (HTTP ${res.status}).`
+        };
+      }
+      return data || {
+        allowed: false,
+        error: responseText.trim() || "Upload endpoint returned invalid JSON."
+      };
     } catch (err) {
-      return { allowed: false, error: "Upload endpoint unavailable." };
+      return {
+        allowed: false,
+        error: (err == null ? void 0 : err.message) || "Upload endpoint unavailable."
+      };
     }
   }
   async function requestPromptTemplate(payload) {
@@ -248,10 +269,13 @@
   var layoutSystemPrompt = [
     "You are a Handlebars (HBS) layout generator for this single-page CMS.",
     "Transform the user description into one HBS template string for the outer layout wrapper rendered by LightnCandy.",
-    'Return a JSON object with a required "template" string and optional "work" object.',
+    'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
+    "When generating a custom layout, use src/includes/worktypes/templates/layout/default/template.hbs as the scaffold and keep the same wrapper behavior unless the user explicitly asks otherwise.",
     "The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.",
     "Keep the wrapped content chain active: use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.",
     "The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.",
+    'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
+    'Prefer returning sibling "css" and "js" strings too, so the custom layout can create template.hbs, style.css, and script.js together.',
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
@@ -518,6 +542,7 @@
       layoutBaseHref,
       inheritedLayoutDirectory,
       layoutAssetsPreview,
+      workData: work,
       workPreview,
       refPreview
     };
@@ -526,6 +551,61 @@
     if (!contextEl) {
       return;
     }
+    const renderValue = (value = "", depth = 0) => {
+      if (value === null || value === void 0 || value === "") {
+        return '<code class="prompt-context-code">-</code>';
+      }
+      if (Array.isArray(value)) {
+        const filtered = value.filter((item) => item !== null && item !== void 0 && item !== "");
+        if (!filtered.length) {
+          return '<code class="prompt-context-code">[]</code>';
+        }
+        return `
+                <div class="prompt-context-list prompt-context-list--nested">
+                    ${filtered.map((item) => `<div class="prompt-context-list-item">${renderValue(item, depth + 1)}</div>`).join("")}
+                </div>
+            `;
+      }
+      if (typeof value === "object") {
+        const entries = Object.entries(value).filter(([, entryValue]) => entryValue !== void 0);
+        if (!entries.length) {
+          return '<code class="prompt-context-code">{}</code>';
+        }
+        return `
+                <div class="prompt-context-object${depth > 0 ? " prompt-context-object--nested" : ""}">
+                    ${entries.map(([entryKey, entryValue]) => `
+                        <div class="prompt-context-object-row">
+                            <div class="prompt-context-object-key">${escapeHtml(entryKey)}</div>
+                            <div class="prompt-context-object-value">${renderValue(entryValue, depth + 1)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+      }
+      return `<code class="prompt-context-code">${escapeHtml(String(value))}</code>`;
+    };
+    const renderRow = (label, value) => `
+        <div class="prompt-context-item">
+            <div class="prompt-context-key">${escapeHtml(label)}</div>
+            <div class="prompt-context-value">${renderValue(value)}</div>
+        </div>
+    `;
+    const renderList = (label, values = []) => {
+      const filtered = Array.isArray(values) ? values.filter(Boolean) : [];
+      if (!filtered.length) {
+        return "";
+      }
+      return `
+            <div class="prompt-context-item">
+                <div class="prompt-context-key">${escapeHtml(label)}</div>
+                <div class="prompt-context-value">
+                    <div class="prompt-context-list">
+                        ${filtered.map((value) => `<div class="prompt-context-list-item">${renderValue(value)}</div>`).join("")}
+                    </div>
+                </div>
+            </div>
+        `;
+    };
     const path = (context == null ? void 0 : context.path) || "";
     const virtualPath = (context == null ? void 0 : context.virtualPath) || "";
     const layoutPreset = (context == null ? void 0 : context.layoutPreset) || "";
@@ -538,24 +618,29 @@
     const layoutBaseHref = (context == null ? void 0 : context.layoutBaseHref) || "";
     const inheritedLayoutDirectory = (context == null ? void 0 : context.inheritedLayoutDirectory) || "";
     const layoutAssetsPreview = (context == null ? void 0 : context.layoutAssetsPreview) || "";
-    const workPreview = (context == null ? void 0 : context.workPreview) || "";
+    const workData = (context == null ? void 0 : context.workData) && typeof context.workData === "object" ? context.workData : {};
     const refPreview = (context == null ? void 0 : context.refPreview) || "";
+    const partials = ["poff-layout", "filesystem-layout", "works", "work"];
+    const refItems = refPreview ? refPreview.split(" | ").filter(Boolean) : [];
+    const layoutAssetItems = layoutAssetsPreview ? layoutAssetsPreview.split(" | ").filter(Boolean) : [];
     contextEl.innerHTML = `
-        ${(context == null ? void 0 : context.isLayout) ? `<div class="prompt-context-row"><strong>virtualPath</strong>: ${escapeHtml(virtualPath)}</div>` : ""}
-        ${(context == null ? void 0 : context.isLayout) && layoutPreset ? `<div class="prompt-context-row"><strong>layoutPreset</strong>: ${escapeHtml(layoutPreset)}</div>` : ""}
-        <div class="prompt-context-row"><strong>pageLink</strong>: ${escapeHtml(pageLink)}</div>
-        <div class="prompt-context-row"><strong>path</strong>: ${escapeHtml(path)}</div>
-        <div class="prompt-context-row"><strong>name</strong>: ${escapeHtml(name)}</div>
-        <div class="prompt-context-row"><strong>viewUrl</strong>: ${escapeHtml(viewUrl)}</div>
-        ${templateTarget ? `<div class="prompt-context-row"><strong>templateTarget</strong>: ${escapeHtml(templateTarget)}</div>` : ""}
-        ${layoutTemplateTarget ? `<div class="prompt-context-row"><strong>layoutTemplateTarget (custom)</strong>: ${escapeHtml(layoutTemplateTarget)}</div>` : ""}
-        ${sectionTemplateTarget ? `<div class="prompt-context-row"><strong>sectionTemplateTarget</strong>: ${escapeHtml(sectionTemplateTarget)}</div>` : ""}
-        ${layoutBaseHref ? `<div class="prompt-context-row"><strong>layoutBaseHref</strong>: ${escapeHtml(layoutBaseHref)}</div>` : ""}
-        ${inheritedLayoutDirectory ? `<div class="prompt-context-row"><strong>inheritedLayoutDirectory</strong>: ${escapeHtml(inheritedLayoutDirectory)}</div>` : ""}
-        <div class="prompt-context-row"><strong>partials</strong>: ${escapeHtml("poff-layout, filesystem-layout, works, work")}</div>
-        ${layoutAssetsPreview ? `<div class="prompt-context-row"><strong>layoutAssets</strong>: ${escapeHtml(layoutAssetsPreview)}</div>` : ""}
-        ${refPreview ? `<div class="prompt-context-row"><strong>refs</strong>: ${escapeHtml(refPreview)}</div>` : ""}
-        ${workPreview ? `<div class="prompt-context-row"><strong>work.*</strong>: ${escapeHtml(workPreview)}</div>` : ""}
+        <div class="prompt-context-grid">
+            ${(context == null ? void 0 : context.isLayout) ? renderRow("virtualPath", virtualPath) : ""}
+            ${(context == null ? void 0 : context.isLayout) && layoutPreset ? renderRow("layoutPreset", layoutPreset) : ""}
+            ${renderRow("pageLink", pageLink)}
+            ${renderRow("path", path)}
+            ${renderRow("name", name)}
+            ${renderRow("viewUrl", viewUrl)}
+            ${templateTarget ? renderRow("templateTarget", templateTarget) : ""}
+            ${layoutTemplateTarget ? renderRow("layoutTemplateTarget", layoutTemplateTarget) : ""}
+            ${sectionTemplateTarget ? renderRow("sectionTemplateTarget", sectionTemplateTarget) : ""}
+            ${layoutBaseHref ? renderRow("layoutBaseHref", layoutBaseHref) : ""}
+            ${inheritedLayoutDirectory ? renderRow("inheritedLayoutDirectory", inheritedLayoutDirectory) : ""}
+        </div>
+        ${renderList("partials", partials)}
+        ${renderList("layoutAssets", layoutAssetItems)}
+        ${renderList("refs", refItems)}
+        ${Object.keys(workData).length ? renderRow("work.*", workData) : ""}
     `;
   }
 
@@ -606,6 +691,7 @@
 
   // src/assets/js/edit/prompt.js
   var PROMPT_FALLBACK_TIMEOUT_MS = 95e3;
+  var PROMPT_LAYER_STATE_KEY = "poffEditPromptLayerState";
   var promptHistory = [];
   var stream = createStreamState();
   var summarizePromptRequest = (payload) => ({
@@ -635,7 +721,7 @@
     name: typeof (err == null ? void 0 : err.name) === "string" ? err.name : "Error",
     message: typeof (err == null ? void 0 : err.message) === "string" ? err.message : String(err || "Prompt failed.")
   });
-  var updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget }) => {
+  var updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget, nextCss = null, nextJs = null }) => {
     const templateSelectors = isLayoutTarget ? ["#edit-layout-primary-template"] : ["#edit-content-template"];
     templateSelectors.forEach((selector) => {
       document.querySelectorAll(selector).forEach((field) => {
@@ -662,6 +748,20 @@
       document.querySelectorAll("#edit-work-type").forEach((field) => {
         if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
           field.value = nextWork.type;
+        }
+      });
+    }
+    if (isLayoutTarget && nextCss !== null) {
+      document.querySelectorAll("#edit-layout-primary-css").forEach((field) => {
+        if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+          field.value = nextCss;
+        }
+      });
+    }
+    if (isLayoutTarget && nextJs !== null) {
+      document.querySelectorAll("#edit-layout-primary-js").forEach((field) => {
+        if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+          field.value = nextJs;
         }
       });
     }
@@ -704,12 +804,15 @@
     const promptGenerationLabelEl = root.querySelector("#promptGenerationLabel");
     const promptTemplateLabelEl = root.querySelector("#promptTemplateLabel");
     const promptTemplateCodeEl = root.querySelector("#promptTemplateCode");
+    const promptAttachmentEl = root.querySelector("#promptAttachment");
+    const promptWindowEl = root.querySelector("#promptWindow");
+    const promptLayerCloseEl = root.querySelector("#promptLayerClose");
+    const promptLayerOpenEl = root.querySelector("#promptLayerOpen");
     const promptInputEl = root.querySelector("#prompt-input");
     const promptSendEl = root.querySelector("#prompt-send");
     const promptAttachEl = root.querySelector("#prompt-attach");
     const promptClearEl = root.querySelector("#prompt-clear");
     const promptImageInputEl = root.querySelector("#prompt-image-input");
-    const promptAttachmentEl = root.querySelector("#promptAttachment");
     const promptAttachmentPreviewEl = root.querySelector("#promptAttachmentPreview");
     const promptAttachmentNameEl = root.querySelector("#promptAttachmentName");
     const promptAttachmentRemoveEl = root.querySelector("#prompt-attachment-remove");
@@ -717,9 +820,40 @@
     let isSending = false;
     let activePath = getActiveSelection2 ? getActiveSelection2().path : "";
     let imageAttachment = null;
+    let promptLayerCollapsed = false;
     const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
     const currentPromptMode = () => (getActiveSelection2 == null ? void 0 : getActiveSelection2().isLayout) ? "layout" : "work";
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+    const readPromptLayerState = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem(PROMPT_LAYER_STATE_KEY) || "{}");
+        return !!stored.collapsed;
+      } catch (err) {
+        return false;
+      }
+    };
+    const writePromptLayerState = (collapsed) => {
+      try {
+        localStorage.setItem(PROMPT_LAYER_STATE_KEY, JSON.stringify({ collapsed: !!collapsed }));
+      } catch (err) {
+      }
+    };
+    const applyPromptLayerState = (collapsed, options = {}) => {
+      promptLayerCollapsed = !!collapsed;
+      root.classList.toggle("prompt-layer-collapsed", promptLayerCollapsed);
+      if (promptWindowEl) {
+        promptWindowEl.hidden = promptLayerCollapsed;
+      }
+      if (promptLayerCloseEl) {
+        promptLayerCloseEl.hidden = promptLayerCollapsed;
+      }
+      if (promptLayerOpenEl) {
+        promptLayerOpenEl.hidden = !promptLayerCollapsed;
+      }
+      if (!options.skipPersist) {
+        writePromptLayerState(promptLayerCollapsed);
+      }
+    };
     const syncModeAwareSystemPrompt = () => {
       if (!systemPromptEl) {
         return;
@@ -855,6 +989,18 @@
         promptInputEl.placeholder = active ? "Generating answer..." : defaultPromptPlaceholder;
       }
     };
+    promptLayerCollapsed = readPromptLayerState();
+    applyPromptLayerState(promptLayerCollapsed, { skipPersist: true });
+    if (promptLayerCloseEl) {
+      promptLayerCloseEl.addEventListener("click", () => {
+        applyPromptLayerState(true);
+      });
+    }
+    if (promptLayerOpenEl) {
+      promptLayerOpenEl.addEventListener("click", () => {
+        applyPromptLayerState(false);
+      });
+    }
     if (providerEl) {
       providerEl.value = settings.provider || "local";
     }
@@ -1090,6 +1236,8 @@
           const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
           const nextTitle = typeof response.title === "string" ? response.title.trim() : null;
           const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
+          const nextCss = typeof response.css === "string" ? response.css : null;
+          const nextJs = typeof response.js === "string" ? response.js : null;
           const isLayoutTarget = !!selection.isLayout;
           const currentConfig = getConfig ? getConfig() : null;
           const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
@@ -1152,7 +1300,9 @@
             nextTitle,
             nextDescription,
             nextWork,
-            isLayoutTarget
+            isLayoutTarget,
+            nextCss,
+            nextJs
           });
           if (drawerForm) {
             const templateField = drawerForm.querySelector("#edit-content-template");
@@ -1212,12 +1362,30 @@
             layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
             if (shouldPersistToLocalWrapper) {
               layoutPayload.template = templateText;
+              if (nextCss !== null) {
+                layoutPayload.css = nextCss;
+              }
+              if (nextJs !== null) {
+                layoutPayload.js = nextJs;
+              }
             } else if (canEditResolvedFilesystemTarget) {
               layoutPayload.originalTarget = resolvedLayoutDirectory;
               layoutPayload.originalTemplate = templateText;
+              if (nextCss !== null) {
+                layoutPayload.originalCss = nextCss;
+              }
+              if (nextJs !== null) {
+                layoutPayload.originalJs = nextJs;
+              }
             } else {
               layoutPayload.name = "custom-layout";
               layoutPayload.template = templateText;
+              if (nextCss !== null) {
+                layoutPayload.css = nextCss;
+              }
+              if (nextJs !== null) {
+                layoutPayload.js = nextJs;
+              }
             }
           } else {
             layoutPayload.sectionTemplate = templateText;
@@ -1250,6 +1418,8 @@
           if (nextDescription !== null) extra.push("description");
           if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(", ")}`);
           if (nextLayoutValue) extra.push("layout");
+          if (nextCss !== null) extra.push("css");
+          if (nextJs !== null) extra.push("js");
           const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? "layout " : ""}HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
           renderSummary(summaryText);
           clearAttachment();
@@ -1431,110 +1601,164 @@
     const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : "<div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial. The outer layout wrapper stays active.</div>";
     const editableCopy = mode === "layout" ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.*</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>';
     return `
-        <div class="prompt-window prompt-inline" id="promptWindow">
-            <div class="prompt-header">
-                <div>
-                    <h4 class="edit-panel-title">Prompt edit window</h4>
-                    <div class="small-note">Chat + completion helper</div>
-                </div>
-            </div>
-            <details class="prompt-system" open>
-                <summary class="prompt-system-summary">Connection</summary>
-                <div class="edit-grid prompt-grid">
+        <div class="prompt-layer" id="promptLayer">
+            <button class="prompt-layer-toggle prompt-layer-toggle-close" type="button" id="promptLayerClose" aria-label="Hide prompt window" title="Hide prompt window">&times;</button>
+            <button class="prompt-layer-toggle prompt-layer-toggle-open" type="button" id="promptLayerOpen" aria-label="Show prompt window" title="Show prompt window" hidden>AI</button>
+            <div class="prompt-window prompt-inline" id="promptWindow">
+                <div class="prompt-header">
                     <div>
-                        <label class="edit-label" for="prompt-provider">Provider</label>
-                        <select class="form-input" id="prompt-provider">
-                            <option value="local">Local URL</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="gemini">Gemini</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="edit-label" for="prompt-model">Model</label>
-                        <input class="form-input" id="prompt-model" type="text" value="${escapeHtml(settings.model || "")}" placeholder="optional">
-                    </div>
-                    <div>
-                        <label class="edit-label" for="prompt-api-key">API key (stored in localStorage)</label>
-                        <input class="form-input" id="prompt-api-key" type="password" value="${escapeHtml(settings.apiKey || "")}">
+                        <h4 class="edit-panel-title">Prompt edit window</h4>
+                        <div class="small-note">Chat + completion helper</div>
                     </div>
                 </div>
-                <div class="prompt-settings-actions">
-                    <button class="btn btn-secondary" type="button" id="prompt-settings-reset">Reset settings</button>
+                <details class="prompt-system">
+                    <summary class="prompt-system-summary">Connection</summary>
+                    <div class="edit-grid prompt-grid">
+                        <div>
+                            <label class="edit-label" for="prompt-provider">Provider</label>
+                            <select class="form-input" id="prompt-provider">
+                                <option value="local">Local URL</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="gemini">Gemini</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="edit-label" for="prompt-model">Model</label>
+                            <input class="form-input" id="prompt-model" type="text" value="${escapeHtml(settings.model || "")}" placeholder="optional">
+                        </div>
+                        <div>
+                            <label class="edit-label" for="prompt-api-key">API key (stored in localStorage)</label>
+                            <input class="form-input" id="prompt-api-key" type="password" value="${escapeHtml(settings.apiKey || "")}">
+                        </div>
+                    </div>
+                    <div class="prompt-settings-actions">
+                        <button class="btn btn-secondary" type="button" id="prompt-settings-reset">Reset settings</button>
+                    </div>
+                    <div id="prompt-endpoint-row">
+                        <label class="edit-label" for="prompt-endpoint">Local endpoint URL</label>
+                        <input class="form-input" id="prompt-endpoint" type="text" value="${escapeHtml(settings.endpoint || "")}" placeholder="http://localhost:1234/generate">
+                    </div>
+                </details>
+                <details class="prompt-system">
+                    <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
+                    <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(settings.systemPrompt || "")}</textarea>
+                    <div class="prompt-system-footer">
+                        <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
+                        <button class="btn btn-secondary" type="button" id="prompt-system-reset">Reset default</button>
+                    </div>
+                </details>
+                <div class="prompt-summary" id="promptSummary">
+                    <div class="prompt-summary-title">Template summary</div>
+                    <div class="prompt-summary-body">Waiting for response...</div>
                 </div>
-                <div id="prompt-endpoint-row">
-                    <label class="edit-label" for="prompt-endpoint">Local endpoint URL</label>
-                    <input class="form-input" id="prompt-endpoint" type="text" value="${escapeHtml(settings.endpoint || "")}" placeholder="http://localhost:1234/generate">
+                <div class="prompt-generation" id="promptGeneration" hidden>
+                    <span class="prompt-generation-pulse" aria-hidden="true"></span>
+                    <span class="prompt-generation-label" id="promptGenerationLabel">Generating answer...</span>
                 </div>
-            </details>
-            <details class="prompt-system" open>
-                <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
-                <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(settings.systemPrompt || "")}</textarea>
-                <div class="prompt-system-footer">
-                    <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
-                    <button class="btn btn-secondary" type="button" id="prompt-system-reset">Reset default</button>
+                <div class="prompt-allowed">
+                    ${editableCopy}
                 </div>
-            </details>
-            <div class="prompt-summary" id="promptSummary">
-                <div class="prompt-summary-title">Template summary</div>
-                <div class="prompt-summary-body">Waiting for response...</div>
+                <details class="prompt-section prompt-section-messages">
+                    <summary>Messages</summary>
+                    <div class="prompt-messages" id="promptMessages"></div>
+                </details>
+                <details class="prompt-section prompt-section-context">
+                    <summary>Prompt context</summary>
+                    <div class="prompt-context" id="promptContext">
+                        <div class="prompt-context-title">Placeholders</div>
+                        <div class="prompt-context-body">
+                        <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                        <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
+                        ${contextCopy}
+                        <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
+                        <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
+                    </div>
+                    </div>
+                </details>
+                <details class="prompt-template-viewer" id="promptTemplateViewer">
+                    <summary class="prompt-template-viewer-summary">Current template code</summary>
+                    <div class="prompt-template-viewer-body">
+                        <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                        <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
+                    </div>
+                </details>
+                <input id="prompt-image-input" type="file" accept="image/*" hidden>
+                <div class="prompt-attachment" id="promptAttachment" hidden>
+                    <div class="prompt-attachment-preview-wrap">
+                        <img class="prompt-attachment-preview" id="promptAttachmentPreview" alt="Prompt attachment preview">
+                    </div>
+                    <div class="prompt-attachment-meta">
+                        <div class="prompt-attachment-name" id="promptAttachmentName">Image attached</div>
+                        <div class="small-note">Clipboard paste and image uploads are supported.</div>
+                    </div>
+                    <button class="btn btn-secondary" type="button" id="prompt-attachment-remove">Remove image</button>
+                </div>
+                <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
+                <div class="prompt-actions">
+                    <div class="prompt-actions-left">
+                        <button class="btn" type="button" id="prompt-send">Send</button>
+                        <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
+                        <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
+                    </div>
+                    <label class="prompt-inline-toggle">
+                        <input class="prompt-inline-toggle-input" type="checkbox" id="prompt-stream" ${settings.streamPreview === false ? "" : "checked"}>
+                        Stream response
+                    </label>
+                </div>
+                <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
+                <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
+                <div class="small-note">${promptTargetCopy}</div>
+                <div class="small-note">${footerCopy}</div>
             </div>
-            <div class="prompt-generation" id="promptGeneration" hidden>
-                <span class="prompt-generation-pulse" aria-hidden="true"></span>
-                <span class="prompt-generation-label" id="promptGenerationLabel">Generating answer...</span>
-            </div>
-            <div class="prompt-allowed">
-                ${editableCopy}
-            </div>
-            <div class="prompt-messages" id="promptMessages"></div>
-            <div class="prompt-context" id="promptContext">
-                <div class="prompt-context-title">Placeholders</div>
-                <div class="prompt-context-body">
-                    <div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                    <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
-                    ${contextCopy}
-                    <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
-                    <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>
-                </div>
-            </div>
-            <details class="prompt-template-viewer" id="promptTemplateViewer">
-                <summary class="prompt-template-viewer-summary">Current template code</summary>
-                <div class="prompt-template-viewer-body">
-                    <div class="small-note" id="promptTemplateLabel">Current target template</div>
-                    <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
-                </div>
-            </details>
-            <input id="prompt-image-input" type="file" accept="image/*" hidden>
-            <div class="prompt-attachment" id="promptAttachment" hidden>
-                <div class="prompt-attachment-preview-wrap">
-                    <img class="prompt-attachment-preview" id="promptAttachmentPreview" alt="Prompt attachment preview">
-                </div>
-                <div class="prompt-attachment-meta">
-                    <div class="prompt-attachment-name" id="promptAttachmentName">Image attached</div>
-                    <div class="small-note">Clipboard paste and image uploads are supported.</div>
-                </div>
-                <button class="btn btn-secondary" type="button" id="prompt-attachment-remove">Remove image</button>
-            </div>
-            <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
-            <div class="prompt-actions">
-                <div class="prompt-actions-left">
-                    <button class="btn" type="button" id="prompt-send">Send</button>
-                    <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
-                    <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
-                </div>
-                <label class="prompt-inline-toggle">
-                    <input class="prompt-inline-toggle-input" type="checkbox" id="prompt-stream" ${settings.streamPreview === false ? "" : "checked"}>
-                    Stream response
-                </label>
-            </div>
-            <div class="small-note">Press <code>Enter</code> to send. Use <code>Shift+Enter</code> for a new line.</div>
-            <div class="small-note">Paste an image from the clipboard directly into the prompt input to attach it.</div>
-            <div class="small-note">${promptTargetCopy}</div>
-            <div class="small-note">${footerCopy}</div>
         </div>
     `;
   }
 
   // src/assets/js/edit/panel.js
+  function formatUploadBytes(value = 0) {
+    const bytes = Number(value) || 0;
+    if (bytes <= 0) {
+      return "0 B";
+    }
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes;
+    let index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index += 1;
+    }
+    const rounded = size >= 10 || index === 0 ? Math.round(size) : Math.round(size * 10) / 10;
+    return `${rounded} ${units[index]}`;
+  }
+  function uploadValidationError(files = [], uploadLimits = null) {
+    if (!Array.isArray(files) || files.length === 0) {
+      return null;
+    }
+    const perFileLimit = Number((uploadLimits == null ? void 0 : uploadLimits.uploadMaxBytes) || 0);
+    const postLimit = Number((uploadLimits == null ? void 0 : uploadLimits.postMaxBytes) || 0);
+    const totalSize = files.reduce((sum, file) => sum + (Number(file == null ? void 0 : file.size) || 0), 0);
+    if (perFileLimit > 0) {
+      const oversizedFile = files.find((file) => (Number(file == null ? void 0 : file.size) || 0) > perFileLimit);
+      if (oversizedFile) {
+        return `${oversizedFile.name} is too large. Max file size is ${(uploadLimits == null ? void 0 : uploadLimits.uploadMax) || formatUploadBytes(perFileLimit)}.`;
+      }
+    }
+    if (postLimit > 0 && totalSize > postLimit) {
+      return `Selected files are too large together. Max upload payload is ${(uploadLimits == null ? void 0 : uploadLimits.postMax) || formatUploadBytes(postLimit)}.`;
+    }
+    return null;
+  }
+  function syncPromptDock(promptRoot = null) {
+    const promptDock = document.querySelector("#promptDock");
+    if (!promptDock) {
+      return;
+    }
+    if (promptRoot) {
+      promptDock.replaceChildren(promptRoot);
+      return;
+    }
+    promptDock.replaceChildren();
+  }
   function layoutOverlayState(config, status) {
     const layoutState = getLayoutState(config);
     const isFile = (status == null ? void 0 : status.target) === "file";
@@ -1591,8 +1815,11 @@
     editPanel,
     config,
     status,
+    contentTargetLabel,
     onSubmitLayout,
-    onReturnToWork
+    onReturnToWork,
+    onUploadFiles,
+    onCreateBlankFile
   }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -1626,6 +1853,8 @@
       { value: "custom", label: "Custom" }
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
+    const isFileSubject = subjectStatus.target === "file";
+    const addContentHint = isFileSubject ? `Add content to the containing folder: ${contentTargetLabel || "."}` : "Upload files or create a blank file in this folder.";
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
         <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
@@ -1659,6 +1888,44 @@
                 </div>
             </div>
         </form>
+        <div class="edit-upload-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add content</div>
+                <div class="small-note">${escapeHtml(addContentHint)}</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">Add content</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                </div>
+                <div class="edit-grid">
+                    <div>
+                        <label class="edit-label" for="edit-upload-source">Source</label>
+                        <select class="form-select" id="edit-upload-source" name="upload_source">
+                            <option value="upload" selected>Upload</option>
+                            <option value="blank">Blank file</option>
+                            <option value="url" disabled>From URL (disabled)</option>
+                        </select>
+                    </div>
+                    <div id="editUploadFilesWrap">
+                        <label class="edit-label" for="edit-upload-files">Files</label>
+                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
+                    </div>
+                    <div id="editBlankFileWrap" hidden>
+                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
+                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
+                    </div>
+                </div>
+                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="edit-inline-actions">
+                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
+                </div>
+            </form>
+        </dialog>
         ${renderPromptWindow(settings, {
       mode: "layout",
       subjectType: subjectLabel,
@@ -1725,7 +1992,20 @@
     const primaryCssEl = editPanel.querySelector("#edit-layout-primary-css");
     const primaryJsEl = editPanel.querySelector("#edit-layout-primary-js");
     const contentTemplateEl = editPanel.querySelector("#edit-content-template");
-    const promptRoot = editPanel.querySelector("#promptWindow");
+    const promptRoot = editPanel.querySelector("#promptLayer");
+    const uploadDialog = editPanel.querySelector("#editUploadDialog");
+    syncPromptDock(promptRoot);
+    const openUploadDialogButton = editPanel.querySelector("#editOpenUploadDialog");
+    const uploadCloseButton = editPanel.querySelector("#editUploadClose");
+    const uploadCancelButton = editPanel.querySelector("#editUploadCancel");
+    const uploadSubmitButton = editPanel.querySelector("#editUploadSubmit");
+    const uploadSourceEl = editPanel.querySelector("#edit-upload-source");
+    const uploadFilesEl = editPanel.querySelector("#edit-upload-files");
+    const uploadSummaryEl = editPanel.querySelector("#editUploadSummary");
+    const uploadFilesWrapEl = editPanel.querySelector("#editUploadFilesWrap");
+    const blankFileWrapEl = editPanel.querySelector("#editBlankFileWrap");
+    const blankFileNameEl = editPanel.querySelector("#edit-blank-file-name");
+    const uploadLimits = (status == null ? void 0 : status.uploadLimits) || null;
     const currentSectionTemplate = layoutState.sectionTemplate || "";
     const drafts = {
       virtualTemplate: originalTemplate || "",
@@ -1841,6 +2121,118 @@
         });
       });
     }
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function" && typeof onCreateBlankFile === "function") {
+      const setUploadSummary = () => {
+        var _a;
+        const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
+        if (!uploadSummaryEl) {
+          return;
+        }
+        if (((uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload") === "blank") {
+          const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
+          uploadSummaryEl.textContent = name ? `Will create: ${name}` : "Enter a file name.";
+          return;
+        }
+        const validationError = uploadValidationError(files, uploadLimits);
+        if (validationError) {
+          uploadSummaryEl.textContent = validationError;
+          return;
+        }
+        uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(", ") : "No files selected.";
+      };
+      const syncUploadMode = () => {
+        const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        if (uploadFilesWrapEl) {
+          uploadFilesWrapEl.hidden = mode !== "upload";
+        }
+        if (blankFileWrapEl) {
+          blankFileWrapEl.hidden = mode !== "blank";
+        }
+        if (uploadSubmitButton) {
+          uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : "Upload";
+        }
+        setUploadSummary();
+      };
+      const closeUploadDialog = () => {
+        if (typeof uploadDialog.close === "function") {
+          uploadDialog.close();
+        } else {
+          uploadDialog.removeAttribute("open");
+        }
+      };
+      const openUploadDialog = () => {
+        syncUploadMode();
+        setUploadSummary();
+        if (typeof uploadDialog.showModal === "function") {
+          uploadDialog.showModal();
+        } else {
+          uploadDialog.setAttribute("open", "open");
+        }
+      };
+      openUploadDialogButton.addEventListener("click", openUploadDialog);
+      if (uploadCloseButton) {
+        uploadCloseButton.addEventListener("click", closeUploadDialog);
+      }
+      if (uploadCancelButton) {
+        uploadCancelButton.addEventListener("click", closeUploadDialog);
+      }
+      if (uploadSourceEl) {
+        uploadSourceEl.addEventListener("change", syncUploadMode);
+      }
+      if (uploadFilesEl) {
+        uploadFilesEl.addEventListener("change", setUploadSummary);
+      }
+      if (blankFileNameEl) {
+        blankFileNameEl.addEventListener("input", setUploadSummary);
+      }
+      if (uploadSubmitButton) {
+        uploadSubmitButton.addEventListener("click", async () => {
+          var _a;
+          const source = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+          try {
+            uploadSubmitButton.disabled = true;
+            if (source === "blank") {
+              const fileName = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
+              if (!fileName) {
+                if (statusEl) {
+                  statusEl.textContent = "Enter a file name.";
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              await onCreateBlankFile({ source, fileName, statusEl });
+            } else {
+              const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
+              if (files.length === 0) {
+                if (statusEl) {
+                  statusEl.textContent = "Choose at least one file.";
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              const validationError = uploadValidationError(files, uploadLimits);
+              if (validationError) {
+                if (statusEl) {
+                  statusEl.textContent = validationError;
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              await onUploadFiles({ source, files, statusEl });
+            }
+            closeUploadDialog();
+          } catch (err) {
+            if (statusEl) {
+              statusEl.textContent = err.message || "Upload failed.";
+              statusEl.className = "edit-status";
+            }
+          } finally {
+            uploadSubmitButton.disabled = false;
+          }
+        });
+      }
+      syncUploadMode();
+    }
     return { statusEl, promptRoot };
   }
   function renderEditPanel({
@@ -1848,6 +2240,7 @@
     editRequested: editRequested2,
     config,
     status,
+    contentTargetLabel,
     onTitleInput,
     onDescriptionInput,
     onSubmit,
@@ -1855,13 +2248,16 @@
     onOpenLayoutPage,
     onReturnToWork,
     onSubmitLayout,
-    onUploadFiles
+    onUploadFiles,
+    onCreateBlankFile
   }) {
     if (!editPanel) {
+      syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
     if (!editRequested2) {
       editPanel.hidden = true;
+      syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
     editPanel.hidden = false;
@@ -1871,6 +2267,7 @@
             <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status">${escapeHtml(message)}</div>
         `;
+      syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
     if (!(status == null ? void 0 : status.allowed)) {
@@ -1878,6 +2275,7 @@
             <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status">Create a file named <code>.edit.allow</code> in the site root to enable edit mode.</div>
         `;
+      syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
     if ((status == null ? void 0 : status.target) === "layout") {
@@ -1885,15 +2283,20 @@
         editPanel,
         config,
         status,
+        contentTargetLabel,
         onSubmitLayout,
-        onReturnToWork
+        onReturnToWork,
+        onUploadFiles,
+        onCreateBlankFile
       });
     }
     const label = (status == null ? void 0 : status.target) === "file" ? "Edit mode (file)" : "Edit mode (folder)";
     const settings = loadPromptSettings();
     const overlayState = layoutOverlayState(config, status);
     const treeItems = Array.isArray(config.tree) ? config.tree : [];
-    const isEmptyFolder = (status == null ? void 0 : status.target) !== "file" && treeItems.length === 0;
+    const isFileTarget = (status == null ? void 0 : status.target) === "file";
+    const isEmptyFolder = !isFileTarget && treeItems.length === 0;
+    const addContentHint = isEmptyFolder ? "This folder is empty. Upload a file or create a blank file to start." : isFileTarget ? `Add content to the containing folder: ${contentTargetLabel || "."}` : "Upload files or create a blank file in this folder.";
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
         <div class="edit-status" id="editInlineStatus"></div>
@@ -1920,48 +2323,44 @@
             </div>
             <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
         </div>
-        ${(status == null ? void 0 : status.target) !== "file" ? `
-            <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
-                <div class="edit-layout-copy">
-                    <div class="edit-layout-title">Add content</div>
-                    <div class="small-note">${isEmptyFolder ? "This folder is empty. Upload a file to start." : "Upload files into this folder."}</div>
+        <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add content</div>
+                <div class="small-note">${escapeHtml(addContentHint)}</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">Add content</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
-                <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add files</button>
-            </div>
-            <dialog class="edit-upload-dialog" id="editUploadDialog">
-                <form method="dialog" class="edit-upload-dialog-form">
-                    <div class="drawer-header">
-                        <h4 class="drawer-title">Add content</h4>
-                        <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                <div class="edit-grid">
+                    <div>
+                        <label class="edit-label" for="edit-upload-source">Source</label>
+                        <select class="form-select" id="edit-upload-source" name="upload_source">
+                            <option value="upload" selected>Upload</option>
+                            <option value="blank">Blank file</option>
+                            <option value="url" disabled>From URL (disabled)</option>
+                        </select>
                     </div>
-                    <div class="edit-grid">
-                        <div>
-                            <label class="edit-label" for="edit-upload-source">Source</label>
-                            <select class="form-select" id="edit-upload-source" name="upload_source">
-                                <option value="upload" selected>Upload</option>
-                                <option value="url" disabled>From URL (disabled)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="edit-label" for="edit-upload-files">Files</label>
-                            <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
-                        </div>
+                    <div id="editUploadFilesWrap">
+                        <label class="edit-label" for="edit-upload-files">Files</label>
+                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
                     </div>
-                    <div class="small-note" id="editUploadSummary">No files selected.</div>
-                    <div class="edit-inline-actions">
-                        <button class="btn" type="button" id="editUploadSubmit">Upload</button>
-                        <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
+                    <div id="editBlankFileWrap" hidden>
+                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
+                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
                     </div>
-                </form>
-            </dialog>
-        ` : ""}
-        <details class="prompt-template-viewer">
-            <summary class="prompt-template-viewer-summary">Current template code</summary>
-            <div class="prompt-template-viewer-body">
-                <div class="small-note">${(status == null ? void 0 : status.target) === "file" ? "Current wrapped file partial" : "Current wrapped folder partial"}</div>
-                <textarea class="form-textarea prompt-template-code" readonly spellcheck="false" placeholder="No template loaded yet.">${escapeHtml(overlayState.layoutState.sectionTemplate || "")}</textarea>
-            </div>
-        </details>
+                </div>
+                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="edit-inline-actions">
+                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
+                </div>
+            </form>
+        </dialog>
         ${renderPromptWindow(settings)}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
@@ -1970,8 +2369,9 @@
     const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
-    const promptRoot = editPanel.querySelector("#promptWindow");
+    const promptRoot = editPanel.querySelector("#promptLayer");
     const uploadDialog = editPanel.querySelector("#editUploadDialog");
+    syncPromptDock(promptRoot);
     const openUploadDialogButton = editPanel.querySelector("#editOpenUploadDialog");
     const uploadCloseButton = editPanel.querySelector("#editUploadClose");
     const uploadCancelButton = editPanel.querySelector("#editUploadCancel");
@@ -1979,6 +2379,10 @@
     const uploadSourceEl = editPanel.querySelector("#edit-upload-source");
     const uploadFilesEl = editPanel.querySelector("#edit-upload-files");
     const uploadSummaryEl = editPanel.querySelector("#editUploadSummary");
+    const uploadFilesWrapEl = editPanel.querySelector("#editUploadFilesWrap");
+    const blankFileWrapEl = editPanel.querySelector("#editBlankFileWrap");
+    const blankFileNameEl = editPanel.querySelector("#edit-blank-file-name");
+    const uploadLimits = (status == null ? void 0 : status.uploadLimits) || null;
     if (titleInput && typeof onTitleInput === "function") {
       titleInput.addEventListener("input", () => {
         onTitleInput(titleInput.value);
@@ -2004,13 +2408,37 @@
     if (changeLayoutButton && typeof onOpenLayoutPage === "function") {
       changeLayoutButton.addEventListener("click", () => onOpenLayoutPage());
     }
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function") {
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function" && typeof onCreateBlankFile === "function") {
       const setUploadSummary = () => {
+        var _a;
         const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
         if (!uploadSummaryEl) {
           return;
         }
+        if (((uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload") === "blank") {
+          const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
+          uploadSummaryEl.textContent = name ? `Will create: ${name}` : "Enter a file name.";
+          return;
+        }
+        const validationError = uploadValidationError(files, uploadLimits);
+        if (validationError) {
+          uploadSummaryEl.textContent = validationError;
+          return;
+        }
         uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(", ") : "No files selected.";
+      };
+      const syncUploadMode = () => {
+        const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        if (uploadFilesWrapEl) {
+          uploadFilesWrapEl.hidden = mode !== "upload";
+        }
+        if (blankFileWrapEl) {
+          blankFileWrapEl.hidden = mode !== "blank";
+        }
+        if (uploadSubmitButton) {
+          uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : "Upload";
+        }
+        setUploadSummary();
       };
       const closeUploadDialog = () => {
         if (typeof uploadDialog.close === "function") {
@@ -2020,6 +2448,7 @@
         }
       };
       const openUploadDialog = () => {
+        syncUploadMode();
         setUploadSummary();
         if (typeof uploadDialog.showModal === "function") {
           uploadDialog.showModal();
@@ -2034,26 +2463,58 @@
       if (uploadCancelButton) {
         uploadCancelButton.addEventListener("click", closeUploadDialog);
       }
+      if (uploadSourceEl) {
+        uploadSourceEl.addEventListener("change", syncUploadMode);
+      }
       if (uploadFilesEl) {
         uploadFilesEl.addEventListener("change", setUploadSummary);
       }
+      if (blankFileNameEl) {
+        blankFileNameEl.addEventListener("input", setUploadSummary);
+      }
       if (uploadSubmitButton) {
         uploadSubmitButton.addEventListener("click", async () => {
-          const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
-          if (files.length === 0) {
-            if (statusEl) {
-              statusEl.textContent = "Choose at least one file.";
-              statusEl.className = "edit-status";
-            }
-            return;
-          }
+          var _a;
+          const source = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
           try {
             uploadSubmitButton.disabled = true;
-            await onUploadFiles({
-              source: (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload",
-              files,
-              statusEl
-            });
+            if (source === "blank") {
+              const fileName = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
+              if (!fileName) {
+                if (statusEl) {
+                  statusEl.textContent = "Enter a file name.";
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              await onCreateBlankFile({
+                source,
+                fileName,
+                statusEl
+              });
+            } else {
+              const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
+              if (files.length === 0) {
+                if (statusEl) {
+                  statusEl.textContent = "Choose at least one file.";
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              const validationError = uploadValidationError(files, uploadLimits);
+              if (validationError) {
+                if (statusEl) {
+                  statusEl.textContent = validationError;
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              await onUploadFiles({
+                source,
+                files,
+                statusEl
+              });
+            }
             closeUploadDialog();
           } catch (err) {
             if (statusEl) {
@@ -2065,6 +2526,7 @@
           }
         });
       }
+      syncUploadMode();
     }
     return { statusEl, promptRoot };
   }
@@ -2077,6 +2539,16 @@
     let editConfig = currentPoffConfig;
     let editTarget = "folder";
     let drawerOpen = false;
+    function getContentTargetPath(selection = getActiveSelection()) {
+      if (selection == null ? void 0 : selection.isLayout) {
+        return selection.path || "";
+      }
+      const previewPath = (selection == null ? void 0 : selection.previewPath) || (selection == null ? void 0 : selection.path) || "";
+      if (selection == null ? void 0 : selection.previewIsFile) {
+        return previewPath.split("/").slice(0, -1).join("/");
+      }
+      return previewPath;
+    }
     function renderFolderMeta() {
       return folderConfig;
     }
@@ -2150,12 +2622,31 @@
       editDrawer.hidden = false;
       editDrawer.classList.add("edit-drawer-open");
     }
+    async function refreshCurrentEditState(selection = getActiveSelection()) {
+      const refreshed = await requestEditConfig("config", { path: selection.path });
+      if (refreshed == null ? void 0 : refreshed.config) {
+        editConfig = refreshed.config;
+        editTarget = refreshed.target || (selection.isLayout ? "layout" : selection.previewIsFile ? "file" : "folder");
+        if (editTarget === "folder" || editTarget === "layout" && refreshed.subjectTarget === "folder") {
+          folderConfig = editConfig;
+          renderFolderMeta();
+        }
+      }
+      renderEditUI((refreshed == null ? void 0 : refreshed.config) || editConfig, {
+        allowed: (refreshed == null ? void 0 : refreshed.allowed) !== false,
+        error: refreshed == null ? void 0 : refreshed.error,
+        target: (refreshed == null ? void 0 : refreshed.target) || editTarget,
+        subjectTarget: refreshed == null ? void 0 : refreshed.subjectTarget,
+        uploadLimits: refreshed == null ? void 0 : refreshed.uploadLimits
+      });
+    }
     function renderEditUI(config, status) {
       const panelState = renderEditPanel({
         editPanel,
         editRequested: editRequested2,
         config,
         status,
+        contentTargetLabel: getContentTargetPath(),
         onTitleInput: (value) => {
           if (!editConfig) {
             return;
@@ -2246,26 +2737,39 @@
         onUploadFiles: async ({ source, files, statusEl }) => {
           const selection = getActiveSelection();
           const data = await requestEditUpload({
-            path: selection.previewPath || selection.path,
+            path: getContentTargetPath(selection),
             source,
             files
           });
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Upload failed.");
           }
-          editConfig = data.config || editConfig;
-          editTarget = data.target || editTarget;
-          if (editTarget === "folder") {
-            folderConfig = editConfig;
-          }
-          renderEditUI(editConfig, {
-            allowed: data.allowed !== false,
-            target: editTarget
-          });
+          await refreshCurrentEditState(selection);
           const inlineStatus = document.getElementById("editInlineStatus");
           if (inlineStatus) {
             const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
             inlineStatus.textContent = count === 1 ? "Uploaded 1 file." : `Uploaded ${count} files.`;
+            inlineStatus.className = "edit-status edit-status-success";
+          }
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        },
+        onCreateBlankFile: async ({ source, fileName, statusEl }) => {
+          var _a;
+          const selection = getActiveSelection();
+          const data = await requestEditUpload({
+            path: getContentTargetPath(selection),
+            source,
+            fileName,
+            files: []
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Create blank file failed.");
+          }
+          await refreshCurrentEditState(selection);
+          const inlineStatus = document.getElementById("editInlineStatus");
+          if (inlineStatus) {
+            const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : fileName;
+            inlineStatus.textContent = `Created ${createdName}.`;
             inlineStatus.className = "edit-status edit-status-success";
           }
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
@@ -2327,7 +2831,8 @@
       renderEditUI(data.config || editConfig, {
         allowed: data.allowed !== false,
         error: data.error,
-        target: editTarget
+        target: editTarget,
+        uploadLimits: data.uploadLimits
       });
     }
     return {
@@ -2851,6 +3356,16 @@
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode
   });
+  function previewHashActive() {
+    return window.location.hash === "#preview";
+  }
+  function scrollToPreview() {
+    const previewEl = document.getElementById("preview");
+    if (!previewEl) {
+      return;
+    }
+    previewEl.scrollIntoView({ block: "start" });
+  }
   function bindSidebarToggle() {
     const { appShell, appSidebar, sidebarToggle } = elements;
     if (!appShell || !appSidebar || !sidebarToggle) {
@@ -2874,7 +3389,10 @@
     bindSidebarToggle();
     editController.syncEditToggle();
     editController.bindEditToggle();
-    if (window.location.hash && window.location.hash.length > 1) {
+    if (previewHashActive()) {
+      navigation.loadCurrentFolderInIframe();
+      requestAnimationFrame(() => scrollToPreview());
+    } else if (window.location.hash && window.location.hash.length > 1) {
       navigation.syncFromLocation();
     } else {
       navigation.loadCurrentFolderInIframe();
@@ -2882,6 +3400,13 @@
     editController.initEditMode();
   });
   window.addEventListener("hashchange", () => {
+    if (previewHashActive()) {
+      scrollToPreview();
+      if (editRequested) {
+        editController.initEditMode();
+      }
+      return;
+    }
     if (!navigation.consumeHashSync()) {
       navigation.syncFromLocation();
     }
