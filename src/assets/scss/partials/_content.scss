@@ -14,6 +14,7 @@
 
 .preview-shell {
     position: relative;
+    --prompt-dock-reserve: 0px;
     flex: 0 0 auto;
     height: 100vh;
     min-height: 100vh;
@@ -49,6 +50,13 @@
     min-height: 0;
     overflow: auto;
     padding-bottom: 24px;
+}
+
+.content-frame > .viewer {
+    min-height: 100%;
+    box-sizing: border-box;
+    padding-inline-end: var(--prompt-dock-reserve);
+    transition: padding-inline-end 0.18s ease;
 }
 
 .content-frame[data-disabled="true"] {
@@ -117,4 +125,10 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     pointer-events: none;
+}
+
+@media (min-width: 1181px) {
+    .preview-shell:has(.prompt-dock:not(:empty) .prompt-layer:not(.prompt-layer-collapsed)) {
+        --prompt-dock-reserve: calc(clamp(320px, 38vw, 620px) + 40px);
+    }
 }
