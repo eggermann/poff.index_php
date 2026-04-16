@@ -1,5 +1,7 @@
 /* Edit mode */
 .edit-panel {
+    position: relative;
+    z-index: 1;
     border-bottom: 1px solid #e5e7eb;
     background: #fff7ed;
     padding: 14px 20px;
@@ -273,7 +275,7 @@
     overflow: auto;
     transform: translateX(100%);
     transition: transform 0.2s ease;
-    z-index: 3;
+    z-index: 30;
 }
 .edit-drawer.open,
 .edit-drawer.edit-drawer-open {
@@ -323,7 +325,8 @@
     width: 100%;
     min-height: 0;
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    align-items: flex-start;
     pointer-events: auto;
 }
 .prompt-layer-toggle {
