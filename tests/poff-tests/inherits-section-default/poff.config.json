@@ -5,19 +5,19 @@
     "title": "inherits-section-default",
     "description": "",
     "type": "folder",
-    "id": "poff_41d69e4f53707f73",
+    "id": "poff_0a0679ad24c8ce6c",
     "tree": [
         {
             "name": "hero.txt",
             "slug": "hero-txt",
             "type": "file",
             "path": "hero.txt",
-            "modifiedAt": "2026-04-16T20:47:54+00:00",
+            "modifiedAt": "2026-04-17T07:28:39+00:00",
             "visible": true
         }
     ],
-    "treeHash": "7d431689fa676c7761d2f229f57b0b4f9d15ebaa9337ad5299cdac3a7618c5a9",
-    "updatedAt": "2026-04-16T20:47:55+00:00",
+    "treeHash": "805a5b0b742950284941a6d38e2550eb9cb2538b532eebcbb2a4bbd511cde684",
+    "updatedAt": "2026-04-17T07:28:40+00:00",
     "work": {
         "type": "folder",
         "layout": {
