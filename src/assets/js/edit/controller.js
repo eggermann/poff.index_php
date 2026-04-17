@@ -26,6 +26,20 @@ export function createEditController({ elements, context, editRequested }) {
         return previewPath;
     }
 
+    function getEditTargetPath(selection = getActiveSelection()) {
+        if (selection?.isLayout) {
+            return selection.path || '';
+        }
+        if (selection?.previewIsFile) {
+            const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
+            const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
+            if (navPath) {
+                return navPath;
+            }
+        }
+        return selection?.previewPath || selection?.path || '';
+    }
+
     function renderFolderMeta() {
         return folderConfig;
     }
@@ -105,7 +119,7 @@ export function createEditController({ elements, context, editRequested }) {
     }
 
     async function refreshCurrentEditState(selection = getActiveSelection()) {
-        const refreshed = await requestEditConfig('config', { path: selection.path });
+        const refreshed = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (refreshed?.config) {
             editConfig = refreshed.config;
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
@@ -153,7 +167,7 @@ export function createEditController({ elements, context, editRequested }) {
             onSubmit: async ({ elements, statusEl }) => {
                 const selection = getActiveSelection();
                 const payload = {
-                    path: selection.path,
+                    path: getEditTargetPath(selection),
                     title: (elements.title?.value || '').trim(),
                     description: (elements.description?.value || '').trim(),
                 };
@@ -214,7 +228,7 @@ export function createEditController({ elements, context, editRequested }) {
                     layoutPayload.originalJs = payload.originalLayoutJs ?? '';
                 }
                 await saveConfig({
-                    path: selection.path,
+                    path: getEditTargetPath(selection),
                     layout: layoutPayload,
                 }, statusEl);
             },
@@ -275,7 +289,7 @@ export function createEditController({ elements, context, editRequested }) {
             onSubmit: async ({ elements, statusEl, treeVisible }) => {
                 const selection = getActiveSelection();
                 const payload = {
-                    path: selection.path,
+                    path: getEditTargetPath(selection),
                     link: (elements.link?.value || '').trim(),
                     url: (elements.url?.value || '').trim(),
                     work: {
@@ -308,7 +322,7 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         const selection = getActiveSelection();
-        const data = await requestEditConfig('config', { path: selection.path });
+        const data = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (data.config) {
             editConfig = data.config;
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');

@@ -38,8 +38,8 @@ if (is_array($tree)) {
             continue;
         }
         $itemType = $item['type'] ?? 'file';
-        $relativePath = $currentRelativePath ? rtrim($currentRelativePath, "/\\") . '/' . $itemName : $itemName;
-        $fullPath = $currentAbsolutePath . DIRECTORY_SEPARATOR . $itemName;
+        $relativePath = $navFolder ? rtrim($navFolder, "/\\") . '/' . $itemName : $itemName;
+        $fullPath = $navAbsolutePath . DIRECTORY_SEPARATOR . $itemName;
         $linkUrl = ($itemType === 'folder') ? null : extractLinkFileUrl($fullPath);
 
         if ($itemType === 'folder') {
@@ -51,6 +51,7 @@ if (is_array($tree)) {
         } else {
             $files[] = [
                 'name'     => $itemName,
+                'path'     => $relativePath,
                 'data_src' => $linkUrl ?? $relativePath,
                 'icon'     => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>',
             ];
@@ -77,10 +78,10 @@ if (is_array($tree)) {
                 continue;
             }
 
-            $itemFullPath = $currentAbsolutePath . DIRECTORY_SEPARATOR . $item;
+            $itemFullPath = $navAbsolutePath . DIRECTORY_SEPARATOR . $item;
             $isDir = is_dir($itemFullPath);
             $linkUrl = $isDir ? null : extractLinkFileUrl($itemFullPath);
-            $itemRelativePath = $currentRelativePath ? rtrim($currentRelativePath, "/\\") . '/' . $item : $item;
+            $itemRelativePath = $navFolder ? rtrim($navFolder, "/\\") . '/' . $item : $item;
 
             if ($isDir) {
                 $directories[] = [
@@ -91,6 +92,7 @@ if (is_array($tree)) {
             } else {
                 $files[] = [
                     'name'     => $item,
+                    'path'     => $itemRelativePath,
                     'data_src' => $linkUrl ?? $itemRelativePath,
                     'icon'     => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>',
                 ];
@@ -117,5 +119,5 @@ if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
 }
 
 foreach ($files as $file) {
-    echo '<li><a class="nav-link" href="#" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '">' . $file['icon'] . htmlspecialchars($file['name']) . '</a></li>';
+    echo '<li><a class="nav-link" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '">' . $file['icon'] . htmlspecialchars($file['name']) . '</a></li>';
 }

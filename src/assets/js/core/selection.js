@@ -49,6 +49,9 @@ export function getSelectionFromPath(path = '') {
 export function getActiveSelection() {
     const rawHash = window.location.hash.replace(/^#\/?/, '');
     let hashPath = rawHash;
+    const params = new URLSearchParams(window.location.search);
+    const filePath = params.get('file') || '';
+    const folderPath = params.get('path') || '';
     if (rawHash) {
         try {
             hashPath = decodeURIComponent(rawHash);
@@ -59,8 +62,10 @@ export function getActiveSelection() {
     if (hashPath) {
         return getSelectionFromPath(hashPath);
     }
-    const params = new URLSearchParams(window.location.search);
-    return getSelectionFromPath(params.get('path') || '');
+    if (filePath) {
+        return getSelectionFromPath(filePath);
+    }
+    return getSelectionFromPath(folderPath);
 }
 
 export function getActivePath() {
