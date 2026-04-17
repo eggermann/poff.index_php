@@ -149,6 +149,9 @@
   function getActiveSelection() {
     const rawHash = window.location.hash.replace(/^#\/?/, "");
     let hashPath = rawHash;
+    const params = new URLSearchParams(window.location.search);
+    const filePath = params.get("file") || "";
+    const folderPath = params.get("path") || "";
     if (rawHash) {
       try {
         hashPath = decodeURIComponent(rawHash);
@@ -159,8 +162,10 @@
     if (hashPath) {
       return getSelectionFromPath(hashPath);
     }
-    const params = new URLSearchParams(window.location.search);
-    return getSelectionFromPath(params.get("path") || "");
+    if (filePath) {
+      return getSelectionFromPath(filePath);
+    }
+    return getSelectionFromPath(folderPath);
   }
 
   // src/assets/js/core/utils.js
@@ -258,16 +263,20 @@
   ].join("\n");
   var layoutSystemPrompt = [
     "You are a Handlebars (HBS) layout generator for this single-page CMS.",
-    "Transform the user description into one HBS template string for the outer layout wrapper rendered by LightnCandy.",
+    "Transform the user description into an updated outer layout wrapper rendered by LightnCandy.",
     'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
-    "When generating a custom layout, use src/includes/worktypes/templates/layout/default/template.hbs as the scaffold and keep the same wrapper behavior unless the user explicitly asks otherwise.",
+    "Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, sectionTemplate, css, and js after filesystem, inheritance, and preset resolution.",
+    "When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.",
     "The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.",
-    "Keep the wrapped content chain active: use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.",
+    "Keep the wrapped content chain active and preserve the data flow from the current item context all the way down to the inner partial. Use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.",
     "The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.",
     'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
+    "Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.",
     'Prefer returning sibling "css" and "js" strings too, so the custom layout can create template.hbs, style.css, and script.js together.',
+    "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
+    "Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
     "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
     "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
@@ -793,6 +802,7 @@
     const promptGenerationEl = root.querySelector("#promptGeneration");
     const promptGenerationLabelEl = root.querySelector("#promptGenerationLabel");
     const promptTemplateLabelEl = root.querySelector("#promptTemplateLabel");
+    const promptTemplateResetEl = root.querySelector("#prompt-template-reset");
     const promptTemplateCodeEl = root.querySelector("#promptTemplateCode");
     const promptAttachmentEl = root.querySelector("#promptAttachment");
     const promptWindowEl = root.querySelector("#promptWindow");
@@ -812,6 +822,7 @@
     let imageAttachment = null;
     let promptLayerCollapsed = false;
     const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
+    const currentPromptPlaceholder = () => currentPromptMode() === "layout" ? "Describe the layout you want..." : defaultPromptPlaceholder;
     const currentPromptMode = () => (getActiveSelection2 == null ? void 0 : getActiveSelection2().isLayout) ? "layout" : "work";
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
     const readPromptLayerState = () => {
@@ -857,6 +868,9 @@
         systemPromptEl.value = nextValue;
         savePromptSettings(readSettings());
       }
+      if (promptInputEl && !isSending) {
+        promptInputEl.placeholder = currentPromptPlaceholder();
+      }
     };
     const setHistory = (nextHistory) => {
       const list = Array.isArray(nextHistory) ? nextHistory : [];
@@ -871,12 +885,17 @@
       return document.querySelector(selector);
     };
     const renderTemplatePreview = () => {
+      var _a;
       if (!promptTemplateCodeEl) {
         return;
       }
       const selection = getActiveSelection2 ? getActiveSelection2() : null;
       const templateField = getCurrentTemplateField();
-      promptTemplateCodeEl.value = templateField && typeof templateField.value === "string" ? templateField.value : "";
+      const currentConfig = getConfig ? getConfig() || {} : {};
+      const layout = ((_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) && typeof currentConfig.work.layout === "object" ? currentConfig.work.layout : {};
+      const explicitTemplate = templateField && typeof templateField.value === "string" ? templateField.value : "";
+      const fallbackTemplate = (selection == null ? void 0 : selection.isLayout) ? typeof layout.template === "string" && layout.template || (typeof layout.phpTemplate === "string" ? layout.phpTemplate : "") : typeof layout.sectionTemplate === "string" && layout.sectionTemplate || (typeof layout.defaultSectionTemplate === "string" ? layout.defaultSectionTemplate : "");
+      promptTemplateCodeEl.value = explicitTemplate || fallbackTemplate || "";
       if (promptTemplateLabelEl) {
         promptTemplateLabelEl.textContent = (selection == null ? void 0 : selection.isLayout) ? "Current layout wrapper template" : "Current wrapped partial template";
       }
@@ -1134,6 +1153,89 @@
         if (statusEl) {
           statusEl.textContent = "Chat cleared.";
           statusEl.className = "edit-status";
+        }
+      });
+    }
+    if (promptTemplateResetEl) {
+      promptTemplateResetEl.addEventListener("click", async () => {
+        var _a, _b, _c, _d;
+        if (isSending) {
+          return;
+        }
+        const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
+        const isLayoutTarget = !!(selection == null ? void 0 : selection.isLayout);
+        const resetLabel = isLayoutTarget ? "current layout wrapper template" : "current wrapped partial template";
+        if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
+          return;
+        }
+        try {
+          isSending = true;
+          setGeneratingState(true, "Resetting template...");
+          if (statusEl) {
+            statusEl.textContent = "Resetting template...";
+            statusEl.className = "edit-status";
+          }
+          const currentConfig = getConfig ? getConfig() || {} : {};
+          const layoutState = getLayoutState(currentConfig || {});
+          const layoutPayload = {
+            name: ((_b = (_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) == null ? void 0 : _b.name) || "poff-layout",
+            engine: ((_d = (_c = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _c.layout) == null ? void 0 : _d.engine) || "lightncandy"
+          };
+          if (isLayoutTarget) {
+            const layoutPresetEl2 = document.getElementById("edit-layout-preset");
+            const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
+            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
+            const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
+            const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
+            layoutPayload.preset = preset;
+            layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
+            if (shouldPersistToLocalWrapper) {
+              layoutPayload.template = "";
+            } else if (canEditResolvedFilesystemTarget) {
+              layoutPayload.originalTarget = resolvedLayoutDirectory;
+              layoutPayload.originalTemplate = "";
+            } else {
+              layoutPayload.template = "";
+            }
+            updatePromptEditorFields({
+              templateText: "",
+              nextTitle: null,
+              nextDescription: null,
+              nextWork: null,
+              isLayoutTarget: true
+            });
+          } else {
+            layoutPayload.sectionTemplate = "";
+            updatePromptEditorFields({
+              templateText: "",
+              nextTitle: null,
+              nextDescription: null,
+              nextWork: null,
+              isLayoutTarget: false
+            });
+          }
+          await saveConfig({
+            path: activePath,
+            layout: layoutPayload
+          }, statusEl);
+          renderContext();
+          renderSummary(`Reset ${isLayoutTarget ? "layout wrapper" : "wrapped partial"} to inherited/default template.`);
+          reloadViewer();
+          if (statusEl) {
+            statusEl.textContent = `${isLayoutTarget ? "Layout wrapper" : "Wrapped partial"} reset to inherited/default template.`;
+            statusEl.className = "edit-status edit-status-success";
+          }
+        } catch (err) {
+          if (statusEl) {
+            statusEl.textContent = (err == null ? void 0 : err.message) || "Template reset failed.";
+            statusEl.className = "edit-status";
+          }
+          renderSummary("Template reset failed.");
+        } finally {
+          setGeneratingState(false);
+          isSending = false;
         }
       });
     }
@@ -1595,6 +1697,7 @@
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                         <div>{{> works}}, {{> work}}, {{work.key}}</div>`;
+    const inputPlaceholder = mode === "layout" ? "Describe the layout you want..." : "Describe the component you want...";
     return `
         <div class="prompt-layer" id="promptLayer">
             <button class="prompt-layer-toggle prompt-layer-toggle-close" type="button" id="promptLayerClose" aria-label="Hide prompt window" title="Hide prompt window">&times;</button>
@@ -1670,7 +1773,10 @@
                 <details class="prompt-template-viewer" id="promptTemplateViewer">
                     <summary class="prompt-template-viewer-summary">Current template code</summary>
                     <div class="prompt-template-viewer-body">
-                        <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                        <div class="prompt-template-viewer-head">
+                            <div class="small-note" id="promptTemplateLabel">Current target template</div>
+                            <button class="btn btn-secondary" type="button" id="prompt-template-reset">Reset to default template</button>
+                        </div>
                         <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
                     </div>
                 </details>
@@ -1685,7 +1791,7 @@
                     </div>
                     <button class="btn btn-secondary" type="button" id="prompt-attachment-remove">Remove image</button>
                 </div>
-                <textarea class="prompt-input" id="prompt-input" placeholder="Describe the component you want..."></textarea>
+                <textarea class="prompt-input" id="prompt-input" placeholder="${escapeHtml(inputPlaceholder)}"></textarea>
                 <div class="prompt-actions">
                     <div class="prompt-actions-left">
                         <button class="btn" type="button" id="prompt-send">Send</button>
@@ -2541,6 +2647,19 @@
       }
       return previewPath;
     }
+    function getEditTargetPath(selection = getActiveSelection()) {
+      if (selection == null ? void 0 : selection.isLayout) {
+        return selection.path || "";
+      }
+      if (selection == null ? void 0 : selection.previewIsFile) {
+        const activeFileLink = document.querySelector("#navList a.nav-link-active[data-path]");
+        const navPath = ((activeFileLink == null ? void 0 : activeFileLink.getAttribute("data-path")) || "").trim();
+        if (navPath) {
+          return navPath;
+        }
+      }
+      return (selection == null ? void 0 : selection.previewPath) || (selection == null ? void 0 : selection.path) || "";
+    }
     function renderFolderMeta() {
       return folderConfig;
     }
@@ -2615,7 +2734,7 @@
       editDrawer.classList.add("edit-drawer-open");
     }
     async function refreshCurrentEditState(selection = getActiveSelection()) {
-      const refreshed = await requestEditConfig("config", { path: selection.path });
+      const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection) });
       if (refreshed == null ? void 0 : refreshed.config) {
         editConfig = refreshed.config;
         editTarget = refreshed.target || (selection.isLayout ? "layout" : selection.previewIsFile ? "file" : "folder");
@@ -2663,7 +2782,7 @@
           var _a, _b;
           const selection = getActiveSelection();
           const payload = {
-            path: selection.path,
+            path: getEditTargetPath(selection),
             title: (((_a = elements3.title) == null ? void 0 : _a.value) || "").trim(),
             description: (((_b = elements3.description) == null ? void 0 : _b.value) || "").trim()
           };
@@ -2722,7 +2841,7 @@
             layoutPayload.originalJs = (_h = payload.originalLayoutJs) != null ? _h : "";
           }
           await saveConfig({
-            path: selection.path,
+            path: getEditTargetPath(selection),
             layout: layoutPayload
           }, statusEl);
         },
@@ -2780,7 +2899,7 @@
           var _a, _b, _c;
           const selection = getActiveSelection();
           const payload = {
-            path: selection.path,
+            path: getEditTargetPath(selection),
             link: (((_a = elements3.link) == null ? void 0 : _a.value) || "").trim(),
             url: (((_b = elements3.url) == null ? void 0 : _b.value) || "").trim(),
             work: {
@@ -2811,7 +2930,7 @@
         return;
       }
       const selection = getActiveSelection();
-      const data = await requestEditConfig("config", { path: selection.path });
+      const data = await requestEditConfig("config", { path: getEditTargetPath(selection) });
       if (data.config) {
         editConfig = data.config;
         editTarget = data.target || (selection.isFile ? "file" : "folder");
@@ -2849,6 +2968,26 @@
     let previewRequestId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get("path") || "";
     let previewClickBound = false;
+    let previewDisabled = false;
+    let lastPreviewKey = "";
+    function previewStateFromUrl(url) {
+      try {
+        const parsed = new URL(url, window.location.href);
+        const isFile = parsed.searchParams.get("view") === "1" && parsed.searchParams.has("file");
+        const path = parsed.searchParams.get(isFile ? "file" : "path") || "";
+        return {
+          key: `${isFile ? "file" : "path"}:${path}`,
+          path,
+          isFile
+        };
+      } catch (err) {
+        return {
+          key: "",
+          path: "",
+          isFile: false
+        };
+      }
+    }
     function parseCmsLinkValue(value = "") {
       const trimmed = (value || "").trim();
       if (!trimmed) {
@@ -3041,6 +3180,35 @@
       }
       return url.pathname + url.search;
     }
+    function syncPreviewDisabledState(disabled = false) {
+      if (!contentFrame) {
+        return;
+      }
+      previewDisabled = !!disabled;
+      contentFrame.setAttribute("aria-disabled", previewDisabled ? "true" : "false");
+      contentFrame.dataset.disabled = previewDisabled ? "true" : "false";
+      if (!previewDisabled) {
+        return;
+      }
+      contentFrame.querySelectorAll('a, button, input, select, textarea, summary, iframe, video, audio, [contenteditable="true"], [tabindex]').forEach((node) => {
+        if (node instanceof HTMLElement) {
+          node.setAttribute("tabindex", "-1");
+          node.setAttribute("aria-disabled", "true");
+        }
+        if ("disabled" in node) {
+          try {
+            node.disabled = true;
+          } catch (err) {
+          }
+        }
+        if (node instanceof HTMLMediaElement) {
+          node.controls = false;
+        }
+        if (node instanceof HTMLDetailsElement) {
+          node.open = false;
+        }
+      });
+    }
     function writeHashPath(path = "") {
       const nextHash = path ? `#/${path.replace(/^\/+/, "")}` : "";
       if (window.location.hash === nextHash) {
@@ -3085,6 +3253,8 @@
         iframeLoading.style.display = "block";
       }
       if (contentFrame) {
+        contentFrame.classList.toggle("content-frame-layout-target", !!selection.isLayout);
+        syncPreviewDisabledState(!!selection.isLayout);
         renderPreview(buildViewerUrl(previewPath, previewIsFile, forceRefresh));
       }
       if (updateHash) {
@@ -3169,6 +3339,11 @@
       }
       previewClickBound = true;
       contentFrame.addEventListener("click", (event) => {
+        if (previewDisabled || contentFrame.getAttribute("aria-disabled") === "true") {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
           return;
         }
@@ -3192,6 +3367,10 @@
         return;
       }
       const requestId = ++previewRequestId;
+      const nextPreview = previewStateFromUrl(url);
+      const shouldPreserveScroll = !!nextPreview.key && nextPreview.key === lastPreviewKey;
+      const preservedScrollTop = shouldPreserveScroll ? contentFrame.scrollTop : 0;
+      const preservedScrollLeft = shouldPreserveScroll ? contentFrame.scrollLeft : 0;
       try {
         const response = await fetch(url, {
           credentials: "same-origin",
@@ -3220,7 +3399,20 @@
           script.textContent = oldScript.textContent || "";
           contentFrame.appendChild(script);
         });
+        syncPreviewDisabledState(previewDisabled);
         bindPreviewNavigation();
+        lastPreviewKey = nextPreview.key;
+        if (shouldPreserveScroll) {
+          const restoreScroll = () => {
+            contentFrame.scrollTop = preservedScrollTop;
+            contentFrame.scrollLeft = preservedScrollLeft;
+          };
+          restoreScroll();
+          requestAnimationFrame(restoreScroll);
+        } else {
+          contentFrame.scrollTop = 0;
+          contentFrame.scrollLeft = 0;
+        }
       } catch (error) {
         if (requestId !== previewRequestId) {
           return;
@@ -3276,6 +3468,9 @@
         const href = target.getAttribute("href") || "";
         const params = new URLSearchParams(href.replace(/^\?/, ""));
         relPath = params.get("path") || "";
+        resolvedPath = true;
+      } else if (target.dataset.path) {
+        relPath = target.dataset.path;
         resolvedPath = true;
       } else if (target.dataset.src) {
         relPath = target.dataset.src;

@@ -375,6 +375,7 @@ body, html {
 
 .preview-shell {
   position: relative;
+  --prompt-dock-reserve: 0px;
   flex: 0 0 auto;
   height: 100vh;
   min-height: 100vh;
@@ -391,7 +392,8 @@ body, html {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  align-items: stretch;
   width: min(620px, 100% - 40px);
   min-height: 0;
   pointer-events: none;
@@ -411,8 +413,95 @@ body, html {
   padding-bottom: 24px;
 }
 
+.content-frame > .viewer {
+  min-height: 100%;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.content-frame > .viewer .viewer-template--folder {
+  padding-inline-end: calc(24px + var(--prompt-dock-reserve));
+  transition: padding-inline-end 0.18s ease;
+}
+
+.content-frame > .viewer .poff-default-layout__main {
+  padding-inline-end: calc(var(--poff-shell-main-padding) + var(--prompt-dock-reserve));
+  transition: padding-inline-end 0.18s ease;
+}
+
+.content-frame[data-disabled=true] {
+  position: relative;
+}
+
+.content-frame[data-disabled=true] a,
+.content-frame[data-disabled=true] button,
+.content-frame[data-disabled=true] input,
+.content-frame[data-disabled=true] select,
+.content-frame[data-disabled=true] textarea,
+.content-frame[data-disabled=true] summary,
+.content-frame[data-disabled=true] iframe,
+.content-frame[data-disabled=true] video,
+.content-frame[data-disabled=true] audio,
+.content-frame[data-disabled=true] [contenteditable=true] {
+  pointer-events: none;
+}
+
+.content-frame.content-frame-layout-target .poff-default-layout__main {
+  position: relative;
+  border: 1px dashed rgba(99, 102, 241, 0.42);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.02)), rgba(15, 23, 42, 0.02);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 10px rgba(99, 102, 241, 0.06);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.content-frame.content-frame-layout-target[data-disabled=true] .poff-default-layout__main {
+  opacity: 0.88;
+}
+
+.content-frame.content-frame-layout-target .poff-default-layout__main::before {
+  content: "Layout Preview";
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #4338ca;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.content-frame.content-frame-layout-target[data-disabled=true]::after {
+  content: "Preview disabled";
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.76);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+@media (min-width: 1181px) {
+  .preview-shell:has(.prompt-dock:not(:empty) .prompt-layer:not(.prompt-layer-collapsed)) {
+    --prompt-dock-reserve: calc(clamp(320px, 38vw, 620px) + 40px);
+  }
+}
 /* Edit mode */
 .edit-panel {
+  position: relative;
+  z-index: 1;
   border-bottom: 1px solid #e5e7eb;
   background: #fff7ed;
   padding: 14px 20px;
@@ -733,7 +822,7 @@ body, html {
   overflow: auto;
   transform: translateX(100%);
   transition: transform 0.2s ease;
-  z-index: 3;
+  z-index: 30;
 }
 
 .edit-drawer.open,
@@ -791,7 +880,8 @@ body, html {
   width: 100%;
   min-height: 0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  align-items: flex-start;
   pointer-events: auto;
 }
 
@@ -823,6 +913,7 @@ body, html {
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.03em;
+  transform: rotate(180deg);
 }
 
 .prompt-layer-toggle[hidden] {
@@ -844,7 +935,7 @@ body, html {
 }
 
 .prompt-layer-collapsed {
-  min-height: 60px;
+  min-height: 100%;
 }
 
 .prompt-layer-collapsed .prompt-window {
@@ -1249,6 +1340,14 @@ body, html {
   margin-top: 8px;
 }
 
+.prompt-template-viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .prompt-template-code {
   min-height: 180px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -1330,6 +1429,9 @@ body, html {
   .prompt-attachment-preview-wrap {
     width: 100%;
     height: 160px;
+  }
+  .prompt-template-viewer-head {
+    align-items: stretch;
   }
   .prompt-dock {
     top: 12px;
