@@ -249,6 +249,7 @@
   // src/assets/js/edit/prompt/constants.js
   var promptSettingsKey = "poffEditPromptSettings";
   var promptHistoryKey = "poffEditPromptHistory";
+  var defaultLocalPromptEndpoint = "http://127.0.0.1:1234/v1/chat/completions";
   function getDefaultModelForProvider(provider = "local") {
     if (provider === "openai") {
       return "gpt-4o-mini";
@@ -258,19 +259,36 @@
     }
     return "gemma4";
   }
-  var workSystemPrompt = [
+  var legacyWorkSystemPrompt = [
     "You are a Handlebars (HBS) template generator for this single-page CMS.",
     "Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.",
-    "Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.",
     "Return only the template (no Markdown, no fences).",
     "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
-    "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
-    "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
-    "Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
+    "Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
     "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
-  var layoutSystemPrompt = [
+  var defaultFileSystemPrompt = [
+    legacyWorkSystemPrompt,
+    "Save target is work.hbs for the current file inside the active item layout folder.",
+    "Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.",
+    "Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.",
+    "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
+    "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.",
+    "Return only the inner partial content that will be rendered inside the existing layout wrapper."
+  ].join("\n");
+  var defaultFolderSystemPrompt = [
+    legacyWorkSystemPrompt,
+    "Save target is works.hbs for the current folder inside the active item layout folder.",
+    "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
+    "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
+    "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
+    "Use folder tree data and resolved refs when relevant instead of inventing paths.",
+    "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
+    "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.",
+    "Return only the inner folder partial content that will be rendered inside the existing layout wrapper."
+  ].join("\n");
+  var defaultLayoutSystemPrompt = [
     "You are a Handlebars (HBS) layout generator for this single-page CMS.",
     "Transform the user description into an updated outer layout wrapper rendered by LightnCandy.",
     'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
@@ -297,33 +315,37 @@
     "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
-  function getDefaultSystemPrompt(mode = "work") {
-    return mode === "layout" ? layoutSystemPrompt : workSystemPrompt;
-  }
-  var defaultSystemPrompt = getDefaultSystemPrompt("work");
   var defaultPromptSettings = {
     provider: "local",
     model: getDefaultModelForProvider("local"),
-    endpoint: "",
+    endpoint: defaultLocalPromptEndpoint,
     apiKey: "",
-    systemPrompt: getDefaultSystemPrompt("work"),
+    systemPrompt: defaultFileSystemPrompt,
+    systemPromptFile: defaultFileSystemPrompt,
+    systemPromptFolder: defaultFolderSystemPrompt,
+    systemPromptLayout: defaultLayoutSystemPrompt,
     streamPreview: true
   };
 
   // src/assets/js/edit/prompt/storage.js
   function loadPromptSettings() {
     try {
-      const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
+      const rawStored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
+      const stored = {
+        provider: rawStored.provider,
+        model: rawStored.model,
+        endpoint: rawStored.endpoint,
+        apiKey: rawStored.apiKey,
+        streamPreview: rawStored.streamPreview
+      };
       const looksLikeLegacyProviderDefault = (!stored.provider || stored.provider === "openai") && (!stored.model || stored.model === "gpt-4o-mini") && !stored.endpoint;
       if (looksLikeLegacyProviderDefault) {
         stored.provider = defaultPromptSettings.provider;
         stored.model = defaultPromptSettings.model;
+        stored.endpoint = defaultPromptSettings.endpoint;
       }
-      if (typeof stored.systemPrompt === "string") {
-        const looksLikeLegacyDefault = stored.systemPrompt.includes("saved to .layout/template.hbs") || stored.systemPrompt.includes("Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}");
-        if (looksLikeLegacyDefault) {
-          stored.systemPrompt = defaultPromptSettings.systemPrompt;
-        }
+      if ((stored.provider === "local" || !stored.provider) && !stored.endpoint) {
+        stored.endpoint = defaultPromptSettings.endpoint;
       }
       return { ...defaultPromptSettings, ...stored };
     } catch (err) {
@@ -332,7 +354,14 @@
   }
   function savePromptSettings(settings) {
     try {
-      localStorage.setItem(promptSettingsKey, JSON.stringify(settings));
+      const persisted = {
+        provider: (settings == null ? void 0 : settings.provider) || defaultPromptSettings.provider,
+        model: (settings == null ? void 0 : settings.model) || "",
+        endpoint: (settings == null ? void 0 : settings.endpoint) || "",
+        apiKey: (settings == null ? void 0 : settings.apiKey) || "",
+        streamPreview: (settings == null ? void 0 : settings.streamPreview) !== false
+      };
+      localStorage.setItem(promptSettingsKey, JSON.stringify(persisted));
     } catch (err) {
     }
   }
@@ -786,8 +815,10 @@
     }
   };
   var builtInSystemPrompts = /* @__PURE__ */ new Set([
-    getDefaultSystemPrompt("work"),
-    getDefaultSystemPrompt("layout")
+    legacyWorkSystemPrompt,
+    defaultFileSystemPrompt,
+    defaultFolderSystemPrompt,
+    defaultLayoutSystemPrompt
   ]);
   function bindPromptWindow({
     root,
@@ -833,13 +864,48 @@
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection2 ? getActiveSelection2().path : "";
+    let activePromptMode = (getActiveSelection2 == null ? void 0 : getActiveSelection2().isLayout) ? "layout" : (getActiveSelection2 == null ? void 0 : getActiveSelection2().previewIsFile) ? "file" : "folder";
     let imageAttachment = null;
     let promptLayerCollapsed = false;
     const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
     const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
-    const currentPromptPlaceholder = () => currentPromptMode() === "layout" ? "Describe the layout you want..." : defaultPromptPlaceholder;
-    const currentPromptMode = () => (getActiveSelection2 == null ? void 0 : getActiveSelection2().isLayout) ? "layout" : "work";
-    const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+    const currentPromptPlaceholder = () => {
+      const mode = currentPromptMode();
+      if (mode === "layout") {
+        return "Describe the layout you want...";
+      }
+      if (mode === "folder") {
+        return "Describe the folder component you want...";
+      }
+      return defaultPromptPlaceholder;
+    };
+    const currentPromptMode = () => {
+      const selection = getActiveSelection2 == null ? void 0 : getActiveSelection2();
+      if (selection == null ? void 0 : selection.isLayout) {
+        return "layout";
+      }
+      return (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder";
+    };
+    const currentDefaultSystemPrompt = () => {
+      const mode = currentPromptMode();
+      if (mode === "layout") {
+        return defaultLayoutSystemPrompt;
+      }
+      if (mode === "folder") {
+        return defaultFolderSystemPrompt;
+      }
+      return defaultFileSystemPrompt;
+    };
+    const currentSystemPromptSettingKey = () => {
+      const mode = currentPromptMode();
+      if (mode === "layout") {
+        return "systemPromptLayout";
+      }
+      if (mode === "folder") {
+        return "systemPromptFolder";
+      }
+      return "systemPromptFile";
+    };
     const currentHasImageContext = () => {
       const selection = getActiveSelection2 ? getActiveSelection2() : null;
       const selectionPath = typeof (selection == null ? void 0 : selection.previewPath) === "string" && selection.previewPath.trim() !== "" ? selection.previewPath : typeof (selection == null ? void 0 : selection.path) === "string" ? selection.path : "";
@@ -886,6 +952,7 @@
       const nextValue = currentDefaultSystemPrompt();
       if (systemPromptEl.value !== nextValue) {
         systemPromptEl.value = nextValue;
+        settings[currentSystemPromptSettingKey()] = nextValue;
         savePromptSettings(readSettings());
       }
       if (promptInputEl && !isSending) {
@@ -923,6 +990,8 @@
     const renderContext = () => {
       const context = buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig });
       activePath = context.path;
+      activePromptMode = currentPromptMode();
+      syncModeAwareSystemPrompt();
       renderPromptContext(promptContextEl, context);
       renderTemplatePreview();
     };
@@ -1039,19 +1108,28 @@
       providerEl.value = settings.provider || "local";
     }
     if (systemPromptEl) {
-      systemPromptEl.value = settings.systemPrompt || currentDefaultSystemPrompt();
+      const mode = currentPromptMode();
+      systemPromptEl.value = mode === "layout" ? settings.systemPromptLayout || settings.systemPrompt || currentDefaultSystemPrompt() : mode === "folder" ? settings.systemPromptFolder || settings.systemPrompt || currentDefaultSystemPrompt() : settings.systemPromptFile || settings.systemPrompt || currentDefaultSystemPrompt();
     }
     if (streamToggleEl) {
       streamToggleEl.checked = settings.streamPreview !== false;
     }
-    const readSettings = () => ({
-      provider: providerEl ? providerEl.value : "local",
-      model: modelEl ? modelEl.value : "",
-      endpoint: endpointEl ? endpointEl.value : "",
-      apiKey: apiKeyEl ? apiKeyEl.value : "",
-      systemPrompt: ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim() || currentDefaultSystemPrompt(),
-      streamPreview: streamToggleEl ? !!streamToggleEl.checked : true
-    });
+    const readSettings = () => {
+      const systemPrompt = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim() || currentDefaultSystemPrompt();
+      const nextSettings = {
+        provider: providerEl ? providerEl.value : "local",
+        model: modelEl ? modelEl.value : "",
+        endpoint: endpointEl ? endpointEl.value : "",
+        apiKey: apiKeyEl ? apiKeyEl.value : "",
+        systemPrompt,
+        systemPromptFile: settings.systemPromptFile || defaultFileSystemPrompt,
+        systemPromptFolder: settings.systemPromptFolder || defaultFolderSystemPrompt,
+        systemPromptLayout: settings.systemPromptLayout || defaultLayoutSystemPrompt,
+        streamPreview: streamToggleEl ? !!streamToggleEl.checked : true
+      };
+      nextSettings[currentSystemPromptSettingKey()] = systemPrompt;
+      return nextSettings;
+    };
     let suppressSave = false;
     const applySettingsToUi = (s) => {
       suppressSave = true;
@@ -1059,7 +1137,10 @@
       if (modelEl) modelEl.value = s.model || "";
       if (endpointEl) endpointEl.value = s.endpoint || "";
       if (apiKeyEl) apiKeyEl.value = s.apiKey || "";
-      if (systemPromptEl) systemPromptEl.value = s.systemPrompt || currentDefaultSystemPrompt();
+      if (systemPromptEl) {
+        const mode = currentPromptMode();
+        systemPromptEl.value = mode === "layout" ? s.systemPromptLayout || s.systemPrompt || currentDefaultSystemPrompt() : mode === "folder" ? s.systemPromptFolder || s.systemPrompt || currentDefaultSystemPrompt() : s.systemPromptFile || s.systemPrompt || currentDefaultSystemPrompt();
+      }
       if (streamToggleEl) streamToggleEl.checked = s.streamPreview !== false;
       suppressSave = false;
       updateProviderUi();
@@ -1090,6 +1171,7 @@
     }
     if (systemPromptEl) {
       systemPromptEl.addEventListener("input", () => {
+        settings[currentSystemPromptSettingKey()] = (systemPromptEl.value || "").trim() || currentDefaultSystemPrompt();
         savePromptSettings(readSettings());
       });
     }
@@ -1101,6 +1183,7 @@
     if (systemResetEl && systemPromptEl) {
       systemResetEl.addEventListener("click", () => {
         systemPromptEl.value = currentDefaultSystemPrompt();
+        settings[currentSystemPromptSettingKey()] = systemPromptEl.value;
         savePromptSettings(readSettings());
       });
     }
@@ -1139,8 +1222,10 @@
     const syncHistoryForPath = () => {
       const selection = getActiveSelection2 ? getActiveSelection2() : { path: "" };
       const nextPath = (selection == null ? void 0 : selection.path) || "";
-      if (nextPath !== activePath) {
+      const nextPromptMode = (selection == null ? void 0 : selection.isLayout) ? "layout" : (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder";
+      if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
         activePath = nextPath;
+        activePromptMode = nextPromptMode;
         setHistory(readStoredHistory(activePath));
         syncModeAwareSystemPrompt();
         renderHistory();
@@ -1355,10 +1440,13 @@
           const nextJs = typeof response.js === "string" ? response.js : null;
           const isLayoutTarget = !!selection.isLayout;
           const currentConfig = getConfig ? getConfig() : null;
+          const layoutSectionKey = isLayoutTarget ? (selection == null ? void 0 : selection.previewIsFile) || (selection == null ? void 0 : selection.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
+          const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
+          const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
           const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
           const mergedWork = {
             ...inferredWork || {},
-            ...response && response.work && typeof response.work === "object" ? response.work : {}
+            ...rawResponseWork || {}
           };
           const nextWork = filterAllowedWork(mergedWork, currentConfig);
           const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, "layout") ? nextWork.layout : null;
@@ -1477,6 +1565,9 @@
             layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
             if (shouldPersistToLocalWrapper) {
               layoutPayload.template = templateText;
+              if (responseSectionTemplate !== null) {
+                layoutPayload.sectionTemplate = responseSectionTemplate;
+              }
               if (nextCss !== null) {
                 layoutPayload.css = nextCss;
               }
@@ -1486,6 +1577,9 @@
             } else if (canEditResolvedFilesystemTarget) {
               layoutPayload.originalTarget = resolvedLayoutDirectory;
               layoutPayload.originalTemplate = templateText;
+              if (responseSectionTemplate !== null) {
+                layoutPayload.sectionTemplate = responseSectionTemplate;
+              }
               if (nextCss !== null) {
                 layoutPayload.originalCss = nextCss;
               }
@@ -1495,6 +1589,9 @@
             } else {
               layoutPayload.name = "custom-layout";
               layoutPayload.template = templateText;
+              if (responseSectionTemplate !== null) {
+                layoutPayload.sectionTemplate = responseSectionTemplate;
+              }
               if (nextCss !== null) {
                 layoutPayload.css = nextCss;
               }
@@ -1710,17 +1807,19 @@
 
   // src/assets/js/edit/prompt-window.js
   function renderPromptWindow(settings = {}, options = {}) {
-    const mode = options.mode === "layout" ? "layout" : "work";
-    const promptTargetCopy = mode === "layout" ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : "Prompt edits the wrapped work.hbs / works.hbs partial for the current item.";
-    const footerCopy = mode === "layout" ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || "work.hbs")}</code>.` : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files and <code>works.hbs</code> for folders.";
-    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : "<div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial.</div>";
+    const mode = options.mode === "layout" ? "layout" : options.mode === "folder" ? "folder" : "file";
+    const systemPrompt = mode === "layout" ? settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt : mode === "folder" ? settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt : settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt;
+    const promptTargetCopy = mode === "layout" ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : mode === "folder" ? "Prompt edits the wrapped works.hbs partial for the current folder." : "Prompt edits the wrapped work.hbs partial for the current file.";
+    const footerCopy = mode === "layout" ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || "work.hbs")}</code>.` : mode === "folder" ? "Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders." : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.";
+    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : mode === "folder" ? "<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>" : "<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>";
     const editableCopy = mode === "layout" ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.*</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>';
     const placeholderCopy = mode === "layout" ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                         <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
-                        <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> works}}, {{> work}}, {{work.key}}</div>`;
-    const inputPlaceholder = mode === "layout" ? "Describe the layout you want..." : "Describe the component you want...";
+                        <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : mode === "folder" ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
+                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                        <div>{{> work}}, {{work.key}}, layout.*</div>`;
+    const inputPlaceholder = mode === "layout" ? "Describe the layout you want..." : mode === "folder" ? "Describe the folder component you want..." : "Describe the file component you want...";
     return `
         <div class="prompt-layer" id="promptLayer">
             <button class="prompt-layer-toggle prompt-layer-toggle-close" type="button" id="promptLayerClose" aria-label="Hide prompt window" title="Hide prompt window">&times;</button>
@@ -1762,9 +1861,9 @@
                 </details>
                 <details class="prompt-system">
                     <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
-                    <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(settings.systemPrompt || "")}</textarea>
+                    <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(systemPrompt)}</textarea>
                     <div class="prompt-system-footer">
-                        <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
+                        <span class="small-note">Used for chat + completions. Not saved across reloads.</span>
                         <button class="btn btn-secondary" type="button" id="prompt-system-reset">Reset default</button>
                     </div>
                 </details>
@@ -2482,7 +2581,7 @@
                 </div>
             </form>
         </dialog>
-        ${renderPromptWindow(settings)}
+        ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
     const statusEl = editPanel.querySelector("#editInlineStatus");

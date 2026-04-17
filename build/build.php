@@ -113,9 +113,13 @@ try {
     $buildContent .= '$__worktypeTemplates = ' . var_export($embeddedTemplates, true) . ";\n";
     $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
 
-    // Add PoffConfig model
+    // Add PoffConfig model and inline its helper trait so the built output stays single-file.
+    $poffConfigLayoutHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-helpers.php');
     $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
+    $poffConfigLayoutHelpers = str_replace(['<?php', '?>'], '', $poffConfigLayoutHelpers);
     $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);
+    $poffConfigContent = preg_replace('/^\s*require_once[^\n]*\n/m', '', $poffConfigContent);
+    $buildContent .= trim($poffConfigLayoutHelpers) . "\n\n";
     $buildContent .= trim($poffConfigContent) . "\n\n";
 
     // Inline viewer helpers so the built output stays single-file (no require_once).

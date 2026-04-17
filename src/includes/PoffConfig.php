@@ -5,6 +5,8 @@
  * with lightweight folder metadata and a first-level tree listing.
  */
 
+require_once __DIR__ . '/PoffConfig/layout-helpers.php';
+
 class PoffConfig
 {
     private const DEFAULT_LAYOUT_FOLDER = '.layout';
@@ -13,6 +15,8 @@ class PoffConfig
     private const LAYOUT_SCRIPT_FILE = 'script.js';
     private const WORK_SECTION_TEMPLATE_FILE = 'work.hbs';
     private const WORKS_SECTION_TEMPLATE_FILE = 'works.hbs';
+
+    use PoffConfigLayoutHelpers;
 
     private static function generateId(): string
     {
@@ -30,52 +34,6 @@ class PoffConfig
         $work['layout'] = Worktype::normalizeLayout($work['layout'] ?? null, $section);
 
         return $work;
-    }
-
-    public static function configPath(string $dir): string
-    {
-        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff.config.json';
-    }
-
-    public static function fileConfigPath(string $dir, string $fileName): string
-    {
-        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.works' . DIRECTORY_SEPARATOR . $fileName . '.config.json';
-    }
-
-    public static function folderLayoutDir(string $dir): string
-    {
-        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.layout';
-    }
-
-    public static function fileLayoutDir(string $dir, string $fileName): string
-    {
-        return rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.works' . DIRECTORY_SEPARATOR . $fileName . '.layout';
-    }
-
-    public static function relativeLayoutPath(string $itemPath, bool $isFile): string
-    {
-        $normalized = str_replace('\\', '/', trim($itemPath, "/\\"));
-        if (!$isFile) {
-            return $normalized === '' ? '.layout' : $normalized . '/.layout';
-        }
-
-        if ($normalized === '') {
-            return '.works/unknown.layout';
-        }
-
-        $fileName = basename($normalized);
-        $dirName = dirname($normalized);
-        if ($dirName === '.' || $dirName === DIRECTORY_SEPARATOR) {
-            $dirName = '';
-        }
-
-        return ($dirName !== '' ? $dirName . '/' : '') . '.works/' . $fileName . '.layout';
-    }
-
-    public static function slugify(string $name): string
-    {
-        $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($name));
-        return trim($slug, '-') ?: 'untitled';
     }
 
     /**
@@ -409,6 +367,7 @@ class PoffConfig
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
+        self::writeManagedLayoutFiles($layoutDir, self::defaultLayoutFiles($section));
         self::writeManagedLayoutFiles($layoutDir, [
             self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,
             self::LAYOUT_STYLE_FILE => array_key_exists('css', $normalized) ? (string) $normalized['css'] : null,

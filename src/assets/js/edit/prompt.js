@@ -1,5 +1,5 @@
 import { getLayoutState } from '../core/utils.js';
-import { defaultPromptSettings, getDefaultModelForProvider, getDefaultSystemPrompt } from './prompt/constants.js';
+import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt, defaultPromptSettings, getDefaultModelForProvider, legacyWorkSystemPrompt } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
 import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
@@ -107,10 +107,10 @@ const debugPromptLog = (label, payload) => {
 };
 
 const builtInSystemPrompts = new Set([
-    getDefaultSystemPrompt('work'),
-    getDefaultSystemPrompt('file'),
-    getDefaultSystemPrompt('folder'),
-    getDefaultSystemPrompt('layout'),
+    legacyWorkSystemPrompt,
+    defaultFileSystemPrompt,
+    defaultFolderSystemPrompt,
+    defaultLayoutSystemPrompt,
 ]);
 
 export function bindPromptWindow({
@@ -180,7 +180,16 @@ export function bindPromptWindow({
         }
         return selection?.previewIsFile ? 'file' : 'folder';
     };
-    const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+    const currentDefaultSystemPrompt = () => {
+        const mode = currentPromptMode();
+        if (mode === 'layout') {
+            return defaultLayoutSystemPrompt;
+        }
+        if (mode === 'folder') {
+            return defaultFolderSystemPrompt;
+        }
+        return defaultFileSystemPrompt;
+    };
     const currentSystemPromptSettingKey = () => {
         const mode = currentPromptMode();
         if (mode === 'layout') {
@@ -428,8 +437,8 @@ export function bindPromptWindow({
         systemPromptEl.value = mode === 'layout'
             ? (settings.systemPromptLayout || settings.systemPrompt || currentDefaultSystemPrompt())
             : mode === 'folder'
-                ? (settings.systemPromptFolder || settings.systemPromptFile || settings.systemPromptWork || settings.systemPrompt || currentDefaultSystemPrompt())
-                : (settings.systemPromptFile || settings.systemPromptWork || settings.systemPrompt || currentDefaultSystemPrompt());
+                ? (settings.systemPromptFolder || settings.systemPrompt || currentDefaultSystemPrompt())
+                : (settings.systemPromptFile || settings.systemPrompt || currentDefaultSystemPrompt());
     }
     if (streamToggleEl) {
         streamToggleEl.checked = settings.streamPreview !== false;
@@ -443,10 +452,9 @@ export function bindPromptWindow({
             endpoint: endpointEl ? endpointEl.value : '',
             apiKey: apiKeyEl ? apiKeyEl.value : '',
             systemPrompt,
-            systemPromptWork: settings.systemPromptWork || settings.systemPromptFile || getDefaultSystemPrompt('file'),
-            systemPromptFile: settings.systemPromptFile || settings.systemPromptWork || getDefaultSystemPrompt('file'),
-            systemPromptFolder: settings.systemPromptFolder || settings.systemPromptWork || getDefaultSystemPrompt('folder'),
-            systemPromptLayout: settings.systemPromptLayout || getDefaultSystemPrompt('layout'),
+            systemPromptFile: settings.systemPromptFile || defaultFileSystemPrompt,
+            systemPromptFolder: settings.systemPromptFolder || defaultFolderSystemPrompt,
+            systemPromptLayout: settings.systemPromptLayout || defaultLayoutSystemPrompt,
             streamPreview: streamToggleEl ? !!streamToggleEl.checked : true,
         };
         nextSettings[currentSystemPromptSettingKey()] = systemPrompt;
@@ -465,8 +473,8 @@ export function bindPromptWindow({
             systemPromptEl.value = mode === 'layout'
                 ? (s.systemPromptLayout || s.systemPrompt || currentDefaultSystemPrompt())
                 : mode === 'folder'
-                    ? (s.systemPromptFolder || s.systemPromptFile || s.systemPromptWork || s.systemPrompt || currentDefaultSystemPrompt())
-                    : (s.systemPromptFile || s.systemPromptWork || s.systemPrompt || currentDefaultSystemPrompt());
+                    ? (s.systemPromptFolder || s.systemPrompt || currentDefaultSystemPrompt())
+                    : (s.systemPromptFile || s.systemPrompt || currentDefaultSystemPrompt());
         }
         if (streamToggleEl) streamToggleEl.checked = s.streamPreview !== false;
         suppressSave = false;

@@ -1,8 +1,15 @@
-import { defaultPromptSettings, getDefaultSystemPrompt, promptHistoryKey, promptSettingsKey } from './constants.js';
+import { defaultPromptSettings, promptHistoryKey, promptSettingsKey } from './constants.js';
 
 export function loadPromptSettings() {
     try {
-        const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || '{}');
+        const rawStored = JSON.parse(localStorage.getItem(promptSettingsKey) || '{}');
+        const stored = {
+            provider: rawStored.provider,
+            model: rawStored.model,
+            endpoint: rawStored.endpoint,
+            apiKey: rawStored.apiKey,
+            streamPreview: rawStored.streamPreview,
+        };
         const looksLikeLegacyProviderDefault = (!stored.provider || stored.provider === 'openai')
             && (!stored.model || stored.model === 'gpt-4o-mini')
             && !stored.endpoint;
@@ -14,28 +21,6 @@ export function loadPromptSettings() {
         if ((stored.provider === 'local' || !stored.provider) && !stored.endpoint) {
             stored.endpoint = defaultPromptSettings.endpoint;
         }
-        if (typeof stored.systemPrompt === 'string') {
-            const looksLikeLegacyDefault = stored.systemPrompt.includes('saved to .layout/template.hbs')
-                || stored.systemPrompt.includes('Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}');
-            if (looksLikeLegacyDefault) {
-                stored.systemPrompt = defaultPromptSettings.systemPrompt;
-            }
-        }
-        const legacyWorkPrompt = typeof stored.systemPromptWork === 'string' && stored.systemPromptWork.trim() !== ''
-            ? stored.systemPromptWork
-            : (typeof stored.systemPrompt === 'string' && stored.systemPrompt.trim() !== '' ? stored.systemPrompt : '');
-        if (typeof stored.systemPromptFile !== 'string' || stored.systemPromptFile.trim() === '') {
-            stored.systemPromptFile = legacyWorkPrompt || getDefaultSystemPrompt('file');
-        }
-        if (typeof stored.systemPromptFolder !== 'string' || stored.systemPromptFolder.trim() === '') {
-            stored.systemPromptFolder = legacyWorkPrompt || getDefaultSystemPrompt('folder');
-        }
-        if (typeof stored.systemPromptLayout !== 'string' || stored.systemPromptLayout.trim() === '') {
-            stored.systemPromptLayout = getDefaultSystemPrompt('layout');
-        }
-        if (typeof stored.systemPromptWork !== 'string' || stored.systemPromptWork.trim() === '') {
-            stored.systemPromptWork = stored.systemPromptFile;
-        }
         return { ...defaultPromptSettings, ...stored };
     } catch (err) {
         return defaultPromptSettings;
@@ -44,7 +29,14 @@ export function loadPromptSettings() {
 
 export function savePromptSettings(settings) {
     try {
-        localStorage.setItem(promptSettingsKey, JSON.stringify(settings));
+        const persisted = {
+            provider: settings?.provider || defaultPromptSettings.provider,
+            model: settings?.model || '',
+            endpoint: settings?.endpoint || '',
+            apiKey: settings?.apiKey || '',
+            streamPreview: settings?.streamPreview !== false,
+        };
+        localStorage.setItem(promptSettingsKey, JSON.stringify(persisted));
     } catch (err) {
         // Ignore storage failures.
     }

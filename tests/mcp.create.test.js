@@ -387,7 +387,13 @@ describe('MCP create route helper (CLI)', () => {
       status: 200,
       statusLine: 'HTTP/1.1 200 OK',
       body: JSON.stringify({
-        template: '<section class="lm-studio-card">{{title}}</section>',
+        choices: [
+          {
+            message: {
+              content: '<section class="lm-studio-card">{{title}}</section>',
+            },
+          },
+        ],
       }),
     }, capturePath);
 
@@ -399,14 +405,26 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.template).toBe('<section class="lm-studio-card">{{title}}</section>');
     expect(captured.url).toBe(endpoint);
     expect(captured.headers).toEqual([]);
-    expect(captured.payload.prompt).toBe('Create a compact image card.');
-    expect(captured.payload.history).toEqual([
-      { role: 'assistant', content: 'Previous draft.' },
-      { role: 'user', content: 'Make it smaller.' },
-    ]);
-    expect(captured.payload.instruction).toContain('Handlebars (HBS) template generator');
-    expect(captured.payload.config.title).toBe('Folder Preview');
-    expect(captured.payload.image).toBeNull();
+    expect(captured.payload.model).toBe('gemma4');
+    expect(captured.payload.temperature).toBe(0.4);
+    expect(captured.payload.messages[0]).toEqual(expect.objectContaining({
+      role: 'system',
+    }));
+    expect(captured.payload.messages[0].content).toContain('Handlebars (HBS) template generator');
+    expect(captured.payload.messages[1]).toEqual({
+      role: 'assistant',
+      content: 'Previous draft.',
+    });
+    expect(captured.payload.messages[2]).toEqual({
+      role: 'user',
+      content: 'Make it smaller.',
+    });
+    expect(captured.payload.messages[3]).toEqual(expect.objectContaining({
+      role: 'user',
+    }));
+    expect(captured.payload.messages[3].content).toContain('Config JSON:');
+    expect(captured.payload.messages[3].content).toContain('"title": "Folder Preview"');
+    expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
   });
 
   test('parses layout prompt JSON with css/js and restores the required default main block', async () => {
@@ -422,6 +440,57 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.template).toContain('{{#if isFolder}}');
     expect(result.template).toContain('{{> works}}');
     expect(result.template).toContain('{{> work}}');
+  });
+
+  test('parses OpenAI-compatible chat completion envelopes into template text', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-test',
+      choices: [
+        {
+          message: {
+            content: '<div class="card">{{title}}</div>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toBe('<div class="card">{{title}}</div>');
+  });
+
+  test('parses fenced JSON chat completion envelopes into structured layout fields', async () => {
+    const result = await runPromptModelParse('layout', JSON.stringify({
+      id: 'chatcmpl-layout',
+      choices: [
+        {
+          message: {
+            content: "```json\n{\n  \"template\": \"<div class=\\\"poff-default-layout\\\"><header>{{title}}</header><footer>done</footer></div>\",\n  \"css\": \".poff-default-layout{outline:0;}\",\n  \"js\": \"document.body.dataset.layout='on';\",\n  \"work\": {\"works.hbs\": \"<article>{{description}}</article>\"}\n}\n```",
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(result.css).toContain('.poff-default-layout{outline:0;}');
+    expect(result.js).toContain("dataset.layout='on'");
+    expect(result.work).toEqual({ 'works.hbs': '<article>{{description}}</article>' });
+  });
+
+  test('treats empty chat completion content as empty instead of raw JSON', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-empty',
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: '',
+            reasoning_content: 'The model only reasoned and never produced a final answer.',
+          },
+          finish_reason: 'length',
+        },
+      ],
+    }));
+
+    expect(result.template).toBe('');
   });
 });
 

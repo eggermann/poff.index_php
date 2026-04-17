@@ -40,10 +40,46 @@ function mcpParsePromptModelResult(string $raw): array
     }
 
     $template = '';
-    if (isset($decoded['template'])) {
+    $extractedFromEnvelope = false;
+    if (isset($decoded['choices'][0]['message']['content'])) {
+        $extractedFromEnvelope = true;
+        $content = $decoded['choices'][0]['message']['content'];
+        if (is_string($content)) {
+            $template = trim($content);
+        } elseif (is_array($content)) {
+            $parts = [];
+            foreach ($content as $part) {
+                if (is_string($part) && trim($part) !== '') {
+                    $parts[] = trim($part);
+                    continue;
+                }
+                if (is_array($part) && isset($part['text']) && is_scalar($part['text'])) {
+                    $parts[] = trim((string) $part['text']);
+                }
+            }
+            $template = trim(implode("\n", array_filter($parts)));
+        }
+    } elseif (isset($decoded['choices'][0]['text']) && is_scalar($decoded['choices'][0]['text'])) {
+        $extractedFromEnvelope = true;
+        $template = trim((string) $decoded['choices'][0]['text']);
+    } elseif (isset($decoded['message']['content']) && is_scalar($decoded['message']['content'])) {
+        $extractedFromEnvelope = true;
+        $template = trim((string) $decoded['message']['content']);
+    } elseif (isset($decoded['response']) && is_scalar($decoded['response'])) {
+        $extractedFromEnvelope = true;
+        $template = trim((string) $decoded['response']);
+    } elseif (isset($decoded['template'])) {
         $template = trim((string) $decoded['template']);
     } elseif (isset($decoded['content'])) {
         $template = trim((string) $decoded['content']);
+    }
+
+    if ($extractedFromEnvelope && $template !== '' && $template !== $trimmed) {
+        return mcpParsePromptModelResult($template);
+    }
+
+    if ($extractedFromEnvelope && $template === '') {
+        return ['template' => ''];
     }
 
     if ($template === '') {
@@ -162,6 +198,12 @@ function mcpPromptHttpPost(string $url, array $headers, array $payload): array
         'statusLine' => $statusLine,
         'body' => $response !== false ? $response : '',
     ];
+}
+
+function mcpPromptIsOpenAiCompatibleEndpoint(string $url): bool
+{
+    $normalized = strtolower(trim($url));
+    return $normalized !== '' && str_contains($normalized, '/v1/chat/completions');
 }
 
 function mcpPromptNormalizeErrorText(string $text): string
@@ -717,19 +759,42 @@ function handlePromptTemplate(array $opts): array
         $template = (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
     } else {
         if ($endpoint === '') {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => 'Local endpoint URL missing.',
+            $endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+        }
+        if ($usedModel === '') {
+            $usedModel = 'gemma4';
+        }
+        if (mcpPromptIsOpenAiCompatibleEndpoint($endpoint)) {
+            $messages = [['role' => 'system', 'content' => $systemPrompt]];
+            foreach ($history as $message) {
+                if (!is_array($message)) {
+                    continue;
+                }
+                $role = strtolower(trim((string) ($message['role'] ?? 'user')));
+                $content = trim((string) ($message['content'] ?? ''));
+                if ($content === '' || !in_array($role, ['system', 'user', 'assistant'], true)) {
+                    continue;
+                }
+                $messages[] = ['role' => $role, 'content' => $content];
+            }
+            $messages[] = ['role' => 'user', 'content' => $image ? [
+                ['type' => 'text', 'text' => $userPrompt],
+                ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+            ] : $userPrompt];
+            $payload = [
+                'model' => $usedModel,
+                'messages' => $messages,
+                'temperature' => 0.4,
+            ];
+        } else {
+            $payload = [
+                'prompt' => $prompt,
+                'history' => $history,
+                'config' => $config,
+                'instruction' => $systemPrompt,
+                'image' => $image,
             ];
         }
-        $payload = [
-            'prompt' => $prompt,
-            'history' => $history,
-            'config' => $config,
-            'instruction' => $systemPrompt,
-            'image' => $image,
-        ];
         $response = mcpPromptHttpPost($endpoint, [], $payload);
         if (!$response['ok']) {
             return [
@@ -740,7 +805,9 @@ function handlePromptTemplate(array $opts): array
         }
         $decoded = json_decode($response['body'], true);
         if (is_array($decoded)) {
-            if (isset($decoded['template'])) {
+            if (isset($decoded['choices'][0]['message']['content'])) {
+                $template = (string) $decoded['choices'][0]['message']['content'];
+            } elseif (isset($decoded['template'])) {
                 $template = (string) $decoded['template'];
             } elseif (isset($decoded['content'])) {
                 $template = (string) $decoded['content'];

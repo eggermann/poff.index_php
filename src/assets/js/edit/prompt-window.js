@@ -1,5 +1,5 @@
 import { escapeHtml } from '../core/utils.js';
-import { getDefaultSystemPrompt } from './prompt/constants.js';
+import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt } from './prompt/constants.js';
 
 export function renderPromptWindow(settings = {}, options = {}) {
     const mode = options.mode === 'layout'
@@ -8,10 +8,10 @@ export function renderPromptWindow(settings = {}, options = {}) {
             ? 'folder'
             : 'file';
     const systemPrompt = mode === 'layout'
-        ? (settings.systemPromptLayout || settings.systemPrompt || getDefaultSystemPrompt('layout'))
+        ? (settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt)
         : mode === 'folder'
-            ? (settings.systemPromptFolder || settings.systemPromptFile || settings.systemPrompt || getDefaultSystemPrompt('folder'))
-            : (settings.systemPromptFile || settings.systemPromptWork || settings.systemPrompt || getDefaultSystemPrompt('file'));
+            ? (settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt)
+            : (settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt);
     const promptTargetCopy = mode === 'layout'
         ? 'Prompt edits the outer layout wrapper target for this virtual .layout page.'
         : mode === 'folder'
@@ -89,7 +89,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                     <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
                     <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(systemPrompt)}</textarea>
                     <div class="prompt-system-footer">
-                        <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
+                        <span class="small-note">Used for chat + completions. Not saved across reloads.</span>
                         <button class="btn btn-secondary" type="button" id="prompt-system-reset">Reset default</button>
                     </div>
                 </details>

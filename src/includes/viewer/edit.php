@@ -524,7 +524,7 @@ function cmsHandleEditAction(): void
             ];
         }
         $promptContextJson = json_encode(cmsPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $configJson = json_encode($isLayoutTarget ? cmsPromptCompactConfig($config, true) : $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $configJson = json_encode(cmsPromptCompactConfig($config, $isLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $responseFormatInstruction = implode("\n", $isLayoutTarget
             ? [
                 'Response format: return strict JSON.',
@@ -534,7 +534,12 @@ function cmsHandleEditAction(): void
                 'Template requirement: keep a <main class="poff-default-layout__main"> block that renders {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}.',
                 'Example: {"template":"<div class=\"poff-default-layout\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","css":".poff-default-layout{min-height:100dvh;}","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
             ]
-            : []);
+            : [
+                'Response format: return raw HBS only for the current inner partial save target.',
+                'Do not return JSON, code fences, or the outer layout wrapper.',
+                'Use Prompt context JSON current.templateTarget / current.sectionTemplateTarget to understand the exact save target.',
+                'Treat layout metadata as reference only; the answer must be inner partial content for the existing wrapper.',
+            ]);
         $sharedWorkSystemPrompt = [
             'You are a Handlebars (HBS) template generator for this single-page CMS.',
             'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
@@ -548,12 +553,18 @@ function cmsHandleEditAction(): void
             'Save target is work.hbs for the current file inside the active item layout folder.',
             'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
             'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
+            'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
+            'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
+            'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
         ]);
         $folderWorkSystemPrompt = array_merge($sharedWorkSystemPrompt, [
             'Save target is works.hbs for the current folder inside the active item layout folder.',
             'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
             'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
             'Use folder tree data and resolved refs when relevant instead of inventing paths.',
+            'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
+            'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
+            'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
         ]);
         $defaultSystemPrompt = implode("\n", $isLayoutTarget
             ? [
@@ -587,9 +598,7 @@ function cmsHandleEditAction(): void
             : ($subjectType === 'folder' ? $folderWorkSystemPrompt : $fileWorkSystemPrompt));
         $systemPrompt = $systemPromptValue !== '' ? $systemPromptValue : $defaultSystemPrompt;
         $historyText = cmsPromptHistoryText($history);
-        $userPrompt = $isLayoutTarget
-            ? "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt
-            : "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
+        $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $responseFormatInstruction . "\n\n" . $historyText . "USER: " . $prompt;
         if ($image) {
             $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
         }
@@ -701,13 +710,11 @@ function cmsHandleEditAction(): void
                 $payload = [
                     'prompt' => $prompt,
                     'history' => $history,
-                    'config' => $config,
+                    'config' => cmsPromptCompactConfig($config, $isLayoutTarget),
                     'instruction' => $systemPrompt,
                     'image' => $image,
+                    'promptContext' => cmsPromptCompactContext($promptContext),
                 ];
-                if ($isLayoutTarget) {
-                    $payload['promptContext'] = $promptContext;
-                }
             }
             $response = cmsHttpPost($endpoint, [], $payload);
             if (!$response['ok']) {

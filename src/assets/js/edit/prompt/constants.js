@@ -12,7 +12,7 @@ export function getDefaultModelForProvider(provider = 'local') {
     return 'gemma4';
 }
 
-const sharedWorkSystemPrompt = [
+export const legacyWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
     'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
     'Return only the template (no Markdown, no fences).',
@@ -22,23 +22,29 @@ const sharedWorkSystemPrompt = [
     'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
 ].join('\n');
 
-const fileWorkSystemPrompt = [
-    sharedWorkSystemPrompt,
+export const defaultFileSystemPrompt = [
+    legacyWorkSystemPrompt,
     'Save target is work.hbs for the current file inside the active item layout folder.',
     'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
     'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
+    'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
+    'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
+    'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
 ].join('\n');
 
-const folderWorkSystemPrompt = [
-    sharedWorkSystemPrompt,
+export const defaultFolderSystemPrompt = [
+    legacyWorkSystemPrompt,
     'Save target is works.hbs for the current folder inside the active item layout folder.',
     'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
     'Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
     'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
     'Use folder tree data and resolved refs when relevant instead of inventing paths.',
+    'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
+    'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
+    'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
 ].join('\n');
 
-const layoutSystemPrompt = [
+export const defaultLayoutSystemPrompt = [
     'You are a Handlebars (HBS) layout generator for this single-page CMS.',
     'Transform the user description into an updated outer layout wrapper rendered by LightnCandy.',
     'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
@@ -66,25 +72,15 @@ const layoutSystemPrompt = [
     'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
 ].join('\n');
 
-export function getDefaultSystemPrompt(mode = 'work') {
-    if (mode === 'layout') {
-        return layoutSystemPrompt;
-    }
-    if (mode === 'folder') {
-        return folderWorkSystemPrompt;
-    }
-    return fileWorkSystemPrompt;
-}
-
-export const defaultSystemPrompt = getDefaultSystemPrompt('work');
+export const defaultSystemPrompt = defaultFileSystemPrompt;
 export const defaultPromptSettings = {
     provider: 'local',
     model: getDefaultModelForProvider('local'),
     endpoint: defaultLocalPromptEndpoint,
     apiKey: '',
-    systemPrompt: getDefaultSystemPrompt('work'),
-    systemPromptFile: getDefaultSystemPrompt('file'),
-    systemPromptFolder: getDefaultSystemPrompt('folder'),
-    systemPromptLayout: getDefaultSystemPrompt('layout'),
+    systemPrompt: defaultFileSystemPrompt,
+    systemPromptFile: defaultFileSystemPrompt,
+    systemPromptFolder: defaultFolderSystemPrompt,
+    systemPromptLayout: defaultLayoutSystemPrompt,
     streamPreview: true,
 };
