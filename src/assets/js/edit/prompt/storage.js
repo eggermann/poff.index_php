@@ -1,4 +1,4 @@
-import { defaultPromptSettings, promptHistoryKey, promptSettingsKey } from './constants.js';
+import { defaultPromptSettings, getDefaultSystemPrompt, promptHistoryKey, promptSettingsKey } from './constants.js';
 
 export function loadPromptSettings() {
     try {
@@ -9,6 +9,10 @@ export function loadPromptSettings() {
         if (looksLikeLegacyProviderDefault) {
             stored.provider = defaultPromptSettings.provider;
             stored.model = defaultPromptSettings.model;
+            stored.endpoint = defaultPromptSettings.endpoint;
+        }
+        if ((stored.provider === 'local' || !stored.provider) && !stored.endpoint) {
+            stored.endpoint = defaultPromptSettings.endpoint;
         }
         if (typeof stored.systemPrompt === 'string') {
             const looksLikeLegacyDefault = stored.systemPrompt.includes('saved to .layout/template.hbs')
@@ -16,6 +20,12 @@ export function loadPromptSettings() {
             if (looksLikeLegacyDefault) {
                 stored.systemPrompt = defaultPromptSettings.systemPrompt;
             }
+        }
+        if (typeof stored.systemPromptWork !== 'string' || stored.systemPromptWork.trim() === '') {
+            stored.systemPromptWork = getDefaultSystemPrompt('work');
+        }
+        if (typeof stored.systemPromptLayout !== 'string' || stored.systemPromptLayout.trim() === '') {
+            stored.systemPromptLayout = getDefaultSystemPrompt('layout');
         }
         return { ...defaultPromptSettings, ...stored };
     } catch (err) {

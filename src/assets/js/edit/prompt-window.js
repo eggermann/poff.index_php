@@ -1,7 +1,11 @@
 import { escapeHtml } from '../core/utils.js';
+import { getDefaultSystemPrompt } from './prompt/constants.js';
 
 export function renderPromptWindow(settings = {}, options = {}) {
     const mode = options.mode === 'layout' ? 'layout' : 'work';
+    const systemPrompt = mode === 'layout'
+        ? (settings.systemPromptLayout || settings.systemPrompt || getDefaultSystemPrompt('layout'))
+        : (settings.systemPromptWork || settings.systemPrompt || getDefaultSystemPrompt('work'));
     const promptTargetCopy = mode === 'layout'
         ? 'Prompt edits the outer layout wrapper target for this virtual .layout page.'
         : 'Prompt edits the wrapped work.hbs / works.hbs partial for the current item.';
@@ -66,7 +70,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                 </details>
                 <details class="prompt-system">
                     <summary class="prompt-system-summary">System prompt (description &rarr; HBS component)</summary>
-                    <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(settings.systemPrompt || '')}</textarea>
+                    <textarea class="form-textarea prompt-textarea" id="prompt-system" placeholder="Set the instruction your model should follow.">${escapeHtml(systemPrompt)}</textarea>
                     <div class="prompt-system-footer">
                         <span class="small-note">Used for chat + completions. Stored only in this browser.</span>
                         <button class="btn btn-secondary" type="button" id="prompt-system-reset">Reset default</button>

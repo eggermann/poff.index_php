@@ -156,6 +156,7 @@ export function bindPromptWindow({
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection ? getActiveSelection().path : '';
+    let activePromptMode = getActiveSelection?.().isLayout ? 'layout' : 'work';
     let imageAttachment = null;
     let promptLayerCollapsed = false;
     const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
@@ -165,6 +166,7 @@ export function bindPromptWindow({
         : defaultPromptPlaceholder);
     const currentPromptMode = () => (getActiveSelection?.().isLayout ? 'layout' : 'work');
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+    const currentSystemPromptSettingKey = () => (currentPromptMode() === 'layout' ? 'systemPromptLayout' : 'systemPromptWork');
     const currentHasImageContext = () => {
         const selection = getActiveSelection ? getActiveSelection() : null;
         const selectionPath = typeof selection?.previewPath === 'string' && selection.previewPath.trim() !== ''
@@ -219,6 +221,7 @@ export function bindPromptWindow({
         const nextValue = currentDefaultSystemPrompt();
         if (systemPromptEl.value !== nextValue) {
             systemPromptEl.value = nextValue;
+            settings[currentSystemPromptSettingKey()] = nextValue;
             savePromptSettings(readSettings());
         }
         if (promptInputEl && !isSending) {
@@ -268,6 +271,8 @@ export function bindPromptWindow({
     const renderContext = () => {
         const context = buildPromptContext({ getActiveSelection, getConfig });
         activePath = context.path;
+        activePromptMode = currentPromptMode();
+        syncModeAwareSystemPrompt();
         renderPromptContext(promptContextEl, context);
         renderTemplatePreview();
     };
@@ -395,20 +400,29 @@ export function bindPromptWindow({
         providerEl.value = settings.provider || 'local';
     }
     if (systemPromptEl) {
-        systemPromptEl.value = settings.systemPrompt || currentDefaultSystemPrompt();
+        systemPromptEl.value = currentPromptMode() === 'layout'
+            ? (settings.systemPromptLayout || settings.systemPrompt || currentDefaultSystemPrompt())
+            : (settings.systemPromptWork || settings.systemPrompt || currentDefaultSystemPrompt());
     }
     if (streamToggleEl) {
         streamToggleEl.checked = settings.streamPreview !== false;
     }
 
-    const readSettings = () => ({
-        provider: providerEl ? providerEl.value : 'local',
-        model: modelEl ? modelEl.value : '',
-        endpoint: endpointEl ? endpointEl.value : '',
-        apiKey: apiKeyEl ? apiKeyEl.value : '',
-        systemPrompt: (systemPromptEl?.value || '').trim() || currentDefaultSystemPrompt(),
-        streamPreview: streamToggleEl ? !!streamToggleEl.checked : true,
-    });
+    const readSettings = () => {
+        const systemPrompt = (systemPromptEl?.value || '').trim() || currentDefaultSystemPrompt();
+        const nextSettings = {
+            provider: providerEl ? providerEl.value : 'local',
+            model: modelEl ? modelEl.value : '',
+            endpoint: endpointEl ? endpointEl.value : '',
+            apiKey: apiKeyEl ? apiKeyEl.value : '',
+            systemPrompt,
+            systemPromptWork: settings.systemPromptWork || getDefaultSystemPrompt('work'),
+            systemPromptLayout: settings.systemPromptLayout || getDefaultSystemPrompt('layout'),
+            streamPreview: streamToggleEl ? !!streamToggleEl.checked : true,
+        };
+        nextSettings[currentSystemPromptSettingKey()] = systemPrompt;
+        return nextSettings;
+    };
     let suppressSave = false;
 
     const applySettingsToUi = (s) => {
@@ -417,7 +431,11 @@ export function bindPromptWindow({
         if (modelEl) modelEl.value = s.model || '';
         if (endpointEl) endpointEl.value = s.endpoint || '';
         if (apiKeyEl) apiKeyEl.value = s.apiKey || '';
-        if (systemPromptEl) systemPromptEl.value = s.systemPrompt || currentDefaultSystemPrompt();
+        if (systemPromptEl) {
+            systemPromptEl.value = currentPromptMode() === 'layout'
+                ? (s.systemPromptLayout || s.systemPrompt || currentDefaultSystemPrompt())
+                : (s.systemPromptWork || s.systemPrompt || currentDefaultSystemPrompt());
+        }
         if (streamToggleEl) streamToggleEl.checked = s.streamPreview !== false;
         suppressSave = false;
         updateProviderUi();
@@ -450,6 +468,7 @@ export function bindPromptWindow({
     }
     if (systemPromptEl) {
         systemPromptEl.addEventListener('input', () => {
+            settings[currentSystemPromptSettingKey()] = (systemPromptEl.value || '').trim() || currentDefaultSystemPrompt();
             savePromptSettings(readSettings());
         });
     }
@@ -461,6 +480,7 @@ export function bindPromptWindow({
     if (systemResetEl && systemPromptEl) {
         systemResetEl.addEventListener('click', () => {
             systemPromptEl.value = currentDefaultSystemPrompt();
+            settings[currentSystemPromptSettingKey()] = systemPromptEl.value;
             savePromptSettings(readSettings());
         });
     }
@@ -504,8 +524,10 @@ export function bindPromptWindow({
     const syncHistoryForPath = () => {
         const selection = getActiveSelection ? getActiveSelection() : { path: '' };
         const nextPath = selection?.path || '';
-        if (nextPath !== activePath) {
+        const nextPromptMode = selection?.isLayout ? 'layout' : 'work';
+        if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
             activePath = nextPath;
+            activePromptMode = nextPromptMode;
             setHistory(readStoredHistory(activePath));
             syncModeAwareSystemPrompt();
             renderHistory();
@@ -744,10 +766,19 @@ export function bindPromptWindow({
                 const nextJs = typeof response.js === 'string' ? response.js : null;
                 const isLayoutTarget = !!selection.isLayout;
                 const currentConfig = getConfig ? getConfig() : null;
+                const layoutSectionKey = isLayoutTarget
+                    ? ((selection?.previewIsFile || selection?.layoutIsFile) ? 'work.hbs' : 'works.hbs')
+                    : '';
+                const rawResponseWork = (response && response.work && typeof response.work === 'object')
+                    ? response.work
+                    : null;
+                const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === 'string'
+                    ? rawResponseWork[layoutSectionKey]
+                    : null;
                 const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
                 const mergedWork = {
                     ...(inferredWork || {}),
-                    ...((response && response.work && typeof response.work === 'object') ? response.work : {}),
+                    ...(rawResponseWork || {}),
                 };
                 const nextWork = filterAllowedWork(mergedWork, currentConfig);
                 const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, 'layout')
@@ -879,6 +910,9 @@ export function bindPromptWindow({
                             : (canEditResolvedFilesystemTarget ? 'filesystem-layout' : 'poff-layout');
                     if (shouldPersistToLocalWrapper) {
                         layoutPayload.template = templateText;
+                        if (responseSectionTemplate !== null) {
+                            layoutPayload.sectionTemplate = responseSectionTemplate;
+                        }
                         if (nextCss !== null) {
                             layoutPayload.css = nextCss;
                         }
@@ -888,6 +922,9 @@ export function bindPromptWindow({
                     } else if (canEditResolvedFilesystemTarget) {
                         layoutPayload.originalTarget = resolvedLayoutDirectory;
                         layoutPayload.originalTemplate = templateText;
+                        if (responseSectionTemplate !== null) {
+                            layoutPayload.sectionTemplate = responseSectionTemplate;
+                        }
                         if (nextCss !== null) {
                             layoutPayload.originalCss = nextCss;
                         }
@@ -897,6 +934,9 @@ export function bindPromptWindow({
                     } else {
                         layoutPayload.name = 'custom-layout';
                         layoutPayload.template = templateText;
+                        if (responseSectionTemplate !== null) {
+                            layoutPayload.sectionTemplate = responseSectionTemplate;
+                        }
                         if (nextCss !== null) {
                             layoutPayload.css = nextCss;
                         }
