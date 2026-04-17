@@ -249,6 +249,15 @@
   // src/assets/js/edit/prompt/constants.js
   var promptSettingsKey = "poffEditPromptSettings";
   var promptHistoryKey = "poffEditPromptHistory";
+  function getDefaultModelForProvider(provider = "local") {
+    if (provider === "openai") {
+      return "gpt-4o-mini";
+    }
+    if (provider === "gemini") {
+      return "gemini-1.5-flash";
+    }
+    return "gemma4";
+  }
   var workSystemPrompt = [
     "You are a Handlebars (HBS) template generator for this single-page CMS.",
     "Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.",
@@ -293,8 +302,8 @@
   }
   var defaultSystemPrompt = getDefaultSystemPrompt("work");
   var defaultPromptSettings = {
-    provider: "openai",
-    model: "gpt-4o-mini",
+    provider: "local",
+    model: getDefaultModelForProvider("local"),
     endpoint: "",
     apiKey: "",
     systemPrompt: getDefaultSystemPrompt("work"),
@@ -305,6 +314,11 @@
   function loadPromptSettings() {
     try {
       const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
+      const looksLikeLegacyProviderDefault = (!stored.provider || stored.provider === "openai") && (!stored.model || stored.model === "gpt-4o-mini") && !stored.endpoint;
+      if (looksLikeLegacyProviderDefault) {
+        stored.provider = defaultPromptSettings.provider;
+        stored.model = defaultPromptSettings.model;
+      }
       if (typeof stored.systemPrompt === "string") {
         const looksLikeLegacyDefault = stored.systemPrompt.includes("saved to .layout/template.hbs") || stored.systemPrompt.includes("Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}");
         if (looksLikeLegacyDefault) {
@@ -1044,11 +1058,8 @@
       if (endpointRow) {
         endpointRow.style.display = provider === "local" ? "block" : "none";
       }
-      if (provider === "openai" && modelEl && !modelEl.value.trim()) {
-        modelEl.value = "gpt-4o-mini";
-      }
-      if (provider === "gemini" && modelEl && !modelEl.value.trim()) {
-        modelEl.value = "gemini-1.5-flash";
+      if (modelEl) {
+        modelEl.value = getDefaultModelForProvider(provider);
       }
       if (!suppressSave) {
         savePromptSettings(readSettings());
@@ -1715,7 +1726,7 @@
                         <div>
                             <label class="edit-label" for="prompt-provider">Provider</label>
                             <select class="form-input" id="prompt-provider">
-                                <option value="local">Local URL</option>
+                                <option value="local">LM Studio</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="gemini">Gemini</option>
                             </select>

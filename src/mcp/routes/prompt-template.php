@@ -131,6 +131,14 @@ function mcpPromptEnvValue(array $env, string $key): ?string
 
 function mcpPromptHttpPost(string $url, array $headers, array $payload): array
 {
+    $override = $GLOBALS['__poff_mcp_prompt_http_post'] ?? null;
+    if (is_callable($override)) {
+        $response = $override($url, $headers, $payload);
+        if (is_array($response)) {
+            return $response;
+        }
+    }
+
     $headerLines = array_merge(['Content-Type: application/json'], $headers);
     $context = stream_context_create([
         'http' => [

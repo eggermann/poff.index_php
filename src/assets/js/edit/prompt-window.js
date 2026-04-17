@@ -42,7 +42,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         <div>
                             <label class="edit-label" for="prompt-provider">Provider</label>
                             <select class="form-input" id="prompt-provider">
-                                <option value="local">Local URL</option>
+                                <option value="local">LM Studio</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="gemini">Gemini</option>
                             </select>

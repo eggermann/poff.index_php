@@ -202,6 +202,39 @@ function runPromptModelParse(mode, raw) {
   });
 }
 
+function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '') {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_prompt_template_local.php'),
+      rootDir,
+      relativePath,
+      __filename,
+      JSON.stringify(payload),
+      mockResponse ? JSON.stringify(mockResponse) : '',
+      capturePath,
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`prompt template helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from prompt template helper: ${stdout}`));
+      }
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -335,6 +368,45 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.cmsOpenAi).toBe('OpenAI request failed (HTTP 401): Incorrect API key provided: sk-***.');
     expect(result.cmsLocalHtml).toBe('Local endpoint request failed (HTTP 502): Bad Gateway.');
     expect(result.mcpGemini).toBe('Gemini request failed (HTTP 429): Quota exceeded for model gemini-1.5-flash.');
+  });
+
+  test('posts LM Studio local prompt payload and parses the gemma template response', async () => {
+    const capturePath = path.join(POFF_DIR, 'lm-studio-request.json');
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runPromptTemplateLocal(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Create a compact image card.',
+      history: [
+        { role: 'assistant', content: 'Previous draft.' },
+        { role: 'user', content: 'Make it smaller.' },
+      ],
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        template: '<section class="lm-studio-card">{{title}}</section>',
+      }),
+    }, capturePath);
+
+    const captured = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+
+    expect(result.allowed).toBe(true);
+    expect(result.provider).toBe('local');
+    expect(result.model).toBe('gemma4');
+    expect(result.template).toBe('<section class="lm-studio-card">{{title}}</section>');
+    expect(captured.url).toBe(endpoint);
+    expect(captured.headers).toEqual([]);
+    expect(captured.payload.prompt).toBe('Create a compact image card.');
+    expect(captured.payload.history).toEqual([
+      { role: 'assistant', content: 'Previous draft.' },
+      { role: 'user', content: 'Make it smaller.' },
+    ]);
+    expect(captured.payload.instruction).toContain('Handlebars (HBS) template generator');
+    expect(captured.payload.config.title).toBe('Folder Preview');
+    expect(captured.payload.image).toBeNull();
   });
 
   test('parses layout prompt JSON with css/js and restores the required default main block', async () => {

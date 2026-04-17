@@ -1,5 +1,16 @@
 export const promptSettingsKey = 'poffEditPromptSettings';
 export const promptHistoryKey = 'poffEditPromptHistory';
+
+export function getDefaultModelForProvider(provider = 'local') {
+    if (provider === 'openai') {
+        return 'gpt-4o-mini';
+    }
+    if (provider === 'gemini') {
+        return 'gemini-1.5-flash';
+    }
+    return 'gemma4';
+}
+
 const workSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
     'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
@@ -47,8 +58,8 @@ export function getDefaultSystemPrompt(mode = 'work') {
 
 export const defaultSystemPrompt = getDefaultSystemPrompt('work');
 export const defaultPromptSettings = {
-    provider: 'openai',
-    model: 'gpt-4o-mini',
+    provider: 'local',
+    model: getDefaultModelForProvider('local'),
     endpoint: '',
     apiKey: '',
     systemPrompt: getDefaultSystemPrompt('work'),

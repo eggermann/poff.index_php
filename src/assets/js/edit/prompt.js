@@ -1,5 +1,5 @@
 import { getLayoutState } from '../core/utils.js';
-import { defaultPromptSettings, getDefaultSystemPrompt } from './prompt/constants.js';
+import { defaultPromptSettings, getDefaultModelForProvider, getDefaultSystemPrompt } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
 import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
@@ -414,11 +414,8 @@ export function bindPromptWindow({
         if (endpointRow) {
             endpointRow.style.display = provider === 'local' ? 'block' : 'none';
         }
-        if (provider === 'openai' && modelEl && !modelEl.value.trim()) {
-            modelEl.value = 'gpt-4o-mini';
-        }
-        if (provider === 'gemini' && modelEl && !modelEl.value.trim()) {
-            modelEl.value = 'gemini-1.5-flash';
+        if (modelEl) {
+            modelEl.value = getDefaultModelForProvider(provider);
         }
         if (!suppressSave) {
             savePromptSettings(readSettings());

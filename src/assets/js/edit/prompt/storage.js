@@ -3,6 +3,13 @@ import { defaultPromptSettings, promptHistoryKey, promptSettingsKey } from './co
 export function loadPromptSettings() {
     try {
         const stored = JSON.parse(localStorage.getItem(promptSettingsKey) || '{}');
+        const looksLikeLegacyProviderDefault = (!stored.provider || stored.provider === 'openai')
+            && (!stored.model || stored.model === 'gpt-4o-mini')
+            && !stored.endpoint;
+        if (looksLikeLegacyProviderDefault) {
+            stored.provider = defaultPromptSettings.provider;
+            stored.model = defaultPromptSettings.model;
+        }
         if (typeof stored.systemPrompt === 'string') {
             const looksLikeLegacyDefault = stored.systemPrompt.includes('saved to .layout/template.hbs')
                 || stored.systemPrompt.includes('Built-in wrapper partials are {{> poff-layout}} and {{> filesystem-layout}}');
