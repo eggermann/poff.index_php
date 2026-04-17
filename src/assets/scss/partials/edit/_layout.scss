@@ -1,0 +1,126 @@
+.edit-layout-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(2px);
+    padding: 16px;
+    overflow: auto;
+}
+.edit-layout-overlay-shell {
+    width: min(1080px, calc(100% - 16px));
+    min-height: calc(100% - 12px);
+    margin-left: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #fffaf2 0%, #ffffff 100%);
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.32);
+    padding: 18px;
+}
+.edit-layout-overlay-form {
+    display: grid;
+    gap: 16px;
+}
+.edit-layout-overlay-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.edit-layout-meta {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.edit-layout-meta-card,
+.edit-layout-editor {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #ffffff;
+    padding: 14px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+.edit-layout-meta-title {
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+}
+.edit-layout-meta-card .small-note,
+.edit-layout-editor .small-note {
+    display: block;
+    margin-top: 4px;
+}
+.edit-layout-editor-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.edit-layout-editor textarea:disabled {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+}
+.edit-layout-panel {
+    display: grid;
+    gap: 16px;
+}
+.edit-layout-summary {
+    align-items: flex-start;
+    gap: 16px;
+}
+.edit-layout-summary-line {
+    color: #6b7280;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+.edit-layout-header-actions {
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+.edit-layout-section-note {
+    border: 1px solid #fed7aa;
+    border-radius: 14px;
+    background: #fff7ed;
+    padding: 12px 14px;
+}
+.edit-layout-manual {
+    margin-top: 18px;
+}
+.edit-layout-workspace {
+    display: grid;
+    gap: 16px;
+}
+.edit-layout-advanced {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.74);
+    padding: 10px 14px 14px;
+}
+.edit-layout-advanced-summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 10px;
+}
+.edit-panel .edit-layout-copy {
+    display: grid;
+    gap: 4px;
+}
+.edit-panel .edit-layout-title {
+    font-weight: 700;
+    color: #9a3412;
+}
+.edit-panel .edit-layout-launch .small-note {
+    color: #7c2d12;
+}
+.edit-panel .edit-layout-launch button {
+    white-space: nowrap;
+}
+.edit-panel .edit-secondary {
+    background: #f97316;
+}
+.edit-panel .edit-secondary:hover {
+    background: #ea580c;
+}

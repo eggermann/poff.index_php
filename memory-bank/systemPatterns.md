@@ -13,6 +13,7 @@ It is optional, but recommended to be updated as the project evolves.
 ## Architectural Patterns
 
 *   
+*  [2026-04-17 20:28:56] - Large SCSS feature areas can be split into feature-scoped partials and composed from a small entry partial using `@use`.
 
 ## Testing Patterns
 
