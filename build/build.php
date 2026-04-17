@@ -121,6 +121,11 @@ try {
     // Inline viewer helpers so the built output stays single-file (no require_once).
     $viewerUtils = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/utils.php');
     $viewerEdit = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit.php');
+    $viewerEditPromptParse = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-parse.php');
+    $viewerEditPromptRefs = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-refs.php');
+    $viewerEditPromptContext = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-context.php');
+    $viewerEditPromptCompact = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-compact.php');
+    $viewerEditUpload = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/upload.php');
     $viewerRenderEntry = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/entry.php');
     $viewerRenderFile = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/file.php');
     $viewerRenderFolder = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/folder.php');
@@ -131,6 +136,11 @@ try {
     };
     $viewerUtils = $stripRequires($viewerUtils);
     $viewerEdit = $stripRequires($viewerEdit);
+    $viewerEditPromptParse = $stripRequires($viewerEditPromptParse);
+    $viewerEditPromptRefs = $stripRequires($viewerEditPromptRefs);
+    $viewerEditPromptContext = $stripRequires($viewerEditPromptContext);
+    $viewerEditPromptCompact = $stripRequires($viewerEditPromptCompact);
+    $viewerEditUpload = $stripRequires($viewerEditUpload);
     $viewerRenderEntry = $stripRequires($viewerRenderEntry);
     $viewerRenderFile = $stripRequires($viewerRenderFile);
     $viewerRenderFolder = $stripRequires($viewerRenderFolder);
@@ -138,6 +148,11 @@ try {
     $viewerRenderShell = $stripRequires($viewerRenderShell);
     $buildContent .= trim($viewerUtils) . "\n\n";
     $buildContent .= trim($viewerEdit) . "\n\n";
+    $buildContent .= trim($viewerEditPromptParse) . "\n\n";
+    $buildContent .= trim($viewerEditPromptRefs) . "\n\n";
+    $buildContent .= trim($viewerEditPromptContext) . "\n\n";
+    $buildContent .= trim($viewerEditPromptCompact) . "\n\n";
+    $buildContent .= trim($viewerEditUpload) . "\n\n";
     $buildContent .= trim($viewerRenderEntry) . "\n\n";
     $buildContent .= trim($viewerRenderFile) . "\n\n";
     $buildContent .= trim($viewerRenderFolder) . "\n\n";
