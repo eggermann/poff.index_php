@@ -158,12 +158,21 @@ export function bindPromptWindow({
     let activePath = getActiveSelection ? getActiveSelection().path : '';
     let imageAttachment = null;
     let promptLayerCollapsed = false;
+    const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
     const currentPromptPlaceholder = () => (currentPromptMode() === 'layout'
         ? 'Describe the layout you want...'
         : defaultPromptPlaceholder);
     const currentPromptMode = () => (getActiveSelection?.().isLayout ? 'layout' : 'work');
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+    const currentHasImageContext = () => {
+        const selection = getActiveSelection ? getActiveSelection() : null;
+        const selectionPath = typeof selection?.previewPath === 'string' && selection.previewPath.trim() !== ''
+            ? selection.previewPath
+            : (typeof selection?.path === 'string' ? selection.path : '');
+
+        return imageContextPattern.test(selectionPath);
+    };
 
     const readPromptLayerState = () => {
         try {
@@ -271,8 +280,13 @@ export function bindPromptWindow({
         if (!promptAttachmentEl || !promptAttachmentPreviewEl || !promptAttachmentNameEl || !promptInputEl) {
             return;
         }
+        const hasImageContext = currentHasImageContext() || !!imageAttachment;
         const hasAttachment = !!imageAttachment;
+        root.classList.toggle('prompt-has-image-context', hasImageContext);
         promptAttachmentEl.hidden = !hasAttachment;
+        if (promptAttachEl) {
+            promptAttachEl.hidden = !hasImageContext;
+        }
         promptInputEl.classList.toggle('prompt-input-has-attachment', hasAttachment);
         if (!hasAttachment) {
             promptAttachmentPreviewEl.removeAttribute('src');
@@ -497,6 +511,7 @@ export function bindPromptWindow({
             renderHistory();
             renderContext();
             renderSummary('Waiting for response...');
+            updateAttachmentUi();
         }
     };
     window.addEventListener('hashchange', syncHistoryForPath);

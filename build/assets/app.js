@@ -835,10 +835,16 @@
     let activePath = getActiveSelection2 ? getActiveSelection2().path : "";
     let imageAttachment = null;
     let promptLayerCollapsed = false;
+    const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
     const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
     const currentPromptPlaceholder = () => currentPromptMode() === "layout" ? "Describe the layout you want..." : defaultPromptPlaceholder;
     const currentPromptMode = () => (getActiveSelection2 == null ? void 0 : getActiveSelection2().isLayout) ? "layout" : "work";
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
+    const currentHasImageContext = () => {
+      const selection = getActiveSelection2 ? getActiveSelection2() : null;
+      const selectionPath = typeof (selection == null ? void 0 : selection.previewPath) === "string" && selection.previewPath.trim() !== "" ? selection.previewPath : typeof (selection == null ? void 0 : selection.path) === "string" ? selection.path : "";
+      return imageContextPattern.test(selectionPath);
+    };
     const readPromptLayerState = () => {
       try {
         const stored = JSON.parse(localStorage.getItem(PROMPT_LAYER_STATE_KEY) || "{}");
@@ -927,8 +933,13 @@
       if (!promptAttachmentEl || !promptAttachmentPreviewEl || !promptAttachmentNameEl || !promptInputEl) {
         return;
       }
+      const hasImageContext = currentHasImageContext() || !!imageAttachment;
       const hasAttachment = !!imageAttachment;
+      root.classList.toggle("prompt-has-image-context", hasImageContext);
       promptAttachmentEl.hidden = !hasAttachment;
+      if (promptAttachEl) {
+        promptAttachEl.hidden = !hasImageContext;
+      }
       promptInputEl.classList.toggle("prompt-input-has-attachment", hasAttachment);
       if (!hasAttachment) {
         promptAttachmentPreviewEl.removeAttribute("src");
@@ -1135,6 +1146,7 @@
         renderHistory();
         renderContext();
         renderSummary("Waiting for response...");
+        updateAttachmentUi();
       }
     };
     window.addEventListener("hashchange", syncHistoryForPath);
@@ -1767,10 +1779,6 @@
                 <div class="prompt-allowed">
                     ${editableCopy}
                 </div>
-                <details class="prompt-section prompt-section-messages">
-                    <summary>Messages</summary>
-                    <div class="prompt-messages" id="promptMessages"></div>
-                </details>
                 <details class="prompt-section prompt-section-context">
                     <summary>Prompt context</summary>
                     <div class="prompt-context" id="promptContext">
@@ -1790,6 +1798,10 @@
                         </div>
                         <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
                     </div>
+                </details>
+                <details class="prompt-section prompt-section-messages">
+                    <summary>Messages</summary>
+                    <div class="prompt-messages" id="promptMessages"></div>
                 </details>
                 <input id="prompt-image-input" type="file" accept="image/*" hidden>
                 <div class="prompt-attachment" id="promptAttachment" hidden>

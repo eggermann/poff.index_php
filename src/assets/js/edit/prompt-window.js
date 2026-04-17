@@ -83,10 +83,6 @@ export function renderPromptWindow(settings = {}, options = {}) {
                 <div class="prompt-allowed">
                     ${editableCopy}
                 </div>
-                <details class="prompt-section prompt-section-messages">
-                    <summary>Messages</summary>
-                    <div class="prompt-messages" id="promptMessages"></div>
-                </details>
                 <details class="prompt-section prompt-section-context">
                     <summary>Prompt context</summary>
                     <div class="prompt-context" id="promptContext">
@@ -106,6 +102,10 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         </div>
                         <textarea class="form-textarea prompt-template-code" id="promptTemplateCode" readonly spellcheck="false" placeholder="No template loaded yet."></textarea>
                     </div>
+                </details>
+                <details class="prompt-section prompt-section-messages">
+                    <summary>Messages</summary>
+                    <div class="prompt-messages" id="promptMessages"></div>
                 </details>
                 <input id="prompt-image-input" type="file" accept="image/*" hidden>
                 <div class="prompt-attachment" id="promptAttachment" hidden>
