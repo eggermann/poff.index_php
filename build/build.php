@@ -121,16 +121,28 @@ try {
     // Inline viewer helpers so the built output stays single-file (no require_once).
     $viewerUtils = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/utils.php');
     $viewerEdit = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit.php');
-    $viewerRender = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render.php');
+    $viewerRenderEntry = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/entry.php');
+    $viewerRenderFile = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/file.php');
+    $viewerRenderFolder = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/folder.php');
+    $viewerRenderData = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/data.php');
+    $viewerRenderShell = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/shell.php');
     $stripRequires = static function (string $content): string {
         return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
     };
     $viewerUtils = $stripRequires($viewerUtils);
     $viewerEdit = $stripRequires($viewerEdit);
-    $viewerRender = $stripRequires($viewerRender);
+    $viewerRenderEntry = $stripRequires($viewerRenderEntry);
+    $viewerRenderFile = $stripRequires($viewerRenderFile);
+    $viewerRenderFolder = $stripRequires($viewerRenderFolder);
+    $viewerRenderData = $stripRequires($viewerRenderData);
+    $viewerRenderShell = $stripRequires($viewerRenderShell);
     $buildContent .= trim($viewerUtils) . "\n\n";
     $buildContent .= trim($viewerEdit) . "\n\n";
-    $buildContent .= trim($viewerRender) . "\n\n";
+    $buildContent .= trim($viewerRenderEntry) . "\n\n";
+    $buildContent .= trim($viewerRenderFile) . "\n\n";
+    $buildContent .= trim($viewerRenderFolder) . "\n\n";
+    $buildContent .= trim($viewerRenderData) . "\n\n";
+    $buildContent .= trim($viewerRenderShell) . "\n\n";
     $buildContent .= "cmsHandleEditAction();\n\n";
 
     // Add initialization code

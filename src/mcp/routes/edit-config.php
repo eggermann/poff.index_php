@@ -1,35 +1,9 @@
 <?php
 declare(strict_types=1);
 
-function mcpResolveEditPath(string $rootDir, string $relativePath): ?string
-{
-    $trimmed = trim($relativePath, "/\\");
-    $base = rtrim($rootDir, DIRECTORY_SEPARATOR);
-    if ($trimmed === '') {
-        return realpath($base) ?: null;
-    }
-    $candidate = realpath($base . DIRECTORY_SEPARATOR . $trimmed);
-    if ($candidate === false) {
-        return null;
-    }
-    if (strpos($candidate, $base) !== 0) {
-        return null;
-    }
-    if (!is_dir($candidate)) {
-        return null;
-    }
-    return $candidate;
-}
-
-function mcpReadJsonBody(): array
-{
-    $raw = (string) file_get_contents('php://input');
-    if ($raw === '') {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
-}
+require_once __DIR__ . '/edit-config/helpers.php';
+require_once __DIR__ . '/edit-config/payload.php';
+require_once __DIR__ . '/edit-config/apply.php';
 
 function handleEditConfig(array $opts): array
 {
@@ -67,231 +41,19 @@ function handleEditConfig(array $opts): array
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
     if ($method === 'POST') {
-        $data = mcpReadJsonBody();
-        if ($data === []) {
-            $data = $_POST;
+        $data = mcpReadEditConfigRequest();
+        $payload = mcpParseEditConfigPayload($data);
+        $result = mcpApplyEditConfigPayload($config, $payload, $targetDir);
+
+        if ($result['error'] !== null) {
+            return [
+                'route' => 'edit-config',
+                'allowed' => true,
+                'error' => $result['error'],
+            ];
         }
 
-        $title = trim((string) ($data['title'] ?? ''));
-        $description = trim((string) ($data['description'] ?? ''));
-        $link = trim((string) ($data['link'] ?? ''));
-        $url = trim((string) ($data['url'] ?? ''));
-        $workType = trim((string) ($data['work']['type'] ?? $data['work_type'] ?? ''));
-        $workLayoutRaw = $data['work']['layout'] ?? $data['work_layout'] ?? '';
-        $workLayout = trim((string) $workLayoutRaw);
-        $layoutPayload = $data['layout'] ?? null;
-        $layoutPayloadMode = is_array($layoutPayload) ? ($layoutPayload['mode'] ?? $layoutPayload['name'] ?? '') : '';
-        $layoutMode = trim((string) ($data['layout_mode'] ?? $layoutPayloadMode));
-        $layoutModel = is_array($layoutPayload) ? ($layoutPayload['model'] ?? null) : null;
-        $layoutSectionTemplateProvided = false;
-        $layoutSectionTemplate = null;
-        $layoutCssProvided = false;
-        $layoutCss = null;
-        $layoutJsProvided = false;
-        $layoutJs = null;
-        $originalLayoutTarget = '';
-        $originalLayoutTemplateProvided = false;
-        $originalLayoutTemplate = null;
-        $originalLayoutCssProvided = false;
-        $originalLayoutCss = null;
-        $originalLayoutJsProvided = false;
-        $originalLayoutJs = null;
-        if ($layoutModel === null && array_key_exists('layout_model', $data)) {
-            $layoutModel = $data['layout_model'];
-        }
-        $layoutTemplateProvided = false;
-        $layoutTemplate = null;
-        if (is_array($layoutPayload) && array_key_exists('template', $layoutPayload)) {
-            $layoutTemplateProvided = true;
-            $layoutTemplate = (string) $layoutPayload['template'];
-        }
-        if (is_array($layoutPayload) && array_key_exists('sectionTemplate', $layoutPayload)) {
-            $layoutSectionTemplateProvided = true;
-            $layoutSectionTemplate = (string) $layoutPayload['sectionTemplate'];
-        }
-        if (is_array($layoutPayload) && (array_key_exists('css', $layoutPayload) || array_key_exists('style', $layoutPayload))) {
-            $layoutCssProvided = true;
-            $layoutCss = (string) ($layoutPayload['css'] ?? $layoutPayload['style'] ?? '');
-        }
-        if (is_array($layoutPayload) && (array_key_exists('js', $layoutPayload) || array_key_exists('script', $layoutPayload))) {
-            $layoutJsProvided = true;
-            $layoutJs = (string) ($layoutPayload['js'] ?? $layoutPayload['script'] ?? '');
-        }
-        if (is_array($layoutPayload) && array_key_exists('originalTarget', $layoutPayload)) {
-            $originalLayoutTarget = trim((string) $layoutPayload['originalTarget']);
-        }
-        if (is_array($layoutPayload) && array_key_exists('originalTemplate', $layoutPayload)) {
-            $originalLayoutTemplateProvided = true;
-            $originalLayoutTemplate = (string) $layoutPayload['originalTemplate'];
-        }
-        if (is_array($layoutPayload) && (array_key_exists('originalCss', $layoutPayload) || array_key_exists('originalStyle', $layoutPayload))) {
-            $originalLayoutCssProvided = true;
-            $originalLayoutCss = (string) ($layoutPayload['originalCss'] ?? $layoutPayload['originalStyle'] ?? '');
-        }
-        if (is_array($layoutPayload) && (array_key_exists('originalJs', $layoutPayload) || array_key_exists('originalScript', $layoutPayload))) {
-            $originalLayoutJsProvided = true;
-            $originalLayoutJs = (string) ($layoutPayload['originalJs'] ?? $layoutPayload['originalScript'] ?? '');
-        }
-        if (array_key_exists('layout_template', $data)) {
-            $layoutTemplateProvided = true;
-            $layoutTemplate = (string) $data['layout_template'];
-        }
-        if (array_key_exists('layoutTemplate', $data)) {
-            $layoutTemplateProvided = true;
-            $layoutTemplate = (string) $data['layoutTemplate'];
-        }
-        if (array_key_exists('section_template', $data)) {
-            $layoutSectionTemplateProvided = true;
-            $layoutSectionTemplate = (string) $data['section_template'];
-        }
-        if (array_key_exists('sectionTemplate', $data)) {
-            $layoutSectionTemplateProvided = true;
-            $layoutSectionTemplate = (string) $data['sectionTemplate'];
-        }
-        if (array_key_exists('layout_css', $data)) {
-            $layoutCssProvided = true;
-            $layoutCss = (string) $data['layout_css'];
-        }
-        if (array_key_exists('layout_js', $data)) {
-            $layoutJsProvided = true;
-            $layoutJs = (string) $data['layout_js'];
-        }
-        if (array_key_exists('original_layout_target', $data)) {
-            $originalLayoutTarget = trim((string) $data['original_layout_target']);
-        }
-        if (array_key_exists('originalLayoutTarget', $data)) {
-            $originalLayoutTarget = trim((string) $data['originalLayoutTarget']);
-        }
-        if (array_key_exists('original_layout_template', $data)) {
-            $originalLayoutTemplateProvided = true;
-            $originalLayoutTemplate = (string) $data['original_layout_template'];
-        }
-        if (array_key_exists('originalLayoutTemplate', $data)) {
-            $originalLayoutTemplateProvided = true;
-            $originalLayoutTemplate = (string) $data['originalLayoutTemplate'];
-        }
-        if (array_key_exists('original_layout_css', $data)) {
-            $originalLayoutCssProvided = true;
-            $originalLayoutCss = (string) $data['original_layout_css'];
-        }
-        if (array_key_exists('originalLayoutCss', $data)) {
-            $originalLayoutCssProvided = true;
-            $originalLayoutCss = (string) $data['originalLayoutCss'];
-        }
-        if (array_key_exists('original_layout_js', $data)) {
-            $originalLayoutJsProvided = true;
-            $originalLayoutJs = (string) $data['original_layout_js'];
-        }
-        if (array_key_exists('originalLayoutJs', $data)) {
-            $originalLayoutJsProvided = true;
-            $originalLayoutJs = (string) $data['originalLayoutJs'];
-        }
-        $treeVisible = $data['treeVisible'] ?? $data['tree_visible'] ?? null;
-        $visibleKeys = [];
-        $hasTreeUpdate = array_key_exists('treeVisible', $data) || array_key_exists('tree_visible', $data);
-        if (is_array($treeVisible)) {
-            foreach ($treeVisible as $key) {
-                if (is_scalar($key)) {
-                    $visibleKeys[(string) $key] = true;
-                }
-            }
-        }
-
-        $config['title'] = $title;
-        $config['description'] = $description;
-        if ($link !== '') {
-            $config['link'] = $link;
-        } else {
-            unset($config['link']);
-        }
-        if ($url !== '') {
-            $config['url'] = $url;
-        } else {
-            unset($config['url']);
-        }
-
-        $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
-        if (isset($data['work']) && is_array($data['work'])) {
-            foreach ($data['work'] as $key => $value) {
-                if ($key === 'type') {
-                    continue;
-                }
-                $work[$key] = $value;
-            }
-        }
-        if ($workType !== '') {
-            $work['type'] = $workType;
-        }
-        $layoutValue = $work['layout'] ?? null;
-        $layout = is_array($layoutValue) ? $layoutValue : [];
-        if (is_string($layoutValue) && $layoutValue !== '') {
-            $layout['mode'] = $layoutValue;
-        }
-        if ($layoutMode !== '') {
-            $layout['mode'] = $layoutMode;
-        }
-        if ($layoutTemplateProvided) {
-            $layout['template'] = $layoutTemplate;
-        }
-        if ($layoutSectionTemplateProvided) {
-            $layout['sectionTemplate'] = $layoutSectionTemplate;
-        }
-        if ($layoutCssProvided) {
-            $layout['css'] = $layoutCss;
-        }
-        if ($layoutJsProvided) {
-            $layout['js'] = $layoutJs;
-        }
-        if (is_string($layoutModel) && $layoutModel !== '') {
-            $layout['model'] = $layoutModel;
-        }
-        $layoutSection = 'works';
-        $hasLayoutUpdate = is_array($layoutPayload)
-            || $layoutTemplateProvided
-            || $layoutSectionTemplateProvided
-            || $layoutCssProvided
-            || $layoutJsProvided
-            || array_key_exists('layout_mode', $data)
-            || array_key_exists('layout_model', $data);
-        if ($hasLayoutUpdate) {
-            $work['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
-        } elseif ($workLayout !== '') {
-            $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
-        }
-        $work['layout'] = PoffConfig::persistLayoutFiles($targetDir, null, $work['layout'] ?? null, $layoutSection);
-        if (
-            $originalLayoutTarget !== ''
-            && ($originalLayoutTemplateProvided || $originalLayoutCssProvided || $originalLayoutJsProvided)
-        ) {
-            try {
-                PoffConfig::persistOriginalLayoutFiles($originalLayoutTarget, [
-                    'template' => $originalLayoutTemplateProvided ? $originalLayoutTemplate : null,
-                    'css' => $originalLayoutCssProvided ? $originalLayoutCss : null,
-                    'js' => $originalLayoutJsProvided ? $originalLayoutJs : null,
-                ]);
-            } catch (InvalidArgumentException $error) {
-                return [
-                    'route' => 'edit-config',
-                    'allowed' => true,
-                    'error' => $error->getMessage(),
-                ];
-            }
-        }
-        $config['work'] = $work;
-
-        if ($hasTreeUpdate && isset($config['tree']) && is_array($config['tree'])) {
-            foreach ($config['tree'] as &$item) {
-                $key = $item['path'] ?? $item['name'] ?? null;
-                if ($key === null) {
-                    continue;
-                }
-                $item['visible'] = isset($visibleKeys[$key]);
-            }
-            unset($item);
-        }
-
-        $config['updatedAt'] = date('c');
-        $config['treeHash'] = hash('sha256', json_encode($config['tree'] ?? []));
+        $config = $result['config'];
         $configPath = PoffConfig::configPath($targetDir);
         $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($encoded === false) {
