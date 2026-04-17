@@ -546,6 +546,9 @@ function cmsHandleEditAction(): void
             'Return only the template (no Markdown, no fences).',
             'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
             'Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+            'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
+            'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
+            'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
             'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
             'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
         ];

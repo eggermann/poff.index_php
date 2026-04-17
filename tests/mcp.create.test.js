@@ -427,6 +427,26 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
   });
 
+  test('omits folder-only prompt context fields for file targets', async () => {
+    const result = await runPhpJson('php_prompt_compact_context.php');
+
+    expect(result.file.current).toEqual(expect.objectContaining({
+      subjectType: 'file',
+      sectionTemplateTarget: '.works/viewer-file.txt.layout/work.hbs',
+    }));
+    expect(result.file.counts).toBeUndefined();
+    expect(result.file.items).toBeUndefined();
+    expect(result.folder.current).toEqual(expect.objectContaining({
+      subjectType: 'folder',
+      sectionTemplateTarget: 'viewer-folder/.layout/works.hbs',
+    }));
+    expect(result.folder.counts).toEqual(expect.objectContaining({
+      items: expect.any(Number),
+      files: expect.any(Number),
+    }));
+    expect(Array.isArray(result.folder.items)).toBe(true);
+  });
+
   test('parses layout prompt JSON with css/js and restores the required default main block', async () => {
     const result = await runPromptModelParse('layout', JSON.stringify({
       template: '<div class="poff-default-layout poff-default-layout--file"><header class="poff-default-layout__header"></header><footer class="poff-default-layout__footer"></footer></div>',

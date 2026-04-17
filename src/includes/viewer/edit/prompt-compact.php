@@ -117,12 +117,21 @@ function cmsPromptCompactContext(array $context): array
         $current['activeLayout'] = $activeLayout;
     }
 
+    $compact = [
+        'current' => $current,
+    ];
+
+    $subjectType = strtolower(trim((string) ($current['subjectType'] ?? '')));
+    if ($subjectType !== 'folder') {
+        return $compact;
+    }
+
     $items = array_values(array_filter(array_map(
         static fn(array $ref): array => cmsPromptCompactRef($ref),
         array_slice(is_array($context['items'] ?? null) ? $context['items'] : [], 0, 24)
     )));
 
-    $counts = [
+    $compact['counts'] = [
         'items' => count(is_array($context['items'] ?? null) ? $context['items'] : []),
         'files' => count(is_array($context['allFiles'] ?? null) ? $context['allFiles'] : []),
         'folders' => count(is_array($context['allFolders'] ?? null) ? $context['allFolders'] : []),
@@ -134,12 +143,9 @@ function cmsPromptCompactContext(array $context): array
         'links' => count(is_array($context['allLinks'] ?? null) ? $context['allLinks'] : []),
         'other' => count(is_array($context['allOther'] ?? null) ? $context['allOther'] : []),
     ];
+    $compact['items'] = $items;
 
-    return [
-        'current' => $current,
-        'counts' => $counts,
-        'items' => $items,
-    ];
+    return $compact;
 }
 
 function cmsPromptHistoryText(array $history): string
