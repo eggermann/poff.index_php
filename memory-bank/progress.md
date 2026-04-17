@@ -11,8 +11,8 @@ This file tracks the project's progress using a task list format.
 
 ## Current Tasks
 
-*   
+*  [2026-04-17 06:25:22] - viewer/render.php refactor completed; tests passing.
 
 ## Next Steps
 
-*
+*  [2026-04-17 06:25:22] - Choose next large PHP file (viewer/edit.php or PoffConfig).
