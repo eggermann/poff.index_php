@@ -705,7 +705,7 @@ export function renderEditPanel({
                 </div>
             </form>
         </dialog>
-        ${renderPromptWindow(settings)}
+        ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
     `;
 
     const form = editPanel.querySelector('#inlineEditForm');

@@ -21,11 +21,20 @@ export function loadPromptSettings() {
                 stored.systemPrompt = defaultPromptSettings.systemPrompt;
             }
         }
-        if (typeof stored.systemPromptWork !== 'string' || stored.systemPromptWork.trim() === '') {
-            stored.systemPromptWork = getDefaultSystemPrompt('work');
+        const legacyWorkPrompt = typeof stored.systemPromptWork === 'string' && stored.systemPromptWork.trim() !== ''
+            ? stored.systemPromptWork
+            : (typeof stored.systemPrompt === 'string' && stored.systemPrompt.trim() !== '' ? stored.systemPrompt : '');
+        if (typeof stored.systemPromptFile !== 'string' || stored.systemPromptFile.trim() === '') {
+            stored.systemPromptFile = legacyWorkPrompt || getDefaultSystemPrompt('file');
+        }
+        if (typeof stored.systemPromptFolder !== 'string' || stored.systemPromptFolder.trim() === '') {
+            stored.systemPromptFolder = legacyWorkPrompt || getDefaultSystemPrompt('folder');
         }
         if (typeof stored.systemPromptLayout !== 'string' || stored.systemPromptLayout.trim() === '') {
             stored.systemPromptLayout = getDefaultSystemPrompt('layout');
+        }
+        if (typeof stored.systemPromptWork !== 'string' || stored.systemPromptWork.trim() === '') {
+            stored.systemPromptWork = stored.systemPromptFile;
         }
         return { ...defaultPromptSettings, ...stored };
     } catch (err) {

@@ -42,6 +42,12 @@ function cmsUploadLimits(): array
     ];
 }
 
+function cmsIsOpenAiCompatibleEndpoint(string $url): bool
+{
+    $normalized = strtolower(trim($url));
+    return $normalized !== '' && str_contains($normalized, '/v1/chat/completions');
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
@@ -529,6 +535,26 @@ function cmsHandleEditAction(): void
                 'Example: {"template":"<div class=\"poff-default-layout\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","css":".poff-default-layout{min-height:100dvh;}","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
             ]
             : []);
+        $sharedWorkSystemPrompt = [
+            'You are a Handlebars (HBS) template generator for this single-page CMS.',
+            'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
+            'Return only the template (no Markdown, no fences).',
+            'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+            'Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+            'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
+            'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
+        ];
+        $fileWorkSystemPrompt = array_merge($sharedWorkSystemPrompt, [
+            'Save target is work.hbs for the current file inside the active item layout folder.',
+            'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
+            'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
+        ]);
+        $folderWorkSystemPrompt = array_merge($sharedWorkSystemPrompt, [
+            'Save target is works.hbs for the current folder inside the active item layout folder.',
+            'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
+            'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
+            'Use folder tree data and resolved refs when relevant instead of inventing paths.',
+        ]);
         $defaultSystemPrompt = implode("\n", $isLayoutTarget
             ? [
                 'You are a Handlebars (HBS) layout generator for this single-page CMS.',
@@ -558,18 +584,7 @@ function cmsHandleEditAction(): void
                 'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
                 'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
             ]
-            : [
-                'You are a Handlebars (HBS) template generator for this single-page CMS.',
-                'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
-                'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
-                'Return only the template (no Markdown, no fences).',
-                'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-                'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
-                'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
-                'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
-                'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
-                'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
-            ]);
+            : ($subjectType === 'folder' ? $folderWorkSystemPrompt : $fileWorkSystemPrompt));
         $systemPrompt = $systemPromptValue !== '' ? $systemPromptValue : $defaultSystemPrompt;
         $historyText = cmsPromptHistoryText($history);
         $userPrompt = $isLayoutTarget
@@ -655,20 +670,44 @@ function cmsHandleEditAction(): void
             $template = (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
         } else {
             if ($endpoint === '') {
-                cmsJsonResponse([
-                    'allowed' => true,
-                    'error' => 'Local endpoint URL missing.',
-                ]);
+                $endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
             }
-            $payload = [
-                'prompt' => $prompt,
-                'history' => $history,
-                'config' => $config,
-                'instruction' => $systemPrompt,
-                'image' => $image,
-            ];
-            if ($isLayoutTarget) {
-                $payload['promptContext'] = $promptContext;
+            if ($usedModel === '') {
+                $usedModel = 'gemma4';
+            }
+            if (cmsIsOpenAiCompatibleEndpoint($endpoint)) {
+                $messages = [['role' => 'system', 'content' => $systemPrompt]];
+                foreach ($history as $message) {
+                    if (!is_array($message)) {
+                        continue;
+                    }
+                    $role = strtolower(trim((string) ($message['role'] ?? 'user')));
+                    $content = trim((string) ($message['content'] ?? ''));
+                    if ($content === '' || !in_array($role, ['system', 'user', 'assistant'], true)) {
+                        continue;
+                    }
+                    $messages[] = ['role' => $role, 'content' => $content];
+                }
+                $messages[] = ['role' => 'user', 'content' => $image ? [
+                    ['type' => 'text', 'text' => $userPrompt],
+                    ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+                ] : $userPrompt];
+                $payload = [
+                    'model' => $usedModel,
+                    'messages' => $messages,
+                    'temperature' => 0.4,
+                ];
+            } else {
+                $payload = [
+                    'prompt' => $prompt,
+                    'history' => $history,
+                    'config' => $config,
+                    'instruction' => $systemPrompt,
+                    'image' => $image,
+                ];
+                if ($isLayoutTarget) {
+                    $payload['promptContext'] = $promptContext;
+                }
             }
             $response = cmsHttpPost($endpoint, [], $payload);
             if (!$response['ok']) {
@@ -679,7 +718,9 @@ function cmsHandleEditAction(): void
             }
             $decoded = json_decode($response['body'], true);
             if (is_array($decoded)) {
-                if (isset($decoded['template'])) {
+                if (isset($decoded['choices'][0]['message']['content'])) {
+                    $template = (string) $decoded['choices'][0]['message']['content'];
+                } elseif (isset($decoded['template'])) {
                     $template = (string) $decoded['template'];
                 } elseif (isset($decoded['content'])) {
                     $template = (string) $decoded['content'];

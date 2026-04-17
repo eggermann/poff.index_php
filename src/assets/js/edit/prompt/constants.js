@@ -1,5 +1,6 @@
 export const promptSettingsKey = 'poffEditPromptSettings';
 export const promptHistoryKey = 'poffEditPromptHistory';
+export const defaultLocalPromptEndpoint = 'http://127.0.0.1:1234/v1/chat/completions';
 
 export function getDefaultModelForProvider(provider = 'local') {
     if (provider === 'openai') {
@@ -11,17 +12,30 @@ export function getDefaultModelForProvider(provider = 'local') {
     return 'gemma4';
 }
 
-const workSystemPrompt = [
+const sharedWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
     'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
-    'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
     'Return only the template (no Markdown, no fences).',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-    'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
-    'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
-    'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+    'Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
     'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
     'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
+].join('\n');
+
+const fileWorkSystemPrompt = [
+    sharedWorkSystemPrompt,
+    'Save target is work.hbs for the current file inside the active item layout folder.',
+    'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
+    'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
+].join('\n');
+
+const folderWorkSystemPrompt = [
+    sharedWorkSystemPrompt,
+    'Save target is works.hbs for the current folder inside the active item layout folder.',
+    'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
+    'Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
+    'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
+    'Use folder tree data and resolved refs when relevant instead of inventing paths.',
 ].join('\n');
 
 const layoutSystemPrompt = [
@@ -53,15 +67,24 @@ const layoutSystemPrompt = [
 ].join('\n');
 
 export function getDefaultSystemPrompt(mode = 'work') {
-    return mode === 'layout' ? layoutSystemPrompt : workSystemPrompt;
+    if (mode === 'layout') {
+        return layoutSystemPrompt;
+    }
+    if (mode === 'folder') {
+        return folderWorkSystemPrompt;
+    }
+    return fileWorkSystemPrompt;
 }
 
 export const defaultSystemPrompt = getDefaultSystemPrompt('work');
 export const defaultPromptSettings = {
     provider: 'local',
     model: getDefaultModelForProvider('local'),
-    endpoint: '',
+    endpoint: defaultLocalPromptEndpoint,
     apiKey: '',
     systemPrompt: getDefaultSystemPrompt('work'),
+    systemPromptFile: getDefaultSystemPrompt('file'),
+    systemPromptFolder: getDefaultSystemPrompt('folder'),
+    systemPromptLayout: getDefaultSystemPrompt('layout'),
     streamPreview: true,
 };

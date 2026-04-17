@@ -108,6 +108,8 @@ const debugPromptLog = (label, payload) => {
 
 const builtInSystemPrompts = new Set([
     getDefaultSystemPrompt('work'),
+    getDefaultSystemPrompt('file'),
+    getDefaultSystemPrompt('folder'),
     getDefaultSystemPrompt('layout'),
 ]);
 
@@ -156,17 +158,39 @@ export function bindPromptWindow({
     const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection ? getActiveSelection().path : '';
-    let activePromptMode = getActiveSelection?.().isLayout ? 'layout' : 'work';
+    let activePromptMode = getActiveSelection?.().isLayout ? 'layout' : (getActiveSelection?.().previewIsFile ? 'file' : 'folder');
     let imageAttachment = null;
     let promptLayerCollapsed = false;
     const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
-    const currentPromptPlaceholder = () => (currentPromptMode() === 'layout'
-        ? 'Describe the layout you want...'
-        : defaultPromptPlaceholder);
-    const currentPromptMode = () => (getActiveSelection?.().isLayout ? 'layout' : 'work');
+    const currentPromptPlaceholder = () => {
+        const mode = currentPromptMode();
+        if (mode === 'layout') {
+            return 'Describe the layout you want...';
+        }
+        if (mode === 'folder') {
+            return 'Describe the folder component you want...';
+        }
+        return defaultPromptPlaceholder;
+    };
+    const currentPromptMode = () => {
+        const selection = getActiveSelection?.();
+        if (selection?.isLayout) {
+            return 'layout';
+        }
+        return selection?.previewIsFile ? 'file' : 'folder';
+    };
     const currentDefaultSystemPrompt = () => getDefaultSystemPrompt(currentPromptMode());
-    const currentSystemPromptSettingKey = () => (currentPromptMode() === 'layout' ? 'systemPromptLayout' : 'systemPromptWork');
+    const currentSystemPromptSettingKey = () => {
+        const mode = currentPromptMode();
+        if (mode === 'layout') {
+            return 'systemPromptLayout';
+        }
+        if (mode === 'folder') {
+            return 'systemPromptFolder';
+        }
+        return 'systemPromptFile';
+    };
     const currentHasImageContext = () => {
         const selection = getActiveSelection ? getActiveSelection() : null;
         const selectionPath = typeof selection?.previewPath === 'string' && selection.previewPath.trim() !== ''
@@ -400,9 +424,12 @@ export function bindPromptWindow({
         providerEl.value = settings.provider || 'local';
     }
     if (systemPromptEl) {
-        systemPromptEl.value = currentPromptMode() === 'layout'
+        const mode = currentPromptMode();
+        systemPromptEl.value = mode === 'layout'
             ? (settings.systemPromptLayout || settings.systemPrompt || currentDefaultSystemPrompt())
-            : (settings.systemPromptWork || settings.systemPrompt || currentDefaultSystemPrompt());
+            : mode === 'folder'
+                ? (settings.systemPromptFolder || settings.systemPromptFile || settings.systemPromptWork || settings.systemPrompt || currentDefaultSystemPrompt())
+                : (settings.systemPromptFile || settings.systemPromptWork || settings.systemPrompt || currentDefaultSystemPrompt());
     }
     if (streamToggleEl) {
         streamToggleEl.checked = settings.streamPreview !== false;
@@ -416,7 +443,9 @@ export function bindPromptWindow({
             endpoint: endpointEl ? endpointEl.value : '',
             apiKey: apiKeyEl ? apiKeyEl.value : '',
             systemPrompt,
-            systemPromptWork: settings.systemPromptWork || getDefaultSystemPrompt('work'),
+            systemPromptWork: settings.systemPromptWork || settings.systemPromptFile || getDefaultSystemPrompt('file'),
+            systemPromptFile: settings.systemPromptFile || settings.systemPromptWork || getDefaultSystemPrompt('file'),
+            systemPromptFolder: settings.systemPromptFolder || settings.systemPromptWork || getDefaultSystemPrompt('folder'),
             systemPromptLayout: settings.systemPromptLayout || getDefaultSystemPrompt('layout'),
             streamPreview: streamToggleEl ? !!streamToggleEl.checked : true,
         };
@@ -432,9 +461,12 @@ export function bindPromptWindow({
         if (endpointEl) endpointEl.value = s.endpoint || '';
         if (apiKeyEl) apiKeyEl.value = s.apiKey || '';
         if (systemPromptEl) {
-            systemPromptEl.value = currentPromptMode() === 'layout'
+            const mode = currentPromptMode();
+            systemPromptEl.value = mode === 'layout'
                 ? (s.systemPromptLayout || s.systemPrompt || currentDefaultSystemPrompt())
-                : (s.systemPromptWork || s.systemPrompt || currentDefaultSystemPrompt());
+                : mode === 'folder'
+                    ? (s.systemPromptFolder || s.systemPromptFile || s.systemPromptWork || s.systemPrompt || currentDefaultSystemPrompt())
+                    : (s.systemPromptFile || s.systemPromptWork || s.systemPrompt || currentDefaultSystemPrompt());
         }
         if (streamToggleEl) streamToggleEl.checked = s.streamPreview !== false;
         suppressSave = false;
@@ -524,7 +556,7 @@ export function bindPromptWindow({
     const syncHistoryForPath = () => {
         const selection = getActiveSelection ? getActiveSelection() : { path: '' };
         const nextPath = selection?.path || '';
-        const nextPromptMode = selection?.isLayout ? 'layout' : 'work';
+        const nextPromptMode = selection?.isLayout ? 'layout' : (selection?.previewIsFile ? 'file' : 'folder');
         if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
             activePath = nextPath;
             activePromptMode = nextPromptMode;

@@ -2,19 +2,31 @@ import { escapeHtml } from '../core/utils.js';
 import { getDefaultSystemPrompt } from './prompt/constants.js';
 
 export function renderPromptWindow(settings = {}, options = {}) {
-    const mode = options.mode === 'layout' ? 'layout' : 'work';
+    const mode = options.mode === 'layout'
+        ? 'layout'
+        : options.mode === 'folder'
+            ? 'folder'
+            : 'file';
     const systemPrompt = mode === 'layout'
         ? (settings.systemPromptLayout || settings.systemPrompt || getDefaultSystemPrompt('layout'))
-        : (settings.systemPromptWork || settings.systemPrompt || getDefaultSystemPrompt('work'));
+        : mode === 'folder'
+            ? (settings.systemPromptFolder || settings.systemPromptFile || settings.systemPrompt || getDefaultSystemPrompt('folder'))
+            : (settings.systemPromptFile || settings.systemPromptWork || settings.systemPrompt || getDefaultSystemPrompt('file'));
     const promptTargetCopy = mode === 'layout'
         ? 'Prompt edits the outer layout wrapper target for this virtual .layout page.'
-        : 'Prompt edits the wrapped work.hbs / works.hbs partial for the current item.';
+        : mode === 'folder'
+            ? 'Prompt edits the wrapped works.hbs partial for the current folder.'
+            : 'Prompt edits the wrapped work.hbs partial for the current file.';
     const footerCopy = mode === 'layout'
         ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || 'work.hbs')}</code>.`
-        : 'Template responses are saved to the wrapped partial: <code>work.hbs</code> for files and <code>works.hbs</code> for folders.';
+        : mode === 'folder'
+            ? 'Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders.'
+            : 'Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.';
     const contextCopy = mode === 'layout'
         ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>`
-        : '<div>Prompt edits the wrapped <code>{{> work}}</code> / <code>{{> works}}</code> partial.</div>';
+        : mode === 'folder'
+            ? '<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>'
+            : '<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>';
     const editableCopy = mode === 'layout'
         ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.*</strong>'
         : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>';
@@ -23,11 +35,16 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>`
-        : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> works}}, {{> work}}, {{work.key}}</div>`;
+        : mode === 'folder'
+            ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
+                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>`
+            : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                        <div>{{> work}}, {{work.key}}, layout.*</div>`;
     const inputPlaceholder = mode === 'layout'
         ? 'Describe the layout you want...'
-        : 'Describe the component you want...';
+        : mode === 'folder'
+            ? 'Describe the folder component you want...'
+            : 'Describe the file component you want...';
 
     return `
         <div class="prompt-layer" id="promptLayer">
