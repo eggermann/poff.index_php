@@ -13,6 +13,7 @@ This file tracks the project's progress using a task list format.
 
 *  [2026-04-17 06:25:22] - viewer/render.php refactor completed; tests passing.
 *  [2026-04-17 20:28:56] - SCSS edit stylesheet refactor completed; partials split and MCP tests passed.
+*  [2026-04-18 11:03:31] - JS app bootstrap cleanup completed with shared constants/helpers, and SCSS entry order was normalized.
 
 ## Next Steps
 

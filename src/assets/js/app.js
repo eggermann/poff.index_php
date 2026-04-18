@@ -1,24 +1,16 @@
 import { createEditController } from './edit/controller.js';
 import { initNavigation } from './nav/navigation.js';
+import {
+    bindSidebarToggle,
+    createAppElements,
+    isPreviewHashActive,
+    redirectLegacyMcpHash,
+    scrollToPreview,
+} from './app/helpers.js';
 
+redirectLegacyMcpHash();
 
-if (window.location.hash === '#mcp') {
-    const basePath = window.location.pathname.split('#')[0];
-    window.location.href = `${basePath}?mcp=1`;
-}
-
-const elements = {
-    appShell: document.getElementById('appShell'),
-    appSidebar: document.getElementById('appSidebar'),
-    navList: document.getElementById('navList'),
-    contentFrame: document.getElementById('contentFrame'),
-    editPanel: document.getElementById('editPanel'),
-    editDrawer: document.getElementById('editDrawer'),
-    editToggle: document.getElementById('editToggle'),
-    sidebarToggle: document.getElementById('sidebarToggle'),
-    iframeLoading: document.getElementById('iframeLoading'),
-    sidebarLoading: document.getElementById('sidebarLoading'),
-};
+const elements = createAppElements();
 
 const poffContext = window.POFF_CONTEXT || {};
 const currentPathForIframe = Object.prototype.hasOwnProperty.call(poffContext, 'currentPathForIframe')
@@ -34,8 +26,6 @@ const editController = createEditController({
     editRequested,
 });
 
-
-
 const navigation = initNavigation({
     elements,
     editQuery,
@@ -44,48 +34,16 @@ const navigation = initNavigation({
     initEditMode: editController.initEditMode,
 });
 
-function previewHashActive() {
-    return window.location.hash === '#preview';
-}
-
-function scrollToPreview() {
-    const previewEl = document.getElementById('preview');
-    if (!previewEl) {
-        return;
-    }
-
-    previewEl.scrollIntoView({ block: 'start' });
-}
-
-function bindSidebarToggle() {
-    const { appShell, appSidebar, sidebarToggle } = elements;
-    if (!appShell || !appSidebar || !sidebarToggle) {
-        return;
-    }
-
-    const syncSidebarState = (isOpen) => {
-        appShell.classList.toggle('sidebar-collapsed', !isOpen);
-        appSidebar.hidden = !isOpen;
-        appSidebar.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-        sidebarToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        sidebarToggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
-        sidebarToggle.setAttribute('title', isOpen ? 'Close navigation' : 'Open navigation');
-    };
-
-    syncSidebarState(true);
-
-    sidebarToggle.addEventListener('click', () => {
-        const isOpen = !appShell.classList.contains('sidebar-collapsed');
-        syncSidebarState(!isOpen);
-    });
-}
+const sidebarController = bindSidebarToggle(elements);
 
 document.addEventListener('DOMContentLoaded', () => {
-    bindSidebarToggle();
+    if (sidebarController) {
+        sidebarController.syncSidebarState(true);
+    }
     editController.syncEditToggle();
     editController.bindEditToggle();
 
-    if (previewHashActive()) {
+    if (isPreviewHashActive()) {
         navigation.loadCurrentFolderInIframe();
         requestAnimationFrame(() => scrollToPreview());
     } else if (window.location.hash && window.location.hash.length > 1) {
@@ -97,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('hashchange', () => {
-    if (previewHashActive()) {
+    if (isPreviewHashActive()) {
         scrollToPreview();
         if (editRequested) {
             editController.initEditMode();
