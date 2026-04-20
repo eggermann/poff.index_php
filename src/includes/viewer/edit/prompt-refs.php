@@ -1,22 +1,15 @@
 <?php
 
+require_once __DIR__ . '/../link-targets.php';
+
 function cmsPromptViewerUrl(string $relativePath, bool $isFile): string
 {
-    return $isFile
-        ? '?view=1&file=' . rawurlencode($relativePath)
-        : '?view=1&path=' . rawurlencode($relativePath);
+    return cmsBuildViewerHrefFromRelativePath($relativePath, $isFile);
 }
 
 function cmsPromptAssetUrl(string $relativePath, bool $isFile): string
 {
-    if (!$isFile) {
-        return '?path=' . rawurlencode($relativePath);
-    }
-
-    $parts = explode('/', $relativePath);
-    $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
-
-    return implode('/', $encoded);
+    return cmsBuildAssetHrefFromRelativePath($relativePath, $isFile);
 }
 
 function cmsPromptEncodeRelativePath(string $path): string
@@ -59,28 +52,30 @@ function cmsBuildPromptRef(string $basePath, array $item): ?array
         return null;
     }
 
-    $relativePath = trim((string) ($item['path'] ?? $name), "/\\");
+    $configuredType = strtolower(trim((string) ($item['type'] ?? 'file')));
+    $explicitLinkTarget = cmsConfiguredTreeLinkTarget($item);
+    $relativePath = cmsConfiguredTreeDisplayPath($basePath, $item, $name);
     if ($relativePath === '') {
-        $relativePath = $name;
-    }
-    if ($basePath !== '') {
-        $normalizedBase = trim($basePath, "/\\");
-        if (!str_starts_with($relativePath, $normalizedBase . '/') && $relativePath !== $normalizedBase) {
-            $relativePath = $normalizedBase . '/' . ltrim($relativePath, "/\\");
-        }
+        $relativePath = cmsConfiguredTreeFilesystemRelativePath($basePath, $item, $name);
     }
 
-    $type = (string) ($item['type'] ?? 'file');
-    $isFolder = $type === 'folder';
-    $kind = cmsPromptRefKind($name, $type);
-    $pageLink = cmsPromptViewerUrl($relativePath, !$isFolder);
-    $assetUrl = cmsPromptAssetUrl($relativePath, !$isFolder);
+    $isFolder = $configuredType === 'folder';
+    $kind = $isFolder
+        ? 'folder'
+        : (($configuredType === 'link' || $explicitLinkTarget !== '') ? 'link' : cmsPromptRefKind($name, $configuredType));
+    $pageLink = $explicitLinkTarget !== ''
+        ? $explicitLinkTarget
+        : cmsPromptViewerUrl($relativePath, !$isFolder);
+    $assetUrl = $explicitLinkTarget !== ''
+        ? $explicitLinkTarget
+        : cmsPromptAssetUrl($relativePath, !$isFolder);
+    $linkUrl = cmsConfiguredTreeExternalLinkUrl($item);
 
-    return [
+    $result = [
         'name' => $name,
         'title' => (string) ($item['title'] ?? $name),
         'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
-        'type' => $type,
+        'type' => $isFolder ? 'folder' : 'file',
         'kind' => $kind,
         'path' => $relativePath,
         'pageLink' => $pageLink,
@@ -97,4 +92,10 @@ function cmsBuildPromptRef(string $basePath, array $item): ?array
         'isFile' => !$isFolder,
         'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
     ];
+
+    if ($linkUrl !== '') {
+        $result['linkUrl'] = $linkUrl;
+    }
+
+    return $result;
 }

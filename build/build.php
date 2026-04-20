@@ -115,11 +115,14 @@ try {
 
     // Add PoffConfig model and inline its helper trait so the built output stays single-file.
     $poffConfigLayoutHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-helpers.php');
+    $viewerLinkTargets = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/link-targets.php');
     $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
     $poffConfigLayoutHelpers = str_replace(['<?php', '?>'], '', $poffConfigLayoutHelpers);
+    $viewerLinkTargets = str_replace(['<?php', '?>'], '', $viewerLinkTargets);
     $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);
     $poffConfigContent = preg_replace('/^\s*require_once[^\n]*\n/m', '', $poffConfigContent);
     $buildContent .= trim($poffConfigLayoutHelpers) . "\n\n";
+    $buildContent .= trim($viewerLinkTargets) . "\n\n";
     $buildContent .= trim($poffConfigContent) . "\n\n";
 
     // Inline viewer helpers so the built output stays single-file (no require_once).

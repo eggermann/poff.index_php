@@ -13,7 +13,7 @@ function cmsPromptTrimText(string $text, int $maxLength = 240): string
 function cmsPromptCompactRef(array $ref): array
 {
     $compact = [];
-    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
+    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'linkUrl', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
         if (!array_key_exists($key, $ref)) {
             continue;
         }

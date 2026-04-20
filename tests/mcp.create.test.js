@@ -22,6 +22,7 @@ const INVALID_TEMPLATE_DIR = path.join(POFF_DIR, 'invalid-json-template');
 const INHERITED_DEFAULT_DIR = path.join(POFF_DIR, 'inherits-default');
 const INHERITED_SECTION_DIR = path.join(POFF_DIR, 'inherits-section-default');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
+const VIRTUAL_LINK_DIR = path.join(POFF_DIR, 'virtual-links');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -71,6 +72,34 @@ function runWorktype(action, kind, payload = null) {
     proc.stderr.on('data', (d) => (stderr += d.toString()));
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`worktype helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runWorktypeDetailed(action, kind, payload = null) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_render_worktype.php'), action, kind];
+    if (payload !== null) {
+      args.push(JSON.stringify(payload));
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve({
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+        });
+        return;
+      }
       reject(new Error(`worktype helper failed: ${code} ${stderr}`));
     });
   });
@@ -399,6 +428,44 @@ describe('MCP create route helper (CLI)', () => {
       },
     }, null, 2));
     fs.mkdirSync(UPLOAD_TARGET_DIR, { recursive: true });
+    fs.mkdirSync(VIRTUAL_LINK_DIR, { recursive: true });
+    fs.mkdirSync(path.join(VIRTUAL_LINK_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(VIRTUAL_LINK_DIR, 'existing.txt'), 'existing');
+    fs.writeFileSync(path.join(VIRTUAL_LINK_DIR, '.layout', 'works.hbs'), '{{#each items}}<a class="virtual-link" href="{{pageLink}}">{{name}}</a>{{/each}}');
+    fs.writeFileSync(path.join(VIRTUAL_LINK_DIR, 'poff.config.json'), JSON.stringify({
+      folderName: 'virtual-links',
+      slug: 'virtual-links',
+      title: 'Virtual Links',
+      description: 'Folder with configured links',
+      tree: [
+        {
+          name: 'Portfolio',
+          type: 'folder',
+          path: '?view=1&path=linkone',
+          visible: true,
+        },
+        {
+          name: 'Contact',
+          type: 'link',
+          url: 'https://example.com/contact',
+          visible: true,
+        },
+        {
+          name: 'existing.txt',
+          type: 'file',
+          path: 'existing.txt',
+          visible: true,
+        },
+      ],
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-folder-layout',
+          engine: 'lightncandy',
+          section: 'works',
+        },
+      },
+    }, null, 2));
   });
 
   afterAll(() => {
@@ -653,6 +720,27 @@ describe('MCP create route helper (CLI)', () => {
       files: expect.any(Number),
     }));
     expect(Array.isArray(result.folder.items)).toBe(true);
+  });
+
+  test('keeps explicit internal and external configured tree links intact in prompt context', async () => {
+    const result = await runPhpJson('php_virtual_link_context.php');
+
+    expect(result.prompt.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Portfolio',
+        path: 'linkone',
+        pageLink: '?view=1&path=linkone',
+        isFolder: true,
+      }),
+      expect.objectContaining({
+        name: 'Contact',
+        kind: 'link',
+        pageLink: 'https://example.com/contact',
+        linkUrl: 'https://example.com/contact',
+        isFile: true,
+      }),
+    ]));
+    expect(JSON.stringify(result.prompt)).not.toContain('?view=1&path=%3Fview%3D1%26path%3Dlinkone');
   });
 
   test('parses layout prompt JSON with css/js and restores the required default main block', async () => {
@@ -1056,6 +1144,54 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('notes.txt');
   });
 
+  test('falls back cleanly when the active section partial is invalid', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
+    const result = await runWorktypeDetailed('render', 'folder', {
+      ctx: {
+        path: 'projects',
+        name: 'projects',
+        title: 'Projects',
+        description: '',
+        descriptionHtml: '',
+        linkUrl: '',
+        slug: 'projects',
+        displayPath: 'projects',
+        parentPageLink: '?view=1&path=',
+        directoryPageLink: '?view=1&path=projects',
+        hasItems: true,
+        itemCount: 2,
+        items: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        tree: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        work: {
+          type: 'folder',
+          layout: {
+            name: 'poff-layout',
+            engine: 'lightncandy',
+            section: 'works',
+            sectionTemplate: '{{#if hasItems}}{{/unless}}',
+          },
+        },
+      },
+    });
+
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('<iframe ');
+    if (lightnCandyInstalled) {
+      expect(result.stdout).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+    } else {
+      expect(result.stdout).toContain('<div class="poff-folder-fallback">');
+    }
+    expect(result.stdout).toContain('projects');
+    expect(result.stdout).toContain('alpha');
+    expect(result.stdout).toContain('notes.txt');
+  });
+
   test('inherits a parent folder layout from the nearest ancestor .layout', async () => {
     const output = await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR);
     const config = JSON.parse(output);
@@ -1157,6 +1293,14 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('?view&#x3D;1&amp;file&#x3D;viewer-folder%2Fchild.txt');
     expect(output).toContain('child.txt:file');
     expect(output).toContain('.layout/background.txt');
+  });
+
+  test('renders configured virtual links without nesting viewer urls', async () => {
+    const output = await runViewer('virtual-links');
+
+    expect(output).toMatch(/href="\?view(?:=|&#x3D;)1&amp;path(?:=|&#x3D;)linkone"/);
+    expect(output).toContain('href="https://example.com/contact"');
+    expect(output).not.toContain('%3Fview%3D1%26path%3Dlinkone');
   });
 
   test('renders file previews from .works/<file>.layout', async () => {

@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/viewer/link-targets.php';
+
 const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 90;
 
 function mcpPromptResponseCandidates(string $raw): array
@@ -409,21 +411,12 @@ function mcpPromptFormatHttpError(string $label, array $response): string
 
 function mcpPromptViewerUrl(string $relativePath, bool $isFile): string
 {
-    return $isFile
-        ? '?view=1&file=' . rawurlencode($relativePath)
-        : '?view=1&path=' . rawurlencode($relativePath);
+    return cmsBuildViewerHrefFromRelativePath($relativePath, $isFile);
 }
 
 function mcpPromptAssetUrl(string $relativePath, bool $isFile): string
 {
-    if (!$isFile) {
-        return '?path=' . rawurlencode($relativePath);
-    }
-
-    $parts = explode('/', $relativePath);
-    $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
-
-    return implode('/', $encoded);
+    return cmsBuildAssetHrefFromRelativePath($relativePath, $isFile);
 }
 
 function mcpPromptTemplateTarget(string $relativePath): string
@@ -452,28 +445,30 @@ function mcpBuildPromptRef(string $basePath, array $item): ?array
         return null;
     }
 
-    $relativePath = trim((string) ($item['path'] ?? $name), "/\\");
+    $configuredType = strtolower(trim((string) ($item['type'] ?? 'file')));
+    $explicitLinkTarget = cmsConfiguredTreeLinkTarget($item);
+    $relativePath = cmsConfiguredTreeDisplayPath($basePath, $item, $name);
     if ($relativePath === '') {
-        $relativePath = $name;
-    }
-    if ($basePath !== '') {
-        $normalizedBase = trim($basePath, "/\\");
-        if (!str_starts_with($relativePath, $normalizedBase . '/') && $relativePath !== $normalizedBase) {
-            $relativePath = $normalizedBase . '/' . ltrim($relativePath, "/\\");
-        }
+        $relativePath = cmsConfiguredTreeFilesystemRelativePath($basePath, $item, $name);
     }
 
-    $type = (string) ($item['type'] ?? 'file');
-    $isFolder = $type === 'folder';
-    $kind = mcpPromptRefKind($name, $type);
-    $pageLink = mcpPromptViewerUrl($relativePath, !$isFolder);
-    $assetUrl = mcpPromptAssetUrl($relativePath, !$isFolder);
+    $isFolder = $configuredType === 'folder';
+    $kind = $isFolder
+        ? 'folder'
+        : (($configuredType === 'link' || $explicitLinkTarget !== '') ? 'link' : mcpPromptRefKind($name, $configuredType));
+    $pageLink = $explicitLinkTarget !== ''
+        ? $explicitLinkTarget
+        : mcpPromptViewerUrl($relativePath, !$isFolder);
+    $assetUrl = $explicitLinkTarget !== ''
+        ? $explicitLinkTarget
+        : mcpPromptAssetUrl($relativePath, !$isFolder);
+    $linkUrl = cmsConfiguredTreeExternalLinkUrl($item);
 
-    return [
+    $result = [
         'name' => $name,
         'title' => (string) ($item['title'] ?? $name),
         'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
-        'type' => $type,
+        'type' => $isFolder ? 'folder' : 'file',
         'kind' => $kind,
         'path' => $relativePath,
         'pageLink' => $pageLink,
@@ -490,6 +485,12 @@ function mcpBuildPromptRef(string $basePath, array $item): ?array
         'isFile' => !$isFolder,
         'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
     ];
+
+    if ($linkUrl !== '') {
+        $result['linkUrl'] = $linkUrl;
+    }
+
+    return $result;
 }
 
 function mcpBuildPromptContext(string $relativePath, array $config): array
@@ -589,7 +590,7 @@ function mcpPromptTrimText(string $text, int $maxLength = 240): string
 function mcpPromptCompactRef(array $ref): array
 {
     $compact = [];
-    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
+    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'linkUrl', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
         if (!array_key_exists($key, $ref)) {
             continue;
         }
@@ -781,6 +782,8 @@ function handlePromptTemplate(array $opts): array
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
         'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+        'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
+        'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
         'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
         'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
     ]);

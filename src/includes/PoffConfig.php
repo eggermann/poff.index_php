@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/PoffConfig/layout-helpers.php';
+require_once __DIR__ . '/viewer/link-targets.php';
 
 class PoffConfig
 {
@@ -205,6 +206,45 @@ class PoffConfig
                 }
             }
             unset($item);
+
+            $mergedNames = [];
+            foreach ($mergedTree as $item) {
+                if (isset($item['name']) && is_string($item['name']) && $item['name'] !== '') {
+                    $mergedNames[$item['name']] = true;
+                }
+            }
+
+            foreach ($existing['tree'] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $name = trim((string) ($item['name'] ?? ''));
+                if ($name === '' || isset($mergedNames[$name])) {
+                    continue;
+                }
+                if (cmsConfiguredTreeLinkTarget($item) === '') {
+                    continue;
+                }
+
+                $virtualItem = [
+                    'name' => $name,
+                    'slug' => (string) ($item['slug'] ?? self::slugify($name)),
+                    'type' => (string) ($item['type'] ?? 'file'),
+                    'path' => (string) ($item['path'] ?? $name),
+                    'modifiedAt' => $item['modifiedAt'] ?? null,
+                    'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
+                ];
+
+                foreach ($item as $key => $value) {
+                    if (array_key_exists($key, $virtualItem)) {
+                        continue;
+                    }
+                    $virtualItem[$key] = $value;
+                }
+
+                $mergedTree[] = $virtualItem;
+                $mergedNames[$name] = true;
+            }
         }
 
         // Start with defaults but preserve user-provided title/description/link/url if present

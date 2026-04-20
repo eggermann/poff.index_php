@@ -360,6 +360,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.",
     "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
     "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
+    "If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.",
+    "Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.",
     "Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
     "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
@@ -553,6 +555,65 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   }
 
   // src/assets/js/edit/prompt/render.js
+  function isExternalPromptLink(value = "") {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) {
+      return false;
+    }
+    if (trimmed.startsWith("//")) {
+      return true;
+    }
+    return /^[a-z][a-z0-9+.-]*:/i.test(trimmed);
+  }
+  function isCmsPromptLink(value = "") {
+    const trimmed = String(value || "").trim();
+    if (!trimmed.startsWith("?")) {
+      return false;
+    }
+    const params = new URLSearchParams(trimmed.replace(/^\?/, ""));
+    return params.has("file") || params.has("path") || params.get("view") === "1";
+  }
+  function isSpecialPromptLink(value = "") {
+    const trimmed = String(value || "").trim();
+    return trimmed.startsWith("#") || isCmsPromptLink(trimmed) || isExternalPromptLink(trimmed);
+  }
+  function getPromptItemExplicitLink(item = {}) {
+    const keys = ["pageLink", "pageUrl", "viewUrl", "workUrl", "viewerHref", "linkUrl", "link", "url"];
+    for (const key of keys) {
+      const value = String((item == null ? void 0 : item[key]) || "").trim();
+      if (value) {
+        return value;
+      }
+    }
+    const rawPath = String((item == null ? void 0 : item.path) || (item == null ? void 0 : item.relativePath) || "").trim();
+    return isSpecialPromptLink(rawPath) ? rawPath : "";
+  }
+  function getPromptItemDisplayPath(folderBasePath = "", item = {}) {
+    const rawPath = String((item == null ? void 0 : item.path) || (item == null ? void 0 : item.relativePath) || "").trim();
+    if (rawPath) {
+      if (isCmsPromptLink(rawPath)) {
+        const params = new URLSearchParams(rawPath.replace(/^\?/, ""));
+        return params.get(params.has("file") ? "file" : "path") || "";
+      }
+      if (isSpecialPromptLink(rawPath)) {
+        return rawPath;
+      }
+      return folderBasePath && !rawPath.startsWith(`${folderBasePath}/`) && rawPath !== folderBasePath ? `${folderBasePath}/${rawPath}` : rawPath;
+    }
+    const explicitLink = getPromptItemExplicitLink(item);
+    if (isCmsPromptLink(explicitLink)) {
+      const params = new URLSearchParams(explicitLink.replace(/^\?/, ""));
+      return params.get(params.has("file") ? "file" : "path") || "";
+    }
+    if (explicitLink) {
+      return explicitLink;
+    }
+    const fallbackName = String((item == null ? void 0 : item.name) || "").trim();
+    if (!fallbackName) {
+      return "";
+    }
+    return folderBasePath ? `${folderBasePath}/${fallbackName}` : fallbackName;
+  }
   function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
       return;
@@ -642,11 +703,10 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       if (!itemName) {
         return "";
       }
-      const rawItemPath = (item == null ? void 0 : item.path) || itemName;
-      const itemPath = folderBasePath ? String(rawItemPath).startsWith(`${folderBasePath}/`) ? String(rawItemPath) : `${folderBasePath}/${rawItemPath}` : String(rawItemPath);
+      const itemPath = getPromptItemDisplayPath(folderBasePath, item);
       const isItemFile = ((item == null ? void 0 : item.type) || "file") !== "folder";
-      const itemPageLink = isItemFile ? `?view=1&file=${encodeURIComponent(itemPath)}` : `?view=1&path=${encodeURIComponent(itemPath)}`;
-      const itemAssetUrl = isItemFile ? itemPath.split("/").map((part) => encodeURIComponent(part)).join("/") : `?path=${encodeURIComponent(itemPath)}`;
+      const itemPageLink = getPromptItemExplicitLink(item) || (isItemFile ? `?view=1&file=${encodeURIComponent(itemPath)}` : `?view=1&path=${encodeURIComponent(itemPath)}`);
+      const itemAssetUrl = getPromptItemExplicitLink(item) || (isItemFile ? itemPath.split("/").map((part) => encodeURIComponent(part)).join("/") : `?path=${encodeURIComponent(itemPath)}`);
       return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
     }).filter(Boolean).join(" | ");
     const layoutBaseHref = activeLayoutDirectory;

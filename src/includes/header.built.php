@@ -936,11 +936,26 @@ body, html {
 }
 
 .prompt-layer-collapsed {
-  min-height: 100%;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: auto;
+  min-height: 0;
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  pointer-events: none;
 }
 
 .prompt-layer-collapsed .prompt-window {
   display: none;
+}
+
+.prompt-layer-collapsed .prompt-layer-toggle-open {
+  position: static;
+  right: auto;
+  bottom: auto;
+  pointer-events: auto;
 }
 
 .prompt-dock .prompt-context {
