@@ -185,7 +185,7 @@ export function bindPromptWindow({
 
     const renderContext = () => {
         const context = buildPromptContext({ getActiveSelection, getConfig });
-        activePath = context.path;
+        activePath = context.isLayout ? (context.virtualPath || context.path) : context.path;
         activePromptMode = currentPromptMode();
         syncModeAwareSystemPrompt();
         renderPromptContext(promptContextEl, context);

@@ -17,6 +17,7 @@ const VIEWER_FOLDER_DIR = path.join(POFF_DIR, 'viewer-folder');
 const VIEWER_FILE_NAME = 'viewer-file.txt';
 const VIEWER_FILE_PATH = path.join(POFF_DIR, VIEWER_FILE_NAME);
 const PERSIST_LAYOUT_DIR = path.join(POFF_DIR, 'persist-layout');
+const INVALID_TEMPLATE_DIR = path.join(POFF_DIR, 'invalid-json-template');
 const INHERITED_DEFAULT_DIR = path.join(POFF_DIR, 'inherits-default');
 const INHERITED_SECTION_DIR = path.join(POFF_DIR, 'inherits-section-default');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
@@ -235,6 +236,38 @@ function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockRespons
   });
 }
 
+function runViewerPrompt(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '') {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_viewer_prompt.php'),
+      rootDir,
+      relativePath,
+      JSON.stringify(payload),
+      mockResponse ? JSON.stringify(mockResponse) : '',
+      capturePath,
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`viewer prompt helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from viewer prompt helper: ${stdout}`));
+      }
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -312,6 +345,33 @@ describe('MCP create route helper (CLI)', () => {
     fs.mkdirSync(INHERITED_SECTION_DIR, { recursive: true });
     fs.writeFileSync(path.join(INHERITED_SECTION_DIR, 'hero.txt'), 'hero');
     fs.mkdirSync(PERSIST_LAYOUT_DIR, { recursive: true });
+    fs.mkdirSync(path.join(INVALID_TEMPLATE_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, 'poster.txt'), 'poster');
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, '.layout', 'template.hbs'), '<div class="invalid-json-layout"><main>{{> works}}</main></div>');
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, '.layout', 'works.hbs'), JSON.stringify({
+      id: 'chatcmpl-md9dsfuuobyyebhpfelhd',
+      object: 'chat.completion',
+      created: 1776458336,
+      model: 'google/gemma-4-e4b',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: '',
+            reasoning_content: 'The model reasoned but did not produce final template code.',
+            tool_calls: [],
+          },
+          logprobs: null,
+          finish_reason: 'length',
+        },
+      ],
+      usage: {
+        prompt_tokens: 3870,
+        completion_tokens: 226,
+        total_tokens: 4096,
+      },
+    }, null, 2));
     fs.mkdirSync(UPLOAD_TARGET_DIR, { recursive: true });
   });
 
@@ -427,6 +487,47 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
   });
 
+  test('routes subject-path layout prompts through the layout wrapper handler', async () => {
+    const capturePath = path.join(POFF_DIR, 'viewer-layout-request.json');
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Make the wrapper more cinematic.',
+      layoutPreset: 'actual',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                template: '<div class="poff-default-layout"><header></header><footer></footer></div>',
+                css: '.poff-default-layout{min-height:100vh;}',
+              }),
+            },
+          },
+        ],
+      }),
+    }, capturePath);
+
+    const captured = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+
+    expect(result.allowed).toBe(true);
+    expect(result.target).toBe('layout');
+    expect(result.subjectTarget).toBe('folder');
+    expect(result.provider).toBe('local');
+    expect(result.model).toBe('gemma4');
+    expect(result.css).toContain('min-height:100vh');
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(captured.url).toBe(endpoint);
+    expect(captured.payload.messages[0].content).toContain('layout generator');
+    expect(captured.payload.messages[1].content).toContain('"templateTarget": ".layout/template.hbs"');
+  });
+
   test('omits folder-only prompt context fields for file targets', async () => {
     const result = await runPhpJson('php_prompt_compact_context.php');
 
@@ -512,6 +613,91 @@ describe('MCP create route helper (CLI)', () => {
 
     expect(result.template).toBe('');
   });
+
+  test('treats usage-only JSON model responses as empty instead of literal template text', async () => {
+    const parseResult = await runPromptModelParse('work', JSON.stringify({
+      usage: {
+        prompt_tokens: 3870,
+        completion_tokens: 226,
+        total_tokens: 4096,
+      },
+      model: 'gemma4',
+    }));
+
+    expect(parseResult.template).toBe('');
+
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const viewerResult = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Make it smaller.',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        usage: {
+          prompt_tokens: 3870,
+          completion_tokens: 226,
+          total_tokens: 4096,
+        },
+        model: 'gemma4',
+      }),
+    });
+
+    expect(viewerResult.allowed).toBe(true);
+    expect(viewerResult.error).toBe('Template was empty.');
+    expect(viewerResult.template).toBeUndefined();
+  });
+
+  test('treats reasoning-only local chat responses as empty instead of storing the raw JSON envelope', async () => {
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const viewerResult = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'google/gemma-4-e4b',
+      endpoint,
+      prompt: 'Make the layout red again.',
+      layoutPreset: 'actual',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        id: 'chatcmpl-md9dsfuuobyyebhpfelhd',
+        object: 'chat.completion',
+        created: 1776458336,
+        model: 'google/gemma-4-e4b',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '',
+              reasoning_content: 'The model reasoned but did not produce final template code.',
+              tool_calls: [],
+            },
+            logprobs: null,
+            finish_reason: 'length',
+          },
+        ],
+        usage: {
+          prompt_tokens: 3870,
+          completion_tokens: 226,
+          total_tokens: 4096,
+          completion_tokens_details: {
+            reasoning_tokens: 223,
+          },
+        },
+        stats: {},
+        system_fingerprint: 'google/gemma-4-e4b',
+      }),
+    });
+
+    expect(viewerResult.allowed).toBe(true);
+    expect(viewerResult.error).toBe('Template was empty.');
+    expect(viewerResult.template).toBeUndefined();
+  });
 });
 
 describe('Worktype HBS renderer', () => {
@@ -546,6 +732,15 @@ describe('Worktype HBS renderer', () => {
       ]),
     );
     expect(config.tree.map((item) => item.name)).not.toContain('.layout');
+  });
+
+  test('sanitizes persisted raw chat JSON in section templates on read', async () => {
+    const output = await runLayoutFilesystem('ensure-folder', INVALID_TEMPLATE_DIR);
+    const config = JSON.parse(output);
+
+    expect(config.work.layout.sectionTemplate).toBe('');
+    expect(config.work.layout.defaultSectionTemplate).toContain('folder-view');
+    expect(config.work.layout.template).toContain('invalid-json-layout');
   });
 
   test('renders the default layout with the file work partial', async () => {

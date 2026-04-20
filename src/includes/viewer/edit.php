@@ -499,6 +499,12 @@ function cmsHandleEditAction(): void
         $history = is_array($data['history'] ?? null) ? $data['history'] : [];
         $systemPromptValue = trim((string) ($data['systemPrompt'] ?? ''));
         $layoutPreset = trim((string) ($data['layoutPreset'] ?? $data['layout_preset'] ?? ''));
+        $promptMode = strtolower(trim((string) ($data['promptMode'] ?? $data['prompt_mode'] ?? '')));
+        $promptTarget = strtolower(trim((string) ($data['promptTarget'] ?? $data['prompt_target'] ?? '')));
+        $promptIsLayoutTarget = $isLayoutTarget
+            || $promptMode === 'layout'
+            || in_array($promptTarget, ['layout', 'wrapper', 'layout-wrapper'], true)
+            || ($layoutPreset !== '' && !$isLayoutTarget);
         $image = cmsPromptImagePayload($data);
 
         if ($prompt === '' && !$image) {
@@ -508,8 +514,8 @@ function cmsHandleEditAction(): void
             ]);
         }
 
-        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $isLayoutTarget, $layoutPreset);
-        if ($isLayoutTarget && is_array($config['work']['layout'] ?? null)) {
+        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $promptIsLayoutTarget, $layoutPreset);
+        if ($promptIsLayoutTarget && is_array($config['work']['layout'] ?? null)) {
             $promptContext['current']['activeLayout'] = [
                 'name' => (string) ($config['work']['layout']['name'] ?? ''),
                 'mode' => (string) ($config['work']['layout']['mode'] ?? ''),
@@ -524,8 +530,8 @@ function cmsHandleEditAction(): void
             ];
         }
         $promptContextJson = json_encode(cmsPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $configJson = json_encode(cmsPromptCompactConfig($config, $isLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $responseFormatInstruction = implode("\n", $isLayoutTarget
+        $configJson = json_encode(cmsPromptCompactConfig($config, $promptIsLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $responseFormatInstruction = implode("\n", $promptIsLayoutTarget
             ? [
                 'Response format: return strict JSON.',
                 'Required key: "template" with the outer layout wrapper HBS string.',
@@ -569,7 +575,7 @@ function cmsHandleEditAction(): void
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
             'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
         ]);
-        $defaultSystemPrompt = implode("\n", $isLayoutTarget
+        $defaultSystemPrompt = implode("\n", $promptIsLayoutTarget
             ? [
                 'You are a Handlebars (HBS) layout generator for this single-page CMS.',
                 'Transform the user description into an updated outer layout wrapper rendered through LightnCandy.',
@@ -713,7 +719,7 @@ function cmsHandleEditAction(): void
                 $payload = [
                     'prompt' => $prompt,
                     'history' => $history,
-                    'config' => cmsPromptCompactConfig($config, $isLayoutTarget),
+                    'config' => cmsPromptCompactConfig($config, $promptIsLayoutTarget),
                     'instruction' => $systemPrompt,
                     'image' => $image,
                     'promptContext' => cmsPromptCompactContext($promptContext),
@@ -735,13 +741,12 @@ function cmsHandleEditAction(): void
                 } elseif (isset($decoded['content'])) {
                     $template = (string) $decoded['content'];
                 }
-            }
-            if ($template === '') {
+            } elseif ($template === '') {
                 $template = trim((string) $response['body']);
             }
         }
 
-        $parsedResult = cmsParsePromptModelResult($template, $isLayoutTarget);
+        $parsedResult = cmsParsePromptModelResult($template, $promptIsLayoutTarget);
         $templateText = trim((string) ($parsedResult['template'] ?? ''));
         if ($templateText === '') {
             cmsJsonResponse([
@@ -752,7 +757,7 @@ function cmsHandleEditAction(): void
 
         $responsePayload = [
             'allowed' => true,
-            'target' => $isLayoutTarget ? 'layout' : $subjectType,
+            'target' => $promptIsLayoutTarget ? 'layout' : $subjectType,
             'subjectTarget' => $subjectType,
             'provider' => $provider,
             'model' => $usedModel,

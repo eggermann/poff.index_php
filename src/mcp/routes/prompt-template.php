@@ -83,7 +83,7 @@ function mcpParsePromptModelResult(string $raw): array
     }
 
     if ($template === '') {
-        return ['template' => $trimmed];
+        return ['template' => ''];
     }
 
     $result = ['template' => $template];
@@ -812,8 +812,7 @@ function handlePromptTemplate(array $opts): array
             } elseif (isset($decoded['content'])) {
                 $template = (string) $decoded['content'];
             }
-        }
-        if ($template === '') {
+        } elseif ($template === '') {
             $template = trim((string) $response['body']);
         }
     }

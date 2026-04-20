@@ -126,7 +126,7 @@ function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): a
     }
 
     if ($template === '') {
-        return ['template' => $trimmed];
+        return ['template' => ''];
     }
 
     if ($isLayoutTarget) {
