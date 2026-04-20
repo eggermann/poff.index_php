@@ -595,6 +595,46 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[1].content).toContain('.draft-layout{background:red;}');
   });
 
+  test('strips malformed fenced JSON-ish layout wrappers from local prompt responses', async () => {
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Make the wrapper more cinematic.',
+      layoutPreset: 'actual',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: `\`\`\`json
+{
+  "template": "<div class="poff-default-layout">
+    <header>{{title}}</header>
+    <footer>done</footer>
+  </div>",
+  "css": ".poff-default-layout{min-height:100vh;}",
+  "js": "document.documentElement.dataset.layout = 'cinematic';"
+}
+\`\`\``,
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(result.template).not.toContain('```json');
+    expect(result.template).not.toContain('"template"');
+    expect(result.css).toContain('min-height:100vh');
+    expect(result.js).toContain("layout = 'cinematic'");
+  });
+
   test('omits folder-only prompt context fields for file targets', async () => {
     const result = await runPhpJson('php_prompt_compact_context.php');
 
@@ -661,6 +701,34 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.css).toContain('.poff-default-layout{outline:0;}');
     expect(result.js).toContain("dataset.layout='on'");
     expect(result.work).toEqual({ 'works.hbs': '<article>{{description}}</article>' });
+  });
+
+  test('salvages malformed fenced JSON-ish layout content without leaking wrapper artefacts', async () => {
+    const result = await runPromptModelParse('layout', JSON.stringify({
+      id: 'chatcmpl-layout-malformed',
+      choices: [
+        {
+          message: {
+            content: `\`\`\`json
+{
+  "template": "<div class="poff-default-layout">
+    <header>{{title}}</header>
+    <footer>done</footer>
+  </div>",
+  "css": ".poff-default-layout{outline:0;}",
+  "js": "document.body.dataset.layout='on';"
+}
+\`\`\``,
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(result.template).not.toContain('```json');
+    expect(result.template).not.toContain('"template"');
+    expect(result.css).toContain('.poff-default-layout{outline:0;}');
+    expect(result.js).toContain("dataset.layout='on'");
   });
 
   test('treats empty chat completion content as empty instead of raw JSON', async () => {
@@ -834,6 +902,25 @@ describe('Worktype HBS renderer', () => {
     expect(config.work.layout.sectionTemplate).toBe('');
     expect(config.work.layout.defaultSectionTemplate).toContain('folder-view');
     expect(config.work.layout.template).toContain('invalid-json-layout');
+  });
+
+  test('sanitizes persisted malformed fenced JSON-ish templates on read', async () => {
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, '.layout', 'works.hbs'), `\`\`\`json
+{
+  "template": "<article class="artifact-card">
+    <h2>{{title}}</h2>
+    <p>{{description}}</p>
+  </article>"
+}
+\`\`\``);
+
+    const output = await runLayoutFilesystem('ensure-folder', INVALID_TEMPLATE_DIR);
+    const config = JSON.parse(output);
+
+    expect(config.work.layout.sectionTemplate).toContain('<article class="artifact-card">');
+    expect(config.work.layout.sectionTemplate).toContain('{{description}}');
+    expect(config.work.layout.sectionTemplate).not.toContain('```json');
+    expect(config.work.layout.sectionTemplate).not.toContain('"template"');
   });
 
   test('renders the default layout with the file work partial', async () => {

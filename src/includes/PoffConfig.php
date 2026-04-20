@@ -578,12 +578,7 @@ class PoffConfig
             return '';
         }
 
-        $candidate = $trimmed;
-        if (preg_match('/```(?:json)?\s*(\{.*\})\s*```/si', $trimmed, $matches)) {
-            $candidate = trim((string) $matches[1]);
-        }
-
-        $decoded = json_decode($candidate, true);
+        $decoded = self::decodeStoredPromptPayload($trimmed);
         if (!is_array($decoded)) {
             return $value;
         }
@@ -637,6 +632,122 @@ class PoffConfig
         }
 
         return self::sanitizeStoredPromptTemplate($template, $depth);
+    }
+
+    private static function storedPromptResponseCandidates(string $raw): array
+    {
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $candidates = [$trimmed];
+
+        if (preg_match_all('/```(?:[a-z0-9_-]+)?\s*([\s\S]*?)```/i', $trimmed, $matches)) {
+            foreach ($matches[1] as $match) {
+                $candidate = trim((string) $match);
+                if ($candidate !== '') {
+                    $candidates[] = $candidate;
+                }
+            }
+        }
+
+        $firstBrace = strpos($trimmed, '{');
+        $lastBrace = strrpos($trimmed, '}');
+        if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
+            $candidate = trim(substr($trimmed, $firstBrace, $lastBrace - $firstBrace + 1));
+            if ($candidate !== '') {
+                $candidates[] = $candidate;
+            }
+        }
+
+        $normalized = [];
+        foreach ($candidates as $candidate) {
+            if (in_array($candidate, $normalized, true)) {
+                continue;
+            }
+            $normalized[] = $candidate;
+        }
+
+        return $normalized;
+    }
+
+    private static function decodeStoredPromptLooseString(string $value): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $decoded = json_decode($trimmed, true);
+        if (is_string($decoded)) {
+            return $decoded;
+        }
+
+        if ($trimmed[0] === '"') {
+            $trimmed = substr($trimmed, 1);
+        }
+        if ($trimmed !== '' && substr($trimmed, -1) === '"') {
+            $trimmed = substr($trimmed, 0, -1);
+        }
+
+        return stripcslashes($trimmed);
+    }
+
+    private static function extractStoredPromptLooseScalarField(string $payload, string $key): ?string
+    {
+        $knownKeys = [
+            'template',
+            'css',
+            'style',
+            'js',
+            'script',
+            'work',
+            'title',
+            'description',
+            'model',
+            'content',
+            'response',
+        ];
+        $otherKeys = array_values(array_filter($knownKeys, static fn (string $candidate): bool => $candidate !== $key));
+        $otherKeysPattern = implode('|', array_map(static fn (string $candidate): string => preg_quote($candidate, '/'), $otherKeys));
+        $pattern = '/"' . preg_quote($key, '/') . '"\s*:\s*([\s\S]*?)(?=\s*(?:,\s*"(?:' . $otherKeysPattern . ')"\s*:|\}\s*$|$))/i';
+        if (preg_match($pattern, $payload, $matches) !== 1) {
+            return null;
+        }
+
+        return self::decodeStoredPromptLooseString((string) $matches[1]);
+    }
+
+    private static function decodeStoredPromptPayload(string $raw): ?array
+    {
+        $candidates = self::storedPromptResponseCandidates($raw);
+        foreach ($candidates as $candidate) {
+            $decoded = json_decode($candidate, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            if (!preg_match('/"(template|css|style|js|script|title|description|model|content|response)"\s*:/i', $candidate)) {
+                continue;
+            }
+
+            $result = [];
+            foreach (['template', 'css', 'style', 'js', 'script', 'title', 'description', 'model', 'content', 'response'] as $key) {
+                $value = self::extractStoredPromptLooseScalarField($candidate, $key);
+                if ($value !== null) {
+                    $result[$key] = $value;
+                }
+            }
+
+            if ($result !== []) {
+                return $result;
+            }
+        }
+
+        return null;
     }
 
     private static function findInheritedLayoutDir(string $dir, string $localLayoutDir): ?array
