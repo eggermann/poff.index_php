@@ -311,6 +311,8 @@
     "Save target is work.hbs for the current file inside the active item layout folder.",
     "Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.",
     "Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.",
+    "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
+    "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
     "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
     "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.",
     "Return only the inner partial content that will be rendered inside the existing layout wrapper."
@@ -322,6 +324,9 @@
     "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
     "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
     "Use folder tree data and resolved refs when relevant instead of inventing paths.",
+    "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
+    "When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.",
+    "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
     "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
     "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.",
     "Return only the inner folder partial content that will be rendered inside the existing layout wrapper."
@@ -432,6 +437,115 @@
   // src/assets/js/edit/prompt/history.js
   function tagHistory(history) {
     return history.map((msg, idx) => ({ ...msg, _index: idx }));
+  }
+  function trimHistoryText(value, maxLength = 600) {
+    const normalized = String(value != null ? value : "").replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      return "";
+    }
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
+  }
+  function buildTemplateHistorySnapshot({
+    templateText = "",
+    nextCss = null,
+    nextJs = null,
+    nextTitle = null,
+    nextDescription = null,
+    nextWork = null,
+    isLayoutTarget = false
+  } = {}) {
+    const template = trimHistoryText(templateText, isLayoutTarget ? 1e3 : 800);
+    if (!template) {
+      return null;
+    }
+    const snapshot = {
+      targetType: isLayoutTarget ? "layout" : "partial",
+      template,
+      templateLength: String(templateText || "").trim().length
+    };
+    if (typeof nextCss === "string" && nextCss.trim() !== "") {
+      snapshot.css = trimHistoryText(nextCss, 400);
+      snapshot.cssLength = nextCss.length;
+    }
+    if (typeof nextJs === "string" && nextJs.trim() !== "") {
+      snapshot.js = trimHistoryText(nextJs, 320);
+      snapshot.jsLength = nextJs.length;
+    }
+    if (typeof nextTitle === "string" && nextTitle.trim() !== "") {
+      snapshot.title = trimHistoryText(nextTitle, 160);
+    }
+    if (typeof nextDescription === "string" && nextDescription.trim() !== "") {
+      snapshot.description = trimHistoryText(nextDescription, 220);
+    }
+    if (nextWork && typeof nextWork === "object") {
+      const keys = Object.keys(nextWork).filter((key) => key !== "layout").slice(0, 6);
+      if (keys.length) {
+        snapshot.workKeys = keys;
+      }
+      if (nextWork.layout && typeof nextWork.layout === "object") {
+        const layoutCandidate = nextWork.layout.name || nextWork.layout.mode || nextWork.layout.value || "";
+        if (typeof layoutCandidate === "string" && layoutCandidate.trim() !== "") {
+          snapshot.layoutName = layoutCandidate.trim();
+        }
+      } else if (typeof nextWork.layout === "string" && nextWork.layout.trim() !== "") {
+        snapshot.layoutName = nextWork.layout.trim();
+      }
+    }
+    return snapshot;
+  }
+  function serializeHistoryForRequest(history) {
+    const list = Array.isArray(history) ? history : [];
+    return list.map((item) => {
+      const role = (item == null ? void 0 : item.role) || "user";
+      let content = String((item == null ? void 0 : item.content) || "");
+      const snapshot = item == null ? void 0 : item.templateSnapshot;
+      if (snapshot && typeof snapshot === "object") {
+        const lines = [];
+        if (typeof snapshot.targetType === "string" && snapshot.targetType) {
+          lines.push(`Template snapshot target: ${snapshot.targetType}`);
+        }
+        if (typeof snapshot.template === "string" && snapshot.template) {
+          lines.push(`Template snapshot:
+${snapshot.template}`);
+        }
+        if (typeof snapshot.css === "string" && snapshot.css) {
+          lines.push(`CSS snapshot:
+${snapshot.css}`);
+        }
+        if (typeof snapshot.js === "string" && snapshot.js) {
+          lines.push(`JS snapshot:
+${snapshot.js}`);
+        }
+        if (typeof snapshot.title === "string" && snapshot.title) {
+          lines.push(`Title snapshot: ${snapshot.title}`);
+        }
+        if (typeof snapshot.description === "string" && snapshot.description) {
+          lines.push(`Description snapshot: ${snapshot.description}`);
+        }
+        if (Array.isArray(snapshot.workKeys) && snapshot.workKeys.length) {
+          lines.push(`Work keys updated: ${snapshot.workKeys.join(", ")}`);
+        }
+        if (typeof snapshot.layoutName === "string" && snapshot.layoutName) {
+          lines.push(`Layout name snapshot: ${snapshot.layoutName}`);
+        }
+        if (lines.length) {
+          content = content ? `${content}
+
+${lines.join("\n\n")}` : lines.join("\n\n");
+        }
+      }
+      return { role, content };
+    });
+  }
+  function summarizeSerializedHistory(history) {
+    const serialized = serializeHistoryForRequest(history);
+    return serialized.reduce((summary, item) => ({
+      count: summary.count + 1,
+      chars: summary.chars + String((item == null ? void 0 : item.content) || "").length
+    }), { count: 0, chars: 0 });
   }
   function compactValue(value) {
     return String(value != null ? value : "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -608,8 +722,9 @@
     }
     const { forceScroll = false } = options;
     const stickToBottom = container.scrollHeight - container.clientHeight - container.scrollTop < 24;
+    const historyStats = summarizeSerializedHistory(history);
     if (!history || !history.length) {
-      container.innerHTML = '<div class="small-note">No messages yet.</div>';
+      container.innerHTML = '<div class="small-note">History payload: 0 messages, 0 chars.</div><div class="small-note">No messages yet.</div>';
       return;
     }
     container.innerHTML = history.map((msg) => {
@@ -617,13 +732,31 @@
       const isStreaming = streamState && streamState.index === msg._index;
       const content = isStreaming ? streamState.text : msg.content;
       const safeContent = content || "";
+      const snapshot = (msg == null ? void 0 : msg.templateSnapshot) && typeof msg.templateSnapshot === "object" ? msg.templateSnapshot : null;
+      const snapshotParts = [];
+      if (snapshot) {
+        if (typeof snapshot.targetType === "string" && snapshot.targetType) {
+          snapshotParts.push(`target: ${snapshot.targetType}`);
+        }
+        if (typeof snapshot.templateLength === "number" && snapshot.templateLength > 0) {
+          snapshotParts.push(`template: ${snapshot.templateLength} chars`);
+        }
+        if (typeof snapshot.cssLength === "number" && snapshot.cssLength > 0) {
+          snapshotParts.push(`css: ${snapshot.cssLength}`);
+        }
+        if (typeof snapshot.jsLength === "number" && snapshot.jsLength > 0) {
+          snapshotParts.push(`js: ${snapshot.jsLength}`);
+        }
+      }
       return `
             <div class="prompt-message prompt-message-${role}">
                 <span class="prompt-message-role">${escapeHtml(role)}:</span>
                 <span class="prompt-message-content">${escapeHtml(safeContent)}${isStreaming ? '<span class="stream-cursor"></span>' : ""}</span>
+                ${snapshotParts.length ? `<div class="small-note prompt-message-meta">${escapeHtml(snapshotParts.join(" | "))}</div>` : ""}
             </div>
         `;
     }).join("");
+    container.innerHTML = `<div class="small-note">History payload: ${historyStats.count} messages, ${historyStats.chars} chars.</div>${container.innerHTML}`;
     if (forceScroll || stickToBottom) {
       container.scrollTop = container.scrollHeight;
     }
@@ -1246,6 +1379,12 @@
       }
       updateAttachmentUi();
     };
+    const clearPromptHistory = () => {
+      stopStreaming(stream);
+      setHistory([]);
+      writeStoredHistory(activePath, promptHistory);
+      renderHistory();
+    };
     const attachImageFile = async (file) => {
       try {
         imageAttachment = await readImageFile(file);
@@ -1304,10 +1443,7 @@
       layoutPresetEl: document.getElementById("edit-layout-preset"),
       onClearChat: () => {
         syncHistoryForPath();
-        stopStreaming(stream);
-        setHistory([]);
-        writeStoredHistory(activePath, promptHistory);
-        renderHistory();
+        clearPromptHistory();
         clearAttachment();
         if (statusEl) {
           statusEl.textContent = "Chat cleared.";
@@ -1377,6 +1513,7 @@
             path: activePath,
             layout: layoutPayload
           }, statusEl);
+          clearPromptHistory();
           renderContext();
           renderSummary(`Reset ${isLayoutTarget ? "layout wrapper" : "wrapped partial"} to inherited/default template.`);
           reloadViewer();
@@ -1450,10 +1587,7 @@
             statusEl.className = "edit-status";
           }
           renderSummary("Generating answer...");
-          const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
-            role: item.role,
-            content: item.content
-          }));
+          const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
           const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
           const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
           const payload = {
@@ -1511,6 +1645,7 @@
             const errMsg = response.error || "Prompt returned no content.";
             if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
               promptHistory[pendingAssistantIndex].content = errMsg;
+              delete promptHistory[pendingAssistantIndex].templateSnapshot;
               setHistory(promptHistory);
             } else {
               setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
@@ -1526,11 +1661,25 @@
             return;
           }
           stopStreaming(stream);
+          const templateSnapshot = buildTemplateHistorySnapshot({
+            templateText,
+            nextCss,
+            nextJs,
+            nextTitle,
+            nextDescription,
+            nextWork,
+            isLayoutTarget
+          });
           if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
             promptHistory[pendingAssistantIndex].content = templateText;
+            promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
             setHistory(promptHistory);
           } else {
-            setHistory([...promptHistory, { role: "assistant", content: templateText }].slice(-12));
+            setHistory([...promptHistory, {
+              role: "assistant",
+              content: templateText,
+              templateSnapshot
+            }].slice(-12));
             pendingAssistantIndex = promptHistory.length - 1;
           }
           writeStoredHistory(activePath, promptHistory);
@@ -1883,10 +2032,7 @@
     if (promptClearEl) {
       promptClearEl.addEventListener("click", () => {
         syncHistoryForPath();
-        stopStreaming(stream);
-        setHistory([]);
-        writeStoredHistory(activePath, promptHistory);
-        renderHistory();
+        clearPromptHistory();
         clearAttachment();
         if (statusEl) {
           statusEl.textContent = "Chat cleared.";
@@ -1958,6 +2104,7 @@
             path: activePath,
             layout: layoutPayload
           }, statusEl);
+          clearPromptHistory();
           renderContext();
           renderSummary(`Reset ${isLayoutTarget ? "layout wrapper" : "wrapped partial"} to inherited/default template.`);
           reloadViewer();
@@ -2033,10 +2180,7 @@
             statusEl.className = "edit-status";
           }
           renderSummary("Generating answer...");
-          const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
-            role: item.role,
-            content: item.content
-          }));
+          const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
           const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
           const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
           const payload = {
@@ -2090,6 +2234,7 @@
             const errMsg = response.error || "Prompt returned no content.";
             if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
               promptHistory[pendingAssistantIndex].content = errMsg;
+              delete promptHistory[pendingAssistantIndex].templateSnapshot;
               setHistory(promptHistory);
             } else {
               setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
@@ -2105,11 +2250,25 @@
             return;
           }
           stopStreaming(stream);
+          const templateSnapshot = buildTemplateHistorySnapshot({
+            templateText,
+            nextCss,
+            nextJs,
+            nextTitle,
+            nextDescription,
+            nextWork,
+            isLayoutTarget
+          });
           if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
             promptHistory[pendingAssistantIndex].content = templateText;
+            promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
             setHistory(promptHistory);
           } else {
-            setHistory([...promptHistory, { role: "assistant", content: templateText }].slice(-12));
+            setHistory([...promptHistory, {
+              role: "assistant",
+              content: templateText,
+              templateSnapshot
+            }].slice(-12));
             pendingAssistantIndex = promptHistory.length - 1;
           }
           writeStoredHistory(activePath, promptHistory);

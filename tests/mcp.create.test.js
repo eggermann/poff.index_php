@@ -577,6 +577,8 @@ describe('MCP create route helper (CLI)', () => {
     }));
     expect(captured.payload.messages[3].content).toContain('Config JSON:');
     expect(captured.payload.messages[3].content).toContain('"title": "Folder Preview"');
+    expect(captured.payload.messages[3].content).toContain('"outerWrapper"');
+    expect(captured.payload.messages[3].content).toContain('"source": "resolved active wrapper"');
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
   });
 
@@ -708,13 +710,21 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.file.current).toEqual(expect.objectContaining({
       subjectType: 'file',
       sectionTemplateTarget: '.works/viewer-file.txt.layout/work.hbs',
+      outerWrapper: expect.objectContaining({
+        sectionPartial: 'work',
+      }),
     }));
+    expect(result.file.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
     expect(result.file.counts).toBeUndefined();
     expect(result.file.items).toBeUndefined();
     expect(result.folder.current).toEqual(expect.objectContaining({
       subjectType: 'folder',
       sectionTemplateTarget: 'viewer-folder/.layout/works.hbs',
+      outerWrapper: expect.objectContaining({
+        sectionPartial: 'works',
+      }),
     }));
+    expect(result.folder.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
     expect(result.folder.counts).toEqual(expect.objectContaining({
       items: expect.any(Number),
       files: expect.any(Number),

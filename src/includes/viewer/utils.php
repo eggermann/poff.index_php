@@ -189,6 +189,23 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
     ];
 }
 
+function cmsPromptDebugCapture(string $rootDir, array $entry): string
+{
+    $baseDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff-prompt-debug';
+    if (!is_dir($baseDir)) {
+        @mkdir($baseDir, 0755, true);
+    }
+
+    $workspace = basename(rtrim($rootDir, DIRECTORY_SEPARATOR));
+    $workspace = preg_replace('/[^a-z0-9._-]+/i', '-', (string) $workspace) ?: 'workspace';
+    $targetPath = $baseDir . DIRECTORY_SEPARATOR . $workspace . '-last-local-prompt.json';
+    $entry['capturedAt'] = date('c');
+
+    @file_put_contents($targetPath, json_encode($entry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+    return $targetPath;
+}
+
 function cmsPromptNormalizeErrorText(string $text): string
 {
     $normalized = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');

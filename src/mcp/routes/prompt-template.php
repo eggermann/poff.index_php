@@ -429,6 +429,59 @@ function mcpPromptLayoutTemplateTarget(string $relativePath): string
     return PoffConfig::relativeLayoutPath($relativePath, false) . '/template.hbs';
 }
 
+function mcpPromptOuterWrapperReference(array $layoutValue): array
+{
+    $layoutName = trim((string) ($layoutValue['name'] ?? Worktype::defaultLayoutName()));
+    if ($layoutName === '') {
+        $layoutName = Worktype::defaultLayoutName();
+    }
+
+    $storage = trim((string) ($layoutValue['storage'] ?? ''));
+    if ($storage === '') {
+        $storage = 'default';
+    }
+
+    $templateName = $layoutName;
+    $templateCandidate = Worktype::template($templateName);
+    if (!is_string($templateCandidate) || $templateCandidate === '') {
+        $templateName = Worktype::defaultLayoutName();
+        $templateCandidate = Worktype::template($templateName);
+    }
+
+    $template = '';
+    if (isset($layoutValue['template']) && is_string($layoutValue['template']) && trim($layoutValue['template']) !== '') {
+        $template = $layoutValue['template'];
+    } else {
+        $template = (string) ($templateCandidate ?? '');
+    }
+
+    $css = '';
+    if (isset($layoutValue['css']) && is_string($layoutValue['css']) && trim($layoutValue['css']) !== '') {
+        $css = $layoutValue['css'];
+    } else {
+        $css = (string) (Worktype::layoutBundleAsset($templateName, 'style.css') ?? '');
+    }
+
+    $js = '';
+    if (isset($layoutValue['js']) && is_string($layoutValue['js']) && trim($layoutValue['js']) !== '') {
+        $js = $layoutValue['js'];
+    } else {
+        $js = (string) (Worktype::layoutBundleAsset($templateName, 'script.js') ?? '');
+    }
+
+    return [
+        'name' => $layoutName,
+        'storage' => $storage,
+        'sectionPartial' => 'works',
+        'source' => $storage === 'filesystem'
+            ? 'resolved active wrapper'
+            : ($storage === 'inline' ? 'inline wrapper config' : 'bundled default wrapper reference'),
+        'template' => $template,
+        'css' => $css,
+        'js' => $js,
+    ];
+}
+
 function mcpPromptRefKind(string $name, string $type): string
 {
     if ($type === 'folder') {
@@ -499,6 +552,9 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     $currentName = (string) ($config['folderName'] ?? basename($normalizedPath));
     $currentPageLink = mcpPromptViewerUrl($normalizedPath, false);
     $currentAssetUrl = mcpPromptAssetUrl($normalizedPath, false);
+    $layoutValue = is_array($config['work'] ?? null) && is_array($config['work']['layout'] ?? null)
+        ? $config['work']['layout']
+        : [];
 
     $context = [
         'current' => [
@@ -518,6 +574,7 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
             'sourceUrl' => $currentAssetUrl,
             'templateTarget' => mcpPromptTemplateTarget($normalizedPath),
             'layoutTemplateTarget' => mcpPromptLayoutTemplateTarget($normalizedPath),
+            'outerWrapper' => mcpPromptOuterWrapperReference($layoutValue),
         ],
         'items' => [],
         'allItems' => [],
@@ -674,6 +731,23 @@ function mcpPromptCompactConfig(array $config): array
 
 function mcpPromptCompactContext(array $context): array
 {
+    $current = is_array($context['current'] ?? null) ? $context['current'] : [];
+    if (is_array($current['outerWrapper'] ?? null)) {
+        $outerWrapper = [];
+        foreach (['name', 'storage', 'sectionPartial', 'source'] as $key) {
+            if (array_key_exists($key, $current['outerWrapper'])) {
+                $outerWrapper[$key] = $current['outerWrapper'][$key];
+            }
+        }
+        foreach (['template', 'css', 'js'] as $key) {
+            if (isset($current['outerWrapper'][$key]) && is_string($current['outerWrapper'][$key]) && $current['outerWrapper'][$key] !== '') {
+                $outerWrapper[$key] = mcpPromptTrimText($current['outerWrapper'][$key], 2200);
+                $outerWrapper[$key . 'Length'] = strlen($current['outerWrapper'][$key]);
+            }
+        }
+        $current['outerWrapper'] = $outerWrapper;
+    }
+
     $items = array_values(array_filter(array_map(
         static fn(array $ref): array => mcpPromptCompactRef($ref),
         array_slice(is_array($context['items'] ?? null) ? $context['items'] : [], 0, 24)
@@ -693,7 +767,7 @@ function mcpPromptCompactContext(array $context): array
     ];
 
     return [
-        'current' => $context['current'] ?? [],
+        'current' => $current,
         'counts' => $counts,
         'items' => $items,
     ];
@@ -782,13 +856,18 @@ function handlePromptTemplate(array $opts): array
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
         'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+        'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
+        'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
+        'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
         'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
         'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
         'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
         'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
     ]);
+    $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config));
+    $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $historyText = mcpPromptHistoryText($history);
-    $userPrompt = "Config JSON:\n" . $configJson . "\n\n" . $historyText . "USER: " . $prompt;
+    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $historyText . "USER: " . $prompt;
     if ($image) {
         $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
     }

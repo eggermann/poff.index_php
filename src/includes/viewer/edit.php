@@ -564,6 +564,8 @@ function cmsHandleEditAction(): void
             'Save target is work.hbs for the current file inside the active item layout folder.',
             'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
             'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
+            'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
+            'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
             'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
             'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
@@ -573,6 +575,9 @@ function cmsHandleEditAction(): void
             'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
             'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
             'Use folder tree data and resolved refs when relevant instead of inventing paths.',
+            'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
+            'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
+            'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
             'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
             'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
@@ -620,6 +625,7 @@ function cmsHandleEditAction(): void
         $env = cmsLoadEnv($rootDir);
         $template = '';
         $usedModel = $model;
+        $localDebugEntry = null;
 
         if ($provider === 'openai') {
             $key = $apiKey !== '' ? $apiKey : (cmsEnvValue($env, 'OPENAI_API_KEY') ?? '');
@@ -730,14 +736,36 @@ function cmsHandleEditAction(): void
                     'promptContext' => cmsPromptCompactContext($promptContext),
                 ];
             }
+            $localDebugEntry = [
+                'provider' => $provider,
+                'path' => $path,
+                'targetType' => $promptIsLayoutTarget ? 'layout' : $subjectType,
+                'subjectType' => $subjectType,
+                'endpoint' => $endpoint,
+                'requestPayload' => $payload,
+            ];
             $response = cmsHttpPost($endpoint, [], $payload);
             if (!$response['ok']) {
+                $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                    'failure' => 'http',
+                    'response' => $response,
+                ]));
                 cmsJsonResponse([
                     'allowed' => true,
-                    'error' => cmsFormatPromptHttpError('Local endpoint', $response),
+                    'error' => cmsFormatPromptHttpError('Local endpoint', $response) . ' Debug saved to ' . $debugPath . '.',
                 ]);
             }
             $decoded = json_decode($response['body'], true);
+            if (cmsIsOpenAiCompatibleEndpoint($endpoint) && !is_array($decoded)) {
+                $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                    'failure' => 'invalid_json_envelope',
+                    'response' => $response,
+                ]));
+                cmsJsonResponse([
+                    'allowed' => true,
+                    'error' => 'Local endpoint returned an invalid JSON chat envelope. Debug saved to ' . $debugPath . '.',
+                ], 502);
+            }
             if (is_array($decoded)) {
                 if (isset($decoded['choices'][0]['message']['content'])) {
                     $template = (string) $decoded['choices'][0]['message']['content'];

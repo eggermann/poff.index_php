@@ -2,7 +2,7 @@ import { getLayoutState } from '../core/utils.js';
 import { getDefaultSystemPromptForMode, getPromptMode, getPromptPlaceholderForMode, getSystemPromptSettingKeyForMode } from './prompt/mode.js';
 import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt, defaultPromptSettings, getDefaultModelForProvider, legacyWorkSystemPrompt } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
-import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt } from './prompt/history.js';
+import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplateHistorySnapshot, serializeHistoryForRequest } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
 import { createStreamState, startStreaming, stopStreaming } from './prompt/stream.js';
 import { updatePromptEditorFields } from './prompt/editor-fields.js';
@@ -226,6 +226,13 @@ export function bindPromptWindow({
         updateAttachmentUi();
     };
 
+    const clearPromptHistory = () => {
+        stopStreaming(stream);
+        setHistory([]);
+        writeStoredHistory(activePath, promptHistory);
+        renderHistory();
+    };
+
     const attachImageFile = async (file) => {
         try {
             imageAttachment = await readImageFile(file);
@@ -287,10 +294,7 @@ export function bindPromptWindow({
         layoutPresetEl: document.getElementById('edit-layout-preset'),
         onClearChat: () => {
             syncHistoryForPath();
-            stopStreaming(stream);
-            setHistory([]);
-            writeStoredHistory(activePath, promptHistory);
-            renderHistory();
+            clearPromptHistory();
             clearAttachment();
             if (statusEl) {
                 statusEl.textContent = 'Chat cleared.';
@@ -377,6 +381,7 @@ export function bindPromptWindow({
                     layout: layoutPayload,
                 }, statusEl);
 
+                clearPromptHistory();
                 renderContext();
                 renderSummary(`Reset ${isLayoutTarget ? 'layout wrapper' : 'wrapped partial'} to inherited/default template.`);
                 reloadViewer();
@@ -453,10 +458,7 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 renderSummary('Generating answer...');
-                const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
-                    role: item.role,
-                    content: item.content,
-                }));
+                const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
                 const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
@@ -524,6 +526,7 @@ export function bindPromptWindow({
                     const errMsg = response.error || 'Prompt returned no content.';
                     if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                         promptHistory[pendingAssistantIndex].content = errMsg;
+                        delete promptHistory[pendingAssistantIndex].templateSnapshot;
                         setHistory(promptHistory);
                     } else {
                         setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
@@ -539,11 +542,25 @@ export function bindPromptWindow({
                     return;
                 }
                 stopStreaming(stream);
+                const templateSnapshot = buildTemplateHistorySnapshot({
+                    templateText,
+                    nextCss,
+                    nextJs,
+                    nextTitle,
+                    nextDescription,
+                    nextWork,
+                    isLayoutTarget,
+                });
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                     promptHistory[pendingAssistantIndex].content = templateText;
+                    promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
                     setHistory(promptHistory);
                 } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: templateText }].slice(-12));
+                    setHistory([...promptHistory, {
+                        role: 'assistant',
+                        content: templateText,
+                        templateSnapshot,
+                    }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
                 writeStoredHistory(activePath, promptHistory);
@@ -927,10 +944,7 @@ export function bindPromptWindow({
     if (promptClearEl) {
         promptClearEl.addEventListener('click', () => {
             syncHistoryForPath();
-            stopStreaming(stream);
-            setHistory([]);
-            writeStoredHistory(activePath, promptHistory);
-            renderHistory();
+            clearPromptHistory();
             clearAttachment();
             if (statusEl) {
                 statusEl.textContent = 'Chat cleared.';
@@ -1020,6 +1034,7 @@ export function bindPromptWindow({
                     layout: layoutPayload,
                 }, statusEl);
 
+                clearPromptHistory();
                 renderContext();
                 renderSummary(`Reset ${isLayoutTarget ? 'layout wrapper' : 'wrapped partial'} to inherited/default template.`);
                 reloadViewer();
@@ -1099,10 +1114,7 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 renderSummary('Generating answer...');
-                const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
-                    role: item.role,
-                    content: item.content,
-                }));
+                const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
                 const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
@@ -1166,6 +1178,7 @@ export function bindPromptWindow({
                     const errMsg = response.error || 'Prompt returned no content.';
                     if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                         promptHistory[pendingAssistantIndex].content = errMsg;
+                        delete promptHistory[pendingAssistantIndex].templateSnapshot;
                         setHistory(promptHistory);
                     } else {
                         setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
@@ -1181,11 +1194,25 @@ export function bindPromptWindow({
                     return;
                 }
                 stopStreaming(stream);
+                const templateSnapshot = buildTemplateHistorySnapshot({
+                    templateText,
+                    nextCss,
+                    nextJs,
+                    nextTitle,
+                    nextDescription,
+                    nextWork,
+                    isLayoutTarget,
+                });
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                     promptHistory[pendingAssistantIndex].content = templateText;
+                    promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
                     setHistory(promptHistory);
                 } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: templateText }].slice(-12));
+                    setHistory([...promptHistory, {
+                        role: 'assistant',
+                        content: templateText,
+                        templateSnapshot,
+                    }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
                 writeStoredHistory(activePath, promptHistory);
