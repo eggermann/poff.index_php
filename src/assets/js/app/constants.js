@@ -1,6 +1,6 @@
 export const APP_ELEMENT_IDS = {
-    shell: 'appShell',
-    sidebar: 'appSidebar',
+    appShell: 'appShell',
+    appSidebar: 'appSidebar',
     navList: 'navList',
     contentFrame: 'contentFrame',
     editPanel: 'editPanel',
