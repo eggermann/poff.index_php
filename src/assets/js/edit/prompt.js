@@ -9,6 +9,7 @@ import { updatePromptEditorFields } from './prompt/editor-fields.js';
 import { bindPromptActions } from './prompt/actions.js';
 import { debugPromptLog } from './prompt/log.js';
 import { readImageFile } from './prompt/image.js';
+import { readPromptEditorDraft } from './prompt/draft.js';
 import { summarizePromptError, summarizePromptRequest, summarizePromptResponse } from './prompt/summary.js';
 
 const PROMPT_FALLBACK_TIMEOUT_MS = 95000;
@@ -468,6 +469,10 @@ export function bindPromptWindow({
                     history: historyForRequest,
                     systemPrompt: systemPromptValue,
                 };
+                const editorDraft = readPromptEditorDraft(selection);
+                if (editorDraft) {
+                    payload.draft = editorDraft;
+                }
                 if (selection?.isLayout) {
                     const layoutPresetEl = document.getElementById('edit-layout-preset');
                     if (layoutPresetEl && typeof layoutPresetEl.value === 'string' && layoutPresetEl.value.trim() !== '') {

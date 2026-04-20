@@ -6,7 +6,8 @@ function cmsBuildPromptContext(
     array $config,
     ?string $targetFile = null,
     bool $isLayoutTarget = false,
-    string $layoutPreset = ''
+    string $layoutPreset = '',
+    array $editorDraft = []
 ): array {
     $normalizedPath = trim($relativePath, "/\\");
     $currentName = $subjectType === 'file'
@@ -92,6 +93,17 @@ function cmsBuildPromptContext(
         'allLinks' => [],
         'allOther' => [],
     ];
+
+    $draftSummary = [];
+    foreach (['template', 'sectionTemplate', 'css', 'js'] as $key) {
+        if (!array_key_exists($key, $editorDraft) || !is_string($editorDraft[$key])) {
+            continue;
+        }
+        $draftSummary[$key] = $editorDraft[$key];
+    }
+    if ($draftSummary !== []) {
+        $context['current']['editorDraft'] = $draftSummary;
+    }
 
     if ($subjectType !== 'folder') {
         return $context;

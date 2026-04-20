@@ -499,6 +499,7 @@ function cmsHandleEditAction(): void
         $history = is_array($data['history'] ?? null) ? $data['history'] : [];
         $systemPromptValue = trim((string) ($data['systemPrompt'] ?? ''));
         $layoutPreset = trim((string) ($data['layoutPreset'] ?? $data['layout_preset'] ?? ''));
+        $editorDraft = is_array($data['draft'] ?? null) ? $data['draft'] : [];
         $promptMode = strtolower(trim((string) ($data['promptMode'] ?? $data['prompt_mode'] ?? '')));
         $promptTarget = strtolower(trim((string) ($data['promptTarget'] ?? $data['prompt_target'] ?? '')));
         $promptIsLayoutTarget = $isLayoutTarget
@@ -514,7 +515,7 @@ function cmsHandleEditAction(): void
             ]);
         }
 
-        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $promptIsLayoutTarget, $layoutPreset);
+        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $promptIsLayoutTarget, $layoutPreset, $editorDraft);
         if ($promptIsLayoutTarget && is_array($config['work']['layout'] ?? null)) {
             $promptContext['current']['activeLayout'] = [
                 'name' => (string) ($config['work']['layout']['name'] ?? ''),
@@ -555,6 +556,7 @@ function cmsHandleEditAction(): void
             'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
             'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
             'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
+            'If Prompt context JSON current.editorDraft is present, treat it as the latest unsaved editor state and revise that draft before falling back to saved config or saved template sources.',
             'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
             'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
         ];
@@ -586,6 +588,7 @@ function cmsHandleEditAction(): void
                 'The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.',
                 'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
                 'Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.',
+                'If Prompt context JSON current.editorDraft is present, treat those unsaved draft template/css/js values as the latest version to evolve from before falling back to current.activeLayout.',
                 'Prefer returning sibling "css" and "js" strings too, so the layout prompt can design template.hbs, style.css, and script.js together for files and folders.',
                 'Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.',
                 'When the current layout mode stays inherited or actual, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',

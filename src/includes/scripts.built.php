@@ -515,6 +515,43 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     return filtered;
   }
 
+  // src/assets/js/edit/prompt/draft.js
+  function readFieldValue(root, selector) {
+    if (!root || typeof root.querySelector !== "function") {
+      return null;
+    }
+    const field = root.querySelector(selector);
+    if (!field || typeof field.value !== "string") {
+      return null;
+    }
+    return field.value;
+  }
+  function readPromptEditorDraft(selection = {}, root = document) {
+    const isLayout = !!(selection == null ? void 0 : selection.isLayout);
+    const template = readFieldValue(root, isLayout ? "#edit-layout-primary-template" : "#edit-content-template");
+    if (template === null) {
+      return null;
+    }
+    const draft = {
+      template
+    };
+    if (isLayout) {
+      const sectionTemplate = readFieldValue(root, "#edit-content-template");
+      const css = readFieldValue(root, "#edit-layout-primary-css");
+      const js = readFieldValue(root, "#edit-layout-primary-js");
+      if (sectionTemplate !== null) {
+        draft.sectionTemplate = sectionTemplate;
+      }
+      if (css !== null) {
+        draft.css = css;
+      }
+      if (js !== null) {
+        draft.js = js;
+      }
+    }
+    return draft;
+  }
+
   // src/assets/js/edit/prompt/render.js
   function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
@@ -620,6 +657,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       }
       return `${assetPath} -> ${layoutBaseHref}/${assetPath}`;
     }).filter(Boolean).join(" | ") : "";
+    const editorDraft = readPromptEditorDraft(selection);
     return {
       path,
       virtualPath,
@@ -634,6 +672,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       layoutBaseHref,
       inheritedLayoutDirectory,
       layoutAssetsPreview,
+      editorDraft,
       workData: work,
       workPreview,
       refPreview
@@ -710,6 +749,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     const layoutBaseHref = (context == null ? void 0 : context.layoutBaseHref) || "";
     const inheritedLayoutDirectory = (context == null ? void 0 : context.inheritedLayoutDirectory) || "";
     const layoutAssetsPreview = (context == null ? void 0 : context.layoutAssetsPreview) || "";
+    const editorDraft = (context == null ? void 0 : context.editorDraft) && typeof context.editorDraft === "object" ? context.editorDraft : null;
     const workData = (context == null ? void 0 : context.workData) && typeof context.workData === "object" ? context.workData : {};
     const refPreview = (context == null ? void 0 : context.refPreview) || "";
     const partials = ["poff-layout", "filesystem-layout", "works", "work"];
@@ -728,6 +768,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
             ${sectionTemplateTarget ? renderRow("sectionTemplateTarget", sectionTemplateTarget) : ""}
             ${layoutBaseHref ? renderRow("layoutBaseHref", layoutBaseHref) : ""}
             ${inheritedLayoutDirectory ? renderRow("inheritedLayoutDirectory", inheritedLayoutDirectory) : ""}
+            ${editorDraft ? renderRow("editorDraft", editorDraft) : ""}
         </div>
         ${renderList("partials", partials)}
         ${renderList("layoutAssets", layoutAssetItems)}
@@ -1377,6 +1418,10 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
             history: historyForRequest,
             systemPrompt: systemPromptValue
           };
+          const editorDraft = readPromptEditorDraft(selection);
+          if (editorDraft) {
+            payload.draft = editorDraft;
+          }
           if (selection == null ? void 0 : selection.isLayout) {
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             if (layoutPresetEl2 && typeof layoutPresetEl2.value === "string" && layoutPresetEl2.value.trim() !== "") {

@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../core/utils.js';
+import { readPromptEditorDraft } from './draft.js';
 
 export function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
@@ -123,6 +124,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
             return `${assetPath} -> ${layoutBaseHref}/${assetPath}`;
         }).filter(Boolean).join(' | ')
         : '';
+    const editorDraft = readPromptEditorDraft(selection);
     return {
         path,
         virtualPath,
@@ -137,6 +139,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         layoutBaseHref,
         inheritedLayoutDirectory,
         layoutAssetsPreview,
+        editorDraft,
         workData: work,
         workPreview,
         refPreview,
@@ -215,6 +218,7 @@ export function renderPromptContext(contextEl, context) {
     const layoutBaseHref = context?.layoutBaseHref || '';
     const inheritedLayoutDirectory = context?.inheritedLayoutDirectory || '';
     const layoutAssetsPreview = context?.layoutAssetsPreview || '';
+    const editorDraft = (context?.editorDraft && typeof context.editorDraft === 'object') ? context.editorDraft : null;
     const workData = (context?.workData && typeof context.workData === 'object') ? context.workData : {};
     const refPreview = context?.refPreview || '';
     const partials = ['poff-layout', 'filesystem-layout', 'works', 'work'];
@@ -233,6 +237,7 @@ export function renderPromptContext(contextEl, context) {
             ${sectionTemplateTarget ? renderRow('sectionTemplateTarget', sectionTemplateTarget) : ''}
             ${layoutBaseHref ? renderRow('layoutBaseHref', layoutBaseHref) : ''}
             ${inheritedLayoutDirectory ? renderRow('inheritedLayoutDirectory', inheritedLayoutDirectory) : ''}
+            ${editorDraft ? renderRow('editorDraft', editorDraft) : ''}
         </div>
         ${renderList('partials', partials)}
         ${renderList('layoutAssets', layoutAssetItems)}

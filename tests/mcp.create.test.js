@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const POFF_DIR = path.join(ROOT, 'tests/poff-tests');
@@ -201,6 +202,31 @@ function runPromptModelParse(mode, raw) {
       }
     });
   });
+}
+
+function loadPromptDraftHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/edit/prompt/draft.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    document: null,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  readPromptEditorDraft,
+};
+`, context);
+
+  return module.exports;
 }
 
 function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '') {
@@ -528,6 +554,47 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[1].content).toContain('"templateTarget": ".layout/template.hbs"');
   });
 
+  test('includes unsaved editor draft content in layout prompt context', async () => {
+    const capturePath = path.join(POFF_DIR, 'viewer-layout-draft-request.json');
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Push this draft further.',
+      layoutPreset: 'actual',
+      draft: {
+        template: '<div class="draft-layout">{{title}}</div>',
+        sectionTemplate: '<article class="draft-section">{{description}}</article>',
+        css: '.draft-layout{background:red;}',
+        js: 'document.body.dataset.draft = "on";',
+      },
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                template: '<div class="poff-default-layout"><header></header><footer></footer></div>',
+              }),
+            },
+          },
+        ],
+      }),
+    }, capturePath);
+
+    const captured = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+
+    expect(result.allowed).toBe(true);
+    expect(captured.payload.messages[0].content).toContain('current.editorDraft');
+    expect(captured.payload.messages[1].content).toContain('"editorDraft"');
+    expect(captured.payload.messages[1].content).toContain('<div class=\\"draft-layout\\">{{title}}</div>');
+    expect(captured.payload.messages[1].content).toContain('.draft-layout{background:red;}');
+  });
+
   test('omits folder-only prompt context fields for file targets', async () => {
     const result = await runPhpJson('php_prompt_compact_context.php');
 
@@ -701,6 +768,32 @@ describe('MCP create route helper (CLI)', () => {
 });
 
 describe('Worktype HBS renderer', () => {
+  test('reads the current unsaved editor draft for layout and work prompt targets', () => {
+    const { readPromptEditorDraft } = loadPromptDraftHelpers();
+    const fields = {
+      '#edit-layout-primary-template': { value: '<div class="draft-layout"></div>' },
+      '#edit-layout-primary-css': { value: '.draft-layout{color:red;}' },
+      '#edit-layout-primary-js': { value: 'console.log("draft");' },
+      '#edit-content-template': { value: '<article class="draft-section"></article>' },
+    };
+    const root = {
+      querySelector(selector) {
+        return fields[selector] || null;
+      },
+    };
+
+    expect(readPromptEditorDraft({ isLayout: true }, root)).toEqual({
+      template: '<div class="draft-layout"></div>',
+      sectionTemplate: '<article class="draft-section"></article>',
+      css: '.draft-layout{color:red;}',
+      js: 'console.log("draft");',
+    });
+
+    expect(readPromptEditorDraft({ isLayout: false }, root)).toEqual({
+      template: '<article class="draft-section"></article>',
+    });
+  });
+
   test('normalizes default layout metadata for files', async () => {
     const output = await runWorktype('definition', 'image');
     const definition = JSON.parse(output);

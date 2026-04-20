@@ -101,6 +101,17 @@ function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource
 function cmsPromptCompactContext(array $context): array
 {
     $current = is_array($context['current'] ?? null) ? $context['current'] : [];
+    if (is_array($current['editorDraft'] ?? null)) {
+        $draft = [];
+        foreach (['template', 'sectionTemplate', 'css', 'js'] as $key) {
+            if (!isset($current['editorDraft'][$key]) || !is_string($current['editorDraft'][$key])) {
+                continue;
+            }
+            $draft[$key] = cmsPromptTrimText($current['editorDraft'][$key], 6000);
+            $draft[$key . 'Length'] = strlen($current['editorDraft'][$key]);
+        }
+        $current['editorDraft'] = $draft;
+    }
     if (is_array($current['activeLayout'] ?? null)) {
         $activeLayout = [];
         foreach (['name', 'mode', 'storage', 'directory', 'inheritedDirectory', 'sectionDirectory'] as $key) {
