@@ -3,6 +3,9 @@
  * Shared CMS utilities: JSON responses, config helpers, HTTP helpers.
  */
 
+require_once __DIR__ . '/../project-root.php';
+require_once __DIR__ . '/../edit-mode.php';
+
 const CMS_HTTP_TIMEOUT_SECONDS = 90;
 
 function cmsJsonResponse(array $payload, int $status = 200): void

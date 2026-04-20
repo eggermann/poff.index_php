@@ -1,5 +1,11 @@
 import { defaultPromptSettings, promptHistoryKey, promptSettingsKey } from './constants.js';
 
+function normalizeHistoryScope(path, mode = '') {
+    const normalizedPath = String(path ?? '').trim().replace(/^\/+|\/+$/g, '');
+    const normalizedMode = String(mode ?? '').trim() || 'folder';
+    return `${normalizedMode}:${normalizedPath || '__root__'}`;
+}
+
 export function loadPromptSettings() {
     try {
         const rawStored = JSON.parse(localStorage.getItem(promptSettingsKey) || '{}');
@@ -42,26 +48,22 @@ export function savePromptSettings(settings) {
     }
 }
 
-export function readStoredHistory(path) {
-    if (!path) {
-        return [];
-    }
+export function readStoredHistory(path, mode = '') {
     try {
         const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || '{}');
-        const list = stored[path] || [];
+        const scopedKey = normalizeHistoryScope(path, mode);
+        const legacyKey = String(path ?? '').trim();
+        const list = stored[scopedKey] || stored[legacyKey] || [];
         return Array.isArray(list) ? list : [];
     } catch (err) {
         return [];
     }
 }
 
-export function writeStoredHistory(path, history) {
-    if (!path) {
-        return;
-    }
+export function writeStoredHistory(path, history, mode = '') {
     try {
         const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || '{}');
-        stored[path] = history;
+        stored[normalizeHistoryScope(path, mode)] = history;
         localStorage.setItem(promptHistoryKey, JSON.stringify(stored));
     } catch (err) {
         // ignore

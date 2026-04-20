@@ -113,7 +113,7 @@ trait PoffConfigLayoutHelpers
 
     public static function resolveRelativeDirectory(string $relativeDir): ?string
     {
-        $base = realpath(getcwd() ?: '.');
+        $base = realpath(cmsProjectRootDir());
         if ($base === false) {
             return null;
         }

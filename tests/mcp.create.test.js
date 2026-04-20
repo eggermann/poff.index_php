@@ -4,6 +4,8 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
+const BUILD_SHARED_CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, 'build', 'BuildConfig.shared.json'), 'utf8'));
+const RUNTIME_ROOT = path.join(ROOT, BUILD_SHARED_CONFIG.pagesDir, BUILD_SHARED_CONFIG.siteHost);
 const POFF_DIR = path.join(ROOT, 'tests/poff-tests');
 const TEST_NAME = 'jest-create-route';
 const TEST_DEST = path.join(POFF_DIR, TEST_NAME);
@@ -318,6 +320,36 @@ function runViewerPrompt(rootDir, relativePath, payload = {}, mockResponse = nul
         resolve(JSON.parse(stdout));
       } catch (err) {
         reject(new Error(`invalid json from viewer prompt helper: ${stdout}`));
+      }
+    });
+  });
+}
+
+function runViewerSave(cwd, relativePath, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_viewer_save.php'),
+      cwd,
+      relativePath,
+      JSON.stringify(payload),
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`viewer save helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from viewer save helper: ${stdout}`));
       }
     });
   });
@@ -781,6 +813,54 @@ describe('MCP create route helper (CLI)', () => {
     }));
 
     expect(result.template).toBe('<div class="card">{{title}}</div>');
+  });
+
+  test('strips outer layout shell blocks from non-layout prompt responses', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-shell-artifacts',
+      choices: [
+        {
+          message: {
+            content: '<header class="poff-default-layout__header"><div class="poff-default-layout__header-copy"><h2 class="poff-default-layout__video-title">{{title}}</h2></div></header><div class="poff-default-layout__video"><video class="poff-default-layout__video-player" src="{{srcUrl}}" autoplay controls></video></div>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toContain('poff-default-layout__video');
+    expect(result.template).toContain('autoplay');
+    expect(result.template).not.toContain('poff-default-layout__header');
+    expect(result.template).not.toContain('poff-default-layout__header-copy');
+  });
+
+  test('extracts main-inner content when a non-layout prompt returns a full wrapper', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-full-wrapper',
+      choices: [
+        {
+          message: {
+            content: '<div class="poff-default-layout"><header class="poff-default-layout__header"><h1>{{title}}</h1></header><main class="poff-default-layout__main"><article class="autoplay-card"><video src="{{srcUrl}}" autoplay muted loop controls></video></article></main><footer class="poff-default-layout__footer">done</footer></div>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toBe('<article class="autoplay-card"><video src="{{srcUrl}}" autoplay muted loop controls></video></article>');
+  });
+
+  test('strips generic shell tags from non-layout prompt responses', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-generic-shell-artifacts',
+      choices: [
+        {
+          message: {
+            content: '<header><h2>{{title}}</h2></header><div class="video-card"><video src="{{srcUrl}}" autoplay controls></video></div><footer><a href="{{pageLink}}">Open</a></footer>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toBe('<div class="video-card"><video src="{{srcUrl}}" autoplay controls></video></div>');
   });
 
   test('parses fenced JSON chat completion envelopes into structured layout fields', async () => {
@@ -1322,6 +1402,89 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="file-custom">');
     expect(output).toContain('Viewer File');
     expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
+  });
+
+  test('sanitizes persisted file work partials that accidentally include outer wrapper shell blocks', async () => {
+    await runLayoutFilesystem('persist-file', POFF_DIR, VIEWER_FILE_NAME, {
+      name: 'filesystem-layout',
+      engine: 'lightncandy',
+      section: 'work',
+      template: '<div class="file-custom">{{title}}</div>',
+      sectionTemplate: '<header class="poff-default-layout__header"><div class="poff-default-layout__header-copy"><h2 class="poff-default-layout__video-title">{{title}}</h2></div></header><div class="poff-default-layout__video"><video class="poff-default-layout__video-player" src="{{srcUrl}}" autoplay playsinline controls></video></div>',
+    });
+
+    const ensured = JSON.parse(await runLayoutFilesystem('ensure-file', POFF_DIR, VIEWER_FILE_NAME));
+    expect(ensured.work.layout.sectionTemplate).toContain('poff-default-layout__video');
+    expect(ensured.work.layout.sectionTemplate).toContain('autoplay');
+    expect(ensured.work.layout.sectionTemplate).not.toContain('poff-default-layout__header');
+    expect(ensured.work.layout.sectionTemplate).not.toContain('poff-default-layout__header-copy');
+
+    const output = await runViewer(VIEWER_FILE_NAME);
+    expect(output).toContain('poff-default-layout__video-player');
+    expect(output).toContain('autoplay');
+    expect(output).not.toContain('poff-default-layout__header-copy');
+  });
+
+  test('saves section-only file edits into the runtime pages tree without rewriting the wrapper template', async () => {
+    const sourceTemplatePath = path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`, 'template.hbs');
+    const sourceTemplateBefore = fs.readFileSync(sourceTemplatePath, 'utf8');
+    const runtimeLayoutDir = path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`);
+    const runtimeWorkPath = path.join(runtimeLayoutDir, 'work.hbs');
+    const runtimeWorkBefore = fs.readFileSync(runtimeWorkPath, 'utf8');
+    if (fs.existsSync(runtimeLayoutDir)) {
+      const leakedTemplatePath = path.join(runtimeLayoutDir, 'template.hbs');
+      if (fs.existsSync(leakedTemplatePath)) {
+        fs.writeFileSync(leakedTemplatePath, sourceTemplateBefore);
+      }
+    }
+
+    const result = await runViewerSave(POFF_DIR, VIEWER_FILE_NAME, {
+      layout: {
+        sectionTemplate: '<article class="source-only-update">{{title}}</article>',
+      },
+    });
+
+    expect(result.saved).toBe(true);
+    expect(fs.readFileSync(sourceTemplatePath, 'utf8')).toBe(sourceTemplateBefore);
+    expect(runtimeWorkBefore).not.toContain('source-only-update');
+    expect(fs.existsSync(path.join(runtimeLayoutDir, 'template.hbs'))).toBe(true);
+    expect(fs.readFileSync(runtimeWorkPath, 'utf8')).toContain('source-only-update');
+  });
+
+  test('inherits edit mode from an ancestor allow marker', async () => {
+    const runtimeRoot = RUNTIME_ROOT;
+    const nestedRuntimeDir = path.join(runtimeRoot, 'tests', 'poff-tests', 'viewer-folder');
+    fs.mkdirSync(nestedRuntimeDir, { recursive: true });
+    fs.writeFileSync(path.join(runtimeRoot, '.edit.allow'), 'allow');
+    const denyPath = path.join(nestedRuntimeDir, 'edit.not-allow');
+    if (fs.existsSync(denyPath)) {
+      fs.unlinkSync(denyPath);
+    }
+
+    const result = await runViewerSave(runtimeRoot, 'tests/poff-tests/viewer-folder', {
+      description: 'Inherited edit mode works',
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.saved).toBe(true);
+    expect(result.config.description).toBe('Inherited edit mode works');
+  });
+
+  test('stops inherited edit mode when edit.not-allow exists locally', async () => {
+    const runtimeRoot = RUNTIME_ROOT;
+    const nestedRuntimeDir = path.join(runtimeRoot, 'tests', 'poff-tests', 'viewer-folder');
+    fs.mkdirSync(nestedRuntimeDir, { recursive: true });
+    fs.writeFileSync(path.join(runtimeRoot, '.edit.allow'), 'allow');
+    fs.writeFileSync(path.join(nestedRuntimeDir, 'edit.not-allow'), 'deny');
+
+    const result = await runViewerSave(runtimeRoot, 'tests/poff-tests/viewer-folder', {
+      description: 'This should be blocked',
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.error).toBe('Edit mode not enabled.');
+
+    fs.unlinkSync(path.join(nestedRuntimeDir, 'edit.not-allow'));
   });
 
   test('injects the wrapped work partial when a filesystem file wrapper forgets to include it', async () => {

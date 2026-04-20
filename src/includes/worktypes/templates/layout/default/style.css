@@ -97,6 +97,9 @@
 .poff-default-layout__header {
     display: grid;
     gap: 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 5;
     padding: 28px 32px 18px;
     border-bottom: 1px solid var(--poff-shell-header-border);
     background: #ffffff;

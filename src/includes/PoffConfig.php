@@ -5,7 +5,9 @@
  * with lightweight folder metadata and a first-level tree listing.
  */
 
+require_once __DIR__ . '/project-root.php';
 require_once __DIR__ . '/PoffConfig/layout-helpers.php';
+require_once __DIR__ . '/prompt-template-sanitize.php';
 require_once __DIR__ . '/viewer/link-targets.php';
 
 class PoffConfig
@@ -405,10 +407,10 @@ class PoffConfig
     {
         $normalized = Worktype::normalizeLayout($layout, $section);
         if (array_key_exists('template', $normalized)) {
-            $normalized['template'] = self::sanitizeStoredPromptTemplate((string) $normalized['template']);
+            $normalized['template'] = self::sanitizeStoredPromptTemplate((string) $normalized['template'], true);
         }
         if (array_key_exists('sectionTemplate', $normalized)) {
-            $normalized['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $normalized['sectionTemplate']);
+            $normalized['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $normalized['sectionTemplate'], false);
         }
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
@@ -424,6 +426,19 @@ class PoffConfig
         return self::serializeLayout($normalized, $section);
     }
 
+    public static function persistSectionTemplate(string $dir, ?string $fileName, string $sectionTemplate, string $section = 'work'): string
+    {
+        $layoutDir = $fileName === null
+            ? self::folderLayoutDir($dir)
+            : self::fileLayoutDir($dir, $fileName);
+        $sanitized = self::sanitizeStoredPromptTemplate($sectionTemplate, false);
+        self::writeManagedLayoutFiles($layoutDir, [
+            self::sectionTemplateFile($section) => $sanitized,
+        ]);
+
+        return $sanitized;
+    }
+
     public static function persistOriginalLayoutFiles(string $relativeDir, array $payload): string
     {
         $layoutDir = self::resolveRelativeDirectory($relativeDir);
@@ -432,7 +447,7 @@ class PoffConfig
         }
 
         self::writeManagedLayoutFiles($layoutDir, [
-            self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $payload) ? self::sanitizeStoredPromptTemplate((string) $payload['template']) : null,
+            self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $payload) ? self::sanitizeStoredPromptTemplate((string) $payload['template'], true) : null,
             self::LAYOUT_STYLE_FILE => array_key_exists('css', $payload) ? (string) $payload['css'] : null,
             self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $payload) ? (string) $payload['js'] : null,
         ]);
@@ -517,10 +532,10 @@ class PoffConfig
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
         if (array_key_exists('template', $resolved)) {
-            $resolved['template'] = self::sanitizeStoredPromptTemplate((string) $resolved['template']);
+            $resolved['template'] = self::sanitizeStoredPromptTemplate((string) $resolved['template'], true);
         }
         if (array_key_exists('sectionTemplate', $resolved)) {
-            $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $resolved['sectionTemplate']);
+            $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $resolved['sectionTemplate'], false);
         }
         $resolved['phpTemplate'] = Worktype::template((string) ($resolved['name'] ?? Worktype::defaultLayoutName())) ?? '';
         $localLayoutDir = $fileName === null
@@ -556,7 +571,7 @@ class PoffConfig
 
             $templatePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_TEMPLATE_FILE;
             if (is_file($templatePath)) {
-                $resolved['template'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($templatePath));
+                $resolved['template'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($templatePath), true);
             }
 
             $stylePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_STYLE_FILE;
@@ -597,7 +612,7 @@ class PoffConfig
         }
 
         if (is_string($sectionTemplatePath) && $sectionTemplatePath !== '') {
-            $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($sectionTemplatePath));
+            $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($sectionTemplatePath), false);
         }
 
         $resolved['assets'] = $assets;
@@ -607,10 +622,10 @@ class PoffConfig
         return $resolved;
     }
 
-    private static function sanitizeStoredPromptTemplate(string $value, int $depth = 0): string
+    private static function sanitizeStoredPromptTemplate(string $value, bool $isLayoutTarget = true, int $depth = 0): string
     {
         if ($depth > 3) {
-            return trim($value);
+            return cmsSanitizePromptTemplateForTarget((string) $value, $isLayoutTarget);
         }
 
         $trimmed = trim($value);
@@ -620,18 +635,18 @@ class PoffConfig
 
         $decoded = self::decodeStoredPromptPayload($trimmed);
         if (!is_array($decoded)) {
-            return $value;
+            return cmsSanitizePromptTemplateForTarget($value, $isLayoutTarget);
         }
 
-        $extracted = self::extractStoredPromptTemplateFromPayload($decoded, $depth + 1);
+        $extracted = self::extractStoredPromptTemplateFromPayload($decoded, $isLayoutTarget, $depth + 1);
         if ($extracted === null) {
             return '';
         }
 
-        return $extracted;
+        return cmsSanitizePromptTemplateForTarget($extracted, $isLayoutTarget);
     }
 
-    private static function extractStoredPromptTemplateFromPayload(array $decoded, int $depth): ?string
+    private static function extractStoredPromptTemplateFromPayload(array $decoded, bool $isLayoutTarget, int $depth): ?string
     {
         $template = null;
         if (isset($decoded['choices'][0]['message']['content'])) {
@@ -671,7 +686,7 @@ class PoffConfig
             return '';
         }
 
-        return self::sanitizeStoredPromptTemplate($template, $depth);
+        return self::sanitizeStoredPromptTemplate($template, $isLayoutTarget, $depth);
     }
 
     private static function storedPromptResponseCandidates(string $raw): array

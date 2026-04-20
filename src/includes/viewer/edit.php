@@ -55,9 +55,20 @@ function cmsHandleEditAction(): void
         return;
     }
 
-    $rootDir = getcwd();
-    $allowFile = $rootDir . DIRECTORY_SEPARATOR . '.edit.allow';
-    if (!is_file($allowFile)) {
+    $runtimeRootDir = realpath(getcwd() ?: '.') ?: '.';
+    $rootDir = $runtimeRootDir;
+
+    $data = ($action === 'save' || $action === 'prompt') ? cmsReadJsonBody() : [];
+    if ($data === []) {
+        $data = $_POST;
+    }
+    $path = isset($_GET['path']) ? (string) $_GET['path'] : '';
+    if ($path === '' && isset($data['path'])) {
+        $path = (string) $data['path'];
+    }
+    $runtimeTarget = cmsResolveTarget($runtimeRootDir, $path);
+    $runtimeAllowDir = $runtimeTarget['dir'] ?? $runtimeRootDir;
+    if (!cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir)) {
         cmsJsonResponse([
             'allowed' => false,
             'error' => 'Edit mode not enabled.',
@@ -71,14 +82,6 @@ function cmsHandleEditAction(): void
         ]);
     }
 
-    $data = ($action === 'save' || $action === 'prompt') ? cmsReadJsonBody() : [];
-    if ($data === []) {
-        $data = $_POST;
-    }
-    $path = isset($_GET['path']) ? (string) $_GET['path'] : '';
-    if ($path === '' && isset($data['path'])) {
-        $path = (string) $data['path'];
-    }
     $target = cmsResolveTarget($rootDir, $path);
     if ($target === null) {
         cmsJsonResponse([
@@ -372,6 +375,18 @@ function cmsHandleEditAction(): void
         }
 
         $layoutSection = $subjectType === 'folder' ? 'works' : 'work';
+        $sectionOnlyLayoutUpdate = $hasLayoutUpdate
+            && $layoutSectionTemplateProvided
+            && !$layoutTemplateProvided
+            && !$layoutCssProvided
+            && !$layoutJsProvided
+            && $layoutMode === ''
+            && $layoutPreset === ''
+            && (!is_string($layoutModel) || trim($layoutModel) === '')
+            && $originalLayoutTarget === ''
+            && !$originalLayoutTemplateProvided
+            && !$originalLayoutCssProvided
+            && !$originalLayoutJsProvided;
         if ($hasLayoutUpdate) {
             $layoutValue = $work['layout'] ?? null;
             $layout = is_array($layoutValue) ? $layoutValue : [];
@@ -404,12 +419,26 @@ function cmsHandleEditAction(): void
             $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
 
-        $work['layout'] = PoffConfig::persistLayoutFiles(
-            $targetDir,
-            $subjectType === 'file' ? (string) $targetFile : null,
-            $work['layout'] ?? null,
-            $layoutSection
-        );
+        if ($sectionOnlyLayoutUpdate) {
+            $sanitizedSectionTemplate = PoffConfig::persistSectionTemplate(
+                $targetDir,
+                $subjectType === 'file' ? (string) $targetFile : null,
+                (string) $layoutSectionTemplate,
+                $layoutSection
+            );
+            if (!isset($work['layout']) || !is_array($work['layout'])) {
+                $work['layout'] = [];
+            }
+            $work['layout']['sectionTemplate'] = $sanitizedSectionTemplate;
+            $work['layout'] = Worktype::normalizeLayout($work['layout'], $layoutSection);
+        } else {
+            $work['layout'] = PoffConfig::persistLayoutFiles(
+                $targetDir,
+                $subjectType === 'file' ? (string) $targetFile : null,
+                $work['layout'] ?? null,
+                $layoutSection
+            );
+        }
         if (
             $originalLayoutTarget !== ''
             && ($originalLayoutTemplateProvided || $originalLayoutCssProvided || $originalLayoutJsProvided)
@@ -568,6 +597,7 @@ function cmsHandleEditAction(): void
             'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
             'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
+            'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
             'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
         ]);
         $folderWorkSystemPrompt = array_merge($sharedWorkSystemPrompt, [
@@ -580,6 +610,7 @@ function cmsHandleEditAction(): void
             'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
             'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
+            'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
             'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
         ]);
         $defaultSystemPrompt = implode("\n", $promptIsLayoutTarget

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../../prompt-template-sanitize.php';
+
 function cmsPromptResponseCandidates(string $raw): array
 {
     $trimmed = trim($raw);
@@ -135,52 +137,6 @@ function cmsPromptImagePayload(array $data): ?array
     ];
 }
 
-function cmsDefaultLayoutMainBlock(): string
-{
-    return <<<HBS
-<main class="poff-default-layout__main">
-    {{#if isFolder}}
-        {{> works}}
-    {{else}}
-        {{> work}}
-    {{/if}}
-</main>
-HBS;
-}
-
-function cmsNormalizeLayoutPromptTemplate(string $template): string
-{
-    $trimmed = trim($template);
-    if ($trimmed === '') {
-        return '';
-    }
-
-    $requiredPartials = str_contains($trimmed, '{{> works}}') && str_contains($trimmed, '{{> work}}');
-    $mainPattern = '/<main\b[^>]*class\s*=\s*["\"][^"\']*\bpoff-default-layout__main\b[^"\']*["\'][^>]*>.*?<\/main>/is';
-    $mainBlock = cmsDefaultLayoutMainBlock();
-
-    if (preg_match($mainPattern, $trimmed) === 1) {
-        if ($requiredPartials) {
-            return $trimmed;
-        }
-
-        return preg_replace($mainPattern, $mainBlock, $trimmed, 1) ?? $trimmed;
-    }
-
-    if ($requiredPartials) {
-        return $trimmed;
-    }
-
-    foreach (['</footer>', '</div>'] as $closingTag) {
-        $position = strripos($trimmed, $closingTag);
-        if ($position !== false) {
-            return substr($trimmed, 0, $position) . $mainBlock . "\n\n" . substr($trimmed, $position);
-        }
-    }
-
-    return $trimmed . "\n\n" . $mainBlock;
-}
-
 function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): array
 {
     $trimmed = trim($raw);
@@ -190,7 +146,7 @@ function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): a
 
     $decoded = cmsPromptDecodeLoosePayload($trimmed);
     if (!is_array($decoded)) {
-        return ['template' => $trimmed];
+        return ['template' => cmsSanitizePromptTemplateForTarget($trimmed, $isLayoutTarget)];
     }
 
     $template = '';
@@ -240,9 +196,7 @@ function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): a
         return ['template' => ''];
     }
 
-    if ($isLayoutTarget) {
-        $template = cmsNormalizeLayoutPromptTemplate($template);
-    }
+    $template = cmsSanitizePromptTemplateForTarget($template, $isLayoutTarget);
 
     $result = ['template' => $template];
     foreach (['title', 'description', 'model'] as $key) {

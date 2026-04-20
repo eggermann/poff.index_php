@@ -150,6 +150,24 @@ export function bindPromptWindow({
         promptHistory = tagHistory(list);
     };
 
+    const getHistoryScope = (selection = null) => {
+        const currentSelection = selection || (getActiveSelection ? getActiveSelection() : null) || { path: '' };
+        return {
+            path: currentSelection?.path || '',
+            mode: currentSelection?.isLayout ? 'layout' : (currentSelection?.previewIsFile ? 'file' : 'folder'),
+        };
+    };
+
+    const readHistoryForSelection = (selection = null) => {
+        const scope = getHistoryScope(selection);
+        return readStoredHistory(scope.path, scope.mode);
+    };
+
+    const writeHistoryForSelection = (history, selection = null) => {
+        const scope = getHistoryScope(selection);
+        writeStoredHistory(scope.path, history, scope.mode);
+    };
+
     const renderHistory = (options = {}) => {
         renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
@@ -229,7 +247,7 @@ export function bindPromptWindow({
     const clearPromptHistory = () => {
         stopStreaming(stream);
         setHistory([]);
-        writeStoredHistory(activePath, promptHistory);
+        writeHistoryForSelection(promptHistory);
         renderHistory();
     };
 
@@ -434,6 +452,7 @@ export function bindPromptWindow({
                 const userPrompt = promptInputEl.value.trim();
                 const providerValue = providerEl ? providerEl.value : 'local';
                 const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
                     setGeneratingState(false);
                     if (statusEl) {
@@ -449,7 +468,7 @@ export function bindPromptWindow({
                 // Add a temporary assistant placeholder
                 setHistory([...promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
                 pendingAssistantIndex = promptHistory.length - 1;
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderContext();
                 promptInputEl.value = '';
@@ -460,7 +479,6 @@ export function bindPromptWindow({
                 renderSummary('Generating answer...');
                 const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
-                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
                     path: activePath,
                     provider: providerEl ? providerEl.value : 'local',
@@ -532,7 +550,7 @@ export function bindPromptWindow({
                         setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
                         pendingAssistantIndex = promptHistory.length - 1;
                     }
-                    writeStoredHistory(activePath, promptHistory);
+                    writeHistoryForSelection(promptHistory, selection);
                     renderHistory({ forceScroll: true });
                     if (statusEl) {
                         statusEl.textContent = errMsg;
@@ -563,7 +581,7 @@ export function bindPromptWindow({
                     }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 if (streamToggleEl && streamToggleEl.checked && templateText) {
                     startStreaming({
@@ -742,7 +760,7 @@ export function bindPromptWindow({
                 } else {
                     setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
                 }
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderSummary(errMsg);
             } finally {
@@ -885,7 +903,7 @@ export function bindPromptWindow({
 
     updateProviderUi();
     syncModeAwareSystemPrompt();
-    setHistory(readStoredHistory(activePath));
+    setHistory(readHistoryForSelection(getActiveSelection ? getActiveSelection() : null));
     renderHistory();
     renderContext();
     renderSummary('Waiting for response...');
@@ -915,7 +933,7 @@ export function bindPromptWindow({
         if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
             activePath = nextPath;
             activePromptMode = nextPromptMode;
-            setHistory(readStoredHistory(activePath));
+            setHistory(readHistoryForSelection(selection));
             syncModeAwareSystemPrompt();
             renderHistory();
             renderContext();
@@ -1090,6 +1108,7 @@ export function bindPromptWindow({
                 const userPrompt = promptInputEl.value.trim();
                 const providerValue = providerEl ? providerEl.value : 'local';
                 const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
                     setGeneratingState(false);
                     if (statusEl) {
@@ -1105,7 +1124,7 @@ export function bindPromptWindow({
                 // Add a temporary assistant placeholder
                 setHistory([...promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
                 pendingAssistantIndex = promptHistory.length - 1;
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderContext();
                 promptInputEl.value = '';
@@ -1116,7 +1135,6 @@ export function bindPromptWindow({
                 renderSummary('Generating answer...');
                 const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
-                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
                     path: activePath,
                     provider: providerEl ? providerEl.value : 'local',
@@ -1184,7 +1202,7 @@ export function bindPromptWindow({
                         setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
                         pendingAssistantIndex = promptHistory.length - 1;
                     }
-                    writeStoredHistory(activePath, promptHistory);
+                    writeHistoryForSelection(promptHistory, selection);
                     renderHistory({ forceScroll: true });
                     if (statusEl) {
                         statusEl.textContent = errMsg;
@@ -1215,7 +1233,7 @@ export function bindPromptWindow({
                     }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 if (streamToggleEl && streamToggleEl.checked && templateText) {
                     startStreaming({
@@ -1394,7 +1412,7 @@ export function bindPromptWindow({
                 } else {
                     setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
                 }
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderSummary(errMsg);
             } finally {

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/edit-mode.php';
 require_once __DIR__ . '/edit-config/helpers.php';
 require_once __DIR__ . '/edit-config/payload.php';
 require_once __DIR__ . '/edit-config/apply.php';
@@ -9,16 +10,7 @@ function handleEditConfig(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = $opts['path'] ?? '';
-    $allowFile = $opts['allowFile'] ?? ($rootDir . DIRECTORY_SEPARATOR . '.edit.allow');
-    $allowed = is_file($allowFile);
-
-    if (!$allowed) {
-        return [
-            'route' => 'edit-config',
-            'allowed' => false,
-            'error' => 'Edit mode not enabled.',
-        ];
-    }
+    $allowFile = $opts['allowFile'] ?? null;
 
     if (!class_exists('PoffConfig')) {
         return [
@@ -34,6 +26,17 @@ function handleEditConfig(array $opts): array
             'route' => 'edit-config',
             'allowed' => true,
             'error' => 'Invalid folder path.',
+        ];
+    }
+
+    $allowed = is_string($allowFile) && $allowFile !== ''
+        ? is_file($allowFile)
+        : cmsEditModeAllowedForDirectory($targetDir, $rootDir);
+    if (!$allowed) {
+        return [
+            'route' => 'edit-config',
+            'allowed' => false,
+            'error' => 'Edit mode not enabled.',
         ];
     }
 

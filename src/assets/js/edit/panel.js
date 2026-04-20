@@ -610,7 +610,7 @@ export function renderEditPanel({
     if (!status?.allowed) {
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">Create a file named <code>.edit.allow</code> in the site root to enable edit mode.</div>
+            <div class="edit-status">Create <code>.edit.allow</code> in this folder or an ancestor to enable edit mode. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
         `;
         syncPromptDock();
         return { statusEl: null, promptRoot: null };

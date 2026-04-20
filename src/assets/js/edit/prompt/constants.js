@@ -34,6 +34,7 @@ export const defaultFileSystemPrompt = [
     'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
     'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
     'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
+    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
     'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
 ].join('\n');
 
@@ -49,6 +50,7 @@ export const defaultFolderSystemPrompt = [
     'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
     'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
     'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
+    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
     'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
 ].join('\n');
 

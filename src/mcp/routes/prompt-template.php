@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/viewer/link-targets.php';
+require_once __DIR__ . '/../../includes/edit-mode.php';
+require_once __DIR__ . '/../../includes/prompt-template-sanitize.php';
 
 const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 90;
 
@@ -149,7 +151,7 @@ function mcpParsePromptModelResult(string $raw): array
 
     $decoded = mcpPromptDecodeLoosePayload($trimmed);
     if (!is_array($decoded)) {
-        return ['template' => $trimmed];
+        return ['template' => cmsSanitizePromptTemplateForTarget($trimmed, false)];
     }
 
     $template = '';
@@ -199,7 +201,7 @@ function mcpParsePromptModelResult(string $raw): array
         return ['template' => ''];
     }
 
-    $result = ['template' => $template];
+    $result = ['template' => cmsSanitizePromptTemplateForTarget($template, false)];
     foreach (['title', 'description', 'model'] as $key) {
         if (isset($decoded[$key]) && is_scalar($decoded[$key])) {
             $result[$key] = trim((string) $decoded[$key]);
@@ -796,17 +798,7 @@ function handlePromptTemplate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = $opts['path'] ?? '';
-    $allowFile = $opts['allowFile'] ?? ($rootDir . DIRECTORY_SEPARATOR . '.edit.allow');
-    $allowed = is_file($allowFile);
-
-    if (!$allowed) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => false,
-            'error' => 'Edit mode not enabled.',
-        ];
-    }
-
+    $allowFile = $opts['allowFile'] ?? null;
     if (!class_exists('PoffConfig')) {
         return [
             'route' => 'prompt-template',
@@ -821,6 +813,17 @@ function handlePromptTemplate(array $opts): array
             'route' => 'prompt-template',
             'allowed' => true,
             'error' => 'Invalid folder path.',
+        ];
+    }
+
+    $allowed = is_string($allowFile) && $allowFile !== ''
+        ? is_file($allowFile)
+        : cmsEditModeAllowedForDirectory($targetDir, $rootDir);
+    if (!$allowed) {
+        return [
+            'route' => 'prompt-template',
+            'allowed' => false,
+            'error' => 'Edit mode not enabled.',
         ];
     }
 
@@ -859,6 +862,10 @@ function handlePromptTemplate(array $opts): array
         'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
         'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
         'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
+        'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
+        'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this prompt.',
+        'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this prompt.',
+        'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
         'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
         'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
         'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
