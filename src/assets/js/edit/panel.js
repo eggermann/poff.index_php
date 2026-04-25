@@ -103,9 +103,13 @@ function layoutOverlayState(config, status) {
     const originalLabel = originalEditable
         ? `Editable source: ${originalTarget}`
         : 'PHP built-in poff-layout is read-only until a parent .layout exists';
+    const displayMode = layoutState.mode === 'filesystem-layout'
+        ? 'custom-layout'
+        : layoutState.mode;
 
     return {
         layoutState,
+        displayMode,
         sectionName,
         localLayoutDirectory,
         wrapperTarget,
@@ -146,6 +150,7 @@ function renderEditLayoutPanel({
     const overlayState = layoutOverlayState(config, subjectStatus);
     const {
         layoutState,
+        displayMode,
         sectionName,
         wrapperTarget,
         sectionTarget,
@@ -184,7 +189,7 @@ function renderEditLayoutPanel({
                 <div class="edit-layout-copy">
                     <div class="edit-layout-title">Layout</div>
                     <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
-                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
+                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                     <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
                 </div>
                 <div class="edit-inline-actions edit-layout-header-actions">
@@ -343,6 +348,9 @@ function renderEditLayoutPanel({
         if (preset === 'custom') {
             return 'local';
         }
+        if (preset === 'actual') {
+            return 'virtual';
+        }
         return hasVirtualSource ? 'virtual' : 'local';
     };
 
@@ -352,12 +360,13 @@ function renderEditLayoutPanel({
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
-                : (originalEditable ? 'filesystem-layout' : 'poff-layout');
+                : (originalEditable ? 'custom-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
+        const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');
         const sourcePreview = isVirtual
             ? (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout')
-            : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, '')}`;
+            : `Filesystem: ${localWrapperDirectory}`;
 
         if (modePreviewEl) {
             modePreviewEl.textContent = nextMode;
@@ -371,7 +380,9 @@ function renderEditLayoutPanel({
         if (primaryHintEl) {
             if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
-                    ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    ? (originalTarget === localWrapperDirectory
+                        ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.`
+                        : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`)
                     : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
@@ -904,6 +915,7 @@ export function renderEditLayoutOverlay({
     const overlayState = layoutOverlayState(config, status);
     const {
         layoutState,
+        displayMode,
         sectionName,
         localLayoutDirectory,
         wrapperTarget,
@@ -952,7 +964,7 @@ export function renderEditLayoutOverlay({
                                 <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
                             `).join('')}
                         </select>
-                        <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
+                        <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                         <div class="small-note">Resolved wrapper: <code>${escapeHtml(wrapperSourceLabel)}</code></div>
                     </div>
                     <div class="edit-layout-meta-card">
@@ -1038,6 +1050,9 @@ export function renderEditLayoutOverlay({
         if (preset === 'custom') {
             return 'local';
         }
+        if (preset === 'actual') {
+            return 'virtual';
+        }
         return hasVirtualSource ? 'virtual' : 'local';
     };
 
@@ -1047,7 +1062,7 @@ export function renderEditLayoutOverlay({
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
-                : (originalEditable ? 'filesystem-layout' : 'poff-layout');
+                : (originalEditable ? 'custom-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
 
@@ -1059,8 +1074,11 @@ export function renderEditLayoutOverlay({
         }
         if (primaryHintEl) {
             if (isVirtual) {
+                const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');
                 primaryHintEl.innerHTML = originalEditable
-                    ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    ? (originalTarget === localWrapperDirectory
+                        ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.`
+                        : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`)
                     : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
