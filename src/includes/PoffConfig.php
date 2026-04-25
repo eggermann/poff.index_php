@@ -531,6 +531,30 @@ class PoffConfig
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
+        $mode = trim((string) ($resolved['mode'] ?? ''));
+        $name = trim((string) ($resolved['name'] ?? ''));
+        $preset = trim((string) ($resolved['preset'] ?? ''));
+        $isNoneLayout = $mode === 'none' || $name === 'none' || $preset === 'none';
+
+        if ($isNoneLayout) {
+            $resolved['mode'] = 'none';
+            $resolved['name'] = 'none';
+            $resolved['storage'] = 'none';
+            $resolved['directory'] = '';
+            $resolved['inheritedDirectory'] = '';
+            $resolved['sectionDirectory'] = '';
+            $resolved['template'] = '';
+            $resolved['css'] = '';
+            $resolved['js'] = '';
+            $resolved['sectionTemplate'] = '';
+            $resolved['assets'] = [];
+            $resolved['files'] = [];
+            $resolved['assetCount'] = 0;
+            unset($resolved['cssHref'], $resolved['jsHref'], $resolved['phpTemplate']);
+
+            return $resolved;
+        }
+
         if (array_key_exists('template', $resolved)) {
             $resolved['template'] = self::sanitizeStoredPromptTemplate((string) $resolved['template'], true);
         }

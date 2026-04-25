@@ -1325,6 +1325,29 @@ describe('Worktype HBS renderer', () => {
     expect(ensured.work.layout.js).toContain('__editedDefaultFsLayout');
   });
 
+  test('ignores inherited .layout files when layout mode is none', async () => {
+    await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
+      layout: {
+        name: 'none',
+        preset: 'none',
+      },
+    });
+
+    const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(ensured.work.layout).toMatchObject({
+      name: 'none',
+      mode: 'none',
+      storage: 'none',
+    });
+    expect(ensured.work.layout.sectionTemplate || '').toBe('');
+
+    const output = await runViewer('inherits-default');
+    expect(output).not.toContain('<div class="default-fs-layout">');
+    expect(output).not.toContain('tests/poff-tests/.layout/style.css');
+    expect(output).toContain('<div class="folder-view">');
+    expect(output).toContain('child.txt');
+  });
+
   test('resolves virtual .layout targets separately from real file and folder targets', async () => {
     const folderTarget = JSON.parse(await runLayoutFilesystem('resolve-target', POFF_DIR, 'inherits-default/.layout'));
     expect(folderTarget).toMatchObject({
