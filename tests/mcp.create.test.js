@@ -1580,6 +1580,69 @@ describe('Worktype HBS renderer', () => {
     expect(ensuredConfig.work.layout.preset).toBe('actual');
   });
 
+  test('keeps custom layout files when switching presets away from custom', async () => {
+    const payload = {
+      name: 'custom-layout',
+      engine: 'lightncandy',
+      section: 'works',
+      preset: 'custom',
+      template: '<div class="saved-custom-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+      sectionTemplate: '<section class="saved-custom-works">{{title}}</section>',
+      css: '.saved-custom-layout{color:#123;}',
+      js: 'window.__savedCustomLayout = true;',
+    };
+
+    await runLayoutFilesystem('persist-folder', PERSIST_LAYOUT_DIR, '', payload);
+
+    await runViewerSave(POFF_DIR, 'persist-layout/.layout', {
+      layout: {
+        name: 'none',
+        preset: 'none',
+        template: '',
+        sectionTemplate: '',
+        css: '',
+        js: '',
+      },
+    });
+
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('saved-custom-works');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__savedCustomLayout');
+
+    await runViewerSave(POFF_DIR, 'persist-layout/.layout', {
+      layout: {
+        name: 'custom-layout',
+        preset: 'custom',
+        template: '',
+        sectionTemplate: '',
+        css: '',
+        js: '',
+      },
+    });
+
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('saved-custom-works');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__savedCustomLayout');
+
+    await runViewerSave(POFF_DIR, 'persist-layout/.layout', {
+      layout: {
+        name: 'filesystem-layout',
+        preset: 'inherit',
+        template: '',
+        sectionTemplate: '',
+        css: '',
+        js: '',
+      },
+    });
+
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('saved-custom-works');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__savedCustomLayout');
+  });
+
   test('persists wrapped content partials into works.hbs without replacing the wrapper', async () => {
     const payload = {
       name: 'poff-layout',

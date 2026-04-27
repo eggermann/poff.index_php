@@ -418,6 +418,16 @@ function cmsHandleEditAction(): void
             if (is_string($layoutModel) && $layoutModel !== '') {
                 $layout['model'] = $layoutModel;
             }
+            foreach ([
+                'template' => $layoutTemplateProvided,
+                'sectionTemplate' => $layoutSectionTemplateProvided,
+                'css' => $layoutCssProvided,
+                'js' => $layoutJsProvided,
+            ] as $layoutFileKey => $wasProvided) {
+                if (!$wasProvided && array_key_exists($layoutFileKey, $layout) && trim((string) $layout[$layoutFileKey]) === '') {
+                    unset($layout[$layoutFileKey]);
+                }
+            }
             $work['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
         } elseif ($workLayout !== '') {
             $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);

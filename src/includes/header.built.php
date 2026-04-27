@@ -761,6 +761,11 @@ body, html {
   padding: 12px 14px;
 }
 
+.edit-layout-select-actions {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
 .edit-layout-manual {
   margin-top: 18px;
 }
@@ -810,6 +815,14 @@ body, html {
   background: #ea580c;
 }
 
+@media (max-width: 720px) {
+  .edit-layout-select-actions {
+    justify-content: stretch;
+  }
+  .edit-layout-select-actions .btn {
+    width: 100%;
+  }
+}
 .edit-drawer {
   position: absolute;
   top: 0;

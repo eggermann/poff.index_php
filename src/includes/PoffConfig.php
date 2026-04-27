@@ -406,15 +406,52 @@ class PoffConfig
     public static function persistLayoutFiles(string $dir, ?string $fileName, mixed $layout, string $section = 'work'): array
     {
         $normalized = Worktype::normalizeLayout($layout, $section);
+        $layoutMode = trim((string) ($normalized['mode'] ?? ''));
+        $layoutName = trim((string) ($normalized['name'] ?? ''));
+        $layoutPreset = trim((string) ($normalized['preset'] ?? ''));
+        $inactivePreset = $layoutMode === 'none'
+            || $layoutName === 'none'
+            || $layoutPreset === 'none'
+            || (
+                $layoutPreset === 'actual'
+                && in_array($layoutName, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)
+            );
+        $isCustomPreset = $layoutMode === 'custom-layout'
+            || $layoutName === 'custom-layout'
+            || $layoutPreset === 'custom';
         if (array_key_exists('template', $normalized)) {
             $normalized['template'] = self::sanitizeStoredPromptTemplate((string) $normalized['template'], true);
         }
         if (array_key_exists('sectionTemplate', $normalized)) {
             $normalized['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $normalized['sectionTemplate'], false);
         }
+        if ($inactivePreset) {
+            foreach (['template', 'css', 'js', 'sectionTemplate'] as $key) {
+                unset($normalized[$key]);
+            }
+        }
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
+        $managedLayoutKeys = ['template', 'css', 'js', 'sectionTemplate'];
+        $providedManagedKeys = array_values(array_filter(
+            $managedLayoutKeys,
+            static fn(string $key): bool => array_key_exists($key, $normalized)
+        ));
+        $allProvidedManagedValuesEmpty = $providedManagedKeys !== [];
+        foreach ($providedManagedKeys as $key) {
+            if (trim((string) $normalized[$key]) !== '') {
+                $allProvidedManagedValuesEmpty = false;
+                break;
+            }
+        }
+        $hasExistingManagedLayoutFile = self::hasWrapperFiles($layoutDir)
+            || is_file($layoutDir . DIRECTORY_SEPARATOR . self::sectionTemplateFile($section));
+        if ($isCustomPreset && $allProvidedManagedValuesEmpty && $hasExistingManagedLayoutFile) {
+            foreach ($providedManagedKeys as $key) {
+                unset($normalized[$key]);
+            }
+        }
         self::writeManagedLayoutFiles($layoutDir, self::defaultLayoutFiles($section));
         self::writeManagedLayoutFiles($layoutDir, [
             self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,

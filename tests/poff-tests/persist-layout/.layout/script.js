@@ -1,1 +1,1 @@
-window.__persistedLayout = true;
+window.__savedCustomLayout = true;

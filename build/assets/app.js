@@ -2866,6 +2866,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       sectionName,
       wrapperTarget,
       sectionTarget,
+      wrapperWasLocal,
       sectionWasLocal,
       originalTarget,
       originalEditable,
@@ -3159,9 +3160,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             payload.originalLayoutJs = drafts.virtualJs;
           }
         } else {
-          payload.layoutTemplate = drafts.localTemplate;
-          payload.layoutCss = drafts.localCss;
-          payload.layoutJs = drafts.localJs;
+          const hasLocalDraft = wrapperWasLocal || drafts.localTemplate.trim() !== "" || drafts.localCss.trim() !== "" || drafts.localJs.trim() !== "";
+          if (hasLocalDraft) {
+            payload.layoutTemplate = drafts.localTemplate;
+            payload.layoutCss = drafts.localCss;
+            payload.layoutJs = drafts.localJs;
+          }
         }
         await onSubmitLayout({
           payload,

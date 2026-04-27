@@ -54,6 +54,16 @@ function mcpApplyEditConfigPayload(array $config, array $payload, string $target
     if (is_string($payload['layoutModel']) && $payload['layoutModel'] !== '') {
         $layout['model'] = $payload['layoutModel'];
     }
+    foreach ([
+        'template' => $payload['layoutTemplateProvided'],
+        'sectionTemplate' => $payload['layoutSectionTemplateProvided'],
+        'css' => $payload['layoutCssProvided'],
+        'js' => $payload['layoutJsProvided'],
+    ] as $layoutFileKey => $wasProvided) {
+        if (!$wasProvided && array_key_exists($layoutFileKey, $layout) && trim((string) $layout[$layoutFileKey]) === '') {
+            unset($layout[$layoutFileKey]);
+        }
+    }
 
     $layoutSection = 'works';
     $hasLayoutUpdate = $payload['layoutPayloadProvided']

@@ -202,6 +202,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     const layoutValue = (_a = config == null ? void 0 : config.work) == null ? void 0 : _a.layout;
     const normalizePreset = (value) => {
       const preset = String(value || "").trim();
+      if (preset === "inherit") {
+        return "actual";
+      }
       return ["actual", "none", "custom"].includes(preset) ? preset : "";
     };
     const inferredSection = layoutValue && typeof layoutValue === "object" && !Array.isArray(layoutValue) && layoutValue.section ? String(layoutValue.section) : (config == null ? void 0 : config.type) === "folder" || ((_b = config == null ? void 0 : config.work) == null ? void 0 : _b.type) === "folder" && !(config == null ? void 0 : config.name) ? "works" : "work";
@@ -259,11 +262,11 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   }
 
   // src/assets/js/edit/prompt/mode.js
-  function getPromptMode(selection = null) {
-    if (selection == null ? void 0 : selection.isLayout) {
+  function getPromptMode(selection2 = null) {
+    if (selection2 == null ? void 0 : selection2.isLayout) {
       return "layout";
     }
-    return (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder";
+    return (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder";
   }
   function getDefaultSystemPromptForMode(mode, prompts = {}) {
     if (mode === "layout") {
@@ -327,6 +330,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
     "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
     "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.",
+    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
     "Return only the inner partial content that will be rendered inside the existing layout wrapper."
   ].join("\n");
   var defaultFolderSystemPrompt = [
@@ -341,6 +345,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
     "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
     "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.",
+    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
     "Return only the inner folder partial content that will be rendered inside the existing layout wrapper."
   ].join("\n");
   var defaultLayoutSystemPrompt = [
@@ -356,7 +361,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.",
     'Prefer returning sibling "css" and "js" strings too, so the custom layout can create template.hbs, style.css, and script.js together.',
     "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
-    "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.",
+    "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
     "Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
@@ -385,6 +390,11 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   };
 
   // src/assets/js/edit/prompt/storage.js
+  function normalizeHistoryScope(path, mode = "") {
+    const normalizedPath = String(path != null ? path : "").trim().replace(/^\/+|\/+$/g, "");
+    const normalizedMode = String(mode != null ? mode : "").trim() || "folder";
+    return `${normalizedMode}:${normalizedPath || "__root__"}`;
+  }
   function loadPromptSettings() {
     try {
       const rawStored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
@@ -422,25 +432,21 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     } catch (err) {
     }
   }
-  function readStoredHistory(path) {
-    if (!path) {
-      return [];
-    }
+  function readStoredHistory(path, mode = "") {
     try {
       const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || "{}");
-      const list = stored[path] || [];
+      const scopedKey = normalizeHistoryScope(path, mode);
+      const legacyKey = String(path != null ? path : "").trim();
+      const list = stored[scopedKey] || stored[legacyKey] || [];
       return Array.isArray(list) ? list : [];
     } catch (err) {
       return [];
     }
   }
-  function writeStoredHistory(path, history) {
-    if (!path) {
-      return;
-    }
+  function writeStoredHistory(path, history, mode = "") {
     try {
       const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || "{}");
-      stored[path] = history;
+      stored[normalizeHistoryScope(path, mode)] = history;
       localStorage.setItem(promptHistoryKey, JSON.stringify(stored));
     } catch (err) {
     }
@@ -642,8 +648,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return field.value;
   }
-  function readPromptEditorDraft(selection = {}, root = document) {
-    const isLayout = !!(selection == null ? void 0 : selection.isLayout);
+  function readPromptEditorDraft(selection2 = {}, root = document) {
+    const isLayout = !!(selection2 == null ? void 0 : selection2.isLayout);
     const template = readFieldValue(root, isLayout ? "#edit-layout-primary-template" : "#edit-content-template");
     if (template === null) {
       return null;
@@ -787,13 +793,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
   function buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig }) {
     var _a, _b, _c;
-    const selection = typeof getActiveSelection2 === "function" ? getActiveSelection2() : { path: "", isFile: false };
+    const selection2 = typeof getActiveSelection2 === "function" ? getActiveSelection2() : { path: "", isFile: false };
     const config = typeof getConfig === "function" ? getConfig() || {} : {};
-    const isLayout = !!(selection == null ? void 0 : selection.isLayout);
-    const path = (_b = (_a = selection == null ? void 0 : selection.previewPath) != null ? _a : selection == null ? void 0 : selection.path) != null ? _b : "";
-    const virtualPath = (selection == null ? void 0 : selection.path) || "";
+    const isLayout = !!(selection2 == null ? void 0 : selection2.isLayout);
+    const path = (_b = (_a = selection2 == null ? void 0 : selection2.previewPath) != null ? _a : selection2 == null ? void 0 : selection2.path) != null ? _b : "";
+    const virtualPath = (selection2 == null ? void 0 : selection2.path) || "";
     const name = path ? path.split(/[\\/]/).pop() : "";
-    const isFile = isLayout ? !!(selection == null ? void 0 : selection.layoutIsFile) : (_c = selection == null ? void 0 : selection.isFile) != null ? _c : /\.[^\\/]+$/.test(path);
+    const isFile = isLayout ? !!(selection2 == null ? void 0 : selection2.layoutIsFile) : (_c = selection2 == null ? void 0 : selection2.isFile) != null ? _c : /\.[^\\/]+$/.test(path);
     const viewUrl = isFile ? `?view=1&file=${encodeURIComponent(path)}` : `?view=1&path=${encodeURIComponent(path)}`;
     const localLayoutDirectory = isFile ? `.works/${name || "item"}.layout` : ".layout";
     const sectionTemplateTarget = isFile ? `${localLayoutDirectory}/work.hbs` : `${localLayoutDirectory}/works.hbs`;
@@ -819,7 +825,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     })();
     const templateTarget = isLayout ? `${activeLayoutDirectory}/template.hbs` : sectionTemplateTarget;
     const tree = Array.isArray(config == null ? void 0 : config.tree) ? config.tree : [];
-    const folderBasePath = ((selection == null ? void 0 : selection.isFile) ? path.split("/").slice(0, -1).join("/") : path).replace(/^\/+|\/+$/g, "");
+    const folderBasePath = ((selection2 == null ? void 0 : selection2.isFile) ? path.split("/").slice(0, -1).join("/") : path).replace(/^\/+|\/+$/g, "");
     const ellipsis = "\u2026";
     const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
       if (typeof value === "boolean") {
@@ -850,7 +856,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return `${assetPath} -> ${layoutBaseHref}/${assetPath}`;
     }).filter(Boolean).join(" | ") : "";
-    const editorDraft = readPromptEditorDraft(selection);
+    const editorDraft = readPromptEditorDraft(selection2);
     return {
       path,
       virtualPath,
@@ -1273,8 +1279,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     });
     const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
     const currentHasImageContext = () => {
-      const selection = getActiveSelection2 ? getActiveSelection2() : null;
-      const selectionPath = typeof (selection == null ? void 0 : selection.previewPath) === "string" && selection.previewPath.trim() !== "" ? selection.previewPath : typeof (selection == null ? void 0 : selection.path) === "string" ? selection.path : "";
+      const selection2 = getActiveSelection2 ? getActiveSelection2() : null;
+      const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
       return imageContextPattern.test(selectionPath);
     };
     const readPromptLayerState = () => {
@@ -1329,12 +1335,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const list = Array.isArray(nextHistory) ? nextHistory : [];
       promptHistory = tagHistory(list);
     };
+    const getHistoryScope = (selection2 = null) => {
+      const currentSelection = selection2 || (getActiveSelection2 ? getActiveSelection2() : null) || { path: "" };
+      return {
+        path: (currentSelection == null ? void 0 : currentSelection.path) || "",
+        mode: (currentSelection == null ? void 0 : currentSelection.isLayout) ? "layout" : (currentSelection == null ? void 0 : currentSelection.previewIsFile) ? "file" : "folder"
+      };
+    };
+    const readHistoryForSelection = (selection2 = null) => {
+      const scope = getHistoryScope(selection2);
+      return readStoredHistory(scope.path, scope.mode);
+    };
+    const writeHistoryForSelection = (history, selection2 = null) => {
+      const scope = getHistoryScope(selection2);
+      writeStoredHistory(scope.path, history, scope.mode);
+    };
     const renderHistory = (options = {}) => {
       renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
     const getCurrentTemplateField = () => {
-      const selection = getActiveSelection2 ? getActiveSelection2() : null;
-      const selector = (selection == null ? void 0 : selection.isLayout) ? "#edit-layout-primary-template" : "#edit-content-template";
+      const selection2 = getActiveSelection2 ? getActiveSelection2() : null;
+      const selector = (selection2 == null ? void 0 : selection2.isLayout) ? "#edit-layout-primary-template" : "#edit-content-template";
       return document.querySelector(selector);
     };
     const renderTemplatePreview = () => {
@@ -1342,15 +1363,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!promptTemplateCodeEl) {
         return;
       }
-      const selection = getActiveSelection2 ? getActiveSelection2() : null;
+      const selection2 = getActiveSelection2 ? getActiveSelection2() : null;
       const templateField = getCurrentTemplateField();
       const currentConfig = getConfig ? getConfig() || {} : {};
       const layout = ((_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) && typeof currentConfig.work.layout === "object" ? currentConfig.work.layout : {};
       const explicitTemplate = templateField && typeof templateField.value === "string" ? templateField.value : "";
-      const fallbackTemplate = (selection == null ? void 0 : selection.isLayout) ? typeof layout.template === "string" && layout.template || (typeof layout.phpTemplate === "string" ? layout.phpTemplate : "") : typeof layout.sectionTemplate === "string" && layout.sectionTemplate || (typeof layout.defaultSectionTemplate === "string" ? layout.defaultSectionTemplate : "");
+      const fallbackTemplate = (selection2 == null ? void 0 : selection2.isLayout) ? typeof layout.template === "string" && layout.template || (typeof layout.phpTemplate === "string" ? layout.phpTemplate : "") : typeof layout.sectionTemplate === "string" && layout.sectionTemplate || (typeof layout.defaultSectionTemplate === "string" ? layout.defaultSectionTemplate : "");
       promptTemplateCodeEl.value = explicitTemplate || fallbackTemplate || "";
       if (promptTemplateLabelEl) {
-        promptTemplateLabelEl.textContent = (selection == null ? void 0 : selection.isLayout) ? "Current layout wrapper template" : "Current wrapped partial template";
+        promptTemplateLabelEl.textContent = (selection2 == null ? void 0 : selection2.isLayout) ? "Current layout wrapper template" : "Current wrapped partial template";
       }
     };
     const renderContext = () => {
@@ -1394,7 +1415,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const clearPromptHistory = () => {
       stopStreaming(stream);
       setHistory([]);
-      writeStoredHistory(activePath, promptHistory);
+      writeHistoryForSelection(promptHistory);
       renderHistory();
     };
     const attachImageFile = async (file) => {
@@ -1467,8 +1488,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (isSending) {
           return;
         }
-        const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
-        const isLayoutTarget = !!(selection == null ? void 0 : selection.isLayout);
+        const selection2 = getActiveSelection2 ? getActiveSelection2() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
+        const isLayoutTarget = !!(selection2 == null ? void 0 : selection2.isLayout);
         const resetLabel = isLayoutTarget ? "current layout wrapper template" : "current wrapped partial template";
         if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
           return;
@@ -1489,8 +1510,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           if (isLayoutTarget) {
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
-            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
-            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
             const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
             const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
             const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
@@ -1578,6 +1599,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const userPrompt = promptInputEl.value.trim();
           const providerValue = providerEl ? providerEl.value : "local";
           const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
+          const selection2 = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
           if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
             setGeneratingState(false);
             if (statusEl) {
@@ -1590,7 +1612,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           setHistory([...promptHistory, { role: "user", content: userPrompt }].slice(-12));
           setHistory([...promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
           pendingAssistantIndex = promptHistory.length - 1;
-          writeStoredHistory(activePath, promptHistory);
+          writeHistoryForSelection(promptHistory, selection2);
           renderHistory({ forceScroll: true });
           renderContext();
           promptInputEl.value = "";
@@ -1601,7 +1623,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           renderSummary("Generating answer...");
           const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
           const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
-          const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
           const payload = {
             path: activePath,
             provider: providerEl ? providerEl.value : "local",
@@ -1612,11 +1633,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             history: historyForRequest,
             systemPrompt: systemPromptValue
           };
-          const editorDraft = readPromptEditorDraft(selection);
+          const editorDraft = readPromptEditorDraft(selection2);
           if (editorDraft) {
             payload.draft = editorDraft;
           }
-          if (selection == null ? void 0 : selection.isLayout) {
+          if (selection2 == null ? void 0 : selection2.isLayout) {
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             if (layoutPresetEl2 && typeof layoutPresetEl2.value === "string" && layoutPresetEl2.value.trim() !== "") {
               payload.layoutPreset = layoutPresetEl2.value.trim();
@@ -1635,9 +1656,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
           const nextCss = typeof response.css === "string" ? response.css : null;
           const nextJs = typeof response.js === "string" ? response.js : null;
-          const isLayoutTarget = !!selection.isLayout;
+          const isLayoutTarget = !!selection2.isLayout;
           const currentConfig = getConfig ? getConfig() : null;
-          const layoutSectionKey = isLayoutTarget ? (selection == null ? void 0 : selection.previewIsFile) || (selection == null ? void 0 : selection.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
+          const layoutSectionKey = isLayoutTarget ? (selection2 == null ? void 0 : selection2.previewIsFile) || (selection2 == null ? void 0 : selection2.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
           const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
           const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
           const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
@@ -1663,7 +1684,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
               pendingAssistantIndex = promptHistory.length - 1;
             }
-            writeStoredHistory(activePath, promptHistory);
+            writeHistoryForSelection(promptHistory, selection2);
             renderHistory({ forceScroll: true });
             if (statusEl) {
               statusEl.textContent = errMsg;
@@ -1694,7 +1715,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             }].slice(-12));
             pendingAssistantIndex = promptHistory.length - 1;
           }
-          writeStoredHistory(activePath, promptHistory);
+          writeHistoryForSelection(promptHistory, selection2);
           renderHistory({ forceScroll: true });
           if (streamToggleEl && streamToggleEl.checked && templateText) {
             startStreaming({
@@ -1769,8 +1790,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
             layoutPayload.preset = preset;
-            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
-            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
             const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
             const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
             const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
@@ -1864,7 +1885,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           } else {
             setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
           }
-          writeStoredHistory(activePath, promptHistory);
+          writeHistoryForSelection(promptHistory, selection);
           renderHistory({ forceScroll: true });
           renderSummary(errMsg);
         } finally {
@@ -1991,33 +2012,33 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     updateProviderUi();
     syncModeAwareSystemPrompt();
-    setHistory(readStoredHistory(activePath));
+    setHistory(readHistoryForSelection(getActiveSelection2 ? getActiveSelection2() : null));
     renderHistory();
     renderContext();
     renderSummary("Waiting for response...");
     updateAttachmentUi();
     const reloadViewer = () => {
       const frame = document.getElementById("contentFrame");
-      const selection = getActiveSelection2 ? getActiveSelection2() : { path: "", isFile: false };
-      const selectionPath = selection && Object.prototype.hasOwnProperty.call(selection, "previewPath") ? selection.previewPath : void 0;
+      const selection2 = getActiveSelection2 ? getActiveSelection2() : { path: "", isFile: false };
+      const selectionPath = selection2 && Object.prototype.hasOwnProperty.call(selection2, "previewPath") ? selection2.previewPath : void 0;
       const activeViewerPath = selectionPath != null ? selectionPath : activePath;
       if (frame && activeViewerPath !== null && activeViewerPath !== void 0) {
         window.dispatchEvent(new CustomEvent("poff:content-updated", {
           detail: {
             path: activeViewerPath,
-            target: (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder"
+            target: (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder"
           }
         }));
       }
     };
     const syncHistoryForPath = () => {
-      const selection = getActiveSelection2 ? getActiveSelection2() : { path: "" };
-      const nextPath = (selection == null ? void 0 : selection.path) || "";
-      const nextPromptMode = (selection == null ? void 0 : selection.isLayout) ? "layout" : (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder";
+      const selection2 = getActiveSelection2 ? getActiveSelection2() : { path: "" };
+      const nextPath = (selection2 == null ? void 0 : selection2.path) || "";
+      const nextPromptMode = (selection2 == null ? void 0 : selection2.isLayout) ? "layout" : (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder";
       if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
         activePath = nextPath;
         activePromptMode = nextPromptMode;
-        setHistory(readStoredHistory(activePath));
+        setHistory(readHistoryForSelection(selection2));
         syncModeAwareSystemPrompt();
         renderHistory();
         renderContext();
@@ -2058,8 +2079,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (isSending) {
           return;
         }
-        const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
-        const isLayoutTarget = !!(selection == null ? void 0 : selection.isLayout);
+        const selection2 = getActiveSelection2 ? getActiveSelection2() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
+        const isLayoutTarget = !!(selection2 == null ? void 0 : selection2.isLayout);
         const resetLabel = isLayoutTarget ? "current layout wrapper template" : "current wrapped partial template";
         if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
           return;
@@ -2080,8 +2101,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           if (isLayoutTarget) {
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
-            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
-            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
             const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
             const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
             const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
@@ -2171,6 +2192,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const userPrompt = promptInputEl.value.trim();
           const providerValue = providerEl ? providerEl.value : "local";
           const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
+          const selection2 = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
           if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
             setGeneratingState(false);
             if (statusEl) {
@@ -2183,7 +2205,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           setHistory([...promptHistory, { role: "user", content: userPrompt }].slice(-12));
           setHistory([...promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
           pendingAssistantIndex = promptHistory.length - 1;
-          writeStoredHistory(activePath, promptHistory);
+          writeHistoryForSelection(promptHistory, selection2);
           renderHistory({ forceScroll: true });
           renderContext();
           promptInputEl.value = "";
@@ -2194,7 +2216,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           renderSummary("Generating answer...");
           const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
           const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
-          const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
           const payload = {
             path: activePath,
             provider: providerEl ? providerEl.value : "local",
@@ -2205,7 +2226,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             history: historyForRequest,
             systemPrompt: systemPromptValue
           };
-          if (selection == null ? void 0 : selection.isLayout) {
+          if (selection2 == null ? void 0 : selection2.isLayout) {
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             if (layoutPresetEl2 && typeof layoutPresetEl2.value === "string" && layoutPresetEl2.value.trim() !== "") {
               payload.layoutPreset = layoutPresetEl2.value.trim();
@@ -2224,9 +2245,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
           const nextCss = typeof response.css === "string" ? response.css : null;
           const nextJs = typeof response.js === "string" ? response.js : null;
-          const isLayoutTarget = !!selection.isLayout;
+          const isLayoutTarget = !!selection2.isLayout;
           const currentConfig = getConfig ? getConfig() : null;
-          const layoutSectionKey = isLayoutTarget ? (selection == null ? void 0 : selection.previewIsFile) || (selection == null ? void 0 : selection.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
+          const layoutSectionKey = isLayoutTarget ? (selection2 == null ? void 0 : selection2.previewIsFile) || (selection2 == null ? void 0 : selection2.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
           const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
           const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
           const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
@@ -2252,7 +2273,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
               pendingAssistantIndex = promptHistory.length - 1;
             }
-            writeStoredHistory(activePath, promptHistory);
+            writeHistoryForSelection(promptHistory, selection2);
             renderHistory({ forceScroll: true });
             if (statusEl) {
               statusEl.textContent = errMsg;
@@ -2283,7 +2304,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             }].slice(-12));
             pendingAssistantIndex = promptHistory.length - 1;
           }
-          writeStoredHistory(activePath, promptHistory);
+          writeHistoryForSelection(promptHistory, selection2);
           renderHistory({ forceScroll: true });
           if (streamToggleEl && streamToggleEl.checked && templateText) {
             startStreaming({
@@ -2358,8 +2379,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             const layoutPresetEl2 = document.getElementById("edit-layout-preset");
             const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
             layoutPayload.preset = preset;
-            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
-            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
             const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
             const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
             const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
@@ -2453,7 +2474,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           } else {
             setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
           }
-          writeStoredHistory(activePath, promptHistory);
+          writeHistoryForSelection(promptHistory, selection);
           renderHistory({ forceScroll: true });
           renderSummary(errMsg);
         } finally {
@@ -2809,8 +2830,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const wrapperSourceLabel = layoutState.storage === "filesystem" ? `Filesystem: ${layoutState.directory || localLayoutDirectory}` : "PHP built-in poff-layout";
     const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
     const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
+    const displayMode = layoutState.mode === "filesystem-layout" ? "custom-layout" : layoutState.mode;
     return {
       layoutState,
+      displayMode,
       sectionName,
       localLayoutDirectory,
       wrapperTarget,
@@ -2838,6 +2861,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     status,
     contentTargetLabel,
     onSubmitLayout,
+    onLayoutPresetChange,
     onReturnToWork,
     onUploadFiles,
     onCreateBlankFile
@@ -2850,9 +2874,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const overlayState = layoutOverlayState(config, subjectStatus);
     const {
       layoutState,
+      displayMode,
       sectionName,
       wrapperTarget,
       sectionTarget,
+      wrapperWasLocal,
       sectionWasLocal,
       originalTarget,
       originalEditable,
@@ -2869,7 +2895,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     } = overlayState;
     const subjectLabel = subjectStatus.target === "file" ? "file" : "folder";
     const layoutPresetOptions = [
-      { value: "actual", label: "Actual" },
+      { value: "actual", label: "Inherit" },
       { value: "none", label: "None" },
       { value: "custom", label: "Custom" }
     ];
@@ -2885,13 +2911,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div class="edit-layout-copy">
                     <div class="edit-layout-title">Layout</div>
                     <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
-                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
+                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                     <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
                 </div>
                 <div class="edit-inline-actions edit-layout-header-actions">
                     <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
                     <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
-                    <button class="btn" type="submit">Save layout</button>
                 </div>
             </div>
             <div class="edit-grid edit-grid-cols">
@@ -2906,6 +2931,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div class="edit-layout-copy edit-layout-section-note">
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
                     <div class="small-note" id="edit-layout-primary-hint"></div>
+                    <div class="edit-inline-actions edit-layout-select-actions">
+                        <button class="btn" type="submit">Save layout</button>
+                    </div>
                 </div>
             </div>
         </form>
@@ -3041,14 +3069,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (preset === "custom") {
         return "local";
       }
+      if (preset === "actual") {
+        return "virtual";
+      }
       return hasVirtualSource ? "virtual" : "local";
     };
     const syncLayoutMode = () => {
       const preset = ((presetEl == null ? void 0 : presetEl.value) || "actual").trim();
-      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : originalEditable ? "filesystem-layout" : "poff-layout";
+      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : originalEditable ? "custom-layout" : "poff-layout";
       const primaryMode = currentPrimaryMode();
       const isVirtual = primaryMode === "virtual";
-      const sourcePreview = isVirtual ? originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, "")}`;
+      const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, "");
+      const sourcePreview = isVirtual ? originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
       if (modePreviewEl) {
         modePreviewEl.textContent = nextMode;
       }
@@ -3060,7 +3092,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       if (primaryHintEl) {
         if (isVirtual) {
-          primaryHintEl.innerHTML = originalEditable ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled poff-layout. It stays read-only until a parent .layout exists.";
+          primaryHintEl.innerHTML = originalEditable ? originalTarget === localWrapperDirectory ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.` : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled poff-layout. It stays read-only until a parent .layout exists.";
         } else {
           primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
         }
@@ -3092,9 +3124,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       drafts.localJs = (_f = primaryJsEl == null ? void 0 : primaryJsEl.value) != null ? _f : "";
     };
     if (presetEl) {
-      presetEl.addEventListener("change", () => {
+      presetEl.addEventListener("change", async () => {
         storePrimaryDraft();
         syncLayoutMode();
+        if (typeof onLayoutPresetChange === "function") {
+          await onLayoutPresetChange({
+            payload: {
+              layoutPreset: (presetEl.value || "actual").trim()
+            },
+            statusEl
+          });
+        }
       });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
@@ -3132,9 +3172,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             payload.originalLayoutJs = drafts.virtualJs;
           }
         } else {
-          payload.layoutTemplate = drafts.localTemplate;
-          payload.layoutCss = drafts.localCss;
-          payload.layoutJs = drafts.localJs;
+          const hasLocalDraft = wrapperWasLocal || drafts.localTemplate.trim() !== "" || drafts.localCss.trim() !== "" || drafts.localJs.trim() !== "";
+          if (hasLocalDraft) {
+            payload.layoutTemplate = drafts.localTemplate;
+            payload.layoutCss = drafts.localCss;
+            payload.layoutJs = drafts.localJs;
+          }
         }
         await onSubmitLayout({
           payload,
@@ -3269,6 +3312,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onOpenLayoutPage,
     onReturnToWork,
     onSubmitLayout,
+    onLayoutPresetChange,
     onUploadFiles,
     onCreateBlankFile
   }) {
@@ -3294,7 +3338,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (!(status == null ? void 0 : status.allowed)) {
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">Create a file named <code>.edit.allow</code> in the site root to enable edit mode.</div>
+            <div class="edit-status">Create <code>.edit.allow</code> in this folder or an ancestor to enable edit mode. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
         `;
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
@@ -3306,6 +3350,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         status,
         contentTargetLabel,
         onSubmitLayout,
+        onLayoutPresetChange,
         onReturnToWork,
         onUploadFiles,
         onCreateBlankFile
@@ -3560,28 +3605,28 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let editConfig = currentPoffConfig;
     let editTarget = "folder";
     let drawerOpen = false;
-    function getContentTargetPath(selection = getActiveSelection()) {
-      if (selection == null ? void 0 : selection.isLayout) {
-        return selection.path || "";
+    function getContentTargetPath(selection2 = getActiveSelection()) {
+      if (selection2 == null ? void 0 : selection2.isLayout) {
+        return selection2.path || "";
       }
-      const previewPath = (selection == null ? void 0 : selection.previewPath) || (selection == null ? void 0 : selection.path) || "";
-      if (selection == null ? void 0 : selection.previewIsFile) {
+      const previewPath = (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
+      if (selection2 == null ? void 0 : selection2.previewIsFile) {
         return previewPath.split("/").slice(0, -1).join("/");
       }
       return previewPath;
     }
-    function getEditTargetPath(selection = getActiveSelection()) {
-      if (selection == null ? void 0 : selection.isLayout) {
-        return selection.path || "";
+    function getEditTargetPath(selection2 = getActiveSelection()) {
+      if (selection2 == null ? void 0 : selection2.isLayout) {
+        return selection2.path || "";
       }
-      if (selection == null ? void 0 : selection.previewIsFile) {
+      if (selection2 == null ? void 0 : selection2.previewIsFile) {
         const activeFileLink = document.querySelector("#navList a.nav-link-active[data-path]");
         const navPath = ((activeFileLink == null ? void 0 : activeFileLink.getAttribute("data-path")) || "").trim();
         if (navPath) {
           return navPath;
         }
       }
-      return (selection == null ? void 0 : selection.previewPath) || (selection == null ? void 0 : selection.path) || "";
+      return (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
     }
     function renderFolderMeta() {
       return folderConfig;
@@ -3656,11 +3701,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       editDrawer.hidden = false;
       editDrawer.classList.add("edit-drawer-open");
     }
-    async function refreshCurrentEditState(selection = getActiveSelection()) {
-      const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection) });
+    async function refreshCurrentEditState(selection2 = getActiveSelection()) {
+      const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
       if (refreshed == null ? void 0 : refreshed.config) {
         editConfig = refreshed.config;
-        editTarget = refreshed.target || (selection.isLayout ? "layout" : selection.previewIsFile ? "file" : "folder");
+        editTarget = refreshed.target || (selection2.isLayout ? "layout" : selection2.previewIsFile ? "file" : "folder");
         if (editTarget === "folder" || editTarget === "layout" && refreshed.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
@@ -3675,6 +3720,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
     }
     function renderEditUI(config, status) {
+      const layoutNameForPreset = (layoutPreset = "actual") => {
+        var _a;
+        const preset = String(layoutPreset || "actual").trim() === "inherit" ? "actual" : String(layoutPreset || "actual").trim();
+        if (preset === "none") {
+          return "none";
+        }
+        if (preset === "custom") {
+          return "custom-layout";
+        }
+        const currentLayout = (_a = editConfig == null ? void 0 : editConfig.work) == null ? void 0 : _a.layout;
+        const hasFilesystemSource = !!(currentLayout && typeof currentLayout === "object" && (currentLayout.storage === "filesystem" || typeof currentLayout.directory === "string" && currentLayout.directory.trim() !== "" || typeof currentLayout.inheritedDirectory === "string" && currentLayout.inheritedDirectory.trim() !== ""));
+        return hasFilesystemSource ? "filesystem-layout" : "poff-layout";
+      };
       const panelState = renderEditPanel({
         editPanel,
         editRequested: editRequested2,
@@ -3703,9 +3761,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         },
         onSubmit: async ({ elements: elements3, statusEl }) => {
           var _a, _b;
-          const selection = getActiveSelection();
+          const selection2 = getActiveSelection();
           const payload = {
-            path: getEditTargetPath(selection),
+            path: getEditTargetPath(selection2),
             title: (((_a = elements3.title) == null ? void 0 : _a.value) || "").trim(),
             description: (((_b = elements3.description) == null ? void 0 : _b.value) || "").trim()
           };
@@ -3717,15 +3775,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         },
         onOpenLayoutPage: () => {
           var _a;
-          const selection = getActiveSelection();
-          const nextPath = buildVirtualLayoutPath((_a = selection.previewPath) != null ? _a : selection.path);
+          const selection2 = getActiveSelection();
+          const nextPath = buildVirtualLayoutPath((_a = selection2.previewPath) != null ? _a : selection2.path);
           drawerOpen = false;
           syncDrawerVisibility();
           window.location.hash = `#/${nextPath}`;
         },
         onReturnToWork: () => {
-          const selection = getActiveSelection();
-          const nextPath = selection.previewPath || "";
+          const selection2 = getActiveSelection();
+          const nextPath = selection2.previewPath || "";
           drawerOpen = false;
           syncDrawerVisibility();
           if (nextPath) {
@@ -3737,9 +3795,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         },
         onSubmitLayout: async ({ payload, statusEl }) => {
           var _a, _b, _c, _d, _e, _f, _g, _h;
-          const selection = getActiveSelection();
-          const layoutPreset = (payload.layoutPreset || "actual").trim();
-          const layoutName = layoutPreset === "none" ? "none" : layoutPreset === "custom" ? "custom-layout" : Object.prototype.hasOwnProperty.call(payload, "originalLayoutTarget") ? "filesystem-layout" : "poff-layout";
+          const selection2 = getActiveSelection();
+          const rawLayoutPreset = (payload.layoutPreset || "actual").trim();
+          const layoutPreset = rawLayoutPreset === "inherit" ? "actual" : rawLayoutPreset;
+          const layoutName = layoutNameForPreset(layoutPreset);
           const layoutPayload = {
             name: layoutName,
             engine: "lightncandy",
@@ -3757,28 +3816,41 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           if (Object.prototype.hasOwnProperty.call(payload, "layoutJs")) {
             layoutPayload.js = (_d = payload.layoutJs) != null ? _d : "";
           }
-          if (Object.prototype.hasOwnProperty.call(payload, "originalLayoutTarget")) {
+          const hasOriginalDraftWrite = Object.prototype.hasOwnProperty.call(payload, "originalLayoutTemplate") || Object.prototype.hasOwnProperty.call(payload, "originalLayoutCss") || Object.prototype.hasOwnProperty.call(payload, "originalLayoutJs");
+          if (Object.prototype.hasOwnProperty.call(payload, "originalLayoutTarget") && hasOriginalDraftWrite) {
             layoutPayload.originalTarget = (_e = payload.originalLayoutTarget) != null ? _e : "";
             layoutPayload.originalTemplate = (_f = payload.originalLayoutTemplate) != null ? _f : "";
             layoutPayload.originalCss = (_g = payload.originalLayoutCss) != null ? _g : "";
             layoutPayload.originalJs = (_h = payload.originalLayoutJs) != null ? _h : "";
           }
           await saveConfig({
-            path: getEditTargetPath(selection),
+            path: getEditTargetPath(selection2),
             layout: layoutPayload
           }, statusEl);
         },
+        onLayoutPresetChange: async ({ payload, statusEl }) => {
+          const rawLayoutPreset = ((payload == null ? void 0 : payload.layoutPreset) || "actual").trim();
+          const layoutPreset = rawLayoutPreset === "inherit" ? "actual" : rawLayoutPreset;
+          await saveConfig({
+            path: getEditTargetPath(getActiveSelection()),
+            layout: {
+              name: layoutNameForPreset(layoutPreset),
+              engine: "lightncandy",
+              preset: layoutPreset
+            }
+          }, statusEl);
+        },
         onUploadFiles: async ({ source, files, statusEl }) => {
-          const selection = getActiveSelection();
+          const selection2 = getActiveSelection();
           const data = await requestEditUpload({
-            path: getContentTargetPath(selection),
+            path: getContentTargetPath(selection2),
             source,
             files
           });
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Upload failed.");
           }
-          await refreshCurrentEditState(selection);
+          await refreshCurrentEditState(selection2);
           const inlineStatus = document.getElementById("editInlineStatus");
           if (inlineStatus) {
             const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
@@ -3789,9 +3861,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         },
         onCreateBlankFile: async ({ source, fileName, statusEl }) => {
           var _a;
-          const selection = getActiveSelection();
+          const selection2 = getActiveSelection();
           const data = await requestEditUpload({
-            path: getContentTargetPath(selection),
+            path: getContentTargetPath(selection2),
             source,
             fileName,
             files: []
@@ -3799,7 +3871,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Create blank file failed.");
           }
-          await refreshCurrentEditState(selection);
+          await refreshCurrentEditState(selection2);
           const inlineStatus = document.getElementById("editInlineStatus");
           if (inlineStatus) {
             const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : fileName;
@@ -3820,9 +3892,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         },
         onSubmit: async ({ elements: elements3, statusEl, treeVisible }) => {
           var _a, _b, _c;
-          const selection = getActiveSelection();
+          const selection2 = getActiveSelection();
           const payload = {
-            path: getEditTargetPath(selection),
+            path: getEditTargetPath(selection2),
             link: (((_a = elements3.link) == null ? void 0 : _a.value) || "").trim(),
             url: (((_b = elements3.url) == null ? void 0 : _b.value) || "").trim(),
             work: {
@@ -3852,11 +3924,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!editRequested2 || !editPanel) {
         return;
       }
-      const selection = getActiveSelection();
-      const data = await requestEditConfig("config", { path: getEditTargetPath(selection) });
+      const selection2 = getActiveSelection();
+      const data = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
       if (data.config) {
         editConfig = data.config;
-        editTarget = data.target || (selection.isFile ? "file" : "folder");
+        editTarget = data.target || (selection2.isFile ? "file" : "folder");
         if (editTarget === "folder" || editTarget === "layout" && data.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
@@ -4160,40 +4232,40 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setActiveFileLink(fileName);
     }
     function navigateToPath(path = "", options = {}) {
-      const selection = getSelectionFromPath(path);
-      navigateToSelection(selection, options);
+      const selection2 = getSelectionFromPath(path);
+      navigateToSelection(selection2, options);
     }
     function navigateToSelection(selectionInput, options = {}) {
-      const selection = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
+      const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
       const {
         updateHash = true,
         forceRefresh = false
       } = options;
-      const previewPath = selection.previewPath || "";
-      const previewIsFile = !!selection.previewIsFile;
+      const previewPath = selection2.previewPath || "";
+      const previewIsFile = !!selection2.previewIsFile;
       const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
       if (iframeLoading) {
         iframeLoading.style.display = "block";
       }
       if (contentFrame) {
-        contentFrame.classList.toggle("content-frame-layout-target", !!selection.isLayout);
-        syncPreviewDisabledState(!!selection.isLayout);
+        contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
+        syncPreviewDisabledState(!!selection2.isLayout);
         renderPreview(buildViewerUrl(previewPath, previewIsFile, forceRefresh));
       }
       if (updateHash) {
-        writeHashPath(selection.path || "");
+        writeHashPath(selection2.path || "");
       }
       if (navList) {
         if (sidebarLoading) {
           sidebarLoading.style.display = "block";
         }
         loadNav(folderPath).then(() => {
-          syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
+          syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
           if (sidebarLoading) {
             sidebarLoading.style.display = "none";
           }
         }).catch(() => {
-          syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
+          syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
           if (sidebarLoading) {
             sidebarLoading.style.display = "none";
           }
@@ -4349,8 +4421,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     function loadCurrentFolderInIframe() {
       var _a;
-      const selection = getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : "");
-      navigateToSelection(selection, { updateHash: false });
+      const selection2 = getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : "");
+      navigateToSelection(selection2, { updateHash: false });
       if (renderFolderMeta) {
         renderFolderMeta();
       }

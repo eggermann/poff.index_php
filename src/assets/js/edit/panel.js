@@ -155,6 +155,7 @@ function renderEditLayoutPanel({
         sectionName,
         wrapperTarget,
         sectionTarget,
+        wrapperWasLocal,
         sectionWasLocal,
         originalTarget,
         originalEditable,
@@ -467,9 +468,15 @@ function renderEditLayoutPanel({
                     payload.originalLayoutJs = drafts.virtualJs;
                 }
             } else {
-                payload.layoutTemplate = drafts.localTemplate;
-                payload.layoutCss = drafts.localCss;
-                payload.layoutJs = drafts.localJs;
+                const hasLocalDraft = wrapperWasLocal
+                    || drafts.localTemplate.trim() !== ''
+                    || drafts.localCss.trim() !== ''
+                    || drafts.localJs.trim() !== '';
+                if (hasLocalDraft) {
+                    payload.layoutTemplate = drafts.localTemplate;
+                    payload.layoutCss = drafts.localCss;
+                    payload.layoutJs = drafts.localJs;
+                }
             }
 
             await onSubmitLayout({
@@ -1166,9 +1173,15 @@ export function renderEditLayoutOverlay({
                     payload.originalLayoutJs = drafts.virtualJs;
                 }
             } else {
-                payload.layoutTemplate = drafts.localTemplate;
-                payload.layoutCss = drafts.localCss;
-                payload.layoutJs = drafts.localJs;
+                const hasLocalDraft = wrapperWasLocal
+                    || drafts.localTemplate.trim() !== ''
+                    || drafts.localCss.trim() !== ''
+                    || drafts.localJs.trim() !== '';
+                if (hasLocalDraft) {
+                    payload.layoutTemplate = drafts.localTemplate;
+                    payload.layoutCss = drafts.localCss;
+                    payload.layoutJs = drafts.localJs;
+                }
             }
 
             await onSubmit({
