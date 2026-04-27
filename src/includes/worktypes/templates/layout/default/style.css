@@ -18,6 +18,19 @@
     font-family: "Inter", "Segoe UI", sans-serif;
 }
 
+/* Keep debug border red only; prevent host/edit-page styles from tinting layout text. */
+.poff-default-layout,
+.poff-default-layout h1,
+.poff-default-layout h2,
+.poff-default-layout h3,
+.poff-default-layout p,
+.poff-default-layout span,
+.poff-default-layout strong,
+.poff-default-layout small,
+.poff-default-layout a {
+    color: var(--poff-shell-color);
+}
+
 .poff-default-layout__sidebar {
     padding: 92px 18px 22px;
     background: linear-gradient(180deg, rgba(11, 20, 40, 0.98), rgba(11, 20, 40, 0.9));
@@ -239,7 +252,7 @@
     min-height: 340px;
     padding: 14px;
     border-radius: 14px;
-    border: 1px solid #2d3f5d;
+    border: 2px solid #ef4444;
     background: rgba(10, 21, 40, 0.82);
 }
 

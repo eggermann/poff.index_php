@@ -138,6 +138,28 @@ export function createEditController({ elements, context, editRequested }) {
     }
 
     function renderEditUI(config, status) {
+        const layoutNameForPreset = (layoutPreset = 'actual') => {
+            const preset = String(layoutPreset || 'actual').trim() === 'inherit'
+                ? 'actual'
+                : String(layoutPreset || 'actual').trim();
+            if (preset === 'none') {
+                return 'none';
+            }
+            if (preset === 'custom') {
+                return 'custom-layout';
+            }
+            const currentLayout = editConfig?.work?.layout;
+            const hasFilesystemSource = !!(
+                currentLayout
+                && typeof currentLayout === 'object'
+                && (
+                    currentLayout.storage === 'filesystem'
+                    || (typeof currentLayout.directory === 'string' && currentLayout.directory.trim() !== '')
+                    || (typeof currentLayout.inheritedDirectory === 'string' && currentLayout.inheritedDirectory.trim() !== '')
+                )
+            );
+            return hasFilesystemSource ? 'filesystem-layout' : 'poff-layout';
+        };
         const panelState = renderEditPanel({
             editPanel,
             editRequested,
@@ -198,12 +220,9 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onSubmitLayout: async ({ payload, statusEl }) => {
                 const selection = getActiveSelection();
-                const layoutPreset = (payload.layoutPreset || 'actual').trim();
-                const layoutName = layoutPreset === 'none'
-                    ? 'none'
-                    : layoutPreset === 'custom'
-                        ? 'custom-layout'
-                        : (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget') ? 'filesystem-layout' : 'poff-layout');
+                const rawLayoutPreset = (payload.layoutPreset || 'actual').trim();
+                const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
+                const layoutName = layoutNameForPreset(layoutPreset);
                 const layoutPayload = {
                     name: layoutName,
                     engine: 'lightncandy',
@@ -221,7 +240,12 @@ export function createEditController({ elements, context, editRequested }) {
                 if (Object.prototype.hasOwnProperty.call(payload, 'layoutJs')) {
                     layoutPayload.js = payload.layoutJs ?? '';
                 }
-                if (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget')) {
+                const hasOriginalDraftWrite = (
+                    Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTemplate')
+                    || Object.prototype.hasOwnProperty.call(payload, 'originalLayoutCss')
+                    || Object.prototype.hasOwnProperty.call(payload, 'originalLayoutJs')
+                );
+                if (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget') && hasOriginalDraftWrite) {
                     layoutPayload.originalTarget = payload.originalLayoutTarget ?? '';
                     layoutPayload.originalTemplate = payload.originalLayoutTemplate ?? '';
                     layoutPayload.originalCss = payload.originalLayoutCss ?? '';
@@ -230,6 +254,18 @@ export function createEditController({ elements, context, editRequested }) {
                 await saveConfig({
                     path: getEditTargetPath(selection),
                     layout: layoutPayload,
+                }, statusEl);
+            },
+            onLayoutPresetChange: async ({ payload, statusEl }) => {
+                const rawLayoutPreset = (payload?.layoutPreset || 'actual').trim();
+                const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
+                await saveConfig({
+                    path: getEditTargetPath(getActiveSelection()),
+                    layout: {
+                        name: layoutNameForPreset(layoutPreset),
+                        engine: 'lightncandy',
+                        preset: layoutPreset,
+                    },
                 }, statusEl);
             },
             onUploadFiles: async ({ source, files, statusEl }) => {

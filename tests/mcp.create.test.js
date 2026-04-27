@@ -1346,6 +1346,21 @@ describe('Worktype HBS renderer', () => {
     expect(output).not.toContain('tests/poff-tests/.layout/style.css');
     expect(output).toContain('<div class="folder-view">');
     expect(output).toContain('child.txt');
+
+    await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
+      layout: {
+        name: 'filesystem-layout',
+        preset: 'inherit',
+      },
+    });
+
+    const inherited = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(inherited.work.layout).toMatchObject({
+      name: 'filesystem-layout',
+      storage: 'filesystem',
+      directory: 'tests/poff-tests/.layout',
+      preset: 'actual',
+    });
   });
 
   test('resolves virtual .layout targets separately from real file and folder targets', async () => {

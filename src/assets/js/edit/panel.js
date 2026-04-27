@@ -138,6 +138,7 @@ function renderEditLayoutPanel({
     status,
     contentTargetLabel,
     onSubmitLayout,
+    onLayoutPresetChange,
     onReturnToWork,
     onUploadFiles,
     onCreateBlankFile,
@@ -170,7 +171,7 @@ function renderEditLayoutPanel({
     } = overlayState;
     const subjectLabel = subjectStatus.target === 'file' ? 'file' : 'folder';
     const layoutPresetOptions = [
-        { value: 'actual', label: 'Actual' },
+        { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
     ];
@@ -195,7 +196,6 @@ function renderEditLayoutPanel({
                 <div class="edit-inline-actions edit-layout-header-actions">
                     <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
                     <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
-                    <button class="btn" type="submit">Save layout</button>
                 </div>
             </div>
             <div class="edit-grid edit-grid-cols">
@@ -210,6 +210,9 @@ function renderEditLayoutPanel({
                 <div class="edit-layout-copy edit-layout-section-note">
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
                     <div class="small-note" id="edit-layout-primary-hint"></div>
+                    <div class="edit-inline-actions edit-layout-select-actions">
+                        <button class="btn" type="submit">Save layout</button>
+                    </div>
                 </div>
             </div>
         </form>
@@ -416,9 +419,17 @@ function renderEditLayoutPanel({
     };
 
     if (presetEl) {
-        presetEl.addEventListener('change', () => {
+        presetEl.addEventListener('change', async () => {
             storePrimaryDraft();
             syncLayoutMode();
+            if (typeof onLayoutPresetChange === 'function') {
+                await onLayoutPresetChange({
+                    payload: {
+                        layoutPreset: (presetEl.value || 'actual').trim(),
+                    },
+                    statusEl,
+                });
+            }
         });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
@@ -596,6 +607,7 @@ export function renderEditPanel({
     onOpenLayoutPage,
     onReturnToWork,
     onSubmitLayout,
+    onLayoutPresetChange,
     onUploadFiles,
     onCreateBlankFile,
 }) {
@@ -634,6 +646,7 @@ export function renderEditPanel({
             status,
             contentTargetLabel,
             onSubmitLayout,
+            onLayoutPresetChange,
             onReturnToWork,
             onUploadFiles,
             onCreateBlankFile,
@@ -937,7 +950,7 @@ export function renderEditLayoutOverlay({
     } = overlayState;
 
     const layoutPresetOptions = [
-        { value: 'actual', label: 'Actual' },
+        { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
     ];

@@ -395,6 +395,10 @@ function cmsHandleEditAction(): void
             }
             if ($layoutMode !== '') {
                 $layout['mode'] = $layoutMode;
+                $layout['name'] = $layoutMode;
+            }
+            if ($layoutPreset === 'inherit') {
+                $layoutPreset = 'actual';
             }
             if (in_array($layoutPreset, ['actual', 'none', 'custom'], true)) {
                 $layout['preset'] = $layoutPreset;
@@ -627,8 +631,8 @@ function cmsHandleEditAction(): void
                 'If Prompt context JSON current.editorDraft is present, treat those unsaved draft template/css/js values as the latest version to evolve from before falling back to current.activeLayout.',
                 'Prefer returning sibling "css" and "js" strings too, so the layout prompt can design template.hbs, style.css, and script.js together for files and folders.',
                 'Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.',
-                'When the current layout mode stays inherited or actual, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
-                'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.',
+                'When the current layout mode stays inherited/inherit, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
+                'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.',
                 'current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.',
                 'Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.',
                 'For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.',
