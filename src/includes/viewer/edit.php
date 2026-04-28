@@ -9,6 +9,7 @@ require_once __DIR__ . '/edit/prompt-refs.php';
 require_once __DIR__ . '/edit/prompt-context.php';
 require_once __DIR__ . '/edit/prompt-compact.php';
 require_once __DIR__ . '/edit/upload.php';
+require_once __DIR__ . '/edit/delete.php';
 
 function cmsIniBytes(string $value): int
 {
@@ -48,10 +49,27 @@ function cmsIsOpenAiCompatibleEndpoint(string $url): bool
     return $normalized !== '' && str_contains($normalized, '/v1/chat/completions');
 }
 
+function cmsPromptSendSseHeaders(): void
+{
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-transform');
+    header('X-Accel-Buffering: no');
+}
+
+function cmsPromptSendSseEvent(string $event, array $payload): void
+{
+    echo 'event: ' . $event . "\n";
+    echo 'data: ' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+    if (function_exists('ob_flush')) {
+        @ob_flush();
+    }
+    flush();
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['config', 'save', 'prompt', 'upload'], true)) {
+    if (!in_array($action, ['config', 'save', 'prompt', 'upload', 'delete'], true)) {
         return;
     }
 
@@ -181,6 +199,43 @@ function cmsHandleEditAction(): void
             'config' => $updatedConfig,
             'uploadLimits' => cmsUploadLimits(),
         ]);
+    }
+
+    if ($action === 'delete') {
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'Delete requires POST.',
+            ], 405);
+        }
+
+        $deleteResult = cmsDeleteTarget($rootDir, $path);
+        if (($deleteResult['errors'] ?? []) !== []) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => $deleteResult['errors'][0] ?? 'Delete failed.',
+            ], 400);
+        }
+
+        $refreshDir = (string) ($deleteResult['refreshDir'] ?? $rootDir);
+        $updatedConfig = PoffConfig::ensure($refreshDir);
+        $returnPath = trim((string) ($data['return'] ?? $_GET['return'] ?? ''), "/\\");
+
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+        $wantsJson = str_contains($accept, 'application/json') || str_contains($accept, 'text/json');
+        if ($wantsJson) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'deleted' => $deleteResult['deleted'],
+                'config' => $updatedConfig,
+            ]);
+        }
+
+        $redirectUrl = $returnPath !== ''
+            ? '?path=' . urlencode($returnPath) . '&edit=true'
+            : '?edit=true';
+        header('Location: ' . $redirectUrl, true, 303);
+        exit;
     }
 
     if ($action === 'save') {
@@ -675,6 +730,47 @@ function cmsHandleEditAction(): void
         $modelReturnedReasoningOnly = false;
         $usedModel = $model;
         $localDebugEntry = null;
+        $streamRequested = !empty($data['stream']);
+        $streamBuffer = '';
+        $streamTemplate = '';
+        $streamChunkParser = function (string $chunk) use (&$streamBuffer, &$streamTemplate): void {
+            if ($chunk === '') {
+                return;
+            }
+            $chunk = str_replace("\r\n", "\n", $chunk);
+            echo $chunk;
+            if (function_exists('ob_flush')) {
+                @ob_flush();
+            }
+            flush();
+            $streamBuffer .= $chunk;
+            while (strpos($streamBuffer, "\n\n") !== false) {
+                $splitAt = strpos($streamBuffer, "\n\n");
+                $block = trim(substr($streamBuffer, 0, $splitAt));
+                $streamBuffer = substr($streamBuffer, $splitAt + 2);
+                if ($block === '') {
+                    continue;
+                }
+                $dataLines = [];
+                foreach (preg_split('/\r?\n/', $block) ?: [] as $line) {
+                    if (str_starts_with($line, 'data:')) {
+                        $dataLines[] = ltrim(substr($line, 5));
+                    }
+                }
+                $dataLine = implode("\n", $dataLines);
+                if ($dataLine === '' || $dataLine === '[DONE]') {
+                    continue;
+                }
+                $decodedChunk = json_decode($dataLine, true);
+                if (!is_array($decodedChunk)) {
+                    continue;
+                }
+                $delta = $decodedChunk['choices'][0]['delta']['content'] ?? null;
+                if (is_string($delta) && $delta !== '') {
+                    $streamTemplate .= $delta;
+                }
+            }
+        };
 
         if ($provider === 'openai') {
             $key = $apiKey !== '' ? $apiKey : (cmsEnvValue($env, 'OPENAI_API_KEY') ?? '');
@@ -698,17 +794,33 @@ function cmsHandleEditAction(): void
                 ],
                 'temperature' => 0.4,
             ];
-            $response = cmsHttpPost('https://api.openai.com/v1/chat/completions', [
-                'Authorization: Bearer ' . $key,
-            ], $payload);
-            if (!$response['ok']) {
-                cmsJsonResponse([
-                    'allowed' => true,
-                    'error' => cmsFormatPromptHttpError('OpenAI', $response),
-                ]);
+            if ($streamRequested) {
+                cmsPromptSendSseHeaders();
+                $payload['stream'] = true;
+                $response = cmsHttpPostStream('https://api.openai.com/v1/chat/completions', [
+                    'Authorization: Bearer ' . $key,
+                ], $payload, $streamChunkParser);
+                if (!$response['ok']) {
+                    cmsPromptSendSseEvent('final', [
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('OpenAI', $response),
+                    ]);
+                    exit;
+                }
+                $template = $streamTemplate;
+            } else {
+                $response = cmsHttpPost('https://api.openai.com/v1/chat/completions', [
+                    'Authorization: Bearer ' . $key,
+                ], $payload);
+                if (!$response['ok']) {
+                    cmsJsonResponse([
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('OpenAI', $response),
+                    ]);
+                }
+                $decoded = json_decode($response['body'], true);
+                $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
             }
-            $decoded = json_decode($response['body'], true);
-            $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
         } elseif ($provider === 'gemini') {
             $key = $apiKey !== '' ? $apiKey : (cmsEnvValue($env, 'GEMINI_API_KEY') ?? '');
             if ($key === '') {
@@ -793,47 +905,74 @@ function cmsHandleEditAction(): void
                 'endpoint' => $endpoint,
                 'requestPayload' => $payload,
             ];
-            $response = cmsHttpPost($endpoint, [], $payload);
-            if (!$response['ok']) {
-                $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
-                    'failure' => 'http',
-                    'response' => $response,
-                ]));
-                cmsJsonResponse([
-                    'allowed' => true,
-                    'error' => cmsFormatPromptHttpError('Local endpoint', $response) . ' Debug saved to ' . $debugPath . '.',
-                ]);
-            }
-            $decoded = json_decode($response['body'], true);
-            if (cmsIsOpenAiCompatibleEndpoint($endpoint) && !is_array($decoded)) {
-                $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
-                    'failure' => 'invalid_json_envelope',
-                    'response' => $response,
-                ]));
-                cmsJsonResponse([
-                    'allowed' => true,
-                    'error' => 'Local endpoint returned an invalid JSON chat envelope. Debug saved to ' . $debugPath . '.',
-                ], 502);
-            }
-            if (is_array($decoded)) {
-                $message = $decoded['choices'][0]['message'] ?? null;
-                if (is_array($message) && array_key_exists('content', $message)) {
-                    $template = (string) $message['content'];
-                    $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
-                    $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
-                } elseif (isset($decoded['template'])) {
-                    $template = (string) $decoded['template'];
-                } elseif (isset($decoded['content'])) {
-                    $template = (string) $decoded['content'];
+            if ($streamRequested && cmsIsOpenAiCompatibleEndpoint($endpoint)) {
+                cmsPromptSendSseHeaders();
+                $payload['stream'] = true;
+                $response = cmsHttpPostStream($endpoint, [], $payload, $streamChunkParser);
+                if (!$response['ok']) {
+                    $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                        'failure' => 'http',
+                        'response' => $response,
+                    ]));
+                    cmsPromptSendSseEvent('final', [
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('Local endpoint', $response) . ' Debug saved to ' . $debugPath . '.',
+                    ]);
+                    exit;
                 }
-            } elseif ($template === '') {
-                $template = trim((string) $response['body']);
+                $template = $streamTemplate;
+            } else {
+                $response = cmsHttpPost($endpoint, [], $payload);
+                if (!$response['ok']) {
+                    $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                        'failure' => 'http',
+                        'response' => $response,
+                    ]));
+                    cmsJsonResponse([
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('Local endpoint', $response) . ' Debug saved to ' . $debugPath . '.',
+                    ]);
+                }
+                $decoded = json_decode($response['body'], true);
+                if (cmsIsOpenAiCompatibleEndpoint($endpoint) && !is_array($decoded)) {
+                    $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                        'failure' => 'invalid_json_envelope',
+                        'response' => $response,
+                    ]));
+                    cmsJsonResponse([
+                        'allowed' => true,
+                        'error' => 'Local endpoint returned an invalid JSON chat envelope. Debug saved to ' . $debugPath . '.',
+                    ], 502);
+                }
+                if (is_array($decoded)) {
+                    $message = $decoded['choices'][0]['message'] ?? null;
+                    if (is_array($message) && array_key_exists('content', $message)) {
+                        $template = (string) $message['content'];
+                        $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
+                        $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
+                    } elseif (isset($decoded['template'])) {
+                        $template = (string) $decoded['template'];
+                    } elseif (isset($decoded['content'])) {
+                        $template = (string) $decoded['content'];
+                    }
+                } elseif ($template === '') {
+                    $template = trim((string) $response['body']);
+                }
             }
         }
 
         $parsedResult = cmsParsePromptModelResult($template, $promptIsLayoutTarget);
         $templateText = trim((string) ($parsedResult['template'] ?? ''));
         if ($templateText === '') {
+            if ($streamRequested && ($provider === 'openai' || ($provider === 'local' && cmsIsOpenAiCompatibleEndpoint($endpoint)))) {
+                cmsPromptSendSseEvent('final', [
+                    'allowed' => true,
+                    'error' => $modelReturnedReasoningOnly
+                        ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
+                        : 'Template was empty.',
+                ]);
+                exit;
+            }
             cmsJsonResponse([
                 'allowed' => true,
                 'error' => $modelReturnedReasoningOnly
@@ -855,6 +994,11 @@ function cmsHandleEditAction(): void
             if (array_key_exists($key, $parsedResult)) {
                 $responsePayload[$key] = $parsedResult[$key];
             }
+        }
+
+        if ($streamRequested && ($provider === 'openai' || ($provider === 'local' && cmsIsOpenAiCompatibleEndpoint($endpoint)))) {
+            cmsPromptSendSseEvent('final', $responsePayload);
+            exit;
         }
 
         cmsJsonResponse($responsePayload);

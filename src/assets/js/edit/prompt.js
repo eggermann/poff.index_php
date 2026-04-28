@@ -4,7 +4,8 @@ import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystem
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
 import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplateHistorySnapshot, serializeHistoryForRequest } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
-import { createStreamState, startStreaming, stopStreaming } from './prompt/stream.js';
+import { appendStreamingChunk, beginStreaming, createStreamState, finishStreaming, stopStreaming } from './prompt/stream.js';
+import { requestPromptTemplateStream } from '../api/edit.js';
 import { updatePromptEditorFields } from './prompt/editor-fields.js';
 import { bindPromptActions } from './prompt/actions.js';
 import { debugPromptLog } from './prompt/log.js';
@@ -83,6 +84,14 @@ export function bindPromptWindow({
         layout: defaultLayoutSystemPrompt,
     });
     const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
+    const dropPendingAssistantHistory = (pendingAssistantIndex) => {
+        if (pendingAssistantIndex === null || pendingAssistantIndex < 0 || pendingAssistantIndex >= promptHistory.length) {
+            return promptHistory;
+        }
+        const nextHistory = promptHistory.slice();
+        nextHistory.splice(pendingAssistantIndex, 1);
+        return nextHistory;
+    };
     const currentHasImageContext = () => {
         const selection = getActiveSelection ? getActiveSelection() : null;
         const selectionPath = typeof selection?.previewPath === 'string' && selection.previewPath.trim() !== ''
@@ -434,13 +443,8 @@ export function bindPromptWindow({
                 }
                 stopStreaming(stream);
                 setGeneratingState(false);
-                const errMsg = 'Prompt timed out after 95 seconds.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
+                const errMsg = 'Prompt timed out after 5 minutes.';
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                 renderHistory({ forceScroll: true });
                 if (statusEl) {
                     statusEl.textContent = errMsg;
@@ -504,7 +508,25 @@ export function bindPromptWindow({
                 }
                 requestSummary = summarizePromptRequest(payload);
                 debugPromptLog('request', requestSummary);
-                const response = await requestPromptTemplate(payload);
+                const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+                if (useStreaming) {
+                    beginStreaming({
+                        stream,
+                        targetIndex: pendingAssistantIndex,
+                        history: promptHistory,
+                        renderHistory: () => renderHistory({ forceScroll: true }),
+                    });
+                }
+                const response = useStreaming
+                    ? await requestPromptTemplateStream(payload, {
+                        onDelta: (chunk) => appendStreamingChunk({
+                            stream,
+                            chunk,
+                            history: promptHistory,
+                            renderHistory: () => renderHistory({ forceScroll: true }),
+                        }),
+                    })
+                    : await requestPromptTemplate(payload);
                 settled = true;
                 debugPromptLog('response', summarizePromptResponse(response, requestSummary));
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
@@ -542,14 +564,7 @@ export function bindPromptWindow({
                     stopStreaming(stream);
                     setGeneratingState(false);
                     const errMsg = response.error || 'Prompt returned no content.';
-                    if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                        promptHistory[pendingAssistantIndex].content = errMsg;
-                        delete promptHistory[pendingAssistantIndex].templateSnapshot;
-                        setHistory(promptHistory);
-                    } else {
-                        setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                        pendingAssistantIndex = promptHistory.length - 1;
-                    }
+                    setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                     writeHistoryForSelection(promptHistory, selection);
                     renderHistory({ forceScroll: true });
                     if (statusEl) {
@@ -559,7 +574,6 @@ export function bindPromptWindow({
                     renderSummary(errMsg);
                     return;
                 }
-                stopStreaming(stream);
                 const templateSnapshot = buildTemplateHistorySnapshot({
                     templateText,
                     nextCss,
@@ -581,17 +595,16 @@ export function bindPromptWindow({
                     }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
-                writeHistoryForSelection(promptHistory, selection);
-                renderHistory({ forceScroll: true });
-                if (streamToggleEl && streamToggleEl.checked && templateText) {
-                    startStreaming({
+                if (useStreaming) {
+                    finishStreaming({
                         stream,
-                        targetIndex: pendingAssistantIndex ?? (promptHistory.length - 1),
-                        fullText: templateText,
                         history: promptHistory,
+                        fullText: templateText,
                         renderHistory: () => renderHistory({ forceScroll: true }),
                     });
                 }
+                writeHistoryForSelection(promptHistory, selection);
+                renderHistory({ forceScroll: true });
                 renderContext();
                 if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
                     systemPromptEl.value = response.systemPrompt;
@@ -754,12 +767,7 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 const errMsg = 'Prompt failed.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                 writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderSummary(errMsg);
@@ -1094,13 +1102,8 @@ export function bindPromptWindow({
                 }
                 stopStreaming(stream);
                 setGeneratingState(false);
-                const errMsg = 'Prompt timed out after 95 seconds.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
+                const errMsg = 'Prompt timed out after 5 minutes.';
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                 renderHistory({ forceScroll: true });
                 if (statusEl) {
                     statusEl.textContent = errMsg;
@@ -1160,7 +1163,25 @@ export function bindPromptWindow({
                 }
                 requestSummary = summarizePromptRequest(payload);
                 debugPromptLog('request', requestSummary);
-                const response = await requestPromptTemplate(payload);
+                const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+                if (useStreaming) {
+                    beginStreaming({
+                        stream,
+                        targetIndex: pendingAssistantIndex,
+                        history: promptHistory,
+                        renderHistory: () => renderHistory({ forceScroll: true }),
+                    });
+                }
+                const response = useStreaming
+                    ? await requestPromptTemplateStream(payload, {
+                        onDelta: (chunk) => appendStreamingChunk({
+                            stream,
+                            chunk,
+                            history: promptHistory,
+                            renderHistory: () => renderHistory({ forceScroll: true }),
+                        }),
+                    })
+                    : await requestPromptTemplate(payload);
                 settled = true;
                 debugPromptLog('response', summarizePromptResponse(response, requestSummary));
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
@@ -1198,14 +1219,7 @@ export function bindPromptWindow({
                     stopStreaming(stream);
                     setGeneratingState(false);
                     const errMsg = response.error || 'Prompt returned no content.';
-                    if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                        promptHistory[pendingAssistantIndex].content = errMsg;
-                        delete promptHistory[pendingAssistantIndex].templateSnapshot;
-                        setHistory(promptHistory);
-                    } else {
-                        setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                        pendingAssistantIndex = promptHistory.length - 1;
-                    }
+                    setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                     writeHistoryForSelection(promptHistory, selection);
                     renderHistory({ forceScroll: true });
                     if (statusEl) {
@@ -1215,7 +1229,6 @@ export function bindPromptWindow({
                     renderSummary(errMsg);
                     return;
                 }
-                stopStreaming(stream);
                 const templateSnapshot = buildTemplateHistorySnapshot({
                     templateText,
                     nextCss,
@@ -1237,17 +1250,16 @@ export function bindPromptWindow({
                     }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
-                writeHistoryForSelection(promptHistory, selection);
-                renderHistory({ forceScroll: true });
-                if (streamToggleEl && streamToggleEl.checked && templateText) {
-                    startStreaming({
+                if (useStreaming) {
+                    finishStreaming({
                         stream,
-                        targetIndex: pendingAssistantIndex ?? (promptHistory.length - 1),
-                        fullText: templateText,
                         history: promptHistory,
+                        fullText: templateText,
                         renderHistory: () => renderHistory({ forceScroll: true }),
                     });
                 }
+                writeHistoryForSelection(promptHistory, selection);
+                renderHistory({ forceScroll: true });
                 renderContext();
                 if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
                     systemPromptEl.value = response.systemPrompt;
@@ -1410,12 +1422,7 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 const errMsg = 'Prompt failed.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                 writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderSummary(errMsg);

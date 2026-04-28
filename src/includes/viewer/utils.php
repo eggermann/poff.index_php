@@ -207,6 +207,98 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
     ];
 }
 
+function cmsHttpPostStream(string $url, array $headers, array $payload, ?callable $onChunk = null): array
+{
+    $override = $GLOBALS['__poff_prompt_http_post_stream'] ?? null;
+    if (is_callable($override)) {
+        $response = $override($url, $headers, $payload, $onChunk);
+        if (is_array($response)) {
+            return $response;
+        }
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
+    }
+
+    $previousSocketTimeout = ini_get('default_socket_timeout');
+    if (function_exists('ini_set')) {
+        @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
+    }
+
+    $headerLines = array_merge(['Content-Type: application/json'], $headers);
+    $responseBody = '';
+    $status = 0;
+    $statusLine = '';
+    try {
+        if (!function_exists('curl_init')) {
+            $response = cmsHttpPost($url, $headers, $payload);
+            $responseBody = (string) ($response['body'] ?? '');
+            if (is_callable($onChunk) && $responseBody !== '') {
+                $onChunk($responseBody);
+            }
+            return $response;
+        }
+
+        $curl = curl_init($url);
+        if ($curl === false) {
+            return [
+                'ok' => false,
+                'status' => 0,
+                'statusLine' => '',
+                'body' => '',
+            ];
+        }
+
+        curl_setopt_array($curl, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => $headerLines,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_HEADER => false,
+            CURLOPT_TIMEOUT => CMS_HTTP_TIMEOUT_SECONDS,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_WRITEFUNCTION => function ($curlHandle, $chunk) use (&$responseBody, $onChunk) {
+                $responseBody .= $chunk;
+                if (is_callable($onChunk)) {
+                    $onChunk($chunk);
+                }
+                return strlen($chunk);
+            },
+            CURLOPT_HEADERFUNCTION => function ($curlHandle, $headerLine) use (&$status, &$statusLine) {
+                $trimmed = trim($headerLine);
+                if ($trimmed !== '' && preg_match('/^HTTP\/\S+\s+(\d{3})\s*(.*)$/i', $trimmed, $matches)) {
+                    $status = (int) $matches[1];
+                    $statusLine = $trimmed;
+                }
+                return strlen($headerLine);
+            },
+        ]);
+
+        $ok = curl_exec($curl);
+        if ($status === 0) {
+            $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        }
+        if ($statusLine === '') {
+            $statusLine = 'HTTP ' . $status;
+        }
+        $error = curl_error($curl);
+        curl_close($curl);
+
+        return [
+            'ok' => $ok !== false && $status >= 200 && $status < 400,
+            'status' => $status,
+            'statusLine' => $statusLine,
+            'body' => $responseBody,
+            'error' => $error,
+        ];
+    } finally {
+        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
+            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
+        }
+    }
+}
+
 function cmsPromptDebugCapture(string $rootDir, array $entry): string
 {
     $baseDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff-prompt-debug';
