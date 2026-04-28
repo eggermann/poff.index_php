@@ -846,30 +846,34 @@ export function bindPromptWindow({
         updateProviderUi();
     };
 
-    const updateProviderUi = () => {
-        const provider = providerEl ? providerEl.value : 'local';
-        if (endpointRow) {
-            endpointRow.style.display = provider === 'local' ? 'block' : 'none';
-        }
-        if (modelEl) {
-            modelEl.value = getDefaultModelForProvider(provider);
-        }
+    const persistSettings = () => {
         if (!suppressSave) {
             savePromptSettings(readSettings());
         }
     };
 
+    const updateProviderUi = ({ resetModel = false } = {}) => {
+        const provider = providerEl ? providerEl.value : 'local';
+        if (endpointRow) {
+            endpointRow.style.display = provider === 'local' ? 'block' : 'none';
+        }
+        if (modelEl && resetModel) {
+            modelEl.value = getDefaultModelForProvider(provider);
+        }
+        persistSettings();
+    };
+
     if (providerEl) {
-        providerEl.addEventListener('change', updateProviderUi);
+        providerEl.addEventListener('change', () => updateProviderUi({ resetModel: true }));
     }
     if (modelEl) {
-        modelEl.addEventListener('input', updateProviderUi);
+        modelEl.addEventListener('input', persistSettings);
     }
     if (endpointEl) {
-        endpointEl.addEventListener('input', updateProviderUi);
+        endpointEl.addEventListener('input', persistSettings);
     }
     if (apiKeyEl) {
-        apiKeyEl.addEventListener('input', updateProviderUi);
+        apiKeyEl.addEventListener('input', persistSettings);
     }
     if (systemPromptEl) {
         systemPromptEl.addEventListener('input', () => {
@@ -901,7 +905,7 @@ export function bindPromptWindow({
         });
     }
 
-    updateProviderUi();
+    updateProviderUi({ resetModel: false });
     syncModeAwareSystemPrompt();
     setHistory(readHistoryForSelection(getActiveSelection ? getActiveSelection() : null));
     renderHistory();
