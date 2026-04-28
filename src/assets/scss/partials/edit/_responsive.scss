@@ -52,4 +52,9 @@
         width: calc(100% - 24px);
         max-height: calc(100% - 24px);
     }
+
+    .prompt-layer-collapsed {
+        right: 14px;
+        bottom: 14px;
+    }
 }

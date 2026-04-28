@@ -73,9 +73,10 @@
     backdrop-filter: blur(3px);
 }
 .prompt-layer-collapsed {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 13;
     width: auto;
     min-height: 0;
     display: inline-flex;
