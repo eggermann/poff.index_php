@@ -311,6 +311,29 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
+            onCreateFolder: async ({ source, folderName, statusEl }) => {
+                const selection = getActiveSelection();
+                const data = await requestEditUpload({
+                    path: getContentTargetPath(selection),
+                    source,
+                    fileName: folderName,
+                    files: [],
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Create folder failed.');
+                }
+
+                await refreshCurrentEditState(selection);
+                const inlineStatus = document.getElementById('editInlineStatus');
+                if (inlineStatus) {
+                    const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
+                        ? data.uploaded[0].name
+                        : folderName;
+                    inlineStatus.textContent = `Created folder ${createdName}.`;
+                    inlineStatus.className = 'edit-status edit-status-success';
+                }
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            },
         });
 
         const drawerState = renderEditDrawer({

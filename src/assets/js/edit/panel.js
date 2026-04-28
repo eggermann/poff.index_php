@@ -142,6 +142,7 @@ function renderEditLayoutPanel({
     onReturnToWork,
     onUploadFiles,
     onCreateBlankFile,
+    onCreateFolder,
 }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -178,9 +179,47 @@ function renderEditLayoutPanel({
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === 'file';
-    const addContentHint = isFileSubject
-        ? `Add content to the containing folder: ${contentTargetLabel || '.'}`
-        : 'Upload files or create a blank file in this folder.';
+    const uploadSectionHtml = isFileSubject ? '' : `
+        <div class="edit-upload-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">Upload files, create a blank file, or create a folder in this folder.</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">Add work</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                </div>
+                <div class="edit-grid">
+                    <div>
+                        <label class="edit-label" for="edit-upload-source">Source</label>
+                        <select class="form-select" id="edit-upload-source" name="upload_source">
+                            <option value="upload" selected>Upload</option>
+                            <option value="blank">Blank file</option>
+                            <option value="folder">Folder</option>
+                            <option value="url" disabled>From URL (disabled)</option>
+                        </select>
+                    </div>
+                    <div id="editUploadFilesWrap">
+                        <label class="edit-label" for="edit-upload-files">Files</label>
+                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
+                    </div>
+                    <div id="editBlankFileWrap" hidden>
+                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
+                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
+                    </div>
+                </div>
+                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="edit-inline-actions">
+                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
+                </div>
+            </form>
+        </dialog>
+    `;
 
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
@@ -217,44 +256,7 @@ function renderEditLayoutPanel({
                 </div>
             </div>
         </form>
-        <div class="edit-upload-launch">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add work</div>
-                <div class="small-note">${escapeHtml(addContentHint)}</div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
-        </div>
-        <dialog class="edit-upload-dialog" id="editUploadDialog">
-            <form method="dialog" class="edit-upload-dialog-form">
-                <div class="drawer-header">
-                    <h4 class="drawer-title">Add work</h4>
-                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
-                </div>
-                <div class="edit-grid">
-                    <div>
-                        <label class="edit-label" for="edit-upload-source">Source</label>
-                        <select class="form-select" id="edit-upload-source" name="upload_source">
-                            <option value="upload" selected>Upload</option>
-                            <option value="blank">Blank file</option>
-                            <option value="url" disabled>From URL (disabled)</option>
-                        </select>
-                    </div>
-                    <div id="editUploadFilesWrap">
-                        <label class="edit-label" for="edit-upload-files">Files</label>
-                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
-                    </div>
-                    <div id="editBlankFileWrap" hidden>
-                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
-                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
-                    </div>
-                </div>
-                <div class="small-note" id="editUploadSummary">No files selected.</div>
-                <div class="edit-inline-actions">
-                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
-                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
-                </div>
-            </form>
-        </dialog>
+        ${uploadSectionHtml}
         ${renderPromptWindow(settings, {
             mode: 'layout',
             subjectType: subjectLabel,
@@ -486,15 +488,17 @@ function renderEditLayoutPanel({
         });
     }
 
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function') {
+    const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function' && typeof onCreateFolder === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
             if (!uploadSummaryEl) {
                 return;
             }
-            if ((uploadSourceEl?.value || 'upload') === 'blank') {
+            const mode = uploadSourceEl?.value || 'upload';
+            if (mode === 'blank' || mode === 'folder') {
                 const name = blankFileNameEl?.value?.trim() || '';
-                uploadSummaryEl.textContent = name ? `Will create: ${name}` : 'Enter a file name.';
+                uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
                 return;
             }
             const validationError = uploadValidationError(files, uploadLimits);
@@ -510,10 +514,17 @@ function renderEditLayoutPanel({
                 uploadFilesWrapEl.hidden = mode !== 'upload';
             }
             if (blankFileWrapEl) {
-                blankFileWrapEl.hidden = mode !== 'blank';
+                blankFileWrapEl.hidden = mode !== 'blank' && mode !== 'folder';
+            }
+            if (blankFileLabelEl) {
+                blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
             }
             if (uploadSubmitButton) {
-                uploadSubmitButton.textContent = mode === 'blank' ? 'Create blank file' : 'Upload';
+                uploadSubmitButton.textContent = mode === 'blank'
+                    ? 'Create blank file'
+                    : mode === 'folder'
+                        ? 'Create folder'
+                        : 'Upload';
             }
             setUploadSummary();
         };
@@ -565,6 +576,16 @@ function renderEditLayoutPanel({
                             return;
                         }
                         await onCreateBlankFile({ source, fileName, statusEl });
+                    } else if (source === 'folder') {
+                        const folderName = blankFileNameEl?.value?.trim() || '';
+                        if (!folderName) {
+                            if (statusEl) {
+                                statusEl.textContent = 'Enter a folder name.';
+                                statusEl.className = 'edit-status';
+                            }
+                            return;
+                        }
+                        await onCreateFolder({ source, folderName, statusEl });
                     } else {
                         const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
                         if (files.length === 0) {
@@ -617,6 +638,7 @@ export function renderEditPanel({
     onLayoutPresetChange,
     onUploadFiles,
     onCreateBlankFile,
+    onCreateFolder,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -657,6 +679,7 @@ export function renderEditPanel({
             onReturnToWork,
             onUploadFiles,
             onCreateBlankFile,
+            onCreateFolder,
         });
     }
 
@@ -666,11 +689,47 @@ export function renderEditPanel({
     const treeItems = Array.isArray(config.tree) ? config.tree : [];
     const isFileTarget = status?.target === 'file';
     const isEmptyFolder = !isFileTarget && treeItems.length === 0;
-    const addContentHint = isEmptyFolder
-        ? 'This folder is empty. Upload a file or create a blank file to start.'
-        : (isFileTarget
-            ? `Add content to the containing folder: ${contentTargetLabel || '.'}`
-            : 'Upload files or create a blank file in this folder.');
+    const uploadSectionHtml = isFileTarget ? '' : `
+        <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">${isEmptyFolder ? 'This folder is empty. Upload a file, create a blank file, or create a folder to start.' : 'Upload files, create a blank file, or create a folder in this folder.'}</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">Add work</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                </div>
+                <div class="edit-grid">
+                    <div>
+                        <label class="edit-label" for="edit-upload-source">Source</label>
+                        <select class="form-select" id="edit-upload-source" name="upload_source">
+                            <option value="upload" selected>Upload</option>
+                            <option value="blank">Blank file</option>
+                            <option value="folder">Folder</option>
+                            <option value="url" disabled>From URL (disabled)</option>
+                        </select>
+                    </div>
+                    <div id="editUploadFilesWrap">
+                        <label class="edit-label" for="edit-upload-files">Files</label>
+                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
+                    </div>
+                    <div id="editBlankFileWrap" hidden>
+                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
+                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
+                    </div>
+                </div>
+                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="edit-inline-actions">
+                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
+                </div>
+            </form>
+        </dialog>
+    `;
 
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
@@ -698,44 +757,7 @@ export function renderEditPanel({
             </div>
             <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
         </div>
-        <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add work</div>
-                <div class="small-note">${escapeHtml(addContentHint)}</div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
-        </div>
-        <dialog class="edit-upload-dialog" id="editUploadDialog">
-            <form method="dialog" class="edit-upload-dialog-form">
-                <div class="drawer-header">
-                    <h4 class="drawer-title">Add work</h4>
-                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
-                </div>
-                <div class="edit-grid">
-                    <div>
-                        <label class="edit-label" for="edit-upload-source">Source</label>
-                        <select class="form-select" id="edit-upload-source" name="upload_source">
-                            <option value="upload" selected>Upload</option>
-                            <option value="blank">Blank file</option>
-                            <option value="url" disabled>From URL (disabled)</option>
-                        </select>
-                    </div>
-                    <div id="editUploadFilesWrap">
-                        <label class="edit-label" for="edit-upload-files">Files</label>
-                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
-                    </div>
-                    <div id="editBlankFileWrap" hidden>
-                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
-                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
-                    </div>
-                </div>
-                <div class="small-note" id="editUploadSummary">No files selected.</div>
-                <div class="edit-inline-actions">
-                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
-                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
-                </div>
-            </form>
-        </dialog>
+        ${uploadSectionHtml}
         ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
     `;
 
@@ -786,15 +808,17 @@ export function renderEditPanel({
         changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
     }
 
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function') {
+    const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function' && typeof onCreateFolder === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
             if (!uploadSummaryEl) {
                 return;
             }
-            if ((uploadSourceEl?.value || 'upload') === 'blank') {
+            const mode = uploadSourceEl?.value || 'upload';
+            if (mode === 'blank' || mode === 'folder') {
                 const name = blankFileNameEl?.value?.trim() || '';
-                uploadSummaryEl.textContent = name ? `Will create: ${name}` : 'Enter a file name.';
+                uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
                 return;
             }
             const validationError = uploadValidationError(files, uploadLimits);
@@ -810,10 +834,17 @@ export function renderEditPanel({
                 uploadFilesWrapEl.hidden = mode !== 'upload';
             }
             if (blankFileWrapEl) {
-                blankFileWrapEl.hidden = mode !== 'blank';
+                blankFileWrapEl.hidden = mode !== 'blank' && mode !== 'folder';
+            }
+            if (blankFileLabelEl) {
+                blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
             }
             if (uploadSubmitButton) {
-                uploadSubmitButton.textContent = mode === 'blank' ? 'Create blank file' : 'Upload';
+                uploadSubmitButton.textContent = mode === 'blank'
+                    ? 'Create blank file'
+                    : mode === 'folder'
+                        ? 'Create folder'
+                        : 'Upload';
             }
             setUploadSummary();
         };
@@ -867,6 +898,20 @@ export function renderEditPanel({
                         await onCreateBlankFile({
                             source,
                             fileName,
+                            statusEl,
+                        });
+                    } else if (source === 'folder') {
+                        const folderName = blankFileNameEl?.value?.trim() || '';
+                        if (!folderName) {
+                            if (statusEl) {
+                                statusEl.textContent = 'Enter a folder name.';
+                                statusEl.className = 'edit-status';
+                            }
+                            return;
+                        }
+                        await onCreateFolder({
+                            source,
+                            folderName,
                             statusEl,
                         });
                     } else {

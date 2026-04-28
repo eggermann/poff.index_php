@@ -185,6 +185,25 @@ function runBlankFile(targetDir, fileName, contents = '') {
   });
 }
 
+function runCreateFolder(targetDir, folderName) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_create_folder.php'), targetDir, folderName];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`create folder helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runPhpJson(scriptName) {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [path.join(ROOT, 'tests', scriptName)], {
@@ -1696,6 +1715,23 @@ describe('Worktype HBS renderer', () => {
     expect(result.config.tree).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'draft.txt', type: 'file' }),
+      ]),
+    );
+  });
+
+  test('creates a folder in a folder target', async () => {
+    const output = await runCreateFolder(UPLOAD_TARGET_DIR, 'assets');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.stored).toEqual([
+      expect.objectContaining({ name: 'assets', path: 'assets' }),
+    ]);
+    expect(fs.existsSync(path.join(UPLOAD_TARGET_DIR, 'assets'))).toBe(true);
+    expect(fs.lstatSync(path.join(UPLOAD_TARGET_DIR, 'assets')).isDirectory()).toBe(true);
+    expect(result.config.tree).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'assets', type: 'folder' }),
       ]),
     );
   });

@@ -119,6 +119,51 @@ function cmsCreateBlankFile(string $targetDir, string $fileName, string $content
     ];
 }
 
+function cmsCreateFolder(string $targetDir, string $folderName): array
+{
+    $name = cmsUploadSafeName($folderName);
+    if ($name === '') {
+        return [
+            'stored' => [],
+            'errors' => ['Invalid folder name.'],
+        ];
+    }
+
+    $targetPath = $targetDir . DIRECTORY_SEPARATOR . $name;
+    if (is_file($targetPath)) {
+        return [
+            'stored' => [],
+            'errors' => ['A file with that name already exists.'],
+        ];
+    }
+    if (is_dir($targetPath)) {
+        return [
+            'stored' => [],
+            'errors' => ['Folder already exists.'],
+        ];
+    }
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+        return [
+            'stored' => [],
+            'errors' => ['Failed to create target directory.'],
+        ];
+    }
+    if (!mkdir($targetPath, 0755, true) && !is_dir($targetPath)) {
+        return [
+            'stored' => [],
+            'errors' => ['Failed to create folder.'],
+        ];
+    }
+
+    return [
+        'stored' => [[
+            'name' => $name,
+            'path' => $name,
+        ]],
+        'errors' => [],
+    ];
+}
+
 function cmsUploadSafeName(string $name): string
 {
     $name = trim($name);
