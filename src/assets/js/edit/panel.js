@@ -489,6 +489,11 @@ function renderEditLayoutPanel({
     }
 
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
+    const uploadNameDrafts = {
+        blank: '',
+        folder: '',
+    };
+    let uploadMode = uploadSourceEl?.value || 'upload';
     if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function' && typeof onCreateFolder === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
@@ -510,6 +515,10 @@ function renderEditLayoutPanel({
         };
         const syncUploadMode = () => {
             const mode = uploadSourceEl?.value || 'upload';
+            if ((uploadMode === 'blank' || uploadMode === 'folder') && blankFileNameEl) {
+                uploadNameDrafts[uploadMode] = blankFileNameEl.value || '';
+            }
+            uploadMode = mode;
             if (uploadFilesWrapEl) {
                 uploadFilesWrapEl.hidden = mode !== 'upload';
             }
@@ -518,6 +527,12 @@ function renderEditLayoutPanel({
             }
             if (blankFileLabelEl) {
                 blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
+            }
+            if (blankFileNameEl) {
+                blankFileNameEl.placeholder = mode === 'folder' ? 'new-folder' : 'notes.txt';
+                if (mode === 'blank' || mode === 'folder') {
+                    blankFileNameEl.value = uploadNameDrafts[mode] || '';
+                }
             }
             if (uploadSubmitButton) {
                 uploadSubmitButton.textContent = mode === 'blank'
@@ -809,6 +824,11 @@ export function renderEditPanel({
     }
 
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
+    const uploadNameDrafts = {
+        blank: '',
+        folder: '',
+    };
+    let uploadMode = uploadSourceEl?.value || 'upload';
     if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function' && typeof onCreateFolder === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
@@ -830,6 +850,10 @@ export function renderEditPanel({
         };
         const syncUploadMode = () => {
             const mode = uploadSourceEl?.value || 'upload';
+            if ((uploadMode === 'blank' || uploadMode === 'folder') && blankFileNameEl) {
+                uploadNameDrafts[uploadMode] = blankFileNameEl.value || '';
+            }
+            uploadMode = mode;
             if (uploadFilesWrapEl) {
                 uploadFilesWrapEl.hidden = mode !== 'upload';
             }
@@ -838,6 +862,12 @@ export function renderEditPanel({
             }
             if (blankFileLabelEl) {
                 blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
+            }
+            if (blankFileNameEl) {
+                blankFileNameEl.placeholder = mode === 'folder' ? 'new-folder' : 'notes.txt';
+                if (mode === 'blank' || mode === 'folder') {
+                    blankFileNameEl.value = uploadNameDrafts[mode] || '';
+                }
             }
             if (uploadSubmitButton) {
                 uploadSubmitButton.textContent = mode === 'blank'
