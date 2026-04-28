@@ -669,6 +669,7 @@ function cmsHandleEditAction(): void
 
         $env = cmsLoadEnv($rootDir);
         $template = '';
+        $modelReturnedReasoningOnly = false;
         $usedModel = $model;
         $localDebugEntry = null;
 
@@ -812,8 +813,11 @@ function cmsHandleEditAction(): void
                 ], 502);
             }
             if (is_array($decoded)) {
-                if (isset($decoded['choices'][0]['message']['content'])) {
-                    $template = (string) $decoded['choices'][0]['message']['content'];
+                $message = $decoded['choices'][0]['message'] ?? null;
+                if (is_array($message) && array_key_exists('content', $message)) {
+                    $template = (string) $message['content'];
+                    $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
+                    $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
                 } elseif (isset($decoded['template'])) {
                     $template = (string) $decoded['template'];
                 } elseif (isset($decoded['content'])) {
@@ -829,7 +833,9 @@ function cmsHandleEditAction(): void
         if ($templateText === '') {
             cmsJsonResponse([
                 'allowed' => true,
-                'error' => 'Template was empty.',
+                'error' => $modelReturnedReasoningOnly
+                    ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
+                    : 'Template was empty.',
             ]);
         }
 

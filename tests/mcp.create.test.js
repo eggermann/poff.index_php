@@ -1008,7 +1008,7 @@ describe('MCP create route helper (CLI)', () => {
     });
 
     expect(viewerResult.allowed).toBe(true);
-    expect(viewerResult.error).toBe('Template was empty.');
+    expect(viewerResult.error).toBe('Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.');
     expect(viewerResult.template).toBeUndefined();
   });
 });

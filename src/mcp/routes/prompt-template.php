@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../includes/viewer/link-targets.php';
 require_once __DIR__ . '/../../includes/edit-mode.php';
 require_once __DIR__ . '/../../includes/prompt-template-sanitize.php';
 
-const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 90;
+const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 300;
 
 function mcpPromptResponseCandidates(string $raw): array
 {
@@ -155,6 +155,7 @@ function mcpParsePromptModelResult(string $raw): array
     }
 
     $template = '';
+    $modelReturnedReasoningOnly = false;
     $extractedFromEnvelope = false;
     if (isset($decoded['choices'][0]['message']['content'])) {
         $extractedFromEnvelope = true;
@@ -290,17 +291,32 @@ function mcpPromptHttpPost(string $url, array $headers, array $payload): array
         }
     }
 
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(MCP_PROMPT_HTTP_TIMEOUT_SECONDS + 30);
+    }
+
+    $previousSocketTimeout = ini_get('default_socket_timeout');
+    if (function_exists('ini_set')) {
+        @ini_set('default_socket_timeout', (string) MCP_PROMPT_HTTP_TIMEOUT_SECONDS);
+    }
+
     $headerLines = array_merge(['Content-Type: application/json'], $headers);
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => implode("\r\n", $headerLines),
-            'content' => json_encode($payload),
-            'timeout' => MCP_PROMPT_HTTP_TIMEOUT_SECONDS,
-            'ignore_errors' => true,
-        ],
-    ]);
-    $response = @file_get_contents($url, false, $context);
+    try {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", $headerLines),
+                'content' => json_encode($payload),
+                'timeout' => MCP_PROMPT_HTTP_TIMEOUT_SECONDS,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $response = @file_get_contents($url, false, $context);
+    } finally {
+        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
+            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
+        }
+    }
     $status = 0;
     $statusLine = '';
     if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
@@ -1005,8 +1021,11 @@ function handlePromptTemplate(array $opts): array
         }
         $decoded = json_decode($response['body'], true);
         if (is_array($decoded)) {
-            if (isset($decoded['choices'][0]['message']['content'])) {
-                $template = (string) $decoded['choices'][0]['message']['content'];
+            $message = $decoded['choices'][0]['message'] ?? null;
+            if (is_array($message) && array_key_exists('content', $message)) {
+                $template = (string) $message['content'];
+                $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
+                $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
             } elseif (isset($decoded['template'])) {
                 $template = (string) $decoded['template'];
             } elseif (isset($decoded['content'])) {
@@ -1023,7 +1042,9 @@ function handlePromptTemplate(array $opts): array
         return [
             'route' => 'prompt-template',
             'allowed' => true,
-            'error' => 'Template was empty.',
+            'error' => $modelReturnedReasoningOnly
+                ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
+                : 'Template was empty.',
         ];
     }
 

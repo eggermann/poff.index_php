@@ -12,7 +12,7 @@ import { readImageFile } from './prompt/image.js';
 import { readPromptEditorDraft } from './prompt/draft.js';
 import { summarizePromptError, summarizePromptRequest, summarizePromptResponse } from './prompt/summary.js';
 
-const PROMPT_FALLBACK_TIMEOUT_MS = 95000;
+const PROMPT_FALLBACK_TIMEOUT_MS = 305000;
 const PROMPT_LAYER_STATE_KEY = 'poffEditPromptLayerState';
 
 let promptHistory = [];

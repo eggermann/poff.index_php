@@ -1,4 +1,4 @@
-const PROMPT_REQUEST_TIMEOUT_MS = 90000;
+const PROMPT_REQUEST_TIMEOUT_MS = 300000;
 
 export function buildCmsUrl(action, path) {
     const url = new URL(window.location.pathname, window.location.origin);
@@ -94,15 +94,25 @@ export async function requestPromptTemplate(payload) {
             signal: controller ? controller.signal : undefined,
         });
         clearTimeout(timeout);
-        if (!res.ok) {
-            const data = await res.json().catch(() => null);
-            return data || { error: `Prompt endpoint failed (HTTP ${res.status}).` };
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
         }
-        return await res.json();
+        if (!res.ok) {
+            return data || {
+                error: responseText.trim() || `Prompt endpoint failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || {
+            error: responseText.trim() || 'Prompt endpoint returned invalid JSON.',
+        };
     } catch (err) {
         clearTimeout(timeout);
         if (err?.name === 'AbortError') {
-            return { error: 'Prompt request timed out after 90 seconds.' };
+            return { error: 'Prompt request timed out after 5 minutes.' };
         }
         return { error: 'Prompt endpoint unavailable.' };
     }

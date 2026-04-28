@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../project-root.php';
 require_once __DIR__ . '/../edit-mode.php';
 
-const CMS_HTTP_TIMEOUT_SECONDS = 90;
+const CMS_HTTP_TIMEOUT_SECONDS = 300;
 
 function cmsJsonResponse(array $payload, int $status = 200): void
 {
@@ -167,17 +167,32 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
         }
     }
 
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
+    }
+
+    $previousSocketTimeout = ini_get('default_socket_timeout');
+    if (function_exists('ini_set')) {
+        @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
+    }
+
     $headerLines = array_merge(['Content-Type: application/json'], $headers);
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => implode("\r\n", $headerLines),
-            'content' => json_encode($payload),
-            'timeout' => CMS_HTTP_TIMEOUT_SECONDS,
-            'ignore_errors' => true,
-        ],
-    ]);
-    $response = @file_get_contents($url, false, $context);
+    try {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", $headerLines),
+                'content' => json_encode($payload),
+                'timeout' => CMS_HTTP_TIMEOUT_SECONDS,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $response = @file_get_contents($url, false, $context);
+    } finally {
+        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
+            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
+        }
+    }
     $status = 0;
     $statusLine = '';
     if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {

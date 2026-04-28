@@ -219,15 +219,15 @@ function renderEditLayoutPanel({
         </form>
         <div class="edit-upload-launch">
             <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add content</div>
+                <div class="edit-layout-title">Add work</div>
                 <div class="small-note">${escapeHtml(addContentHint)}</div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">Add content</h4>
+                    <h4 class="drawer-title">Add work</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
@@ -700,15 +700,15 @@ export function renderEditPanel({
         </div>
         <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
             <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add content</div>
+                <div class="edit-layout-title">Add work</div>
                 <div class="small-note">${escapeHtml(addContentHint)}</div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">Add content</h4>
+                    <h4 class="drawer-title">Add work</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
