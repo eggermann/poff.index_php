@@ -5,7 +5,10 @@
  * with lightweight folder metadata and a first-level tree listing.
  */
 
+require_once __DIR__ . '/project-root.php';
 require_once __DIR__ . '/PoffConfig/layout-helpers.php';
+require_once __DIR__ . '/prompt-template-sanitize.php';
+require_once __DIR__ . '/viewer/link-targets.php';
 
 class PoffConfig
 {
@@ -205,6 +208,45 @@ class PoffConfig
                 }
             }
             unset($item);
+
+            $mergedNames = [];
+            foreach ($mergedTree as $item) {
+                if (isset($item['name']) && is_string($item['name']) && $item['name'] !== '') {
+                    $mergedNames[$item['name']] = true;
+                }
+            }
+
+            foreach ($existing['tree'] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $name = trim((string) ($item['name'] ?? ''));
+                if ($name === '' || isset($mergedNames[$name])) {
+                    continue;
+                }
+                if (cmsConfiguredTreeLinkTarget($item) === '') {
+                    continue;
+                }
+
+                $virtualItem = [
+                    'name' => $name,
+                    'slug' => (string) ($item['slug'] ?? self::slugify($name)),
+                    'type' => (string) ($item['type'] ?? 'file'),
+                    'path' => (string) ($item['path'] ?? $name),
+                    'modifiedAt' => $item['modifiedAt'] ?? null,
+                    'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
+                ];
+
+                foreach ($item as $key => $value) {
+                    if (array_key_exists($key, $virtualItem)) {
+                        continue;
+                    }
+                    $virtualItem[$key] = $value;
+                }
+
+                $mergedTree[] = $virtualItem;
+                $mergedNames[$name] = true;
+            }
         }
 
         // Start with defaults but preserve user-provided title/description/link/url if present
@@ -364,9 +406,52 @@ class PoffConfig
     public static function persistLayoutFiles(string $dir, ?string $fileName, mixed $layout, string $section = 'work'): array
     {
         $normalized = Worktype::normalizeLayout($layout, $section);
+        $layoutMode = trim((string) ($normalized['mode'] ?? ''));
+        $layoutName = trim((string) ($normalized['name'] ?? ''));
+        $layoutPreset = trim((string) ($normalized['preset'] ?? ''));
+        $inactivePreset = $layoutMode === 'none'
+            || $layoutName === 'none'
+            || $layoutPreset === 'none'
+            || (
+                $layoutPreset === 'actual'
+                && in_array($layoutName, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)
+            );
+        $isCustomPreset = $layoutMode === 'custom-layout'
+            || $layoutName === 'custom-layout'
+            || $layoutPreset === 'custom';
+        if (array_key_exists('template', $normalized)) {
+            $normalized['template'] = self::sanitizeStoredPromptTemplate((string) $normalized['template'], true);
+        }
+        if (array_key_exists('sectionTemplate', $normalized)) {
+            $normalized['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $normalized['sectionTemplate'], false);
+        }
+        if ($inactivePreset) {
+            foreach (['template', 'css', 'js', 'sectionTemplate'] as $key) {
+                unset($normalized[$key]);
+            }
+        }
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
+        $managedLayoutKeys = ['template', 'css', 'js', 'sectionTemplate'];
+        $providedManagedKeys = array_values(array_filter(
+            $managedLayoutKeys,
+            static fn(string $key): bool => array_key_exists($key, $normalized)
+        ));
+        $allProvidedManagedValuesEmpty = $providedManagedKeys !== [];
+        foreach ($providedManagedKeys as $key) {
+            if (trim((string) $normalized[$key]) !== '') {
+                $allProvidedManagedValuesEmpty = false;
+                break;
+            }
+        }
+        $hasExistingManagedLayoutFile = self::hasWrapperFiles($layoutDir)
+            || is_file($layoutDir . DIRECTORY_SEPARATOR . self::sectionTemplateFile($section));
+        if ($isCustomPreset && $allProvidedManagedValuesEmpty && $hasExistingManagedLayoutFile) {
+            foreach ($providedManagedKeys as $key) {
+                unset($normalized[$key]);
+            }
+        }
         self::writeManagedLayoutFiles($layoutDir, self::defaultLayoutFiles($section));
         self::writeManagedLayoutFiles($layoutDir, [
             self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,
@@ -378,6 +463,19 @@ class PoffConfig
         return self::serializeLayout($normalized, $section);
     }
 
+    public static function persistSectionTemplate(string $dir, ?string $fileName, string $sectionTemplate, string $section = 'work'): string
+    {
+        $layoutDir = $fileName === null
+            ? self::folderLayoutDir($dir)
+            : self::fileLayoutDir($dir, $fileName);
+        $sanitized = self::sanitizeStoredPromptTemplate($sectionTemplate, false);
+        self::writeManagedLayoutFiles($layoutDir, [
+            self::sectionTemplateFile($section) => $sanitized,
+        ]);
+
+        return $sanitized;
+    }
+
     public static function persistOriginalLayoutFiles(string $relativeDir, array $payload): string
     {
         $layoutDir = self::resolveRelativeDirectory($relativeDir);
@@ -386,7 +484,7 @@ class PoffConfig
         }
 
         self::writeManagedLayoutFiles($layoutDir, [
-            self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $payload) ? (string) $payload['template'] : null,
+            self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $payload) ? self::sanitizeStoredPromptTemplate((string) $payload['template'], true) : null,
             self::LAYOUT_STYLE_FILE => array_key_exists('css', $payload) ? (string) $payload['css'] : null,
             self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $payload) ? (string) $payload['js'] : null,
         ]);
@@ -470,6 +568,36 @@ class PoffConfig
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
+        $mode = trim((string) ($resolved['mode'] ?? ''));
+        $name = trim((string) ($resolved['name'] ?? ''));
+        $preset = trim((string) ($resolved['preset'] ?? ''));
+        $isNoneLayout = $mode === 'none' || $name === 'none' || $preset === 'none';
+
+        if ($isNoneLayout) {
+            $resolved['mode'] = 'none';
+            $resolved['name'] = 'none';
+            $resolved['storage'] = 'none';
+            $resolved['directory'] = '';
+            $resolved['inheritedDirectory'] = '';
+            $resolved['sectionDirectory'] = '';
+            $resolved['template'] = '';
+            $resolved['css'] = '';
+            $resolved['js'] = '';
+            $resolved['sectionTemplate'] = '';
+            $resolved['assets'] = [];
+            $resolved['files'] = [];
+            $resolved['assetCount'] = 0;
+            unset($resolved['cssHref'], $resolved['jsHref'], $resolved['phpTemplate']);
+
+            return $resolved;
+        }
+
+        if (array_key_exists('template', $resolved)) {
+            $resolved['template'] = self::sanitizeStoredPromptTemplate((string) $resolved['template'], true);
+        }
+        if (array_key_exists('sectionTemplate', $resolved)) {
+            $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $resolved['sectionTemplate'], false);
+        }
         $resolved['phpTemplate'] = Worktype::template((string) ($resolved['name'] ?? Worktype::defaultLayoutName())) ?? '';
         $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
@@ -504,7 +632,7 @@ class PoffConfig
 
             $templatePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_TEMPLATE_FILE;
             if (is_file($templatePath)) {
-                $resolved['template'] = (string) file_get_contents($templatePath);
+                $resolved['template'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($templatePath), true);
             }
 
             $stylePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_STYLE_FILE;
@@ -545,7 +673,7 @@ class PoffConfig
         }
 
         if (is_string($sectionTemplatePath) && $sectionTemplatePath !== '') {
-            $resolved['sectionTemplate'] = (string) file_get_contents($sectionTemplatePath);
+            $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($sectionTemplatePath), false);
         }
 
         $resolved['assets'] = $assets;
@@ -553,6 +681,189 @@ class PoffConfig
         $resolved['assetCount'] = count($assets);
 
         return $resolved;
+    }
+
+    private static function sanitizeStoredPromptTemplate(string $value, bool $isLayoutTarget = true, int $depth = 0): string
+    {
+        if ($depth > 3) {
+            return cmsSanitizePromptTemplateForTarget((string) $value, $isLayoutTarget);
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $decoded = self::decodeStoredPromptPayload($trimmed);
+        if (!is_array($decoded)) {
+            return cmsSanitizePromptTemplateForTarget($value, $isLayoutTarget);
+        }
+
+        $extracted = self::extractStoredPromptTemplateFromPayload($decoded, $isLayoutTarget, $depth + 1);
+        if ($extracted === null) {
+            return '';
+        }
+
+        return cmsSanitizePromptTemplateForTarget($extracted, $isLayoutTarget);
+    }
+
+    private static function extractStoredPromptTemplateFromPayload(array $decoded, bool $isLayoutTarget, int $depth): ?string
+    {
+        $template = null;
+        if (isset($decoded['choices'][0]['message']['content'])) {
+            $content = $decoded['choices'][0]['message']['content'];
+            if (is_string($content)) {
+                $template = trim($content);
+            } elseif (is_array($content)) {
+                $parts = [];
+                foreach ($content as $part) {
+                    if (is_string($part) && trim($part) !== '') {
+                        $parts[] = trim($part);
+                        continue;
+                    }
+                    if (is_array($part) && isset($part['text']) && is_scalar($part['text'])) {
+                        $parts[] = trim((string) $part['text']);
+                    }
+                }
+                $template = trim(implode("\n", array_filter($parts)));
+            }
+        } elseif (isset($decoded['choices'][0]['text']) && is_scalar($decoded['choices'][0]['text'])) {
+            $template = trim((string) $decoded['choices'][0]['text']);
+        } elseif (isset($decoded['message']['content']) && is_scalar($decoded['message']['content'])) {
+            $template = trim((string) $decoded['message']['content']);
+        } elseif (isset($decoded['response']) && is_scalar($decoded['response'])) {
+            $template = trim((string) $decoded['response']);
+        } elseif (isset($decoded['template'])) {
+            $template = trim((string) $decoded['template']);
+        } elseif (isset($decoded['content'])) {
+            $template = trim((string) $decoded['content']);
+        }
+
+        if ($template === null) {
+            return null;
+        }
+
+        if ($template === '') {
+            return '';
+        }
+
+        return self::sanitizeStoredPromptTemplate($template, $isLayoutTarget, $depth);
+    }
+
+    private static function storedPromptResponseCandidates(string $raw): array
+    {
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $candidates = [$trimmed];
+
+        if (preg_match_all('/```(?:[a-z0-9_-]+)?\s*([\s\S]*?)```/i', $trimmed, $matches)) {
+            foreach ($matches[1] as $match) {
+                $candidate = trim((string) $match);
+                if ($candidate !== '') {
+                    $candidates[] = $candidate;
+                }
+            }
+        }
+
+        $firstBrace = strpos($trimmed, '{');
+        $lastBrace = strrpos($trimmed, '}');
+        if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
+            $candidate = trim(substr($trimmed, $firstBrace, $lastBrace - $firstBrace + 1));
+            if ($candidate !== '') {
+                $candidates[] = $candidate;
+            }
+        }
+
+        $normalized = [];
+        foreach ($candidates as $candidate) {
+            if (in_array($candidate, $normalized, true)) {
+                continue;
+            }
+            $normalized[] = $candidate;
+        }
+
+        return $normalized;
+    }
+
+    private static function decodeStoredPromptLooseString(string $value): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $decoded = json_decode($trimmed, true);
+        if (is_string($decoded)) {
+            return $decoded;
+        }
+
+        if ($trimmed[0] === '"') {
+            $trimmed = substr($trimmed, 1);
+        }
+        if ($trimmed !== '' && substr($trimmed, -1) === '"') {
+            $trimmed = substr($trimmed, 0, -1);
+        }
+
+        return stripcslashes($trimmed);
+    }
+
+    private static function extractStoredPromptLooseScalarField(string $payload, string $key): ?string
+    {
+        $knownKeys = [
+            'template',
+            'css',
+            'style',
+            'js',
+            'script',
+            'work',
+            'title',
+            'description',
+            'model',
+            'content',
+            'response',
+        ];
+        $otherKeys = array_values(array_filter($knownKeys, static fn (string $candidate): bool => $candidate !== $key));
+        $otherKeysPattern = implode('|', array_map(static fn (string $candidate): string => preg_quote($candidate, '/'), $otherKeys));
+        $pattern = '/"' . preg_quote($key, '/') . '"\s*:\s*([\s\S]*?)(?=\s*(?:,\s*"(?:' . $otherKeysPattern . ')"\s*:|\}\s*$|$))/i';
+        if (preg_match($pattern, $payload, $matches) !== 1) {
+            return null;
+        }
+
+        return self::decodeStoredPromptLooseString((string) $matches[1]);
+    }
+
+    private static function decodeStoredPromptPayload(string $raw): ?array
+    {
+        $candidates = self::storedPromptResponseCandidates($raw);
+        foreach ($candidates as $candidate) {
+            $decoded = json_decode($candidate, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            if (!preg_match('/"(template|css|style|js|script|title|description|model|content|response)"\s*:/i', $candidate)) {
+                continue;
+            }
+
+            $result = [];
+            foreach (['template', 'css', 'style', 'js', 'script', 'title', 'description', 'model', 'content', 'response'] as $key) {
+                $value = self::extractStoredPromptLooseScalarField($candidate, $key);
+                if ($value !== null) {
+                    $result[$key] = $value;
+                }
+            }
+
+            if ($result !== []) {
+                return $result;
+            }
+        }
+
+        return null;
     }
 
     private static function findInheritedLayoutDir(string $dir, string $localLayoutDir): ?array

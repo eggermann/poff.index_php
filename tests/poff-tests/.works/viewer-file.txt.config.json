@@ -6,12 +6,12 @@
     "kind": "text",
     "path": "viewer-file.txt",
     "size": 11,
-    "modifiedAt": "2026-04-17T22:44:03+00:00",
+    "modifiedAt": "2026-04-28T22:32:31+00:00",
     "visible": true,
     "mimeType": "text/plain",
-    "hash": "2ce324b1b69494128b7bbcf4bc57ad74b76b5d89e50a455736f969243afb5a26",
-    "updatedAt": "2026-04-17T22:44:05+00:00",
-    "id": "poff_27b86675a35263b3",
+    "hash": "9972f3b84b7b5aeac0992015c00368749b705c76d1d39cf24e5271ddbe200a7c",
+    "updatedAt": "2026-04-28T22:32:34+00:00",
+    "id": "poff_6b46fcc4b0d478c9",
     "work": {
         "type": "text",
         "syntax": "text/plain",
@@ -19,7 +19,34 @@
             "mode": "filesystem-file-layout",
             "name": "filesystem-file-layout",
             "engine": "lightncandy",
-            "section": "work"
+            "section": "work",
+            "css": ".file-custom{border:1px solid #8ec5ff;}",
+            "js": "window.__fileLayout = true;",
+            "template": "<div class=\"file-custom\">{{title}}<main class=\"poff-default-layout__main\">\n    {{#if isFolder}}\n        {{> works}}\n    {{else}}\n        {{> work}}\n    {{/if}}\n</main>\n\n</div>",
+            "storage": "filesystem",
+            "directory": ".works/viewer-file.txt.layout",
+            "inheritedDirectory": ".layout",
+            "sectionTemplate": "<article class=\"source-only-update\">{{title}}</article>",
+            "sectionDirectory": ".works/viewer-file.txt.layout",
+            "assets": [
+                {
+                    "name": "thumbnail.txt",
+                    "path": "thumbnail.txt",
+                    "size": 10,
+                    "updatedAt": "2026-04-28T22:32:31+00:00"
+                },
+                {
+                    "name": "work.hbs",
+                    "path": "work.hbs",
+                    "size": 150,
+                    "updatedAt": "2026-04-28T22:32:34+00:00"
+                }
+            ],
+            "files": {
+                "work.hbs": "work.hbs",
+                "thumbnail.txt": "thumbnail.txt"
+            },
+            "assetCount": 2
         }
     },
     "title": "Viewer File",

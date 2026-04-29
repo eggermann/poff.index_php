@@ -9,6 +9,7 @@ require_once __DIR__ . '/edit/prompt-refs.php';
 require_once __DIR__ . '/edit/prompt-context.php';
 require_once __DIR__ . '/edit/prompt-compact.php';
 require_once __DIR__ . '/edit/upload.php';
+require_once __DIR__ . '/edit/delete.php';
 
 function cmsIniBytes(string $value): int
 {
@@ -48,16 +49,44 @@ function cmsIsOpenAiCompatibleEndpoint(string $url): bool
     return $normalized !== '' && str_contains($normalized, '/v1/chat/completions');
 }
 
+function cmsPromptSendSseHeaders(): void
+{
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-transform');
+    header('X-Accel-Buffering: no');
+}
+
+function cmsPromptSendSseEvent(string $event, array $payload): void
+{
+    echo 'event: ' . $event . "\n";
+    echo 'data: ' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+    if (function_exists('ob_flush')) {
+        @ob_flush();
+    }
+    flush();
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['config', 'save', 'prompt', 'upload'], true)) {
+    if (!in_array($action, ['config', 'save', 'prompt', 'upload', 'delete'], true)) {
         return;
     }
 
-    $rootDir = getcwd();
-    $allowFile = $rootDir . DIRECTORY_SEPARATOR . '.edit.allow';
-    if (!is_file($allowFile)) {
+    $runtimeRootDir = realpath(getcwd() ?: '.') ?: '.';
+    $rootDir = $runtimeRootDir;
+
+    $data = ($action === 'save' || $action === 'prompt') ? cmsReadJsonBody() : [];
+    if ($data === []) {
+        $data = $_POST;
+    }
+    $path = isset($_GET['path']) ? (string) $_GET['path'] : '';
+    if ($path === '' && isset($data['path'])) {
+        $path = (string) $data['path'];
+    }
+    $runtimeTarget = cmsResolveTarget($runtimeRootDir, $path);
+    $runtimeAllowDir = $runtimeTarget['dir'] ?? $runtimeRootDir;
+    if (!cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir)) {
         cmsJsonResponse([
             'allowed' => false,
             'error' => 'Edit mode not enabled.',
@@ -71,14 +100,6 @@ function cmsHandleEditAction(): void
         ]);
     }
 
-    $data = ($action === 'save' || $action === 'prompt') ? cmsReadJsonBody() : [];
-    if ($data === []) {
-        $data = $_POST;
-    }
-    $path = isset($_GET['path']) ? (string) $_GET['path'] : '';
-    if ($path === '' && isset($data['path'])) {
-        $path = (string) $data['path'];
-    }
     $target = cmsResolveTarget($rootDir, $path);
     if ($target === null) {
         cmsJsonResponse([
@@ -133,7 +154,7 @@ function cmsHandleEditAction(): void
                 : PoffConfig::folderLayoutDir($targetDir);
         }
         $source = trim((string) ($data['source'] ?? 'upload'));
-        if (!in_array($source, ['upload', 'blank'], true)) {
+        if (!in_array($source, ['upload', 'blank', 'folder'], true)) {
             cmsJsonResponse([
                 'allowed' => true,
                 'error' => 'Unsupported add-content source.',
@@ -144,6 +165,9 @@ function cmsHandleEditAction(): void
             $fileName = (string) ($data['fileName'] ?? $data['filename'] ?? '');
             $contents = (string) ($data['contents'] ?? '');
             $result = cmsCreateBlankFile($uploadTargetDir, $fileName, $contents);
+        } elseif ($source === 'folder') {
+            $folderName = (string) ($data['fileName'] ?? $data['folderName'] ?? $data['filename'] ?? '');
+            $result = cmsCreateFolder($uploadTargetDir, $folderName);
         } else {
             $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
             if ($entries === []) {
@@ -175,6 +199,43 @@ function cmsHandleEditAction(): void
             'config' => $updatedConfig,
             'uploadLimits' => cmsUploadLimits(),
         ]);
+    }
+
+    if ($action === 'delete') {
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'Delete requires POST.',
+            ], 405);
+        }
+
+        $deleteResult = cmsDeleteTarget($rootDir, $path);
+        if (($deleteResult['errors'] ?? []) !== []) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => $deleteResult['errors'][0] ?? 'Delete failed.',
+            ], 400);
+        }
+
+        $refreshDir = (string) ($deleteResult['refreshDir'] ?? $rootDir);
+        $updatedConfig = PoffConfig::ensure($refreshDir);
+        $returnPath = trim((string) ($data['return'] ?? $_GET['return'] ?? ''), "/\\");
+
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+        $wantsJson = str_contains($accept, 'application/json') || str_contains($accept, 'text/json');
+        if ($wantsJson) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'deleted' => $deleteResult['deleted'],
+                'config' => $updatedConfig,
+            ]);
+        }
+
+        $redirectUrl = $returnPath !== ''
+            ? '?path=' . urlencode($returnPath) . '&edit=true'
+            : '?edit=true';
+        header('Location: ' . $redirectUrl, true, 303);
+        exit;
     }
 
     if ($action === 'save') {
@@ -372,6 +433,18 @@ function cmsHandleEditAction(): void
         }
 
         $layoutSection = $subjectType === 'folder' ? 'works' : 'work';
+        $sectionOnlyLayoutUpdate = $hasLayoutUpdate
+            && $layoutSectionTemplateProvided
+            && !$layoutTemplateProvided
+            && !$layoutCssProvided
+            && !$layoutJsProvided
+            && $layoutMode === ''
+            && $layoutPreset === ''
+            && (!is_string($layoutModel) || trim($layoutModel) === '')
+            && $originalLayoutTarget === ''
+            && !$originalLayoutTemplateProvided
+            && !$originalLayoutCssProvided
+            && !$originalLayoutJsProvided;
         if ($hasLayoutUpdate) {
             $layoutValue = $work['layout'] ?? null;
             $layout = is_array($layoutValue) ? $layoutValue : [];
@@ -380,6 +453,10 @@ function cmsHandleEditAction(): void
             }
             if ($layoutMode !== '') {
                 $layout['mode'] = $layoutMode;
+                $layout['name'] = $layoutMode;
+            }
+            if ($layoutPreset === 'inherit') {
+                $layoutPreset = 'actual';
             }
             if (in_array($layoutPreset, ['actual', 'none', 'custom'], true)) {
                 $layout['preset'] = $layoutPreset;
@@ -399,17 +476,41 @@ function cmsHandleEditAction(): void
             if (is_string($layoutModel) && $layoutModel !== '') {
                 $layout['model'] = $layoutModel;
             }
+            foreach ([
+                'template' => $layoutTemplateProvided,
+                'sectionTemplate' => $layoutSectionTemplateProvided,
+                'css' => $layoutCssProvided,
+                'js' => $layoutJsProvided,
+            ] as $layoutFileKey => $wasProvided) {
+                if (!$wasProvided && array_key_exists($layoutFileKey, $layout) && trim((string) $layout[$layoutFileKey]) === '') {
+                    unset($layout[$layoutFileKey]);
+                }
+            }
             $work['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
         } elseif ($workLayout !== '') {
             $work['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }
 
-        $work['layout'] = PoffConfig::persistLayoutFiles(
-            $targetDir,
-            $subjectType === 'file' ? (string) $targetFile : null,
-            $work['layout'] ?? null,
-            $layoutSection
-        );
+        if ($sectionOnlyLayoutUpdate) {
+            $sanitizedSectionTemplate = PoffConfig::persistSectionTemplate(
+                $targetDir,
+                $subjectType === 'file' ? (string) $targetFile : null,
+                (string) $layoutSectionTemplate,
+                $layoutSection
+            );
+            if (!isset($work['layout']) || !is_array($work['layout'])) {
+                $work['layout'] = [];
+            }
+            $work['layout']['sectionTemplate'] = $sanitizedSectionTemplate;
+            $work['layout'] = Worktype::normalizeLayout($work['layout'], $layoutSection);
+        } else {
+            $work['layout'] = PoffConfig::persistLayoutFiles(
+                $targetDir,
+                $subjectType === 'file' ? (string) $targetFile : null,
+                $work['layout'] ?? null,
+                $layoutSection
+            );
+        }
         if (
             $originalLayoutTarget !== ''
             && ($originalLayoutTemplateProvided || $originalLayoutCssProvided || $originalLayoutJsProvided)
@@ -499,6 +600,13 @@ function cmsHandleEditAction(): void
         $history = is_array($data['history'] ?? null) ? $data['history'] : [];
         $systemPromptValue = trim((string) ($data['systemPrompt'] ?? ''));
         $layoutPreset = trim((string) ($data['layoutPreset'] ?? $data['layout_preset'] ?? ''));
+        $editorDraft = is_array($data['draft'] ?? null) ? $data['draft'] : [];
+        $promptMode = strtolower(trim((string) ($data['promptMode'] ?? $data['prompt_mode'] ?? '')));
+        $promptTarget = strtolower(trim((string) ($data['promptTarget'] ?? $data['prompt_target'] ?? '')));
+        $promptIsLayoutTarget = $isLayoutTarget
+            || $promptMode === 'layout'
+            || in_array($promptTarget, ['layout', 'wrapper', 'layout-wrapper'], true)
+            || ($layoutPreset !== '' && !$isLayoutTarget);
         $image = cmsPromptImagePayload($data);
 
         if ($prompt === '' && !$image) {
@@ -508,8 +616,8 @@ function cmsHandleEditAction(): void
             ]);
         }
 
-        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $isLayoutTarget, $layoutPreset);
-        if ($isLayoutTarget && is_array($config['work']['layout'] ?? null)) {
+        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $promptIsLayoutTarget, $layoutPreset, $editorDraft);
+        if ($promptIsLayoutTarget && is_array($config['work']['layout'] ?? null)) {
             $promptContext['current']['activeLayout'] = [
                 'name' => (string) ($config['work']['layout']['name'] ?? ''),
                 'mode' => (string) ($config['work']['layout']['mode'] ?? ''),
@@ -524,8 +632,8 @@ function cmsHandleEditAction(): void
             ];
         }
         $promptContextJson = json_encode(cmsPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $configJson = json_encode(cmsPromptCompactConfig($config, $isLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $responseFormatInstruction = implode("\n", $isLayoutTarget
+        $configJson = json_encode(cmsPromptCompactConfig($config, $promptIsLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $responseFormatInstruction = implode("\n", $promptIsLayoutTarget
             ? [
                 'Response format: return strict JSON.',
                 'Required key: "template" with the outer layout wrapper HBS string.',
@@ -549,6 +657,7 @@ function cmsHandleEditAction(): void
             'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
             'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
             'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
+            'If Prompt context JSON current.editorDraft is present, treat it as the latest unsaved editor state and revise that draft before falling back to saved config or saved template sources.',
             'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
             'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
         ];
@@ -556,8 +665,11 @@ function cmsHandleEditAction(): void
             'Save target is work.hbs for the current file inside the active item layout folder.',
             'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
             'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
+            'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
+            'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
             'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
+            'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
             'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
         ]);
         $folderWorkSystemPrompt = array_merge($sharedWorkSystemPrompt, [
@@ -565,11 +677,15 @@ function cmsHandleEditAction(): void
             'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
             'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
             'Use folder tree data and resolved refs when relevant instead of inventing paths.',
+            'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
+            'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
+            'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
             'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
             'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
+            'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
             'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
         ]);
-        $defaultSystemPrompt = implode("\n", $isLayoutTarget
+        $defaultSystemPrompt = implode("\n", $promptIsLayoutTarget
             ? [
                 'You are a Handlebars (HBS) layout generator for this single-page CMS.',
                 'Transform the user description into an updated outer layout wrapper rendered through LightnCandy.',
@@ -580,10 +696,11 @@ function cmsHandleEditAction(): void
                 'The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.',
                 'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
                 'Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.',
+                'If Prompt context JSON current.editorDraft is present, treat those unsaved draft template/css/js values as the latest version to evolve from before falling back to current.activeLayout.',
                 'Prefer returning sibling "css" and "js" strings too, so the layout prompt can design template.hbs, style.css, and script.js together for files and folders.',
                 'Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.',
-                'When the current layout mode stays inherited or actual, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
-                'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Actual, the local custom wrapper for Custom, and never the inner partial by default.',
+                'When the current layout mode stays inherited/inherit, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
+                'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.',
                 'current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.',
                 'Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.',
                 'For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.',
@@ -592,6 +709,8 @@ function cmsHandleEditAction(): void
                 'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
                 'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
                 'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
+                'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
+                'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
                 'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
                 'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
                 'Prompt context JSON includes resolved refs for the current item and current folder contents. Use those refs directly instead of inventing paths.',
@@ -608,7 +727,50 @@ function cmsHandleEditAction(): void
 
         $env = cmsLoadEnv($rootDir);
         $template = '';
+        $modelReturnedReasoningOnly = false;
         $usedModel = $model;
+        $localDebugEntry = null;
+        $streamRequested = !empty($data['stream']);
+        $streamBuffer = '';
+        $streamTemplate = '';
+        $streamChunkParser = function (string $chunk) use (&$streamBuffer, &$streamTemplate): void {
+            if ($chunk === '') {
+                return;
+            }
+            $chunk = str_replace("\r\n", "\n", $chunk);
+            echo $chunk;
+            if (function_exists('ob_flush')) {
+                @ob_flush();
+            }
+            flush();
+            $streamBuffer .= $chunk;
+            while (strpos($streamBuffer, "\n\n") !== false) {
+                $splitAt = strpos($streamBuffer, "\n\n");
+                $block = trim(substr($streamBuffer, 0, $splitAt));
+                $streamBuffer = substr($streamBuffer, $splitAt + 2);
+                if ($block === '') {
+                    continue;
+                }
+                $dataLines = [];
+                foreach (preg_split('/\r?\n/', $block) ?: [] as $line) {
+                    if (str_starts_with($line, 'data:')) {
+                        $dataLines[] = ltrim(substr($line, 5));
+                    }
+                }
+                $dataLine = implode("\n", $dataLines);
+                if ($dataLine === '' || $dataLine === '[DONE]') {
+                    continue;
+                }
+                $decodedChunk = json_decode($dataLine, true);
+                if (!is_array($decodedChunk)) {
+                    continue;
+                }
+                $delta = $decodedChunk['choices'][0]['delta']['content'] ?? null;
+                if (is_string($delta) && $delta !== '') {
+                    $streamTemplate .= $delta;
+                }
+            }
+        };
 
         if ($provider === 'openai') {
             $key = $apiKey !== '' ? $apiKey : (cmsEnvValue($env, 'OPENAI_API_KEY') ?? '');
@@ -632,17 +794,33 @@ function cmsHandleEditAction(): void
                 ],
                 'temperature' => 0.4,
             ];
-            $response = cmsHttpPost('https://api.openai.com/v1/chat/completions', [
-                'Authorization: Bearer ' . $key,
-            ], $payload);
-            if (!$response['ok']) {
-                cmsJsonResponse([
-                    'allowed' => true,
-                    'error' => cmsFormatPromptHttpError('OpenAI', $response),
-                ]);
+            if ($streamRequested) {
+                cmsPromptSendSseHeaders();
+                $payload['stream'] = true;
+                $response = cmsHttpPostStream('https://api.openai.com/v1/chat/completions', [
+                    'Authorization: Bearer ' . $key,
+                ], $payload, $streamChunkParser);
+                if (!$response['ok']) {
+                    cmsPromptSendSseEvent('final', [
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('OpenAI', $response),
+                    ]);
+                    exit;
+                }
+                $template = $streamTemplate;
+            } else {
+                $response = cmsHttpPost('https://api.openai.com/v1/chat/completions', [
+                    'Authorization: Bearer ' . $key,
+                ], $payload);
+                if (!$response['ok']) {
+                    cmsJsonResponse([
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('OpenAI', $response),
+                    ]);
+                }
+                $decoded = json_decode($response['body'], true);
+                $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
             }
-            $decoded = json_decode($response['body'], true);
-            $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
         } elseif ($provider === 'gemini') {
             $key = $apiKey !== '' ? $apiKey : (cmsEnvValue($env, 'GEMINI_API_KEY') ?? '');
             if ($key === '') {
@@ -713,46 +891,99 @@ function cmsHandleEditAction(): void
                 $payload = [
                     'prompt' => $prompt,
                     'history' => $history,
-                    'config' => cmsPromptCompactConfig($config, $isLayoutTarget),
+                    'config' => cmsPromptCompactConfig($config, $promptIsLayoutTarget),
                     'instruction' => $systemPrompt,
                     'image' => $image,
                     'promptContext' => cmsPromptCompactContext($promptContext),
                 ];
             }
-            $response = cmsHttpPost($endpoint, [], $payload);
-            if (!$response['ok']) {
-                cmsJsonResponse([
-                    'allowed' => true,
-                    'error' => cmsFormatPromptHttpError('Local endpoint', $response),
-                ]);
-            }
-            $decoded = json_decode($response['body'], true);
-            if (is_array($decoded)) {
-                if (isset($decoded['choices'][0]['message']['content'])) {
-                    $template = (string) $decoded['choices'][0]['message']['content'];
-                } elseif (isset($decoded['template'])) {
-                    $template = (string) $decoded['template'];
-                } elseif (isset($decoded['content'])) {
-                    $template = (string) $decoded['content'];
+            $localDebugEntry = [
+                'provider' => $provider,
+                'path' => $path,
+                'targetType' => $promptIsLayoutTarget ? 'layout' : $subjectType,
+                'subjectType' => $subjectType,
+                'endpoint' => $endpoint,
+                'requestPayload' => $payload,
+            ];
+            if ($streamRequested && cmsIsOpenAiCompatibleEndpoint($endpoint)) {
+                cmsPromptSendSseHeaders();
+                $payload['stream'] = true;
+                $response = cmsHttpPostStream($endpoint, [], $payload, $streamChunkParser);
+                if (!$response['ok']) {
+                    $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                        'failure' => 'http',
+                        'response' => $response,
+                    ]));
+                    cmsPromptSendSseEvent('final', [
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('Local endpoint', $response) . ' Debug saved to ' . $debugPath . '.',
+                    ]);
+                    exit;
                 }
-            }
-            if ($template === '') {
-                $template = trim((string) $response['body']);
+                $template = $streamTemplate;
+            } else {
+                $response = cmsHttpPost($endpoint, [], $payload);
+                if (!$response['ok']) {
+                    $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                        'failure' => 'http',
+                        'response' => $response,
+                    ]));
+                    cmsJsonResponse([
+                        'allowed' => true,
+                        'error' => cmsFormatPromptHttpError('Local endpoint', $response) . ' Debug saved to ' . $debugPath . '.',
+                    ]);
+                }
+                $decoded = json_decode($response['body'], true);
+                if (cmsIsOpenAiCompatibleEndpoint($endpoint) && !is_array($decoded)) {
+                    $debugPath = cmsPromptDebugCapture($rootDir, array_merge($localDebugEntry ?? [], [
+                        'failure' => 'invalid_json_envelope',
+                        'response' => $response,
+                    ]));
+                    cmsJsonResponse([
+                        'allowed' => true,
+                        'error' => 'Local endpoint returned an invalid JSON chat envelope. Debug saved to ' . $debugPath . '.',
+                    ], 502);
+                }
+                if (is_array($decoded)) {
+                    $message = $decoded['choices'][0]['message'] ?? null;
+                    if (is_array($message) && array_key_exists('content', $message)) {
+                        $template = (string) $message['content'];
+                        $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
+                        $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
+                    } elseif (isset($decoded['template'])) {
+                        $template = (string) $decoded['template'];
+                    } elseif (isset($decoded['content'])) {
+                        $template = (string) $decoded['content'];
+                    }
+                } elseif ($template === '') {
+                    $template = trim((string) $response['body']);
+                }
             }
         }
 
-        $parsedResult = cmsParsePromptModelResult($template, $isLayoutTarget);
+        $parsedResult = cmsParsePromptModelResult($template, $promptIsLayoutTarget);
         $templateText = trim((string) ($parsedResult['template'] ?? ''));
         if ($templateText === '') {
+            if ($streamRequested && ($provider === 'openai' || ($provider === 'local' && cmsIsOpenAiCompatibleEndpoint($endpoint)))) {
+                cmsPromptSendSseEvent('final', [
+                    'allowed' => true,
+                    'error' => $modelReturnedReasoningOnly
+                        ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
+                        : 'Template was empty.',
+                ]);
+                exit;
+            }
             cmsJsonResponse([
                 'allowed' => true,
-                'error' => 'Template was empty.',
+                'error' => $modelReturnedReasoningOnly
+                    ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
+                    : 'Template was empty.',
             ]);
         }
 
         $responsePayload = [
             'allowed' => true,
-            'target' => $isLayoutTarget ? 'layout' : $subjectType,
+            'target' => $promptIsLayoutTarget ? 'layout' : $subjectType,
             'subjectTarget' => $subjectType,
             'provider' => $provider,
             'model' => $usedModel,
@@ -763,6 +994,11 @@ function cmsHandleEditAction(): void
             if (array_key_exists($key, $parsedResult)) {
                 $responsePayload[$key] = $parsedResult[$key];
             }
+        }
+
+        if ($streamRequested && ($provider === 'openai' || ($provider === 'local' && cmsIsOpenAiCompatibleEndpoint($endpoint)))) {
+            cmsPromptSendSseEvent('final', $responsePayload);
+            exit;
         }
 
         cmsJsonResponse($responsePayload);

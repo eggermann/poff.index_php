@@ -103,9 +103,13 @@ function layoutOverlayState(config, status) {
     const originalLabel = originalEditable
         ? `Editable source: ${originalTarget}`
         : 'PHP built-in poff-layout is read-only until a parent .layout exists';
+    const displayMode = layoutState.mode === 'filesystem-layout'
+        ? 'custom-layout'
+        : layoutState.mode;
 
     return {
         layoutState,
+        displayMode,
         sectionName,
         localLayoutDirectory,
         wrapperTarget,
@@ -134,9 +138,12 @@ function renderEditLayoutPanel({
     status,
     contentTargetLabel,
     onSubmitLayout,
+    onLayoutPresetChange,
     onReturnToWork,
     onUploadFiles,
     onCreateBlankFile,
+    onCreateFolder,
+    onDeleteTarget,
 }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -146,9 +153,11 @@ function renderEditLayoutPanel({
     const overlayState = layoutOverlayState(config, subjectStatus);
     const {
         layoutState,
+        displayMode,
         sectionName,
         wrapperTarget,
         sectionTarget,
+        wrapperWasLocal,
         sectionWasLocal,
         originalTarget,
         originalEditable,
@@ -165,60 +174,24 @@ function renderEditLayoutPanel({
     } = overlayState;
     const subjectLabel = subjectStatus.target === 'file' ? 'file' : 'folder';
     const layoutPresetOptions = [
-        { value: 'actual', label: 'Actual' },
+        { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === 'file';
-    const addContentHint = isFileSubject
-        ? `Add content to the containing folder: ${contentTargetLabel || '.'}`
-        : 'Upload files or create a blank file in this folder.';
-
-    editPanel.innerHTML = `
-        <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
-        <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
-        <div class="edit-status" id="editLayoutStatus"></div>
-        <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
-            <div class="edit-layout-launch edit-layout-summary">
-                <div class="edit-layout-copy">
-                    <div class="edit-layout-title">Layout</div>
-                    <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
-                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
-                    <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
-                </div>
-                <div class="edit-inline-actions edit-layout-header-actions">
-                    <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
-                    <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
-                    <button class="btn" type="submit">Save layout</button>
-                </div>
-            </div>
-            <div class="edit-grid edit-grid-cols">
-                <div>
-                    <label class="edit-label" for="edit-layout-preset">Layout select</label>
-                    <select class="form-select" id="edit-layout-preset" name="layout_preset">
-                        ${layoutPresetOptions.map((option) => `
-                            <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
-                        `).join('')}
-                    </select>
-                </div>
-                <div class="edit-layout-copy edit-layout-section-note">
-                    <div class="edit-layout-title" id="edit-layout-primary-title"></div>
-                    <div class="small-note" id="edit-layout-primary-hint"></div>
-                </div>
-            </div>
-        </form>
+    const uploadSectionHtml = isFileSubject ? '' : `
         <div class="edit-upload-launch">
             <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add content</div>
-                <div class="small-note">${escapeHtml(addContentHint)}</div>
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">Upload files, create a blank file, or create a folder in this folder.</div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">Add content</h4>
+                    <h4 class="drawer-title">Add work</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
@@ -227,6 +200,7 @@ function renderEditLayoutPanel({
                         <select class="form-select" id="edit-upload-source" name="upload_source">
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
+                            <option value="folder">Folder</option>
                             <option value="url" disabled>From URL (disabled)</option>
                         </select>
                     </div>
@@ -246,6 +220,44 @@ function renderEditLayoutPanel({
                 </div>
             </form>
         </dialog>
+    `;
+
+    editPanel.innerHTML = `
+        <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
+        <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
+        <div class="edit-status" id="editLayoutStatus"></div>
+        <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
+            <div class="edit-layout-launch edit-layout-summary">
+                <div class="edit-layout-copy">
+                    <div class="edit-layout-title">Layout</div>
+                    <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
+                    <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
+                    <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
+                </div>
+                <div class="edit-inline-actions edit-layout-header-actions">
+                    <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
+                    <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
+                </div>
+            </div>
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-layout-preset">Layout select</label>
+                    <select class="form-select" id="edit-layout-preset" name="layout_preset">
+                        ${layoutPresetOptions.map((option) => `
+                            <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="edit-layout-copy edit-layout-section-note">
+                    <div class="edit-layout-title" id="edit-layout-primary-title"></div>
+                    <div class="small-note" id="edit-layout-primary-hint"></div>
+                    <div class="edit-inline-actions edit-layout-select-actions">
+                        <button class="btn" type="submit">Save layout</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+        ${uploadSectionHtml}
         ${renderPromptWindow(settings, {
             mode: 'layout',
             subjectType: subjectLabel,
@@ -343,6 +355,9 @@ function renderEditLayoutPanel({
         if (preset === 'custom') {
             return 'local';
         }
+        if (preset === 'actual') {
+            return 'virtual';
+        }
         return hasVirtualSource ? 'virtual' : 'local';
     };
 
@@ -352,12 +367,13 @@ function renderEditLayoutPanel({
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
-                : (originalEditable ? 'filesystem-layout' : 'poff-layout');
+                : (originalEditable ? 'custom-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
+        const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');
         const sourcePreview = isVirtual
             ? (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout')
-            : `Filesystem: ${wrapperTarget.replace(/\/template\.hbs$/, '')}`;
+            : `Filesystem: ${localWrapperDirectory}`;
 
         if (modePreviewEl) {
             modePreviewEl.textContent = nextMode;
@@ -371,7 +387,9 @@ function renderEditLayoutPanel({
         if (primaryHintEl) {
             if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
-                    ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    ? (originalTarget === localWrapperDirectory
+                        ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.`
+                        : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`)
                     : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
@@ -405,9 +423,17 @@ function renderEditLayoutPanel({
     };
 
     if (presetEl) {
-        presetEl.addEventListener('change', () => {
+        presetEl.addEventListener('change', async () => {
             storePrimaryDraft();
             syncLayoutMode();
+            if (typeof onLayoutPresetChange === 'function') {
+                await onLayoutPresetChange({
+                    payload: {
+                        layoutPreset: (presetEl.value || 'actual').trim(),
+                    },
+                    statusEl,
+                });
+            }
         });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
@@ -445,9 +471,15 @@ function renderEditLayoutPanel({
                     payload.originalLayoutJs = drafts.virtualJs;
                 }
             } else {
-                payload.layoutTemplate = drafts.localTemplate;
-                payload.layoutCss = drafts.localCss;
-                payload.layoutJs = drafts.localJs;
+                const hasLocalDraft = wrapperWasLocal
+                    || drafts.localTemplate.trim() !== ''
+                    || drafts.localCss.trim() !== ''
+                    || drafts.localJs.trim() !== '';
+                if (hasLocalDraft) {
+                    payload.layoutTemplate = drafts.localTemplate;
+                    payload.layoutCss = drafts.localCss;
+                    payload.layoutJs = drafts.localJs;
+                }
             }
 
             await onSubmitLayout({
@@ -457,15 +489,22 @@ function renderEditLayoutPanel({
         });
     }
 
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function') {
+    const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
+    const uploadNameDrafts = {
+        blank: '',
+        folder: '',
+    };
+    let uploadMode = uploadSourceEl?.value || 'upload';
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function' && typeof onCreateFolder === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
             if (!uploadSummaryEl) {
                 return;
             }
-            if ((uploadSourceEl?.value || 'upload') === 'blank') {
+            const mode = uploadSourceEl?.value || 'upload';
+            if (mode === 'blank' || mode === 'folder') {
                 const name = blankFileNameEl?.value?.trim() || '';
-                uploadSummaryEl.textContent = name ? `Will create: ${name}` : 'Enter a file name.';
+                uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
                 return;
             }
             const validationError = uploadValidationError(files, uploadLimits);
@@ -477,14 +516,31 @@ function renderEditLayoutPanel({
         };
         const syncUploadMode = () => {
             const mode = uploadSourceEl?.value || 'upload';
+            if ((uploadMode === 'blank' || uploadMode === 'folder') && blankFileNameEl) {
+                uploadNameDrafts[uploadMode] = blankFileNameEl.value || '';
+            }
+            uploadMode = mode;
             if (uploadFilesWrapEl) {
                 uploadFilesWrapEl.hidden = mode !== 'upload';
             }
             if (blankFileWrapEl) {
-                blankFileWrapEl.hidden = mode !== 'blank';
+                blankFileWrapEl.hidden = mode !== 'blank' && mode !== 'folder';
+            }
+            if (blankFileLabelEl) {
+                blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
+            }
+            if (blankFileNameEl) {
+                blankFileNameEl.placeholder = mode === 'folder' ? 'new-folder' : 'notes.txt';
+                if (mode === 'blank' || mode === 'folder') {
+                    blankFileNameEl.value = uploadNameDrafts[mode] || '';
+                }
             }
             if (uploadSubmitButton) {
-                uploadSubmitButton.textContent = mode === 'blank' ? 'Create blank file' : 'Upload';
+                uploadSubmitButton.textContent = mode === 'blank'
+                    ? 'Create blank file'
+                    : mode === 'folder'
+                        ? 'Create folder'
+                        : 'Upload';
             }
             setUploadSummary();
         };
@@ -536,6 +592,16 @@ function renderEditLayoutPanel({
                             return;
                         }
                         await onCreateBlankFile({ source, fileName, statusEl });
+                    } else if (source === 'folder') {
+                        const folderName = blankFileNameEl?.value?.trim() || '';
+                        if (!folderName) {
+                            if (statusEl) {
+                                statusEl.textContent = 'Enter a folder name.';
+                                statusEl.className = 'edit-status';
+                            }
+                            return;
+                        }
+                        await onCreateFolder({ source, folderName, statusEl });
                     } else {
                         const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
                         if (files.length === 0) {
@@ -585,8 +651,11 @@ export function renderEditPanel({
     onOpenLayoutPage,
     onReturnToWork,
     onSubmitLayout,
+    onLayoutPresetChange,
     onUploadFiles,
     onCreateBlankFile,
+    onCreateFolder,
+    onDeleteTarget,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -610,7 +679,7 @@ export function renderEditPanel({
     if (!status?.allowed) {
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">Create a file named <code>.edit.allow</code> in the site root to enable edit mode.</div>
+            <div class="edit-status">Create <code>.edit.allow</code> in this folder or an ancestor to enable edit mode. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
         `;
         syncPromptDock();
         return { statusEl: null, promptRoot: null };
@@ -623,9 +692,11 @@ export function renderEditPanel({
             status,
             contentTargetLabel,
             onSubmitLayout,
+            onLayoutPresetChange,
             onReturnToWork,
             onUploadFiles,
             onCreateBlankFile,
+            onCreateFolder,
         });
     }
 
@@ -635,49 +706,18 @@ export function renderEditPanel({
     const treeItems = Array.isArray(config.tree) ? config.tree : [];
     const isFileTarget = status?.target === 'file';
     const isEmptyFolder = !isFileTarget && treeItems.length === 0;
-    const addContentHint = isEmptyFolder
-        ? 'This folder is empty. Upload a file or create a blank file to start.'
-        : (isFileTarget
-            ? `Add content to the containing folder: ${contentTargetLabel || '.'}`
-            : 'Upload files or create a blank file in this folder.');
-
-    editPanel.innerHTML = `
-        <h3 class="edit-panel-title">${label}</h3>
-        <div class="edit-status" id="editInlineStatus"></div>
-        <form id="inlineEditForm" class="edit-inline">
-            <div>
-                <label class="edit-label" for="edit-title">Title</label>
-                <input class="form-input" id="edit-title" type="text" name="title" value="${escapeHtml(config.title || '')}">
-            </div>
-            <div>
-                <label class="edit-label" for="edit-description">Description</label>
-                <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || '')}</textarea>
-            </div>
-            <div class="edit-inline-actions">
-                <button class="btn" type="submit">Save</button>
-                <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
-            </div>
-        </form>
-        <div class="edit-layout-launch">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Layout</div>
-                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-        </div>
+    const uploadSectionHtml = isFileTarget ? '' : `
         <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
             <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add content</div>
-                <div class="small-note">${escapeHtml(addContentHint)}</div>
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">${isEmptyFolder ? 'This folder is empty. Upload a file, create a blank file, or create a folder to start.' : 'Upload files, create a blank file, or create a folder in this folder.'}</div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">Add content</h4>
+                    <h4 class="drawer-title">Add work</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
@@ -686,6 +726,7 @@ export function renderEditPanel({
                         <select class="form-select" id="edit-upload-source" name="upload_source">
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
+                            <option value="folder">Folder</option>
                             <option value="url" disabled>From URL (disabled)</option>
                         </select>
                     </div>
@@ -705,12 +746,48 @@ export function renderEditPanel({
                 </div>
             </form>
         </dialog>
+    `;
+
+    editPanel.innerHTML = `
+        <h3 class="edit-panel-title">${label}</h3>
+        <div class="edit-status" id="editInlineStatus"></div>
+        <form id="inlineEditForm" class="edit-inline">
+            <div>
+                <label class="edit-label" for="edit-title">Title</label>
+                <input class="form-input" id="edit-title" type="text" name="title" value="${escapeHtml(config.title || '')}">
+            </div>
+            <div>
+                <label class="edit-label" for="edit-description">Description</label>
+                <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || '')}</textarea>
+            </div>
+            <div class="edit-inline-actions">
+                <button class="btn" type="submit">Save</button>
+                <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
+                ${typeof onDeleteTarget === 'function' ? `
+                <button class="btn btn-secondary" type="button" id="editDeleteTarget" style="background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;">
+                    <img src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16" style="display:block;">
+                    Delete
+                </button>
+                ` : ''}
+            </div>
+        </form>
+        <div class="edit-layout-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Layout</div>
+                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
+                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
+                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+        </div>
+        ${uploadSectionHtml}
         ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
     `;
 
     const form = editPanel.querySelector('#inlineEditForm');
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
+    const deleteTargetButton = editPanel.querySelector('#editDeleteTarget');
     const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
@@ -754,16 +831,32 @@ export function renderEditPanel({
     if (changeLayoutButton && typeof onOpenLayoutPage === 'function') {
         changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
     }
+    if (deleteTargetButton && typeof onDeleteTarget === 'function') {
+        deleteTargetButton.addEventListener('click', async () => {
+            const confirmed = window.confirm('Delete this item? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+            await onDeleteTarget({ statusEl });
+        });
+    }
 
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function') {
+    const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
+    const uploadNameDrafts = {
+        blank: '',
+        folder: '',
+    };
+    let uploadMode = uploadSourceEl?.value || 'upload';
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === 'function' && typeof onCreateBlankFile === 'function' && typeof onCreateFolder === 'function') {
         const setUploadSummary = () => {
             const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
             if (!uploadSummaryEl) {
                 return;
             }
-            if ((uploadSourceEl?.value || 'upload') === 'blank') {
+            const mode = uploadSourceEl?.value || 'upload';
+            if (mode === 'blank' || mode === 'folder') {
                 const name = blankFileNameEl?.value?.trim() || '';
-                uploadSummaryEl.textContent = name ? `Will create: ${name}` : 'Enter a file name.';
+                uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
                 return;
             }
             const validationError = uploadValidationError(files, uploadLimits);
@@ -775,14 +868,31 @@ export function renderEditPanel({
         };
         const syncUploadMode = () => {
             const mode = uploadSourceEl?.value || 'upload';
+            if ((uploadMode === 'blank' || uploadMode === 'folder') && blankFileNameEl) {
+                uploadNameDrafts[uploadMode] = blankFileNameEl.value || '';
+            }
+            uploadMode = mode;
             if (uploadFilesWrapEl) {
                 uploadFilesWrapEl.hidden = mode !== 'upload';
             }
             if (blankFileWrapEl) {
-                blankFileWrapEl.hidden = mode !== 'blank';
+                blankFileWrapEl.hidden = mode !== 'blank' && mode !== 'folder';
+            }
+            if (blankFileLabelEl) {
+                blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
+            }
+            if (blankFileNameEl) {
+                blankFileNameEl.placeholder = mode === 'folder' ? 'new-folder' : 'notes.txt';
+                if (mode === 'blank' || mode === 'folder') {
+                    blankFileNameEl.value = uploadNameDrafts[mode] || '';
+                }
             }
             if (uploadSubmitButton) {
-                uploadSubmitButton.textContent = mode === 'blank' ? 'Create blank file' : 'Upload';
+                uploadSubmitButton.textContent = mode === 'blank'
+                    ? 'Create blank file'
+                    : mode === 'folder'
+                        ? 'Create folder'
+                        : 'Upload';
             }
             setUploadSummary();
         };
@@ -836,6 +946,20 @@ export function renderEditPanel({
                         await onCreateBlankFile({
                             source,
                             fileName,
+                            statusEl,
+                        });
+                    } else if (source === 'folder') {
+                        const folderName = blankFileNameEl?.value?.trim() || '';
+                        if (!folderName) {
+                            if (statusEl) {
+                                statusEl.textContent = 'Enter a folder name.';
+                                statusEl.className = 'edit-status';
+                            }
+                            return;
+                        }
+                        await onCreateFolder({
+                            source,
+                            folderName,
                             statusEl,
                         });
                     } else {
@@ -904,6 +1028,7 @@ export function renderEditLayoutOverlay({
     const overlayState = layoutOverlayState(config, status);
     const {
         layoutState,
+        displayMode,
         sectionName,
         localLayoutDirectory,
         wrapperTarget,
@@ -925,7 +1050,7 @@ export function renderEditLayoutOverlay({
     } = overlayState;
 
     const layoutPresetOptions = [
-        { value: 'actual', label: 'Actual' },
+        { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
     ];
@@ -952,7 +1077,7 @@ export function renderEditLayoutOverlay({
                                 <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
                             `).join('')}
                         </select>
-                        <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(layoutState.mode)}</code></div>
+                        <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                         <div class="small-note">Resolved wrapper: <code>${escapeHtml(wrapperSourceLabel)}</code></div>
                     </div>
                     <div class="edit-layout-meta-card">
@@ -1038,6 +1163,9 @@ export function renderEditLayoutOverlay({
         if (preset === 'custom') {
             return 'local';
         }
+        if (preset === 'actual') {
+            return 'virtual';
+        }
         return hasVirtualSource ? 'virtual' : 'local';
     };
 
@@ -1047,7 +1175,7 @@ export function renderEditLayoutOverlay({
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
-                : (originalEditable ? 'filesystem-layout' : 'poff-layout');
+                : (originalEditable ? 'custom-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
 
@@ -1059,8 +1187,11 @@ export function renderEditLayoutOverlay({
         }
         if (primaryHintEl) {
             if (isVirtual) {
+                const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');
                 primaryHintEl.innerHTML = originalEditable
-                    ? `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`
+                    ? (originalTarget === localWrapperDirectory
+                        ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.`
+                        : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`)
                     : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
@@ -1135,9 +1266,15 @@ export function renderEditLayoutOverlay({
                     payload.originalLayoutJs = drafts.virtualJs;
                 }
             } else {
-                payload.layoutTemplate = drafts.localTemplate;
-                payload.layoutCss = drafts.localCss;
-                payload.layoutJs = drafts.localJs;
+                const hasLocalDraft = wrapperWasLocal
+                    || drafts.localTemplate.trim() !== ''
+                    || drafts.localCss.trim() !== ''
+                    || drafts.localJs.trim() !== '';
+                if (hasLocalDraft) {
+                    payload.layoutTemplate = drafts.localTemplate;
+                    payload.layoutCss = drafts.localCss;
+                    payload.layoutJs = drafts.localJs;
+                }
             }
 
             await onSubmit({

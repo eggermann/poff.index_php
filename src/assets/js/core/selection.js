@@ -29,11 +29,12 @@ export function buildVirtualLayoutPath(path = '') {
     return normalized ? `${normalized}/.layout` : '.layout';
 }
 
-export function getSelectionFromPath(path = '') {
+export function getSelectionFromPath(path = '', options = {}) {
     const normalized = normalizeSelectionPath(path);
     const isLayout = isVirtualLayoutPath(normalized);
     const previewPath = isLayout ? subjectPathFromVirtualLayout(normalized) : normalized;
-    const previewIsFile = inferFilePath(previewPath);
+    const hasFileHint = typeof options?.isFile === 'boolean';
+    const previewIsFile = hasFileHint ? !!options.isFile : inferFilePath(previewPath);
 
     return {
         path: normalized,
@@ -60,10 +61,12 @@ export function getActiveSelection() {
         }
     }
     if (hashPath) {
-        return getSelectionFromPath(hashPath);
+        const hashMatchesFileParam = filePath !== '' && hashPath === filePath;
+        const isFileHint = hashMatchesFileParam ? true : undefined;
+        return getSelectionFromPath(hashPath, { isFile: isFileHint });
     }
     if (filePath) {
-        return getSelectionFromPath(filePath);
+        return getSelectionFromPath(filePath, { isFile: true });
     }
     return getSelectionFromPath(folderPath);
 }

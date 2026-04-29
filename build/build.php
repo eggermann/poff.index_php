@@ -13,12 +13,12 @@ require_once __DIR__ . '/FileCopier.php';
 $sourceDir = $config['sourceDir'];
 $outputDir = $config['outputDir'];
 $outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
-$outputFile = $outputDir . $config['outputFile'];
-// Prevent accidental creation of pages/dominikeggermann.comindex.php
-if (file_exists($outputDir . 'index.php') && $outputDir !== (__DIR__ . '/../pages/dominikeggermann.com/')) {
-    unlink($outputDir . 'index.php');
-    echo ('????');
-    die();
+$outputFileName = $config['outputFile'];
+$outputFile = $outputDir . $outputFileName;
+$legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileName;
+// Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
+if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {
+    unlink($legacyOutputFile);
 }
 
 // Ensure output directory exists
@@ -113,13 +113,25 @@ try {
     $buildContent .= '$__worktypeTemplates = ' . var_export($embeddedTemplates, true) . ";\n";
     $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
 
-    // Add PoffConfig model and inline its helper trait so the built output stays single-file.
+    // Add edit-mode helpers, root detection, prompt/template sanitizers, and PoffConfig model so the built output stays single-file.
+    $editModeHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/edit-mode.php');
+    $projectRootHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/project-root.php');
+    $promptTemplateSanitize = ComponentReader::readComponentFile($sourceDir . '/includes/prompt-template-sanitize.php');
     $poffConfigLayoutHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-helpers.php');
+    $viewerLinkTargets = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/link-targets.php');
     $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
+    $editModeHelpers = str_replace(['<?php', '?>'], '', $editModeHelpers);
+    $projectRootHelpers = str_replace(['<?php', '?>'], '', $projectRootHelpers);
+    $promptTemplateSanitize = str_replace(['<?php', '?>'], '', $promptTemplateSanitize);
     $poffConfigLayoutHelpers = str_replace(['<?php', '?>'], '', $poffConfigLayoutHelpers);
+    $viewerLinkTargets = str_replace(['<?php', '?>'], '', $viewerLinkTargets);
     $poffConfigContent = str_replace(['<?php', '?>'], '', $poffConfigContent);
     $poffConfigContent = preg_replace('/^\s*require_once[^\n]*\n/m', '', $poffConfigContent);
+    $buildContent .= trim($editModeHelpers) . "\n\n";
+    $buildContent .= trim($projectRootHelpers) . "\n\n";
+    $buildContent .= trim($promptTemplateSanitize) . "\n\n";
     $buildContent .= trim($poffConfigLayoutHelpers) . "\n\n";
+    $buildContent .= trim($viewerLinkTargets) . "\n\n";
     $buildContent .= trim($poffConfigContent) . "\n\n";
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
@@ -167,7 +179,7 @@ try {
     // Add initialization code
     $buildContent .= <<<'PHP'
 // Initialize path variables
-$baseDir = getcwd(); // Use current working directory
+$baseDir = realpath(__DIR__) ?: __DIR__;
 $currentScript = basename($_SERVER['SCRIPT_NAME']);
 $currentRelativePath = isset($_GET['path']) ? trim($_GET['path'], '/\\') : '';
 $currentAbsolutePath = $baseDir . ($currentRelativePath ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $currentRelativePath) : '');

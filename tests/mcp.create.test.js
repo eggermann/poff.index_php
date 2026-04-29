@@ -1,8 +1,11 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
+const BUILD_SHARED_CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, 'build', 'BuildConfig.shared.json'), 'utf8'));
+const RUNTIME_ROOT = path.join(ROOT, BUILD_SHARED_CONFIG.pagesDir, BUILD_SHARED_CONFIG.siteHost);
 const POFF_DIR = path.join(ROOT, 'tests/poff-tests');
 const TEST_NAME = 'jest-create-route';
 const TEST_DEST = path.join(POFF_DIR, TEST_NAME);
@@ -17,9 +20,13 @@ const VIEWER_FOLDER_DIR = path.join(POFF_DIR, 'viewer-folder');
 const VIEWER_FILE_NAME = 'viewer-file.txt';
 const VIEWER_FILE_PATH = path.join(POFF_DIR, VIEWER_FILE_NAME);
 const PERSIST_LAYOUT_DIR = path.join(POFF_DIR, 'persist-layout');
+const INVALID_TEMPLATE_DIR = path.join(POFF_DIR, 'invalid-json-template');
 const INHERITED_DEFAULT_DIR = path.join(POFF_DIR, 'inherits-default');
 const INHERITED_SECTION_DIR = path.join(POFF_DIR, 'inherits-section-default');
+const DELETE_FILE_DIR = path.join(POFF_DIR, 'delete-file-target');
+const DELETE_FOLDER_DIR = path.join(POFF_DIR, 'delete-folder-target');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
+const VIRTUAL_LINK_DIR = path.join(POFF_DIR, 'virtual-links');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -69,6 +76,34 @@ function runWorktype(action, kind, payload = null) {
     proc.stderr.on('data', (d) => (stderr += d.toString()));
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`worktype helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runWorktypeDetailed(action, kind, payload = null) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_render_worktype.php'), action, kind];
+    if (payload !== null) {
+      args.push(JSON.stringify(payload));
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve({
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+        });
+        return;
+      }
       reject(new Error(`worktype helper failed: ${code} ${stderr}`));
     });
   });
@@ -152,6 +187,44 @@ function runBlankFile(targetDir, fileName, contents = '') {
   });
 }
 
+function runDeleteTarget(targetDir, relativePath) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_delete_item.php'), targetDir, relativePath];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`delete helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runCreateFolder(targetDir, folderName) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_create_folder.php'), targetDir, folderName];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`create folder helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runPhpJson(scriptName) {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [path.join(ROOT, 'tests', scriptName)], {
@@ -202,6 +275,31 @@ function runPromptModelParse(mode, raw) {
   });
 }
 
+function loadPromptDraftHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/edit/prompt/draft.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    document: null,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  readPromptEditorDraft,
+};
+`, context);
+
+  return module.exports;
+}
+
 function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '') {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [
@@ -230,6 +328,68 @@ function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockRespons
         resolve(JSON.parse(stdout));
       } catch (err) {
         reject(new Error(`invalid json from prompt template helper: ${stdout}`));
+      }
+    });
+  });
+}
+
+function runViewerPrompt(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '') {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_viewer_prompt.php'),
+      rootDir,
+      relativePath,
+      JSON.stringify(payload),
+      mockResponse ? JSON.stringify(mockResponse) : '',
+      capturePath,
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`viewer prompt helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from viewer prompt helper: ${stdout}`));
+      }
+    });
+  });
+}
+
+function runViewerSave(cwd, relativePath, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_viewer_save.php'),
+      cwd,
+      relativePath,
+      JSON.stringify(payload),
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`viewer save helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from viewer save helper: ${stdout}`));
       }
     });
   });
@@ -311,8 +471,91 @@ describe('MCP create route helper (CLI)', () => {
     fs.writeFileSync(path.join(INHERITED_DEFAULT_DIR, 'child.txt'), 'child');
     fs.mkdirSync(INHERITED_SECTION_DIR, { recursive: true });
     fs.writeFileSync(path.join(INHERITED_SECTION_DIR, 'hero.txt'), 'hero');
+    fs.mkdirSync(DELETE_FILE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(DELETE_FILE_DIR, 'remove-me.txt'), 'remove me');
+    fs.mkdirSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.layout'), { recursive: true });
+    fs.writeFileSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.config.json'), JSON.stringify({
+      title: 'Remove Me',
+      description: 'Delete target file',
+      work: {
+        type: 'text',
+        layout: {
+          name: 'filesystem-file-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+    fs.writeFileSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.layout', 'template.hbs'), '<div class="delete-target-file">{{title}}</div>');
+    fs.mkdirSync(path.join(DELETE_FOLDER_DIR, 'nested', 'child'), { recursive: true });
+    fs.writeFileSync(path.join(DELETE_FOLDER_DIR, 'nested', 'child', 'deep.txt'), 'deep');
     fs.mkdirSync(PERSIST_LAYOUT_DIR, { recursive: true });
+    fs.mkdirSync(path.join(INVALID_TEMPLATE_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, 'poster.txt'), 'poster');
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, '.layout', 'template.hbs'), '<div class="invalid-json-layout"><main>{{> works}}</main></div>');
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, '.layout', 'works.hbs'), JSON.stringify({
+      id: 'chatcmpl-md9dsfuuobyyebhpfelhd',
+      object: 'chat.completion',
+      created: 1776458336,
+      model: 'google/gemma-4-e4b',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: '',
+            reasoning_content: 'The model reasoned but did not produce final template code.',
+            tool_calls: [],
+          },
+          logprobs: null,
+          finish_reason: 'length',
+        },
+      ],
+      usage: {
+        prompt_tokens: 3870,
+        completion_tokens: 226,
+        total_tokens: 4096,
+      },
+    }, null, 2));
     fs.mkdirSync(UPLOAD_TARGET_DIR, { recursive: true });
+    fs.mkdirSync(VIRTUAL_LINK_DIR, { recursive: true });
+    fs.mkdirSync(path.join(VIRTUAL_LINK_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(VIRTUAL_LINK_DIR, 'existing.txt'), 'existing');
+    fs.writeFileSync(path.join(VIRTUAL_LINK_DIR, '.layout', 'works.hbs'), '{{#each items}}<a class="virtual-link" href="{{pageLink}}">{{name}}</a>{{/each}}');
+    fs.writeFileSync(path.join(VIRTUAL_LINK_DIR, 'poff.config.json'), JSON.stringify({
+      folderName: 'virtual-links',
+      slug: 'virtual-links',
+      title: 'Virtual Links',
+      description: 'Folder with configured links',
+      tree: [
+        {
+          name: 'Portfolio',
+          type: 'folder',
+          path: '?view=1&path=linkone',
+          visible: true,
+        },
+        {
+          name: 'Contact',
+          type: 'link',
+          url: 'https://example.com/contact',
+          visible: true,
+        },
+        {
+          name: 'existing.txt',
+          type: 'file',
+          path: 'existing.txt',
+          visible: true,
+        },
+      ],
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-folder-layout',
+          engine: 'lightncandy',
+          section: 'works',
+        },
+      },
+    }, null, 2));
   });
 
   afterAll(() => {
@@ -424,7 +667,131 @@ describe('MCP create route helper (CLI)', () => {
     }));
     expect(captured.payload.messages[3].content).toContain('Config JSON:');
     expect(captured.payload.messages[3].content).toContain('"title": "Folder Preview"');
+    expect(captured.payload.messages[3].content).toContain('"outerWrapper"');
+    expect(captured.payload.messages[3].content).toContain('"source": "resolved active wrapper"');
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
+  });
+
+  test('routes subject-path layout prompts through the layout wrapper handler', async () => {
+    const capturePath = path.join(POFF_DIR, 'viewer-layout-request.json');
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Make the wrapper more cinematic.',
+      layoutPreset: 'actual',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                template: '<div class="poff-default-layout"><header></header><footer></footer></div>',
+                css: '.poff-default-layout{min-height:100vh;}',
+              }),
+            },
+          },
+        ],
+      }),
+    }, capturePath);
+
+    const captured = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+
+    expect(result.allowed).toBe(true);
+    expect(result.target).toBe('layout');
+    expect(result.subjectTarget).toBe('folder');
+    expect(result.provider).toBe('local');
+    expect(result.model).toBe('gemma4');
+    expect(result.css).toContain('min-height:100vh');
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(captured.url).toBe(endpoint);
+    expect(captured.payload.messages[0].content).toContain('layout generator');
+    expect(captured.payload.messages[1].content).toContain('"templateTarget": ".layout/template.hbs"');
+  });
+
+  test('includes unsaved editor draft content in layout prompt context', async () => {
+    const capturePath = path.join(POFF_DIR, 'viewer-layout-draft-request.json');
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Push this draft further.',
+      layoutPreset: 'actual',
+      draft: {
+        template: '<div class="draft-layout">{{title}}</div>',
+        sectionTemplate: '<article class="draft-section">{{description}}</article>',
+        css: '.draft-layout{background:red;}',
+        js: 'document.body.dataset.draft = "on";',
+      },
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                template: '<div class="poff-default-layout"><header></header><footer></footer></div>',
+              }),
+            },
+          },
+        ],
+      }),
+    }, capturePath);
+
+    const captured = JSON.parse(fs.readFileSync(capturePath, 'utf8'));
+
+    expect(result.allowed).toBe(true);
+    expect(captured.payload.messages[0].content).toContain('current.editorDraft');
+    expect(captured.payload.messages[1].content).toContain('"editorDraft"');
+    expect(captured.payload.messages[1].content).toContain('<div class=\\"draft-layout\\">{{title}}</div>');
+    expect(captured.payload.messages[1].content).toContain('.draft-layout{background:red;}');
+  });
+
+  test('strips malformed fenced JSON-ish layout wrappers from local prompt responses', async () => {
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Make the wrapper more cinematic.',
+      layoutPreset: 'actual',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: `\`\`\`json
+{
+  "template": "<div class="poff-default-layout">
+    <header>{{title}}</header>
+    <footer>done</footer>
+  </div>",
+  "css": ".poff-default-layout{min-height:100vh;}",
+  "js": "document.documentElement.dataset.layout = 'cinematic';"
+}
+\`\`\``,
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(result.template).not.toContain('```json');
+    expect(result.template).not.toContain('"template"');
+    expect(result.css).toContain('min-height:100vh');
+    expect(result.js).toContain("layout = 'cinematic'");
   });
 
   test('omits folder-only prompt context fields for file targets', async () => {
@@ -433,18 +800,47 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.file.current).toEqual(expect.objectContaining({
       subjectType: 'file',
       sectionTemplateTarget: '.works/viewer-file.txt.layout/work.hbs',
+      outerWrapper: expect.objectContaining({
+        sectionPartial: 'work',
+      }),
     }));
+    expect(result.file.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
     expect(result.file.counts).toBeUndefined();
     expect(result.file.items).toBeUndefined();
     expect(result.folder.current).toEqual(expect.objectContaining({
       subjectType: 'folder',
       sectionTemplateTarget: 'viewer-folder/.layout/works.hbs',
+      outerWrapper: expect.objectContaining({
+        sectionPartial: 'works',
+      }),
     }));
+    expect(result.folder.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
     expect(result.folder.counts).toEqual(expect.objectContaining({
       items: expect.any(Number),
       files: expect.any(Number),
     }));
     expect(Array.isArray(result.folder.items)).toBe(true);
+  });
+
+  test('keeps explicit internal and external configured tree links intact in prompt context', async () => {
+    const result = await runPhpJson('php_virtual_link_context.php');
+
+    expect(result.prompt.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Portfolio',
+        path: 'linkone',
+        pageLink: '?view=1&path=linkone',
+        isFolder: true,
+      }),
+      expect.objectContaining({
+        name: 'Contact',
+        kind: 'link',
+        pageLink: 'https://example.com/contact',
+        linkUrl: 'https://example.com/contact',
+        isFile: true,
+      }),
+    ]));
+    expect(JSON.stringify(result.prompt)).not.toContain('?view=1&path=%3Fview%3D1%26path%3Dlinkone');
   });
 
   test('parses layout prompt JSON with css/js and restores the required default main block', async () => {
@@ -477,6 +873,54 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.template).toBe('<div class="card">{{title}}</div>');
   });
 
+  test('strips outer layout shell blocks from non-layout prompt responses', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-shell-artifacts',
+      choices: [
+        {
+          message: {
+            content: '<header class="poff-default-layout__header"><div class="poff-default-layout__header-copy"><h2 class="poff-default-layout__video-title">{{title}}</h2></div></header><div class="poff-default-layout__video"><video class="poff-default-layout__video-player" src="{{srcUrl}}" autoplay controls></video></div>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toContain('poff-default-layout__video');
+    expect(result.template).toContain('autoplay');
+    expect(result.template).not.toContain('poff-default-layout__header');
+    expect(result.template).not.toContain('poff-default-layout__header-copy');
+  });
+
+  test('extracts main-inner content when a non-layout prompt returns a full wrapper', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-full-wrapper',
+      choices: [
+        {
+          message: {
+            content: '<div class="poff-default-layout"><header class="poff-default-layout__header"><h1>{{title}}</h1></header><main class="poff-default-layout__main"><article class="autoplay-card"><video src="{{srcUrl}}" autoplay muted loop controls></video></article></main><footer class="poff-default-layout__footer">done</footer></div>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toBe('<article class="autoplay-card"><video src="{{srcUrl}}" autoplay muted loop controls></video></article>');
+  });
+
+  test('strips generic shell tags from non-layout prompt responses', async () => {
+    const result = await runPromptModelParse('work', JSON.stringify({
+      id: 'chatcmpl-generic-shell-artifacts',
+      choices: [
+        {
+          message: {
+            content: '<header><h2>{{title}}</h2></header><div class="video-card"><video src="{{srcUrl}}" autoplay controls></video></div><footer><a href="{{pageLink}}">Open</a></footer>',
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toBe('<div class="video-card"><video src="{{srcUrl}}" autoplay controls></video></div>');
+  });
+
   test('parses fenced JSON chat completion envelopes into structured layout fields', async () => {
     const result = await runPromptModelParse('layout', JSON.stringify({
       id: 'chatcmpl-layout',
@@ -493,6 +937,34 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.css).toContain('.poff-default-layout{outline:0;}');
     expect(result.js).toContain("dataset.layout='on'");
     expect(result.work).toEqual({ 'works.hbs': '<article>{{description}}</article>' });
+  });
+
+  test('salvages malformed fenced JSON-ish layout content without leaking wrapper artefacts', async () => {
+    const result = await runPromptModelParse('layout', JSON.stringify({
+      id: 'chatcmpl-layout-malformed',
+      choices: [
+        {
+          message: {
+            content: `\`\`\`json
+{
+  "template": "<div class="poff-default-layout">
+    <header>{{title}}</header>
+    <footer>done</footer>
+  </div>",
+  "css": ".poff-default-layout{outline:0;}",
+  "js": "document.body.dataset.layout='on';"
+}
+\`\`\``,
+          },
+        },
+      ],
+    }));
+
+    expect(result.template).toContain('<main class="poff-default-layout__main">');
+    expect(result.template).not.toContain('```json');
+    expect(result.template).not.toContain('"template"');
+    expect(result.css).toContain('.poff-default-layout{outline:0;}');
+    expect(result.js).toContain("dataset.layout='on'");
   });
 
   test('treats empty chat completion content as empty instead of raw JSON', async () => {
@@ -512,9 +984,120 @@ describe('MCP create route helper (CLI)', () => {
 
     expect(result.template).toBe('');
   });
+
+  test('treats usage-only JSON model responses as empty instead of literal template text', async () => {
+    const parseResult = await runPromptModelParse('work', JSON.stringify({
+      usage: {
+        prompt_tokens: 3870,
+        completion_tokens: 226,
+        total_tokens: 4096,
+      },
+      model: 'gemma4',
+    }));
+
+    expect(parseResult.template).toBe('');
+
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const viewerResult = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint,
+      prompt: 'Make it smaller.',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        usage: {
+          prompt_tokens: 3870,
+          completion_tokens: 226,
+          total_tokens: 4096,
+        },
+        model: 'gemma4',
+      }),
+    });
+
+    expect(viewerResult.allowed).toBe(true);
+    expect(viewerResult.error).toBe('Template was empty.');
+    expect(viewerResult.template).toBeUndefined();
+  });
+
+  test('treats reasoning-only local chat responses as empty instead of storing the raw JSON envelope', async () => {
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const viewerResult = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'google/gemma-4-e4b',
+      endpoint,
+      prompt: 'Make the layout red again.',
+      layoutPreset: 'actual',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        id: 'chatcmpl-md9dsfuuobyyebhpfelhd',
+        object: 'chat.completion',
+        created: 1776458336,
+        model: 'google/gemma-4-e4b',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '',
+              reasoning_content: 'The model reasoned but did not produce final template code.',
+              tool_calls: [],
+            },
+            logprobs: null,
+            finish_reason: 'length',
+          },
+        ],
+        usage: {
+          prompt_tokens: 3870,
+          completion_tokens: 226,
+          total_tokens: 4096,
+          completion_tokens_details: {
+            reasoning_tokens: 223,
+          },
+        },
+        stats: {},
+        system_fingerprint: 'google/gemma-4-e4b',
+      }),
+    });
+
+    expect(viewerResult.allowed).toBe(true);
+    expect(viewerResult.error).toBe('Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.');
+    expect(viewerResult.template).toBeUndefined();
+  });
 });
 
 describe('Worktype HBS renderer', () => {
+  test('reads the current unsaved editor draft for layout and work prompt targets', () => {
+    const { readPromptEditorDraft } = loadPromptDraftHelpers();
+    const fields = {
+      '#edit-layout-primary-template': { value: '<div class="draft-layout"></div>' },
+      '#edit-layout-primary-css': { value: '.draft-layout{color:red;}' },
+      '#edit-layout-primary-js': { value: 'console.log("draft");' },
+      '#edit-content-template': { value: '<article class="draft-section"></article>' },
+    };
+    const root = {
+      querySelector(selector) {
+        return fields[selector] || null;
+      },
+    };
+
+    expect(readPromptEditorDraft({ isLayout: true }, root)).toEqual({
+      template: '<div class="draft-layout"></div>',
+      sectionTemplate: '<article class="draft-section"></article>',
+      css: '.draft-layout{color:red;}',
+      js: 'console.log("draft");',
+    });
+
+    expect(readPromptEditorDraft({ isLayout: false }, root)).toEqual({
+      template: '<article class="draft-section"></article>',
+    });
+  });
+
   test('normalizes default layout metadata for files', async () => {
     const output = await runWorktype('definition', 'image');
     const definition = JSON.parse(output);
@@ -546,6 +1129,34 @@ describe('Worktype HBS renderer', () => {
       ]),
     );
     expect(config.tree.map((item) => item.name)).not.toContain('.layout');
+  });
+
+  test('sanitizes persisted raw chat JSON in section templates on read', async () => {
+    const output = await runLayoutFilesystem('ensure-folder', INVALID_TEMPLATE_DIR);
+    const config = JSON.parse(output);
+
+    expect(config.work.layout.sectionTemplate).toBe('');
+    expect(config.work.layout.defaultSectionTemplate).toContain('folder-view');
+    expect(config.work.layout.template).toContain('invalid-json-layout');
+  });
+
+  test('sanitizes persisted malformed fenced JSON-ish templates on read', async () => {
+    fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, '.layout', 'works.hbs'), `\`\`\`json
+{
+  "template": "<article class="artifact-card">
+    <h2>{{title}}</h2>
+    <p>{{description}}</p>
+  </article>"
+}
+\`\`\``);
+
+    const output = await runLayoutFilesystem('ensure-folder', INVALID_TEMPLATE_DIR);
+    const config = JSON.parse(output);
+
+    expect(config.work.layout.sectionTemplate).toContain('<article class="artifact-card">');
+    expect(config.work.layout.sectionTemplate).toContain('{{description}}');
+    expect(config.work.layout.sectionTemplate).not.toContain('```json');
+    expect(config.work.layout.sectionTemplate).not.toContain('"template"');
   });
 
   test('renders the default layout with the file work partial', async () => {
@@ -681,6 +1292,54 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('notes.txt');
   });
 
+  test('falls back cleanly when the active section partial is invalid', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
+    const result = await runWorktypeDetailed('render', 'folder', {
+      ctx: {
+        path: 'projects',
+        name: 'projects',
+        title: 'Projects',
+        description: '',
+        descriptionHtml: '',
+        linkUrl: '',
+        slug: 'projects',
+        displayPath: 'projects',
+        parentPageLink: '?view=1&path=',
+        directoryPageLink: '?view=1&path=projects',
+        hasItems: true,
+        itemCount: 2,
+        items: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        tree: [
+          { name: 'alpha', type: 'folder', path: 'projects/alpha', isFolder: true },
+          { name: 'notes.txt', type: 'file', path: 'projects/notes.txt', isFile: true },
+        ],
+        work: {
+          type: 'folder',
+          layout: {
+            name: 'poff-layout',
+            engine: 'lightncandy',
+            section: 'works',
+            sectionTemplate: '{{#if hasItems}}{{/unless}}',
+          },
+        },
+      },
+    });
+
+    expect(result.stderr).toBe('');
+    expect(result.stdout).not.toContain('<iframe ');
+    if (lightnCandyInstalled) {
+      expect(result.stdout).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+    } else {
+      expect(result.stdout).toContain('<div class="poff-folder-fallback">');
+    }
+    expect(result.stdout).toContain('projects');
+    expect(result.stdout).toContain('alpha');
+    expect(result.stdout).toContain('notes.txt');
+  });
+
   test('inherits a parent folder layout from the nearest ancestor .layout', async () => {
     const output = await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR);
     const config = JSON.parse(output);
@@ -722,6 +1381,44 @@ describe('Worktype HBS renderer', () => {
     expect(ensured.work.layout.template).toContain('default-fs-layout--edited');
     expect(ensured.work.layout.css).toContain('#ff5f5f');
     expect(ensured.work.layout.js).toContain('__editedDefaultFsLayout');
+  });
+
+  test('ignores inherited .layout files when layout mode is none', async () => {
+    await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
+      layout: {
+        name: 'none',
+        preset: 'none',
+      },
+    });
+
+    const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(ensured.work.layout).toMatchObject({
+      name: 'none',
+      mode: 'none',
+      storage: 'none',
+    });
+    expect(ensured.work.layout.sectionTemplate || '').toBe('');
+
+    const output = await runViewer('inherits-default');
+    expect(output).not.toContain('<div class="default-fs-layout">');
+    expect(output).not.toContain('tests/poff-tests/.layout/style.css');
+    expect(output).toContain('<div class="folder-view">');
+    expect(output).toContain('child.txt');
+
+    await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
+      layout: {
+        name: 'filesystem-layout',
+        preset: 'inherit',
+      },
+    });
+
+    const inherited = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(inherited.work.layout).toMatchObject({
+      name: 'filesystem-layout',
+      storage: 'filesystem',
+      directory: 'tests/poff-tests/.layout',
+      preset: 'actual',
+    });
   });
 
   test('resolves virtual .layout targets separately from real file and folder targets', async () => {
@@ -784,6 +1481,14 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('.layout/background.txt');
   });
 
+  test('renders configured virtual links without nesting viewer urls', async () => {
+    const output = await runViewer('virtual-links');
+
+    expect(output).toMatch(/href="\?view(?:=|&#x3D;)1&amp;path(?:=|&#x3D;)linkone"/);
+    expect(output).toContain('href="https://example.com/contact"');
+    expect(output).not.toContain('%3Fview%3D1%26path%3Dlinkone');
+  });
+
   test('renders file previews from .works/<file>.layout', async () => {
     const output = await runViewer(VIEWER_FILE_NAME);
 
@@ -793,6 +1498,89 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="file-custom">');
     expect(output).toContain('Viewer File');
     expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
+  });
+
+  test('sanitizes persisted file work partials that accidentally include outer wrapper shell blocks', async () => {
+    await runLayoutFilesystem('persist-file', POFF_DIR, VIEWER_FILE_NAME, {
+      name: 'filesystem-layout',
+      engine: 'lightncandy',
+      section: 'work',
+      template: '<div class="file-custom">{{title}}</div>',
+      sectionTemplate: '<header class="poff-default-layout__header"><div class="poff-default-layout__header-copy"><h2 class="poff-default-layout__video-title">{{title}}</h2></div></header><div class="poff-default-layout__video"><video class="poff-default-layout__video-player" src="{{srcUrl}}" autoplay playsinline controls></video></div>',
+    });
+
+    const ensured = JSON.parse(await runLayoutFilesystem('ensure-file', POFF_DIR, VIEWER_FILE_NAME));
+    expect(ensured.work.layout.sectionTemplate).toContain('poff-default-layout__video');
+    expect(ensured.work.layout.sectionTemplate).toContain('autoplay');
+    expect(ensured.work.layout.sectionTemplate).not.toContain('poff-default-layout__header');
+    expect(ensured.work.layout.sectionTemplate).not.toContain('poff-default-layout__header-copy');
+
+    const output = await runViewer(VIEWER_FILE_NAME);
+    expect(output).toContain('poff-default-layout__video-player');
+    expect(output).toContain('autoplay');
+    expect(output).not.toContain('poff-default-layout__header-copy');
+  });
+
+  test('saves section-only file edits into the runtime pages tree without rewriting the wrapper template', async () => {
+    const sourceTemplatePath = path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`, 'template.hbs');
+    const sourceTemplateBefore = fs.readFileSync(sourceTemplatePath, 'utf8');
+    const runtimeLayoutDir = path.join(POFF_DIR, '.works', `${VIEWER_FILE_NAME}.layout`);
+    const runtimeWorkPath = path.join(runtimeLayoutDir, 'work.hbs');
+    const runtimeWorkBefore = fs.readFileSync(runtimeWorkPath, 'utf8');
+    if (fs.existsSync(runtimeLayoutDir)) {
+      const leakedTemplatePath = path.join(runtimeLayoutDir, 'template.hbs');
+      if (fs.existsSync(leakedTemplatePath)) {
+        fs.writeFileSync(leakedTemplatePath, sourceTemplateBefore);
+      }
+    }
+
+    const result = await runViewerSave(POFF_DIR, VIEWER_FILE_NAME, {
+      layout: {
+        sectionTemplate: '<article class="source-only-update">{{title}}</article>',
+      },
+    });
+
+    expect(result.saved).toBe(true);
+    expect(fs.readFileSync(sourceTemplatePath, 'utf8')).toBe(sourceTemplateBefore);
+    expect(runtimeWorkBefore).not.toContain('source-only-update');
+    expect(fs.existsSync(path.join(runtimeLayoutDir, 'template.hbs'))).toBe(true);
+    expect(fs.readFileSync(runtimeWorkPath, 'utf8')).toContain('source-only-update');
+  });
+
+  test('inherits edit mode from an ancestor allow marker', async () => {
+    const runtimeRoot = RUNTIME_ROOT;
+    const nestedRuntimeDir = path.join(runtimeRoot, 'tests', 'poff-tests', 'viewer-folder');
+    fs.mkdirSync(nestedRuntimeDir, { recursive: true });
+    fs.writeFileSync(path.join(runtimeRoot, '.edit.allow'), 'allow');
+    const denyPath = path.join(nestedRuntimeDir, 'edit.not-allow');
+    if (fs.existsSync(denyPath)) {
+      fs.unlinkSync(denyPath);
+    }
+
+    const result = await runViewerSave(runtimeRoot, 'tests/poff-tests/viewer-folder', {
+      description: 'Inherited edit mode works',
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.saved).toBe(true);
+    expect(result.config.description).toBe('Inherited edit mode works');
+  });
+
+  test('stops inherited edit mode when edit.not-allow exists locally', async () => {
+    const runtimeRoot = RUNTIME_ROOT;
+    const nestedRuntimeDir = path.join(runtimeRoot, 'tests', 'poff-tests', 'viewer-folder');
+    fs.mkdirSync(nestedRuntimeDir, { recursive: true });
+    fs.writeFileSync(path.join(runtimeRoot, '.edit.allow'), 'allow');
+    fs.writeFileSync(path.join(nestedRuntimeDir, 'edit.not-allow'), 'deny');
+
+    const result = await runViewerSave(runtimeRoot, 'tests/poff-tests/viewer-folder', {
+      description: 'This should be blocked',
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.error).toBe('Edit mode not enabled.');
+
+    fs.unlinkSync(path.join(nestedRuntimeDir, 'edit.not-allow'));
   });
 
   test('injects the wrapped work partial when a filesystem file wrapper forgets to include it', async () => {
@@ -850,6 +1638,69 @@ describe('Worktype HBS renderer', () => {
     expect(ensuredConfig.work.layout.preset).toBe('actual');
   });
 
+  test('keeps custom layout files when switching presets away from custom', async () => {
+    const payload = {
+      name: 'custom-layout',
+      engine: 'lightncandy',
+      section: 'works',
+      preset: 'custom',
+      template: '<div class="saved-custom-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+      sectionTemplate: '<section class="saved-custom-works">{{title}}</section>',
+      css: '.saved-custom-layout{color:#123;}',
+      js: 'window.__savedCustomLayout = true;',
+    };
+
+    await runLayoutFilesystem('persist-folder', PERSIST_LAYOUT_DIR, '', payload);
+
+    await runViewerSave(POFF_DIR, 'persist-layout/.layout', {
+      layout: {
+        name: 'none',
+        preset: 'none',
+        template: '',
+        sectionTemplate: '',
+        css: '',
+        js: '',
+      },
+    });
+
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('saved-custom-works');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__savedCustomLayout');
+
+    await runViewerSave(POFF_DIR, 'persist-layout/.layout', {
+      layout: {
+        name: 'custom-layout',
+        preset: 'custom',
+        template: '',
+        sectionTemplate: '',
+        css: '',
+        js: '',
+      },
+    });
+
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('saved-custom-works');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__savedCustomLayout');
+
+    await runViewerSave(POFF_DIR, 'persist-layout/.layout', {
+      layout: {
+        name: 'filesystem-layout',
+        preset: 'inherit',
+        template: '',
+        sectionTemplate: '',
+        css: '',
+        js: '',
+      },
+    });
+
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('saved-custom-works');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.saved-custom-layout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__savedCustomLayout');
+  });
+
   test('persists wrapped content partials into works.hbs without replacing the wrapper', async () => {
     const payload = {
       name: 'poff-layout',
@@ -903,6 +1754,57 @@ describe('Worktype HBS renderer', () => {
     expect(result.config.tree).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'draft.txt', type: 'file' }),
+      ]),
+    );
+  });
+
+  test('creates a folder in a folder target', async () => {
+    const output = await runCreateFolder(UPLOAD_TARGET_DIR, 'assets');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.stored).toEqual([
+      expect.objectContaining({ name: 'assets', path: 'assets' }),
+    ]);
+    expect(fs.existsSync(path.join(UPLOAD_TARGET_DIR, 'assets'))).toBe(true);
+    expect(fs.lstatSync(path.join(UPLOAD_TARGET_DIR, 'assets')).isDirectory()).toBe(true);
+    expect(result.config.tree).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'assets', type: 'folder' }),
+      ]),
+    );
+  });
+
+  test('deletes a file target and its metadata', async () => {
+    const output = await runDeleteTarget(DELETE_FILE_DIR, 'remove-me.txt');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.deleted).toEqual([
+      expect.objectContaining({ name: 'remove-me.txt', path: 'remove-me.txt', type: 'file' }),
+    ]);
+    expect(fs.existsSync(path.join(DELETE_FILE_DIR, 'remove-me.txt'))).toBe(false);
+    expect(fs.existsSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.config.json'))).toBe(false);
+    expect(fs.existsSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.layout'))).toBe(false);
+    expect(result.config.tree).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'remove-me.txt' }),
+      ]),
+    );
+  });
+
+  test('deletes a folder target recursively', async () => {
+    const output = await runDeleteTarget(DELETE_FOLDER_DIR, 'nested');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.deleted).toEqual([
+      expect.objectContaining({ name: 'nested', path: 'nested', type: 'folder' }),
+    ]);
+    expect(fs.existsSync(path.join(DELETE_FOLDER_DIR, 'nested'))).toBe(false);
+    expect(result.config.tree).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'nested' }),
       ]),
     );
   });

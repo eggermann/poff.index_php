@@ -1,22 +1,22 @@
 {
-  "$schema": "https://dominikeggermann.com/poff-config.schema.json",
-  "folderName": "persist-layout",
-  "slug": "persist-layout",
-  "title": "persist-layout",
-  "description": "",
-  "type": "folder",
-  "id": "poff_19d1d4023387e042",
-  "tree": [],
-  "treeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-  "updatedAt": "2026-04-17T22:44:05+00:00",
-  "work": {
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "folderName": "persist-layout",
+    "slug": "persist-layout",
+    "title": "persist-layout",
+    "description": "",
     "type": "folder",
-    "layout": {
-      "mode": "persisted-layout",
-      "name": "persisted-layout",
-      "engine": "lightncandy",
-      "section": "works",
-      "preset": "actual"
+    "id": "poff_077870c0c6acac4d",
+    "tree": [],
+    "treeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "updatedAt": "2026-04-28T22:32:34+00:00",
+    "work": {
+        "type": "folder",
+        "layout": {
+            "mode": "filesystem-layout",
+            "name": "filesystem-layout",
+            "engine": "lightncandy",
+            "section": "works",
+            "preset": "actual"
+        }
     }
-  }
 }

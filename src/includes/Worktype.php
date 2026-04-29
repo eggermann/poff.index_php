@@ -563,14 +563,21 @@ class Worktype
             return null;
         }
 
-        $partials = self::templates();
+        $partials = self::sanitizePartials(self::templates());
         $section = (string) ($layout['section'] ?? ($kind === 'folder' ? 'works' : 'work'));
         if (!empty($layout['sectionTemplate']) && is_string($layout['sectionTemplate'])) {
             $partials[$section] = $layout['sectionTemplate'];
             $template = self::ensureTemplateIncludesSectionPartial($template, $section, $layout);
         }
 
+        $handlerInstalled = false;
         try {
+            set_error_handler(
+                static function (int $severity, string $message, string $file = '', int $line = 0): void {
+                    throw new \ErrorException($message, 0, $severity, $file, $line);
+                }
+            );
+            $handlerInstalled = true;
             $compiled = \LightnCandy\LightnCandy::compile($template, [
                 'partials' => $partials,
                 'helpers' => self::helpers(),
@@ -578,12 +585,44 @@ class Worktype
                     | \LightnCandy\LightnCandy::FLAG_RUNTIMEPARTIAL
                     | \LightnCandy\LightnCandy::FLAG_ERROR_LOG,
             ]);
+            if (!is_string($compiled) || $compiled === '') {
+                return null;
+            }
             $renderer = \LightnCandy\LightnCandy::prepare($compiled);
+            if (!is_callable($renderer)) {
+                return null;
+            }
 
             return $renderer(self::buildRenderContext($kind, $ctx, $work, $layout));
         } catch (\Throwable $error) {
             return null;
+        } finally {
+            if ($handlerInstalled) {
+                restore_error_handler();
+            }
         }
+    }
+
+    private static function sanitizePartials(array $partials): array
+    {
+        $sanitized = [];
+        foreach ($partials as $name => $template) {
+            $partialName = trim((string) $name);
+            if ($partialName === '' || $template === null) {
+                continue;
+            }
+
+            if (!is_string($template)) {
+                if (!is_scalar($template)) {
+                    continue;
+                }
+                $template = (string) $template;
+            }
+
+            $sanitized[$partialName] = $template;
+        }
+
+        return $sanitized;
     }
 
     private static function ensureTemplateIncludesSectionPartial(string $template, string $section, array $layout): string

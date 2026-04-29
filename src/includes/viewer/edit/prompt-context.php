@@ -1,12 +1,71 @@
 <?php
 
+function cmsPromptOuterWrapperReference(array $layoutValue, string $currentSection): array
+{
+    $layoutName = trim((string) ($layoutValue['name'] ?? Worktype::defaultLayoutName()));
+    if ($layoutName === '') {
+        $layoutName = Worktype::defaultLayoutName();
+    }
+
+    $storage = trim((string) ($layoutValue['storage'] ?? ''));
+    if ($storage === '') {
+        $storage = 'default';
+    }
+
+    $section = trim((string) ($layoutValue['section'] ?? $currentSection));
+    if ($section === '') {
+        $section = $currentSection;
+    }
+
+    $templateName = $layoutName;
+    $templateCandidate = Worktype::template($templateName);
+    if (!is_string($templateCandidate) || $templateCandidate === '') {
+        $templateName = Worktype::defaultLayoutName();
+        $templateCandidate = Worktype::template($templateName);
+    }
+
+    $template = '';
+    if (isset($layoutValue['template']) && is_string($layoutValue['template']) && trim($layoutValue['template']) !== '') {
+        $template = $layoutValue['template'];
+    } else {
+        $template = (string) ($templateCandidate ?? '');
+    }
+
+    $css = '';
+    if (isset($layoutValue['css']) && is_string($layoutValue['css']) && trim($layoutValue['css']) !== '') {
+        $css = $layoutValue['css'];
+    } else {
+        $css = (string) (Worktype::layoutBundleAsset($templateName, 'style.css') ?? '');
+    }
+
+    $js = '';
+    if (isset($layoutValue['js']) && is_string($layoutValue['js']) && trim($layoutValue['js']) !== '') {
+        $js = $layoutValue['js'];
+    } else {
+        $js = (string) (Worktype::layoutBundleAsset($templateName, 'script.js') ?? '');
+    }
+
+    return [
+        'name' => $layoutName,
+        'storage' => $storage,
+        'sectionPartial' => $section,
+        'source' => $storage === 'filesystem'
+            ? 'resolved active wrapper'
+            : ($storage === 'inline' ? 'inline wrapper config' : 'bundled default wrapper reference'),
+        'template' => $template,
+        'css' => $css,
+        'js' => $js,
+    ];
+}
+
 function cmsBuildPromptContext(
     string $relativePath,
     string $subjectType,
     array $config,
     ?string $targetFile = null,
     bool $isLayoutTarget = false,
-    string $layoutPreset = ''
+    string $layoutPreset = '',
+    array $editorDraft = []
 ): array {
     $normalizedPath = trim($relativePath, "/\\");
     $currentName = $subjectType === 'file'
@@ -79,6 +138,7 @@ function cmsBuildPromptContext(
             'inheritedLayoutDirectory' => trim((string) ($layoutValue['inheritedDirectory'] ?? ''), "/\\"),
             'layoutSectionBaseHref' => cmsPromptEncodeRelativePath($layoutSectionBasePath),
             'layoutAssets' => $layoutAssets,
+            'outerWrapper' => cmsPromptOuterWrapperReference($layoutValue, $currentSection),
         ],
         'items' => [],
         'allItems' => [],
@@ -92,6 +152,17 @@ function cmsBuildPromptContext(
         'allLinks' => [],
         'allOther' => [],
     ];
+
+    $draftSummary = [];
+    foreach (['template', 'sectionTemplate', 'css', 'js'] as $key) {
+        if (!array_key_exists($key, $editorDraft) || !is_string($editorDraft[$key])) {
+            continue;
+        }
+        $draftSummary[$key] = $editorDraft[$key];
+    }
+    if ($draftSummary !== []) {
+        $context['current']['editorDraft'] = $draftSummary;
+    }
 
     if ($subjectType !== 'folder') {
         return $context;

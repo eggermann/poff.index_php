@@ -51,3 +51,19 @@ export function updatePromptEditorFields({ templateText, nextTitle, nextDescript
         });
     }
 }
+
+export function focusPromptTemplateField(isLayoutTarget) {
+    const selector = isLayoutTarget ? '#edit-layout-primary-template' : '#edit-content-template';
+    const field = document.querySelector(selector);
+    if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) {
+        return;
+    }
+    field.focus({ preventScroll: true });
+    if (typeof field.select === 'function') {
+        field.select();
+    } else if (typeof field.setSelectionRange === 'function') {
+        const value = field.value || '';
+        field.setSelectionRange(value.length, value.length);
+    }
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}

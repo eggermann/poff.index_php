@@ -1,4 +1,77 @@
 import { escapeHtml } from '../../core/utils.js';
+import { readPromptEditorDraft } from './draft.js';
+import { summarizeSerializedHistory } from './history.js';
+
+function isExternalPromptLink(value = '') {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) {
+        return false;
+    }
+    if (trimmed.startsWith('//')) {
+        return true;
+    }
+
+    return /^[a-z][a-z0-9+.-]*:/i.test(trimmed);
+}
+
+function isCmsPromptLink(value = '') {
+    const trimmed = String(value || '').trim();
+    if (!trimmed.startsWith('?')) {
+        return false;
+    }
+
+    const params = new URLSearchParams(trimmed.replace(/^\?/, ''));
+    return params.has('file') || params.has('path') || params.get('view') === '1';
+}
+
+function isSpecialPromptLink(value = '') {
+    const trimmed = String(value || '').trim();
+    return trimmed.startsWith('#') || isCmsPromptLink(trimmed) || isExternalPromptLink(trimmed);
+}
+
+function getPromptItemExplicitLink(item = {}) {
+    const keys = ['pageLink', 'pageUrl', 'viewUrl', 'workUrl', 'viewerHref', 'linkUrl', 'link', 'url'];
+    for (const key of keys) {
+        const value = String(item?.[key] || '').trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    const rawPath = String(item?.path || item?.relativePath || '').trim();
+    return isSpecialPromptLink(rawPath) ? rawPath : '';
+}
+
+function getPromptItemDisplayPath(folderBasePath = '', item = {}) {
+    const rawPath = String(item?.path || item?.relativePath || '').trim();
+    if (rawPath) {
+        if (isCmsPromptLink(rawPath)) {
+            const params = new URLSearchParams(rawPath.replace(/^\?/, ''));
+            return params.get(params.has('file') ? 'file' : 'path') || '';
+        }
+        if (isSpecialPromptLink(rawPath)) {
+            return rawPath;
+        }
+        return folderBasePath && !rawPath.startsWith(`${folderBasePath}/`) && rawPath !== folderBasePath
+            ? `${folderBasePath}/${rawPath}`
+            : rawPath;
+    }
+
+    const explicitLink = getPromptItemExplicitLink(item);
+    if (isCmsPromptLink(explicitLink)) {
+        const params = new URLSearchParams(explicitLink.replace(/^\?/, ''));
+        return params.get(params.has('file') ? 'file' : 'path') || '';
+    }
+    if (explicitLink) {
+        return explicitLink;
+    }
+
+    const fallbackName = String(item?.name || '').trim();
+    if (!fallbackName) {
+        return '';
+    }
+    return folderBasePath ? `${folderBasePath}/${fallbackName}` : fallbackName;
+}
 
 export function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
@@ -6,8 +79,9 @@ export function renderPromptHistory(container, history, streamState, options = {
     }
     const { forceScroll = false } = options;
     const stickToBottom = (container.scrollHeight - container.clientHeight - container.scrollTop) < 24;
+    const historyStats = summarizeSerializedHistory(history);
     if (!history || !history.length) {
-        container.innerHTML = '<div class="small-note">No messages yet.</div>';
+        container.innerHTML = '<div class="small-note">History payload: 0 messages, 0 chars.</div><div class="small-note">No messages yet.</div>';
         return;
     }
     container.innerHTML = history.map((msg) => {
@@ -15,13 +89,33 @@ export function renderPromptHistory(container, history, streamState, options = {
         const isStreaming = streamState && streamState.index === msg._index;
         const content = isStreaming ? streamState.text : msg.content;
         const safeContent = content || '';
+        const snapshot = msg?.templateSnapshot && typeof msg.templateSnapshot === 'object'
+            ? msg.templateSnapshot
+            : null;
+        const snapshotParts = [];
+        if (snapshot) {
+            if (typeof snapshot.targetType === 'string' && snapshot.targetType) {
+                snapshotParts.push(`target: ${snapshot.targetType}`);
+            }
+            if (typeof snapshot.templateLength === 'number' && snapshot.templateLength > 0) {
+                snapshotParts.push(`template: ${snapshot.templateLength} chars`);
+            }
+            if (typeof snapshot.cssLength === 'number' && snapshot.cssLength > 0) {
+                snapshotParts.push(`css: ${snapshot.cssLength}`);
+            }
+            if (typeof snapshot.jsLength === 'number' && snapshot.jsLength > 0) {
+                snapshotParts.push(`js: ${snapshot.jsLength}`);
+            }
+        }
         return `
             <div class="prompt-message prompt-message-${role}">
                 <span class="prompt-message-role">${escapeHtml(role)}:</span>
                 <span class="prompt-message-content">${escapeHtml(safeContent)}${isStreaming ? '<span class="stream-cursor"></span>' : ''}</span>
+                ${snapshotParts.length ? `<div class="small-note prompt-message-meta">${escapeHtml(snapshotParts.join(' | '))}</div>` : ''}
             </div>
         `;
     }).join('');
+    container.innerHTML = `<div class="small-note">History payload: ${historyStats.count} messages, ${historyStats.chars} chars.</div>${container.innerHTML}`;
     if (forceScroll || stickToBottom) {
         container.scrollTop = container.scrollHeight;
     }
@@ -100,17 +194,14 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         if (!itemName) {
             return '';
         }
-        const rawItemPath = item?.path || itemName;
-        const itemPath = folderBasePath
-            ? (String(rawItemPath).startsWith(`${folderBasePath}/`) ? String(rawItemPath) : `${folderBasePath}/${rawItemPath}`)
-            : String(rawItemPath);
+        const itemPath = getPromptItemDisplayPath(folderBasePath, item);
         const isItemFile = (item?.type || 'file') !== 'folder';
-        const itemPageLink = isItemFile
+        const itemPageLink = getPromptItemExplicitLink(item) || (isItemFile
             ? `?view=1&file=${encodeURIComponent(itemPath)}`
-            : `?view=1&path=${encodeURIComponent(itemPath)}`;
-        const itemAssetUrl = isItemFile
+            : `?view=1&path=${encodeURIComponent(itemPath)}`);
+        const itemAssetUrl = getPromptItemExplicitLink(item) || (isItemFile
             ? itemPath.split('/').map((part) => encodeURIComponent(part)).join('/')
-            : `?path=${encodeURIComponent(itemPath)}`;
+            : `?path=${encodeURIComponent(itemPath)}`);
         return `${itemName} -> pageLink: ${itemPageLink}, srcUrl: ${itemAssetUrl}`;
     }).filter(Boolean).join(' | ');
     const layoutBaseHref = activeLayoutDirectory;
@@ -123,6 +214,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
             return `${assetPath} -> ${layoutBaseHref}/${assetPath}`;
         }).filter(Boolean).join(' | ')
         : '';
+    const editorDraft = readPromptEditorDraft(selection);
     return {
         path,
         virtualPath,
@@ -137,6 +229,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         layoutBaseHref,
         inheritedLayoutDirectory,
         layoutAssetsPreview,
+        editorDraft,
         workData: work,
         workPreview,
         refPreview,
@@ -215,6 +308,7 @@ export function renderPromptContext(contextEl, context) {
     const layoutBaseHref = context?.layoutBaseHref || '';
     const inheritedLayoutDirectory = context?.inheritedLayoutDirectory || '';
     const layoutAssetsPreview = context?.layoutAssetsPreview || '';
+    const editorDraft = (context?.editorDraft && typeof context.editorDraft === 'object') ? context.editorDraft : null;
     const workData = (context?.workData && typeof context.workData === 'object') ? context.workData : {};
     const refPreview = context?.refPreview || '';
     const partials = ['poff-layout', 'filesystem-layout', 'works', 'work'];
@@ -233,6 +327,7 @@ export function renderPromptContext(contextEl, context) {
             ${sectionTemplateTarget ? renderRow('sectionTemplateTarget', sectionTemplateTarget) : ''}
             ${layoutBaseHref ? renderRow('layoutBaseHref', layoutBaseHref) : ''}
             ${inheritedLayoutDirectory ? renderRow('inheritedLayoutDirectory', inheritedLayoutDirectory) : ''}
+            ${editorDraft ? renderRow('editorDraft', editorDraft) : ''}
         </div>
         ${renderList('partials', partials)}
         ${renderList('layoutAssets', layoutAssetItems)}

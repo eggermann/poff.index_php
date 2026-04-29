@@ -1,83 +1,85 @@
 .poff-default-layout {
-    --poff-shell-bg: #f0f2f5;
-    --poff-shell-panel: #ffffff;
-    --poff-shell-sidebar: #ffffff;
-    --poff-shell-color: #374151;
-    --poff-shell-header-border: #e5e7eb;
-    --poff-shell-footer-border: #e5e7eb;
-    --poff-shell-eyebrow-color: #6b7280;
-    --poff-shell-title-color: #111827;
-    --poff-shell-description-color: #4b5563;
-    --poff-shell-footer-color: #6b7280;
-    --poff-shell-card-bg: #ffffff;
-    --poff-shell-card-border: #d1d5db;
-    --poff-shell-nav-border: transparent;
-    --poff-shell-nav-current: #3b82f6;
-    --poff-shell-nav-kind: #374151;
-    --poff-shell-main-padding: 24px;
-    --poff-work-max-height: calc(100dvh - 8rem);
+    --poff-shell-bg: #0f172a;
+    --poff-shell-panel: #111c33;
+    --poff-shell-sidebar: #0b1428;
+    --poff-shell-color: #e2e8f0;
+    --poff-shell-border: #1f2d49;
+    --poff-shell-soft: #94a3b8;
+    --poff-shell-accent: #6366f1;
+    --poff-shell-cyan: #22d3ee;
+    --poff-shell-emerald: #34d399;
+    --poff-work-max-height: calc(100dvh - 14rem);
     min-height: 100dvh;
     height: 100dvh;
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    background: var(--poff-shell-bg);
+    grid-template-columns: 296px minmax(0, 1fr);
+    background: radial-gradient(circle at 78% -10%, rgba(99, 102, 241, 0.3), transparent 36%), var(--poff-shell-bg);
+    color: var(--poff-shell-color);
+    font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+/* Keep debug border red only; prevent host/edit-page styles from tinting layout text. */
+.poff-default-layout,
+.poff-default-layout h1,
+.poff-default-layout h2,
+.poff-default-layout h3,
+.poff-default-layout p,
+.poff-default-layout span,
+.poff-default-layout strong,
+.poff-default-layout small,
+.poff-default-layout a {
     color: var(--poff-shell-color);
 }
 
 .poff-default-layout__sidebar {
-    padding: 92px 20px 20px;
-    background: var(--poff-shell-sidebar);
-    border-right: 1px solid var(--poff-shell-header-border);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    padding: 92px 18px 22px;
+    background: linear-gradient(180deg, rgba(11, 20, 40, 0.98), rgba(11, 20, 40, 0.9));
+    border-right: 1px solid var(--poff-shell-border);
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.32);
     overflow-y: auto;
 }
 
 .poff-default-layout__nav {
     display: grid;
-    gap: 6px;
+    gap: 8px;
 }
 
 .poff-default-layout__nav-link {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--poff-shell-nav-border);
-    border-radius: 6px;
+    padding: 11px 12px;
+    border: 1px solid #23324f;
+    border-radius: 12px;
     text-decoration: none;
     color: var(--poff-shell-color);
+    background: rgba(19, 31, 56, 0.76);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    transition: transform 120ms ease, border-color 120ms ease;
 }
 
 .poff-default-layout__nav-link:hover {
-    background: #e5e7eb;
-    color: #111827;
+    border-color: #4f7dcf;
+    transform: translateY(-1px);
 }
 
 .poff-default-layout__nav-link--current {
-    background: var(--poff-shell-nav-current);
-    color: #ffffff;
-    font-weight: 500;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: transparent;
+    color: #fff;
+    font-weight: 600;
 }
 
 .poff-default-layout__nav-link--up {
-    color: #10b981;
-    font-weight: 500;
-}
-
-.poff-default-layout__nav-link--up:hover {
-    color: #059669;
-    background: #d1fae5;
+    color: #86efac;
 }
 
 .poff-default-layout__nav-icon {
     width: 18px;
     flex: 0 0 18px;
     text-align: center;
-    color: var(--poff-shell-nav-kind);
-    font-size: 0.92rem;
 }
 
 .poff-default-layout__nav-name {
@@ -91,60 +93,324 @@
     display: grid;
     grid-template-rows: auto 1fr auto;
     min-height: 0;
-    background: var(--poff-shell-panel);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(13, 23, 43, 0.95));
 }
 
 .poff-default-layout__header {
-    display: grid;
-    gap: 0.5rem;
-    padding: 28px 32px 18px;
-    border-bottom: 1px solid var(--poff-shell-header-border);
-    background: #ffffff;
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--poff-shell-border);
+    background: rgba(10, 18, 35, 0.85);
+    backdrop-filter: blur(10px);
 }
 
-.poff-default-layout__header-copy {
-    display: grid;
-    gap: 0.5rem;
-    max-width: 44rem;
+.poff-default-layout__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-.poff-default-layout__eyebrow {
-    margin: 0;
-    font-size: 0.72rem;
-    letter-spacing: 0.24em;
+.poff-default-layout__brand-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: linear-gradient(135deg, #4f46e5, #2563eb);
+    box-shadow: 0 0 18px rgba(99, 102, 241, 0.42);
+}
+
+.poff-default-layout__brand-copy {
+    display: grid;
+}
+
+.poff-default-layout__brand-copy strong {
+    font-size: 1rem;
+    line-height: 1.1;
+}
+
+.poff-default-layout__brand-copy span {
+    color: var(--poff-shell-soft);
+    font-size: 0.74rem;
     text-transform: uppercase;
-    color: var(--poff-shell-eyebrow-color);
+    letter-spacing: 0.08em;
+}
+
+.poff-default-layout__header-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.poff-default-layout__meta-block {
+    display: grid;
+    gap: 0.12rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 10px;
+    border: 1px solid #2b3a59;
+    background: rgba(20, 31, 56, 0.74);
+}
+
+.poff-default-layout__meta-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--poff-shell-soft);
+}
+
+.poff-default-layout__meta-value {
+    font-size: 0.77rem;
+}
+
+.poff-default-layout__action {
+    border: 1px solid #33496e;
+    border-radius: 10px;
+    padding: 0.48rem 0.74rem;
+    font-size: 0.75rem;
+    color: #dbeafe;
+    background: rgba(15, 30, 55, 0.92);
+    cursor: pointer;
+}
+
+.poff-default-layout__action:hover {
+    border-color: #5e86c8;
+}
+
+.poff-default-layout__action--sync[data-syncing="true"] {
+    opacity: 0.75;
+    cursor: progress;
+}
+
+.poff-default-layout__health {
+    padding: 0.38rem 0.62rem;
+    border-radius: 999px;
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    background: rgba(99, 102, 241, 0.17);
+    color: #c7d2fe;
+    font-size: 0.73rem;
+    font-weight: 700;
+}
+
+.poff-default-layout__main {
+    padding: 20px 24px;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    gap: 18px;
+}
+
+.poff-default-layout__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+    gap: 16px;
+}
+
+.poff-default-layout__primary,
+.poff-default-layout__timeline,
+.poff-default-layout__drivers {
+    border: 1px solid #243450;
+    border-radius: 16px;
+    background: rgba(15, 27, 49, 0.75);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+}
+
+.poff-default-layout__primary {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.poff-default-layout__section-head {
+    display: grid;
+    gap: 0.35rem;
 }
 
 .poff-default-layout__title {
     margin: 0;
-    font-size: clamp(2rem, 3vw, 3rem);
-    line-height: 1;
-    color: var(--poff-shell-title-color);
+    font-size: clamp(1.45rem, 2.7vw, 2.2rem);
+    line-height: 1.05;
 }
 
-.poff-default-layout__description {
+.poff-default-layout__subtitle {
     margin: 0;
-    max-width: 38rem;
-    font-size: 1rem;
-    line-height: 1.5;
-    color: var(--poff-shell-description-color);
+    font-size: 0.82rem;
+    color: var(--poff-shell-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
 }
 
-.poff-default-layout__main {
-    padding: var(--poff-shell-main-padding);
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
+.poff-default-layout__content-shell {
+    min-height: 340px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 2px solid #ef4444;
+    background: rgba(10, 21, 40, 0.82);
 }
 
-.poff-default-layout__main > * {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+.poff-default-layout__stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.poff-default-layout__stat-card {
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid #314763;
+    background: rgba(22, 37, 65, 0.72);
+    display: grid;
+    gap: 0.25rem;
+}
+
+.poff-default-layout__stat-label {
+    color: var(--poff-shell-soft);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.poff-default-layout__stat-value {
+    font-size: 1.1rem;
+}
+
+.poff-default-layout__timeline {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    max-height: 100%;
+    overflow: auto;
+}
+
+.poff-default-layout__timeline-title {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.poff-default-layout__timeline-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.poff-default-layout__timeline-item {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 0.6rem;
+    padding: 0.6rem;
+    border-radius: 11px;
+    border: 1px solid #30435f;
+    background: rgba(17, 33, 58, 0.78);
+}
+
+.poff-default-layout__timeline-dot {
+    width: 10px;
+    height: 10px;
+    margin-top: 0.25rem;
+    border-radius: 50%;
+    background: var(--poff-shell-accent);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.poff-default-layout__timeline-copy {
+    display: grid;
+    gap: 0.22rem;
+    min-width: 0;
+}
+
+.poff-default-layout__timeline-kind {
+    color: #a5b4fc;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.poff-default-layout__timeline-link {
+    color: #e2e8f0;
+    text-decoration: none;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.poff-default-layout__timeline-link:hover {
+    text-decoration: underline;
+}
+
+.poff-default-layout__timeline-copy small {
+    color: #94a3b8;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.poff-default-layout__timeline-item:nth-child(n + 9) {
+    display: none;
+}
+
+.poff-default-layout__drivers {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.poff-default-layout__drivers h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.poff-default-layout__driver-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.poff-default-layout__driver-card {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #314663;
+    background: linear-gradient(180deg, rgba(24, 39, 67, 0.86), rgba(16, 30, 54, 0.86));
+    display: grid;
+    gap: 0.45rem;
+}
+
+.poff-default-layout__driver-kind {
+    font-size: 0.64rem;
+    color: #93c5fd;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.poff-default-layout__driver-card h3 {
+    margin: 0;
+    font-size: 0.92rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.poff-default-layout__driver-card p {
+    margin: 0;
+    color: #9fb2cf;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    min-height: 2.2em;
+}
+
+.poff-default-layout__driver-card:nth-child(n + 5) {
+    display: none;
 }
 
 .poff-default-layout__main img,
@@ -158,24 +424,13 @@
     margin-inline: auto;
 }
 
-.poff-default-layout__footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 14px 24px 18px;
-    border-top: 1px solid var(--poff-shell-footer-border);
-    color: var(--poff-shell-footer-color);
-    font-size: 0.82rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
 .poff-default-layout .folder-view {
-    gap: 1.5rem;
+    gap: 1rem;
 }
 
 .poff-default-layout .folder-view-summary {
-    color: rgba(226, 232, 240, 0.72);
+    color: #9fb3d1;
+    font-size: 0.82rem;
 }
 
 .poff-default-layout .folder-view-grid {
@@ -183,33 +438,90 @@
 }
 
 .poff-default-layout .folder-view-card {
-    border: 1px solid var(--poff-shell-card-border);
-    background: var(--poff-shell-card-bg);
+    border-radius: 12px;
+    border: 1px solid #324966;
+    background: rgba(18, 33, 59, 0.78);
 }
 
-@media (max-width: 720px) {
+.poff-default-layout .folder-view-card-label {
+    background: rgba(59, 130, 246, 0.25);
+    color: #bfdbfe;
+}
+
+.poff-default-layout .folder-view-card--folder .folder-view-card-label {
+    background: rgba(16, 185, 129, 0.24);
+    color: #a7f3d0;
+}
+
+.poff-default-layout__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 10px 24px 14px;
+    border-top: 1px solid var(--poff-shell-border);
+    color: var(--poff-shell-soft);
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.poff-default-layout--focus .poff-default-layout__timeline,
+.poff-default-layout--focus .poff-default-layout__drivers {
+    display: none;
+}
+
+.poff-default-layout--focus .poff-default-layout__grid {
+    grid-template-columns: 1fr;
+}
+
+@media (max-width: 1080px) {
     .poff-default-layout {
         grid-template-columns: 1fr;
         grid-template-rows: auto 1fr;
         height: auto;
+        min-height: 100dvh;
     }
 
     .poff-default-layout__sidebar {
-        padding: 76px 14px 14px;
+        padding: 72px 14px 14px;
         border-right: 0;
-        border-bottom: 1px solid var(--poff-shell-header-border);
+        border-bottom: 1px solid var(--poff-shell-border);
     }
 
+    .poff-default-layout__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .poff-default-layout__driver-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .poff-default-layout__stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
     .poff-default-layout__header {
-        padding: 20px 18px 14px;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px;
+    }
+
+    .poff-default-layout__header-meta {
+        justify-content: flex-start;
     }
 
     .poff-default-layout__main {
-        --poff-shell-main-padding: 18px;
+        padding: 14px;
+    }
+
+    .poff-default-layout__driver-grid {
+        grid-template-columns: 1fr;
     }
 
     .poff-default-layout__footer {
         justify-content: flex-start;
-        padding: 14px 18px 18px;
+        padding: 10px 16px 14px;
     }
 }

@@ -49,7 +49,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
     return `
         <div class="prompt-layer" id="promptLayer">
             <button class="prompt-layer-toggle prompt-layer-toggle-close" type="button" id="promptLayerClose" aria-label="Hide prompt window" title="Hide prompt window">&times;</button>
-            <button class="prompt-layer-toggle prompt-layer-toggle-open" type="button" id="promptLayerOpen" aria-label="Show prompt window" title="Show prompt window" hidden>AI</button>
+            <button class="prompt-layer-toggle prompt-layer-toggle-open" type="button" id="promptLayerOpen" aria-label="Show prompt window" title="Show prompt window" hidden>poff</button>
             <div class="prompt-window prompt-inline" id="promptWindow">
                 <div class="prompt-header">
                     <div>

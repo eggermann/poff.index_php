@@ -1,5 +1,11 @@
 <?php
 
+const CMS_PROMPT_LAYOUT_EXCERPT_MAX = 1800;
+const CMS_PROMPT_DRAFT_EXCERPT_MAX = 1600;
+const CMS_PROMPT_OUTER_WRAPPER_EXCERPT_MAX = 1200;
+const CMS_PROMPT_HISTORY_ENTRY_MAX = 400;
+const CMS_PROMPT_HISTORY_MAX_ITEMS = 4;
+
 function cmsPromptTrimText(string $text, int $maxLength = 240): string
 {
     $normalized = preg_replace('/\s+/', ' ', trim($text)) ?? trim($text);
@@ -13,7 +19,7 @@ function cmsPromptTrimText(string $text, int $maxLength = 240): string
 function cmsPromptCompactRef(array $ref): array
 {
     $compact = [];
-    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
+    foreach (['name', 'title', 'type', 'kind', 'path', 'pageLink', 'linkUrl', 'srcUrl', 'isFolder', 'isFile', 'visible'] as $key) {
         if (!array_key_exists($key, $ref)) {
             continue;
         }
@@ -53,7 +59,7 @@ function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource
                     if (isset($value[$layoutKey]) && is_string($value[$layoutKey]) && $value[$layoutKey] !== '') {
                         $layoutSummary[$layoutKey . 'Length'] = strlen($value[$layoutKey]);
                         if ($includeResolvedLayoutSource) {
-                            $layoutSummary[$layoutKey] = cmsPromptTrimText($value[$layoutKey], 6000);
+                            $layoutSummary[$layoutKey] = cmsPromptTrimText($value[$layoutKey], CMS_PROMPT_LAYOUT_EXCERPT_MAX);
                         }
                     }
                 }
@@ -101,6 +107,17 @@ function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource
 function cmsPromptCompactContext(array $context): array
 {
     $current = is_array($context['current'] ?? null) ? $context['current'] : [];
+    if (is_array($current['editorDraft'] ?? null)) {
+        $draft = [];
+    foreach (['template', 'sectionTemplate', 'css', 'js'] as $key) {
+        if (!isset($current['editorDraft'][$key]) || !is_string($current['editorDraft'][$key])) {
+            continue;
+        }
+        $draft[$key] = cmsPromptTrimText($current['editorDraft'][$key], CMS_PROMPT_DRAFT_EXCERPT_MAX);
+        $draft[$key . 'Length'] = strlen($current['editorDraft'][$key]);
+    }
+        $current['editorDraft'] = $draft;
+    }
     if (is_array($current['activeLayout'] ?? null)) {
         $activeLayout = [];
         foreach (['name', 'mode', 'storage', 'directory', 'inheritedDirectory', 'sectionDirectory'] as $key) {
@@ -110,11 +127,26 @@ function cmsPromptCompactContext(array $context): array
         }
         foreach (['template', 'sectionTemplate', 'css', 'js'] as $key) {
             if (isset($current['activeLayout'][$key]) && is_string($current['activeLayout'][$key]) && $current['activeLayout'][$key] !== '') {
-                $activeLayout[$key] = cmsPromptTrimText($current['activeLayout'][$key], 6000);
+                $activeLayout[$key] = cmsPromptTrimText($current['activeLayout'][$key], CMS_PROMPT_LAYOUT_EXCERPT_MAX);
                 $activeLayout[$key . 'Length'] = strlen($current['activeLayout'][$key]);
             }
         }
         $current['activeLayout'] = $activeLayout;
+    }
+    if (is_array($current['outerWrapper'] ?? null)) {
+        $outerWrapper = [];
+        foreach (['name', 'storage', 'sectionPartial', 'source'] as $key) {
+            if (array_key_exists($key, $current['outerWrapper'])) {
+                $outerWrapper[$key] = $current['outerWrapper'][$key];
+            }
+        }
+        foreach (['template', 'css', 'js'] as $key) {
+            if (isset($current['outerWrapper'][$key]) && is_string($current['outerWrapper'][$key]) && $current['outerWrapper'][$key] !== '') {
+                $outerWrapper[$key] = cmsPromptTrimText($current['outerWrapper'][$key], CMS_PROMPT_OUTER_WRAPPER_EXCERPT_MAX);
+                $outerWrapper[$key . 'Length'] = strlen($current['outerWrapper'][$key]);
+            }
+        }
+        $current['outerWrapper'] = $outerWrapper;
     }
 
     $compact = [
@@ -150,14 +182,14 @@ function cmsPromptCompactContext(array $context): array
 
 function cmsPromptHistoryText(array $history): string
 {
-    $recentHistory = array_slice($history, -6);
+    $recentHistory = array_slice($history, -CMS_PROMPT_HISTORY_MAX_ITEMS);
     $historyText = '';
     foreach ($recentHistory as $msg) {
         if (!is_array($msg) || !isset($msg['role']) || !isset($msg['content'])) {
             continue;
         }
         $role = strtolower((string) $msg['role']);
-        $content = cmsPromptTrimText((string) $msg['content'], 800);
+        $content = cmsPromptTrimText((string) $msg['content'], CMS_PROMPT_HISTORY_ENTRY_MAX);
         if ($content === '') {
             continue;
         }

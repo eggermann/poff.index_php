@@ -1,0 +1,13 @@
+<div class="poff-default-layout__content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 1200px; margin: auto;">
+  {{#each items}}
+    {{#if isFolder}}
+      <div class="folder-item" style="padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
+        <h2 style="font-size: 1.5em; margin: 0;"><a href="{{pageLink}}">{{title}}</a></h2>
+      </div>
+    {{else if isFile}}
+      <div class="file-item" style="padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px;">
+        <h3 style="font-size: 1.2em; margin: 0;"><a href="{{pageLink}}">{{title}}</a></h3>
+      </div>
+    {{/if}}
+  {{/each}}
+</div>

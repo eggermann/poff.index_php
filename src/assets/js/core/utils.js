@@ -25,6 +25,9 @@ export function getLayoutState(config) {
     const layoutValue = config?.work?.layout;
     const normalizePreset = (value) => {
         const preset = String(value || '').trim();
+        if (preset === 'inherit') {
+            return 'actual';
+        }
         return ['actual', 'none', 'custom'].includes(preset) ? preset : '';
     };
     const inferredSection = layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue) && layoutValue.section

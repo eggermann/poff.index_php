@@ -6,4 +6,10 @@ pages
 vendor/
 
 .DS_Store
-/poff-tests
+/tests/poff-tests/
+
+# generated build artifacts (keep untracked)
+build/assets/app.css
+build/assets/app.js
+src/includes/header.built.php
+src/includes/scripts.built.php

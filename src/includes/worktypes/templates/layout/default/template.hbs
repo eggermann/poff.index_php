@@ -33,21 +33,141 @@
 
     <div class="poff-default-layout__stage">
         <header class="poff-default-layout__header">
-            <div class="poff-default-layout__header-copy">
-                <p class="poff-default-layout__eyebrow">{{#if isFolder}}Folder{{else}}Work{{/if}}</p>
-                <h1 class="poff-default-layout__title">{{title}}</h1>
-                {{#if description}}
-                    <p class="poff-default-layout__description">{{description}}</p>
-                {{/if}}
+            <div class="poff-default-layout__brand">
+                <div class="poff-default-layout__brand-icon">◉</div>
+                <div class="poff-default-layout__brand-copy">
+                    <strong>CVA System</strong>
+                    <span>Career Vector Alignment</span>
+                </div>
+            </div>
+            <div class="poff-default-layout__header-meta">
+                <div class="poff-default-layout__meta-block">
+                    <span class="poff-default-layout__meta-label">Source</span>
+                    <span class="poff-default-layout__meta-value">{{#if isFolder}}Folder{{else}}File{{/if}} • {{name}}</span>
+                </div>
+                <div class="poff-default-layout__meta-block">
+                    <span class="poff-default-layout__meta-label">Last Sync</span>
+                    <span class="poff-default-layout__meta-value" data-layout-last-sync>now</span>
+                </div>
+                <button class="poff-default-layout__action poff-default-layout__action--sync" type="button" data-layout-sync>Sync</button>
+                <button class="poff-default-layout__action" type="button" data-layout-toggle>Focus View</button>
+                <span class="poff-default-layout__health" data-layout-health>On Track</span>
             </div>
         </header>
 
-        <main style="border:33px solid blue" class="poff-default-layout__main">
-            {{#if isFolder}}
-                {{> works}}
-            {{else}}
-                {{> work}}
-            {{/if}}
+        <main class="poff-default-layout__main">
+            <section class="poff-default-layout__grid">
+                <section class="poff-default-layout__primary">
+                    <header class="poff-default-layout__section-head">
+                        <h1 class="poff-default-layout__title">{{title}}</h1>
+                        <p class="poff-default-layout__subtitle">Strategic Alignment Space</p>
+                    </header>
+
+                    <div class="poff-default-layout__content-shell">
+                        {{#if isFolder}}
+                            {{> works}}
+                        {{else}}
+                            {{> work}}
+                        {{/if}}
+                    </div>
+
+                    <div class="poff-default-layout__stats">
+                        <article class="poff-default-layout__stat-card">
+                            <span class="poff-default-layout__stat-label">Scope</span>
+                            <strong class="poff-default-layout__stat-value">{{#if isFolder}}Folder{{else}}File{{/if}}</strong>
+                        </article>
+                        <article class="poff-default-layout__stat-card">
+                            <span class="poff-default-layout__stat-label">Visible</span>
+                            <strong class="poff-default-layout__stat-value">{{#if isFolder}}{{itemCount}}{{else}}1{{/if}}</strong>
+                        </article>
+                        <article class="poff-default-layout__stat-card">
+                            <span class="poff-default-layout__stat-label">Total Assets</span>
+                            <strong class="poff-default-layout__stat-value">{{#if isFolder}}{{#if allItemCount}}{{allItemCount}}{{else}}{{itemCount}}{{/if}}{{else}}1{{/if}}</strong>
+                        </article>
+                        <article class="poff-default-layout__stat-card">
+                            <span class="poff-default-layout__stat-label">Status</span>
+                            <strong class="poff-default-layout__stat-value" data-layout-status>{{#if isFolder}}Indexed{{else}}Ready{{/if}}</strong>
+                        </article>
+                    </div>
+                </section>
+
+                <aside class="poff-default-layout__timeline">
+                    <h2 class="poff-default-layout__timeline-title">Process Timeline</h2>
+                    <ul class="poff-default-layout__timeline-list">
+                        {{#if isFolder}}
+                            {{#if hasItems}}
+                                {{#each items}}
+                                    <li class="poff-default-layout__timeline-item">
+                                        <span class="poff-default-layout__timeline-dot"></span>
+                                        <div class="poff-default-layout__timeline-copy">
+                                            <span class="poff-default-layout__timeline-kind">{{#if isFolder}}Folder{{else}}File{{/if}}</span>
+                                            <a href="{{pageLink}}" class="poff-default-layout__timeline-link">{{name}}</a>
+                                            <small>{{path}}</small>
+                                        </div>
+                                    </li>
+                                {{/each}}
+                            {{else}}
+                                <li class="poff-default-layout__timeline-item">
+                                    <span class="poff-default-layout__timeline-dot"></span>
+                                    <div class="poff-default-layout__timeline-copy">
+                                        <span class="poff-default-layout__timeline-kind">Info</span>
+                                        <span class="poff-default-layout__timeline-link">No entries available.</span>
+                                        <small>Folder is currently empty.</small>
+                                    </div>
+                                </li>
+                            {{/if}}
+                        {{else}}
+                            <li class="poff-default-layout__timeline-item">
+                                <span class="poff-default-layout__timeline-dot"></span>
+                                <div class="poff-default-layout__timeline-copy">
+                                    <span class="poff-default-layout__timeline-kind">Type</span>
+                                    <span class="poff-default-layout__timeline-link">{{kind}}</span>
+                                    <small>{{path}}</small>
+                                </div>
+                            </li>
+                            <li class="poff-default-layout__timeline-item">
+                                <span class="poff-default-layout__timeline-dot"></span>
+                                <div class="poff-default-layout__timeline-copy">
+                                    <span class="poff-default-layout__timeline-kind">Name</span>
+                                    <span class="poff-default-layout__timeline-link">{{name}}</span>
+                                    <small>{{title}}</small>
+                                </div>
+                            </li>
+                        {{/if}}
+                    </ul>
+                </aside>
+            </section>
+
+            <section class="poff-default-layout__drivers">
+                <h2>Strategic & Personal Drivers</h2>
+                <div class="poff-default-layout__driver-grid">
+                    {{#if isFolder}}
+                        {{#each items}}
+                            <article class="poff-default-layout__driver-card">
+                                <span class="poff-default-layout__driver-kind">{{#if isFolder}}Structure{{else}}Asset{{/if}}</span>
+                                <h3>{{name}}</h3>
+                                <p>{{path}}</p>
+                            </article>
+                        {{/each}}
+                    {{else}}
+                        <article class="poff-default-layout__driver-card">
+                            <span class="poff-default-layout__driver-kind">Scope</span>
+                            <h3>{{title}}</h3>
+                            <p>{{description}}</p>
+                        </article>
+                        <article class="poff-default-layout__driver-card">
+                            <span class="poff-default-layout__driver-kind">Type</span>
+                            <h3>{{kind}}</h3>
+                            <p>{{path}}</p>
+                        </article>
+                        <article class="poff-default-layout__driver-card">
+                            <span class="poff-default-layout__driver-kind">Context</span>
+                            <h3>{{name}}</h3>
+                            <p>{{#if description}}{{description}}{{else}}Ready for focused review.{{/if}}</p>
+                        </article>
+                    {{/if}}
+                </div>
+            </section>
         </main>
 
         <footer class="poff-default-layout__footer">

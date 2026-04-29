@@ -1,5 +1,123 @@
 <?php
 
+require_once __DIR__ . '/../../prompt-template-sanitize.php';
+
+function cmsPromptResponseCandidates(string $raw): array
+{
+    $trimmed = trim($raw);
+    if ($trimmed === '') {
+        return [];
+    }
+
+    $candidates = [$trimmed];
+
+    if (preg_match_all('/```(?:[a-z0-9_-]+)?\s*([\s\S]*?)```/i', $trimmed, $matches)) {
+        foreach ($matches[1] as $match) {
+            $candidate = trim((string) $match);
+            if ($candidate !== '') {
+                $candidates[] = $candidate;
+            }
+        }
+    }
+
+    $firstBrace = strpos($trimmed, '{');
+    $lastBrace = strrpos($trimmed, '}');
+    if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
+        $candidate = trim(substr($trimmed, $firstBrace, $lastBrace - $firstBrace + 1));
+        if ($candidate !== '') {
+            $candidates[] = $candidate;
+        }
+    }
+
+    $normalized = [];
+    foreach ($candidates as $candidate) {
+        if (in_array($candidate, $normalized, true)) {
+            continue;
+        }
+        $normalized[] = $candidate;
+    }
+
+    return $normalized;
+}
+
+function cmsPromptDecodeLooseString(string $value): string
+{
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $decoded = json_decode($trimmed, true);
+    if (is_string($decoded)) {
+        return $decoded;
+    }
+
+    if ($trimmed[0] === '"') {
+        $trimmed = substr($trimmed, 1);
+    }
+    if ($trimmed !== '' && substr($trimmed, -1) === '"') {
+        $trimmed = substr($trimmed, 0, -1);
+    }
+
+    return stripcslashes($trimmed);
+}
+
+function cmsPromptExtractLooseScalarField(string $payload, string $key): ?string
+{
+    $knownKeys = [
+        'template',
+        'css',
+        'style',
+        'js',
+        'script',
+        'work',
+        'title',
+        'description',
+        'model',
+        'content',
+        'response',
+    ];
+    $otherKeys = array_values(array_filter($knownKeys, static fn (string $candidate): bool => $candidate !== $key));
+    $otherKeysPattern = implode('|', array_map(static fn (string $candidate): string => preg_quote($candidate, '/'), $otherKeys));
+    $pattern = '/"' . preg_quote($key, '/') . '"\s*:\s*([\s\S]*?)(?=\s*(?:,\s*"(?:' . $otherKeysPattern . ')"\s*:|\}\s*$|$))/i';
+    if (preg_match($pattern, $payload, $matches) !== 1) {
+        return null;
+    }
+
+    return cmsPromptDecodeLooseString((string) $matches[1]);
+}
+
+function cmsPromptDecodeLoosePayload(string $raw): ?array
+{
+    $candidates = cmsPromptResponseCandidates($raw);
+    foreach ($candidates as $candidate) {
+        $decoded = json_decode($candidate, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+    }
+
+    foreach ($candidates as $candidate) {
+        if (!preg_match('/"(template|css|style|js|script|title|description|model|content|response)"\s*:/i', $candidate)) {
+            continue;
+        }
+
+        $result = [];
+        foreach (['template', 'css', 'style', 'js', 'script', 'title', 'description', 'model', 'content', 'response'] as $key) {
+            $value = cmsPromptExtractLooseScalarField($candidate, $key);
+            if ($value !== null) {
+                $result[$key] = $value;
+            }
+        }
+
+        if ($result !== []) {
+            return $result;
+        }
+    }
+
+    return null;
+}
+
 function cmsPromptImagePayload(array $data): ?array
 {
     $image = $data['image'] ?? null;
@@ -19,52 +137,6 @@ function cmsPromptImagePayload(array $data): ?array
     ];
 }
 
-function cmsDefaultLayoutMainBlock(): string
-{
-    return <<<HBS
-<main class="poff-default-layout__main">
-    {{#if isFolder}}
-        {{> works}}
-    {{else}}
-        {{> work}}
-    {{/if}}
-</main>
-HBS;
-}
-
-function cmsNormalizeLayoutPromptTemplate(string $template): string
-{
-    $trimmed = trim($template);
-    if ($trimmed === '') {
-        return '';
-    }
-
-    $requiredPartials = str_contains($trimmed, '{{> works}}') && str_contains($trimmed, '{{> work}}');
-    $mainPattern = '/<main\b[^>]*class\s*=\s*["\"][^"\']*\bpoff-default-layout__main\b[^"\']*["\'][^>]*>.*?<\/main>/is';
-    $mainBlock = cmsDefaultLayoutMainBlock();
-
-    if (preg_match($mainPattern, $trimmed) === 1) {
-        if ($requiredPartials) {
-            return $trimmed;
-        }
-
-        return preg_replace($mainPattern, $mainBlock, $trimmed, 1) ?? $trimmed;
-    }
-
-    if ($requiredPartials) {
-        return $trimmed;
-    }
-
-    foreach (['</footer>', '</div>'] as $closingTag) {
-        $position = strripos($trimmed, $closingTag);
-        if ($position !== false) {
-            return substr($trimmed, 0, $position) . $mainBlock . "\n\n" . substr($trimmed, $position);
-        }
-    }
-
-    return $trimmed . "\n\n" . $mainBlock;
-}
-
 function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): array
 {
     $trimmed = trim($raw);
@@ -72,14 +144,9 @@ function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): a
         return ['template' => ''];
     }
 
-    $candidate = $trimmed;
-    if (preg_match('/```(?:json)?\s*(\{.*\})\s*```/si', $trimmed, $matches)) {
-        $candidate = trim((string) $matches[1]);
-    }
-
-    $decoded = json_decode($candidate, true);
+    $decoded = cmsPromptDecodeLoosePayload($trimmed);
     if (!is_array($decoded)) {
-        return ['template' => $trimmed];
+        return ['template' => cmsSanitizePromptTemplateForTarget($trimmed, $isLayoutTarget)];
     }
 
     $template = '';
@@ -126,12 +193,10 @@ function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): a
     }
 
     if ($template === '') {
-        return ['template' => $trimmed];
+        return ['template' => ''];
     }
 
-    if ($isLayoutTarget) {
-        $template = cmsNormalizeLayoutPromptTemplate($template);
-    }
+    $template = cmsSanitizePromptTemplateForTarget($template, $isLayoutTarget);
 
     $result = ['template' => $template];
     foreach (['title', 'description', 'model'] as $key) {

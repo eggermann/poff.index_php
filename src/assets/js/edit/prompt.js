@@ -2,16 +2,18 @@ import { getLayoutState } from '../core/utils.js';
 import { getDefaultSystemPromptForMode, getPromptMode, getPromptPlaceholderForMode, getSystemPromptSettingKeyForMode } from './prompt/mode.js';
 import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt, defaultPromptSettings, getDefaultModelForProvider, legacyWorkSystemPrompt } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
-import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt } from './prompt/history.js';
+import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplateHistorySnapshot, serializeHistoryForRequest } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
-import { createStreamState, startStreaming, stopStreaming } from './prompt/stream.js';
-import { updatePromptEditorFields } from './prompt/editor-fields.js';
+import { appendStreamingChunk, beginStreaming, createStreamState, finishStreaming, stopStreaming } from './prompt/stream.js';
+import { requestPromptTemplateStream } from '../api/edit.js';
+import { focusPromptTemplateField, updatePromptEditorFields } from './prompt/editor-fields.js';
 import { bindPromptActions } from './prompt/actions.js';
 import { debugPromptLog } from './prompt/log.js';
 import { readImageFile } from './prompt/image.js';
+import { readPromptEditorDraft } from './prompt/draft.js';
 import { summarizePromptError, summarizePromptRequest, summarizePromptResponse } from './prompt/summary.js';
 
-const PROMPT_FALLBACK_TIMEOUT_MS = 95000;
+const PROMPT_FALLBACK_TIMEOUT_MS = 305000;
 const PROMPT_LAYER_STATE_KEY = 'poffEditPromptLayerState';
 
 let promptHistory = [];
@@ -82,6 +84,14 @@ export function bindPromptWindow({
         layout: defaultLayoutSystemPrompt,
     });
     const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
+    const dropPendingAssistantHistory = (pendingAssistantIndex) => {
+        if (pendingAssistantIndex === null || pendingAssistantIndex < 0 || pendingAssistantIndex >= promptHistory.length) {
+            return promptHistory;
+        }
+        const nextHistory = promptHistory.slice();
+        nextHistory.splice(pendingAssistantIndex, 1);
+        return nextHistory;
+    };
     const currentHasImageContext = () => {
         const selection = getActiveSelection ? getActiveSelection() : null;
         const selectionPath = typeof selection?.previewPath === 'string' && selection.previewPath.trim() !== ''
@@ -149,6 +159,24 @@ export function bindPromptWindow({
         promptHistory = tagHistory(list);
     };
 
+    const getHistoryScope = (selection = null) => {
+        const currentSelection = selection || (getActiveSelection ? getActiveSelection() : null) || { path: '' };
+        return {
+            path: currentSelection?.path || '',
+            mode: currentSelection?.isLayout ? 'layout' : (currentSelection?.previewIsFile ? 'file' : 'folder'),
+        };
+    };
+
+    const readHistoryForSelection = (selection = null) => {
+        const scope = getHistoryScope(selection);
+        return readStoredHistory(scope.path, scope.mode);
+    };
+
+    const writeHistoryForSelection = (history, selection = null) => {
+        const scope = getHistoryScope(selection);
+        writeStoredHistory(scope.path, history, scope.mode);
+    };
+
     const renderHistory = (options = {}) => {
         renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
     };
@@ -185,7 +213,7 @@ export function bindPromptWindow({
 
     const renderContext = () => {
         const context = buildPromptContext({ getActiveSelection, getConfig });
-        activePath = context.path;
+        activePath = context.isLayout ? (context.virtualPath || context.path) : context.path;
         activePromptMode = currentPromptMode();
         syncModeAwareSystemPrompt();
         renderPromptContext(promptContextEl, context);
@@ -223,6 +251,13 @@ export function bindPromptWindow({
             promptImageInputEl.value = '';
         }
         updateAttachmentUi();
+    };
+
+    const clearPromptHistory = () => {
+        stopStreaming(stream);
+        setHistory([]);
+        writeHistoryForSelection(promptHistory);
+        renderHistory();
     };
 
     const attachImageFile = async (file) => {
@@ -286,10 +321,7 @@ export function bindPromptWindow({
         layoutPresetEl: document.getElementById('edit-layout-preset'),
         onClearChat: () => {
             syncHistoryForPath();
-            stopStreaming(stream);
-            setHistory([]);
-            writeStoredHistory(activePath, promptHistory);
-            renderHistory();
+            clearPromptHistory();
             clearAttachment();
             if (statusEl) {
                 statusEl.textContent = 'Chat cleared.';
@@ -376,6 +408,7 @@ export function bindPromptWindow({
                     layout: layoutPayload,
                 }, statusEl);
 
+                clearPromptHistory();
                 renderContext();
                 renderSummary(`Reset ${isLayoutTarget ? 'layout wrapper' : 'wrapped partial'} to inherited/default template.`);
                 reloadViewer();
@@ -410,13 +443,8 @@ export function bindPromptWindow({
                 }
                 stopStreaming(stream);
                 setGeneratingState(false);
-                const errMsg = 'Prompt timed out after 95 seconds.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
+                const errMsg = 'Prompt timed out after 5 minutes.';
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                 renderHistory({ forceScroll: true });
                 if (statusEl) {
                     statusEl.textContent = errMsg;
@@ -428,6 +456,7 @@ export function bindPromptWindow({
                 const userPrompt = promptInputEl.value.trim();
                 const providerValue = providerEl ? providerEl.value : 'local';
                 const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
                     setGeneratingState(false);
                     if (statusEl) {
@@ -443,7 +472,7 @@ export function bindPromptWindow({
                 // Add a temporary assistant placeholder
                 setHistory([...promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
                 pendingAssistantIndex = promptHistory.length - 1;
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderContext();
                 promptInputEl.value = '';
@@ -452,12 +481,8 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 renderSummary('Generating answer...');
-                const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
-                    role: item.role,
-                    content: item.content,
-                }));
+                const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
-                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
                     path: activePath,
                     provider: providerEl ? providerEl.value : 'local',
@@ -468,6 +493,10 @@ export function bindPromptWindow({
                     history: historyForRequest,
                     systemPrompt: systemPromptValue,
                 };
+                const editorDraft = readPromptEditorDraft(selection);
+                if (editorDraft) {
+                    payload.draft = editorDraft;
+                }
                 if (selection?.isLayout) {
                     const layoutPresetEl = document.getElementById('edit-layout-preset');
                     if (layoutPresetEl && typeof layoutPresetEl.value === 'string' && layoutPresetEl.value.trim() !== '') {
@@ -479,7 +508,25 @@ export function bindPromptWindow({
                 }
                 requestSummary = summarizePromptRequest(payload);
                 debugPromptLog('request', requestSummary);
-                const response = await requestPromptTemplate(payload);
+                const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+                if (useStreaming) {
+                    beginStreaming({
+                        stream,
+                        targetIndex: pendingAssistantIndex,
+                        history: promptHistory,
+                        renderHistory: () => renderHistory({ forceScroll: true }),
+                    });
+                }
+                const response = useStreaming
+                    ? await requestPromptTemplateStream(payload, {
+                        onDelta: (chunk) => appendStreamingChunk({
+                            stream,
+                            chunk,
+                            history: promptHistory,
+                            renderHistory: () => renderHistory({ forceScroll: true }),
+                        }),
+                    })
+                    : await requestPromptTemplate(payload);
                 settled = true;
                 debugPromptLog('response', summarizePromptResponse(response, requestSummary));
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
@@ -517,14 +564,8 @@ export function bindPromptWindow({
                     stopStreaming(stream);
                     setGeneratingState(false);
                     const errMsg = response.error || 'Prompt returned no content.';
-                    if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                        promptHistory[pendingAssistantIndex].content = errMsg;
-                        setHistory(promptHistory);
-                    } else {
-                        setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                        pendingAssistantIndex = promptHistory.length - 1;
-                    }
-                    writeStoredHistory(activePath, promptHistory);
+                    setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+                    writeHistoryForSelection(promptHistory, selection);
                     renderHistory({ forceScroll: true });
                     if (statusEl) {
                         statusEl.textContent = errMsg;
@@ -533,25 +574,37 @@ export function bindPromptWindow({
                     renderSummary(errMsg);
                     return;
                 }
-                stopStreaming(stream);
+                const templateSnapshot = buildTemplateHistorySnapshot({
+                    templateText,
+                    nextCss,
+                    nextJs,
+                    nextTitle,
+                    nextDescription,
+                    nextWork,
+                    isLayoutTarget,
+                });
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                     promptHistory[pendingAssistantIndex].content = templateText;
+                    promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
                     setHistory(promptHistory);
                 } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: templateText }].slice(-12));
+                    setHistory([...promptHistory, {
+                        role: 'assistant',
+                        content: templateText,
+                        templateSnapshot,
+                    }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
-                writeStoredHistory(activePath, promptHistory);
-                renderHistory({ forceScroll: true });
-                if (streamToggleEl && streamToggleEl.checked && templateText) {
-                    startStreaming({
+                if (useStreaming) {
+                    finishStreaming({
                         stream,
-                        targetIndex: pendingAssistantIndex ?? (promptHistory.length - 1),
-                        fullText: templateText,
                         history: promptHistory,
+                        fullText: templateText,
                         renderHistory: () => renderHistory({ forceScroll: true }),
                     });
                 }
+                writeHistoryForSelection(promptHistory, selection);
+                renderHistory({ forceScroll: true });
                 renderContext();
                 if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
                     systemPromptEl.value = response.systemPrompt;
@@ -566,6 +619,7 @@ export function bindPromptWindow({
                     nextCss,
                     nextJs,
                 });
+                focusPromptTemplateField(isLayoutTarget);
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
                     if (!isLayoutTarget && templateField) {
@@ -714,13 +768,8 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 const errMsg = 'Prompt failed.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
-                writeStoredHistory(activePath, promptHistory);
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderSummary(errMsg);
             } finally {
@@ -806,30 +855,34 @@ export function bindPromptWindow({
         updateProviderUi();
     };
 
-    const updateProviderUi = () => {
-        const provider = providerEl ? providerEl.value : 'local';
-        if (endpointRow) {
-            endpointRow.style.display = provider === 'local' ? 'block' : 'none';
-        }
-        if (modelEl) {
-            modelEl.value = getDefaultModelForProvider(provider);
-        }
+    const persistSettings = () => {
         if (!suppressSave) {
             savePromptSettings(readSettings());
         }
     };
 
+    const updateProviderUi = ({ resetModel = false } = {}) => {
+        const provider = providerEl ? providerEl.value : 'local';
+        if (endpointRow) {
+            endpointRow.style.display = provider === 'local' ? 'block' : 'none';
+        }
+        if (modelEl && resetModel) {
+            modelEl.value = getDefaultModelForProvider(provider);
+        }
+        persistSettings();
+    };
+
     if (providerEl) {
-        providerEl.addEventListener('change', updateProviderUi);
+        providerEl.addEventListener('change', () => updateProviderUi({ resetModel: true }));
     }
     if (modelEl) {
-        modelEl.addEventListener('input', updateProviderUi);
+        modelEl.addEventListener('input', persistSettings);
     }
     if (endpointEl) {
-        endpointEl.addEventListener('input', updateProviderUi);
+        endpointEl.addEventListener('input', persistSettings);
     }
     if (apiKeyEl) {
-        apiKeyEl.addEventListener('input', updateProviderUi);
+        apiKeyEl.addEventListener('input', persistSettings);
     }
     if (systemPromptEl) {
         systemPromptEl.addEventListener('input', () => {
@@ -861,9 +914,9 @@ export function bindPromptWindow({
         });
     }
 
-    updateProviderUi();
+    updateProviderUi({ resetModel: false });
     syncModeAwareSystemPrompt();
-    setHistory(readStoredHistory(activePath));
+    setHistory(readHistoryForSelection(getActiveSelection ? getActiveSelection() : null));
     renderHistory();
     renderContext();
     renderSummary('Waiting for response...');
@@ -893,7 +946,7 @@ export function bindPromptWindow({
         if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
             activePath = nextPath;
             activePromptMode = nextPromptMode;
-            setHistory(readStoredHistory(activePath));
+            setHistory(readHistoryForSelection(selection));
             syncModeAwareSystemPrompt();
             renderHistory();
             renderContext();
@@ -922,10 +975,7 @@ export function bindPromptWindow({
     if (promptClearEl) {
         promptClearEl.addEventListener('click', () => {
             syncHistoryForPath();
-            stopStreaming(stream);
-            setHistory([]);
-            writeStoredHistory(activePath, promptHistory);
-            renderHistory();
+            clearPromptHistory();
             clearAttachment();
             if (statusEl) {
                 statusEl.textContent = 'Chat cleared.';
@@ -1015,6 +1065,7 @@ export function bindPromptWindow({
                     layout: layoutPayload,
                 }, statusEl);
 
+                clearPromptHistory();
                 renderContext();
                 renderSummary(`Reset ${isLayoutTarget ? 'layout wrapper' : 'wrapped partial'} to inherited/default template.`);
                 reloadViewer();
@@ -1052,13 +1103,8 @@ export function bindPromptWindow({
                 }
                 stopStreaming(stream);
                 setGeneratingState(false);
-                const errMsg = 'Prompt timed out after 95 seconds.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
+                const errMsg = 'Prompt timed out after 5 minutes.';
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
                 renderHistory({ forceScroll: true });
                 if (statusEl) {
                     statusEl.textContent = errMsg;
@@ -1070,6 +1116,7 @@ export function bindPromptWindow({
                 const userPrompt = promptInputEl.value.trim();
                 const providerValue = providerEl ? providerEl.value : 'local';
                 const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
                     setGeneratingState(false);
                     if (statusEl) {
@@ -1085,7 +1132,7 @@ export function bindPromptWindow({
                 // Add a temporary assistant placeholder
                 setHistory([...promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
                 pendingAssistantIndex = promptHistory.length - 1;
-                writeStoredHistory(activePath, promptHistory);
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderContext();
                 promptInputEl.value = '';
@@ -1094,12 +1141,8 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 renderSummary('Generating answer...');
-                const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
-                    role: item.role,
-                    content: item.content,
-                }));
+                const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
-                const selection = getActiveSelection ? getActiveSelection() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
                 const payload = {
                     path: activePath,
                     provider: providerEl ? providerEl.value : 'local',
@@ -1121,7 +1164,25 @@ export function bindPromptWindow({
                 }
                 requestSummary = summarizePromptRequest(payload);
                 debugPromptLog('request', requestSummary);
-                const response = await requestPromptTemplate(payload);
+                const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+                if (useStreaming) {
+                    beginStreaming({
+                        stream,
+                        targetIndex: pendingAssistantIndex,
+                        history: promptHistory,
+                        renderHistory: () => renderHistory({ forceScroll: true }),
+                    });
+                }
+                const response = useStreaming
+                    ? await requestPromptTemplateStream(payload, {
+                        onDelta: (chunk) => appendStreamingChunk({
+                            stream,
+                            chunk,
+                            history: promptHistory,
+                            renderHistory: () => renderHistory({ forceScroll: true }),
+                        }),
+                    })
+                    : await requestPromptTemplate(payload);
                 settled = true;
                 debugPromptLog('response', summarizePromptResponse(response, requestSummary));
                 const templateText = (response && typeof response.template === 'string') ? response.template.trim() : '';
@@ -1159,14 +1220,8 @@ export function bindPromptWindow({
                     stopStreaming(stream);
                     setGeneratingState(false);
                     const errMsg = response.error || 'Prompt returned no content.';
-                    if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                        promptHistory[pendingAssistantIndex].content = errMsg;
-                        setHistory(promptHistory);
-                    } else {
-                        setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                        pendingAssistantIndex = promptHistory.length - 1;
-                    }
-                    writeStoredHistory(activePath, promptHistory);
+                    setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+                    writeHistoryForSelection(promptHistory, selection);
                     renderHistory({ forceScroll: true });
                     if (statusEl) {
                         statusEl.textContent = errMsg;
@@ -1175,25 +1230,37 @@ export function bindPromptWindow({
                     renderSummary(errMsg);
                     return;
                 }
-                stopStreaming(stream);
+                const templateSnapshot = buildTemplateHistorySnapshot({
+                    templateText,
+                    nextCss,
+                    nextJs,
+                    nextTitle,
+                    nextDescription,
+                    nextWork,
+                    isLayoutTarget,
+                });
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
                     promptHistory[pendingAssistantIndex].content = templateText;
+                    promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
                     setHistory(promptHistory);
                 } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: templateText }].slice(-12));
+                    setHistory([...promptHistory, {
+                        role: 'assistant',
+                        content: templateText,
+                        templateSnapshot,
+                    }].slice(-12));
                     pendingAssistantIndex = promptHistory.length - 1;
                 }
-                writeStoredHistory(activePath, promptHistory);
-                renderHistory({ forceScroll: true });
-                if (streamToggleEl && streamToggleEl.checked && templateText) {
-                    startStreaming({
+                if (useStreaming) {
+                    finishStreaming({
                         stream,
-                        targetIndex: pendingAssistantIndex ?? (promptHistory.length - 1),
-                        fullText: templateText,
                         history: promptHistory,
+                        fullText: templateText,
                         renderHistory: () => renderHistory({ forceScroll: true }),
                     });
                 }
+                writeHistoryForSelection(promptHistory, selection);
+                renderHistory({ forceScroll: true });
                 renderContext();
                 if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
                     systemPromptEl.value = response.systemPrompt;
@@ -1208,6 +1275,7 @@ export function bindPromptWindow({
                     nextCss,
                     nextJs,
                 });
+                focusPromptTemplateField(isLayoutTarget);
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
                     if (!isLayoutTarget && templateField) {
@@ -1356,13 +1424,8 @@ export function bindPromptWindow({
                     statusEl.className = 'edit-status';
                 }
                 const errMsg = 'Prompt failed.';
-                if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-                    promptHistory[pendingAssistantIndex].content = errMsg;
-                    setHistory(promptHistory);
-                } else {
-                    setHistory([...promptHistory, { role: 'assistant', content: errMsg }].slice(-12));
-                }
-                writeStoredHistory(activePath, promptHistory);
+                setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+                writeHistoryForSelection(promptHistory, selection);
                 renderHistory({ forceScroll: true });
                 renderSummary(errMsg);
             } finally {

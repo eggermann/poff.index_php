@@ -60,40 +60,60 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             continue;
         }
 
-        $entryRelativePath = $relativePath === '' ? $entryName : $relativePath . '/' . $entryName;
-        $entryFullPath = $fullPath . DIRECTORY_SEPARATOR . $entryName;
-        if (!file_exists($entryFullPath)) {
+        $entryRelativePath = cmsConfiguredTreeDisplayPath($relativePath, $entry, $entryName);
+        $filesystemRelativePath = cmsConfiguredTreeFilesystemRelativePath($relativePath, $entry, $entryName);
+        $entryTarget = cmsConfiguredTreeLinkTarget($entry);
+        $entryLinkUrl = cmsConfiguredTreeExternalLinkUrl($entry);
+        $entryStoredPath = trim((string) ($entry['path'] ?? $entry['relativePath'] ?? ''));
+        $entryFullPath = '';
+        if ($entryStoredPath !== '' && !cmsIsSpecialLinkTarget($entryStoredPath)) {
+            $entryFullPath = $fullPath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, trim($entryStoredPath, "/\\"));
+        } elseif ($entryName !== '') {
+            $entryFullPath = $fullPath . DIRECTORY_SEPARATOR . $entryName;
+        }
+        $hasPhysicalTarget = $entryFullPath !== '' && file_exists($entryFullPath);
+        if (!$hasPhysicalTarget && $entryTarget === '') {
             continue;
         }
 
-        $isFolder = is_dir($entryFullPath);
+        $configuredType = strtolower(trim((string) ($entry['type'] ?? '')));
+        $isFolder = $hasPhysicalTarget ? is_dir($entryFullPath) : ($configuredType === 'folder');
         $entryType = $isFolder ? 'folder' : 'file';
-        $entryKind = $isFolder ? 'folder' : detectFileType($entryFullPath);
-        $viewerHref = $isFolder
-            ? '?view=1&path=' . rawurlencode($entryRelativePath)
-            : '?view=1&file=' . rawurlencode($entryRelativePath);
-        $rawHref = $isFolder
-            ? '?path=' . rawurlencode($entryRelativePath)
-            : viewerAssetHref($entryRelativePath);
+        $entryKind = $isFolder
+            ? 'folder'
+            : (($configuredType === 'link' || (!$hasPhysicalTarget && $entryTarget !== '')) ? 'link' : detectFileType($entryFullPath));
+        $viewerHref = $entryTarget !== ''
+            ? $entryTarget
+            : cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, !$isFolder);
+        $rawHref = $entryTarget !== ''
+            ? $entryTarget
+            : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, !$isFolder);
         $item = array_merge($entry, [
             'name' => $entryName,
             'title' => $entry['title'] ?? $entryName,
             'type' => $entryType,
             'kind' => $entryKind,
-            'path' => $entryRelativePath,
-            'relativePath' => $entryRelativePath,
+            'path' => $entryRelativePath !== '' ? $entryRelativePath : $filesystemRelativePath,
+            'relativePath' => $filesystemRelativePath !== '' ? $filesystemRelativePath : $entryRelativePath,
             'basename' => $entryName,
-            'depth' => substr_count($entryRelativePath, '/'),
+            'depth' => substr_count($filesystemRelativePath !== '' ? $filesystemRelativePath : $entryRelativePath, '/'),
             'viewerHref' => $viewerHref,
             'viewUrl' => $viewerHref,
             'workUrl' => $viewerHref,
+            'pageLink' => $viewerHref,
+            'pageUrl' => $viewerHref,
             'rawHref' => $rawHref,
             'assetUrl' => $rawHref,
+            'assetLink' => $rawHref,
+            'srcUrl' => $rawHref,
+            'sourceUrl' => $rawHref,
+            'linkUrl' => $entryLinkUrl,
             'isFolder' => $isFolder,
             'isFile' => !$isFolder,
+            'isVirtual' => !$hasPhysicalTarget,
         ]);
 
-        if ($isFolder) {
+        if ($isFolder && $hasPhysicalTarget) {
             $childConfig = readExistingFolderViewerConfig($entryFullPath);
             if (is_array($childConfig)) {
                 if (isset($childConfig['title']) && is_string($childConfig['title']) && trim($childConfig['title']) !== '') {
@@ -116,19 +136,24 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             }
             $item['children'] = $children;
             $item['childCount'] = count($children);
+        } elseif ($isFolder) {
+            $item['children'] = [];
+            $item['childCount'] = 0;
         } else {
             $item['extension'] = strtolower((string) pathinfo($entryName, PATHINFO_EXTENSION));
-            $item['mimeType'] = MediaType::detectMimeType($entryFullPath, $entryName) ?? '';
-            $fileConfig = readExistingFolderViewerFileConfig($fullPath, $entryName);
-            if (is_array($fileConfig)) {
-                if (isset($fileConfig['title']) && is_string($fileConfig['title']) && trim($fileConfig['title']) !== '') {
-                    $item['title'] = $fileConfig['title'];
-                }
-                if (isset($fileConfig['slug']) && is_string($fileConfig['slug']) && trim($fileConfig['slug']) !== '') {
-                    $item['slug'] = $fileConfig['slug'];
-                }
-                if (isset($fileConfig['description']) && is_string($fileConfig['description'])) {
-                    $item['description'] = $fileConfig['description'];
+            if ($hasPhysicalTarget) {
+                $item['mimeType'] = MediaType::detectMimeType($entryFullPath, $entryName) ?? '';
+                $fileConfig = readExistingFolderViewerFileConfig($fullPath, $entryName);
+                if (is_array($fileConfig)) {
+                    if (isset($fileConfig['title']) && is_string($fileConfig['title']) && trim($fileConfig['title']) !== '') {
+                        $item['title'] = $fileConfig['title'];
+                    }
+                    if (isset($fileConfig['slug']) && is_string($fileConfig['slug']) && trim($fileConfig['slug']) !== '') {
+                        $item['slug'] = $fileConfig['slug'];
+                    }
+                    if (isset($fileConfig['description']) && is_string($fileConfig['description'])) {
+                        $item['description'] = $fileConfig['description'];
+                    }
                 }
             }
         }
@@ -193,12 +218,5 @@ function filterFolderViewerItemsByKind(array $items, string $kind): array
 
 function viewerAssetHref(string $relativePath): string
 {
-    if ($relativePath === '') {
-        return '';
-    }
-
-    $parts = explode('/', $relativePath);
-    $encoded = array_map(static fn(string $part): string => rawurlencode($part), $parts);
-
-    return implode('/', $encoded);
+    return cmsBuildAssetHrefFromRelativePath($relativePath, true);
 }
