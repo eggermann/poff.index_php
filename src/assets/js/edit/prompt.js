@@ -6,7 +6,7 @@ import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplat
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
 import { appendStreamingChunk, beginStreaming, createStreamState, finishStreaming, stopStreaming } from './prompt/stream.js';
 import { requestPromptTemplateStream } from '../api/edit.js';
-import { updatePromptEditorFields } from './prompt/editor-fields.js';
+import { focusPromptTemplateField, updatePromptEditorFields } from './prompt/editor-fields.js';
 import { bindPromptActions } from './prompt/actions.js';
 import { debugPromptLog } from './prompt/log.js';
 import { readImageFile } from './prompt/image.js';
@@ -619,6 +619,7 @@ export function bindPromptWindow({
                     nextCss,
                     nextJs,
                 });
+                focusPromptTemplateField(isLayoutTarget);
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
                     if (!isLayoutTarget && templateField) {
@@ -1274,6 +1275,7 @@ export function bindPromptWindow({
                     nextCss,
                     nextJs,
                 });
+                focusPromptTemplateField(isLayoutTarget);
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
                     if (!isLayoutTarget && templateField) {

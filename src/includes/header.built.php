@@ -152,6 +152,7 @@ body, html {
 
 .preview-shell {
   position: relative;
+  isolation: isolate;
   --prompt-dock-reserve: 0px;
   flex: 0 0 auto;
   height: 100vh;
@@ -182,12 +183,16 @@ body, html {
 
 /* Iframe */
 .content-frame {
+  position: relative;
+  z-index: 0;
   flex-grow: 1;
   border: none;
   height: 100%;
   min-height: 0;
   overflow: auto;
   padding-bottom: 24px;
+  transform: translateZ(0);
+  contain: paint;
 }
 
 .content-frame > .viewer {
@@ -949,9 +954,10 @@ body, html {
 }
 
 .prompt-layer-collapsed {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 13;
   width: auto;
   min-height: 0;
   display: inline-flex;
@@ -1532,6 +1538,10 @@ body, html {
     bottom: 12px;
     width: calc(100% - 24px);
     max-height: calc(100% - 24px);
+  }
+  .prompt-layer-collapsed {
+    right: 14px;
+    bottom: 14px;
   }
 }
 /* POFF_STYLE_END */

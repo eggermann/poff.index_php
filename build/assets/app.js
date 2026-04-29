@@ -1,6 +1,6 @@
 (() => {
   // src/assets/js/api/edit.js
-  var PROMPT_REQUEST_TIMEOUT_MS = 9e4;
+  var PROMPT_REQUEST_TIMEOUT_MS = 3e5;
   function buildCmsUrl(action, path) {
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set("edit", action);
@@ -73,6 +73,41 @@
       };
     }
   }
+  async function requestEditDelete(payload) {
+    const url = buildCmsUrl("delete", payload.path || "");
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
+      }
+      if (!res.ok) {
+        return data || {
+          allowed: false,
+          error: responseText.trim() || `Delete endpoint failed (HTTP ${res.status}).`
+        };
+      }
+      return data || {
+        allowed: false,
+        error: responseText.trim() || "Delete endpoint returned invalid JSON."
+      };
+    } catch (err) {
+      return {
+        allowed: false,
+        error: (err == null ? void 0 : err.message) || "Delete endpoint unavailable."
+      };
+    }
+  }
   async function requestPromptTemplate(payload) {
     const url = buildCmsUrl("prompt", payload.path || "");
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -92,17 +127,170 @@
         signal: controller ? controller.signal : void 0
       });
       clearTimeout(timeout);
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        return data || { error: `Prompt endpoint failed (HTTP ${res.status}).` };
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
       }
-      return await res.json();
+      if (!res.ok) {
+        return data || {
+          error: responseText.trim() || `Prompt endpoint failed (HTTP ${res.status}).`
+        };
+      }
+      return data || {
+        error: responseText.trim() || "Prompt endpoint returned invalid JSON."
+      };
     } catch (err) {
       clearTimeout(timeout);
       if ((err == null ? void 0 : err.name) === "AbortError") {
-        return { error: "Prompt request timed out after 90 seconds." };
+        return { error: "Prompt request timed out after 5 minutes." };
       }
       return { error: "Prompt endpoint unavailable." };
+    }
+  }
+  function parsePromptStreamEventBlock(block) {
+    const lines = String(block || "").replace(/\r\n/g, "\n").split("\n");
+    let eventName = "message";
+    const dataLines = [];
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim() || "message";
+        continue;
+      }
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).replace(/^\s/, ""));
+      }
+    }
+    return {
+      event: eventName,
+      data: dataLines.join("\n")
+    };
+  }
+  function emitPromptStreamDelta(data, onDelta) {
+    var _a, _b, _c, _d, _e, _f;
+    if (typeof onDelta !== "function" || !data || data === "[DONE]") {
+      return;
+    }
+    try {
+      const decoded = JSON.parse(data);
+      const delta = (_c = (_b = (_a = decoded == null ? void 0 : decoded.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.delta) == null ? void 0 : _c.content;
+      if (typeof delta === "string" && delta !== "") {
+        onDelta(delta);
+        return;
+      }
+      const content = (_f = (_e = (_d = decoded == null ? void 0 : decoded.choices) == null ? void 0 : _d[0]) == null ? void 0 : _e.message) == null ? void 0 : _f.content;
+      if (typeof content === "string" && content !== "") {
+        onDelta(content);
+      }
+    } catch (err) {
+      if (data !== "") {
+        onDelta(data);
+      }
+    }
+  }
+  async function requestPromptTemplateStream(payload, { onDelta } = {}) {
+    const url = buildCmsUrl("prompt", payload.path || "");
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout = setTimeout(() => {
+      if (controller) {
+        controller.abort();
+      }
+    }, PROMPT_REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Accept": "text/event-stream, application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ ...payload, stream: true }),
+        signal: controller ? controller.signal : void 0
+      });
+      clearTimeout(timeout);
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      const isJsonResponse = contentType.includes("application/json") || contentType.includes("application/problem+json");
+      if (!res.ok) {
+        const responseText = await res.text();
+        let data = null;
+        try {
+          data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+          data = null;
+        }
+        return data || {
+          error: responseText.trim() || `Prompt endpoint failed (HTTP ${res.status}).`
+        };
+      }
+      if (isJsonResponse || !res.body || typeof res.body.getReader !== "function") {
+        const responseText = await res.text();
+        let data = null;
+        try {
+          data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+          data = null;
+        }
+        return data || {
+          error: responseText.trim() || "Prompt endpoint returned invalid JSON."
+        };
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalPayload = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+        let splitIndex = buffer.indexOf("\n\n");
+        while (splitIndex !== -1) {
+          const eventBlock = buffer.slice(0, splitIndex).trim();
+          buffer = buffer.slice(splitIndex + 2);
+          if (eventBlock !== "") {
+            const event = parsePromptStreamEventBlock(eventBlock);
+            if (event.event === "final") {
+              try {
+                finalPayload = JSON.parse(event.data);
+              } catch (err) {
+                finalPayload = {
+                  error: event.data || "Prompt stream returned invalid final payload."
+                };
+              }
+            } else {
+              emitPromptStreamDelta(event.data, onDelta);
+            }
+          }
+          splitIndex = buffer.indexOf("\n\n");
+        }
+      }
+      buffer += decoder.decode().replace(/\r\n/g, "\n");
+      const trailing = buffer.trim();
+      if (trailing !== "") {
+        const event = parsePromptStreamEventBlock(trailing);
+        if (event.event === "final") {
+          try {
+            finalPayload = JSON.parse(event.data);
+          } catch (err) {
+            finalPayload = {
+              error: event.data || "Prompt stream returned invalid final payload."
+            };
+          }
+        } else {
+          emitPromptStreamDelta(event.data, onDelta);
+        }
+      }
+      return finalPayload || {
+        error: "Prompt stream ended without a final response."
+      };
+    } catch (err) {
+      clearTimeout(timeout);
+      if ((err == null ? void 0 : err.name) === "AbortError") {
+        return { error: "Prompt request timed out after 5 minutes." };
+      }
+      return { error: (err == null ? void 0 : err.message) || "Prompt endpoint unavailable." };
     }
   }
 
@@ -131,11 +319,12 @@
     const normalized = normalizeSelectionPath(path);
     return normalized ? `${normalized}/.layout` : ".layout";
   }
-  function getSelectionFromPath(path = "") {
+  function getSelectionFromPath(path = "", options = {}) {
     const normalized = normalizeSelectionPath(path);
     const isLayout = isVirtualLayoutPath(normalized);
     const previewPath = isLayout ? subjectPathFromVirtualLayout(normalized) : normalized;
-    const previewIsFile = inferFilePath(previewPath);
+    const hasFileHint = typeof (options == null ? void 0 : options.isFile) === "boolean";
+    const previewIsFile = hasFileHint ? !!options.isFile : inferFilePath(previewPath);
     return {
       path: normalized,
       isFile: !isLayout && previewIsFile,
@@ -160,10 +349,12 @@
       }
     }
     if (hashPath) {
-      return getSelectionFromPath(hashPath);
+      const hashMatchesFileParam = filePath !== "" && hashPath === filePath;
+      const isFileHint = hashMatchesFileParam ? true : void 0;
+      return getSelectionFromPath(hashPath, { isFile: isFileHint });
     }
     if (filePath) {
-      return getSelectionFromPath(filePath);
+      return getSelectionFromPath(filePath, { isFile: true });
     }
     return getSelectionFromPath(folderPath);
   }
@@ -966,47 +1157,45 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
 
   // src/assets/js/edit/prompt/stream.js
   function createStreamState() {
-    return { timer: null, state: null };
+    return { state: null };
   }
   function stopStreaming(stream2) {
     if (!stream2) {
       return;
     }
-    if (stream2.timer) {
-      clearInterval(stream2.timer);
-      stream2.timer = null;
-    }
     stream2.state = null;
   }
-  function startStreaming({ stream: stream2, targetIndex, fullText, history, renderHistory }) {
+  function beginStreaming({ stream: stream2, targetIndex, history, renderHistory }) {
     if (!stream2 || typeof renderHistory !== "function") {
       return;
     }
     stopStreaming(stream2);
-    if (!fullText) {
-      renderHistory();
-      return;
-    }
     if (history && history[targetIndex]) {
       history[targetIndex].content = "";
     }
     stream2.state = { index: targetIndex, text: "" };
-    const total = fullText.length;
-    const step = Math.max(1, Math.ceil(total / 80));
-    stream2.timer = window.setInterval(() => {
-      if (!stream2.state) {
-        return;
-      }
-      stream2.state.text = fullText.slice(0, stream2.state.text.length + step);
-      renderHistory();
-      if (stream2.state.text.length >= total) {
-        stopStreaming(stream2);
-        if (history && history[targetIndex]) {
-          history[targetIndex].content = fullText;
-        }
-        renderHistory();
-      }
-    }, 18);
+    renderHistory();
+  }
+  function appendStreamingChunk({ stream: stream2, chunk = "", history, renderHistory }) {
+    if (!stream2 || !stream2.state || typeof renderHistory !== "function" || chunk === "") {
+      return;
+    }
+    stream2.state.text += chunk;
+    if (history && history[stream2.state.index]) {
+      history[stream2.state.index].content = stream2.state.text;
+    }
+    renderHistory();
+  }
+  function finishStreaming({ stream: stream2, history, fullText = "", renderHistory }) {
+    if (!stream2 || typeof renderHistory !== "function" || !stream2.state) {
+      return;
+    }
+    const nextText = fullText || stream2.state.text || "";
+    if (history && history[stream2.state.index]) {
+      history[stream2.state.index].content = nextText;
+    }
+    stopStreaming(stream2);
+    renderHistory();
   }
 
   // src/assets/js/edit/prompt/editor-fields.js
@@ -1054,6 +1243,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       });
     }
+  }
+  function focusPromptTemplateField(isLayoutTarget) {
+    const selector = isLayoutTarget ? "#edit-layout-primary-template" : "#edit-content-template";
+    const field = document.querySelector(selector);
+    if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) {
+      return;
+    }
+    field.focus({ preventScroll: true });
+    if (typeof field.select === "function") {
+      field.select();
+    } else if (typeof field.setSelectionRange === "function") {
+      const value = field.value || "";
+      field.setSelectionRange(value.length, value.length);
+    }
+    field.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   // src/assets/js/edit/prompt/actions.js
@@ -1199,7 +1403,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/prompt.js
-  var PROMPT_FALLBACK_TIMEOUT_MS = 95e3;
+  var PROMPT_FALLBACK_TIMEOUT_MS = 305e3;
   var PROMPT_LAYER_STATE_KEY = "poffEditPromptLayerState";
   var promptHistory = [];
   var stream = createStreamState();
@@ -1266,6 +1470,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       layout: defaultLayoutSystemPrompt
     });
     const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
+    const dropPendingAssistantHistory = (pendingAssistantIndex) => {
+      if (pendingAssistantIndex === null || pendingAssistantIndex < 0 || pendingAssistantIndex >= promptHistory.length) {
+        return promptHistory;
+      }
+      const nextHistory = promptHistory.slice();
+      nextHistory.splice(pendingAssistantIndex, 1);
+      return nextHistory;
+    };
     const currentHasImageContext = () => {
       const selection2 = getActiveSelection2 ? getActiveSelection2() : null;
       const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
@@ -1569,13 +1781,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           stopStreaming(stream);
           setGeneratingState(false);
-          const errMsg = "Prompt timed out after 95 seconds.";
-          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-            promptHistory[pendingAssistantIndex].content = errMsg;
-            setHistory(promptHistory);
-          } else {
-            setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
-          }
+          const errMsg = "Prompt timed out after 5 minutes.";
+          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
           renderHistory({ forceScroll: true });
           if (statusEl) {
             statusEl.textContent = errMsg;
@@ -1636,7 +1843,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           requestSummary = summarizePromptRequest(payload);
           debugPromptLog("request", requestSummary);
-          const response = await requestPromptTemplate2(payload);
+          const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+          if (useStreaming) {
+            beginStreaming({
+              stream,
+              targetIndex: pendingAssistantIndex,
+              history: promptHistory,
+              renderHistory: () => renderHistory({ forceScroll: true })
+            });
+          }
+          const response = useStreaming ? await requestPromptTemplateStream(payload, {
+            onDelta: (chunk) => appendStreamingChunk({
+              stream,
+              chunk,
+              history: promptHistory,
+              renderHistory: () => renderHistory({ forceScroll: true })
+            })
+          }) : await requestPromptTemplate2(payload);
           settled = true;
           debugPromptLog("response", summarizePromptResponse(response, requestSummary));
           const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
@@ -1664,14 +1887,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             stopStreaming(stream);
             setGeneratingState(false);
             const errMsg = response.error || "Prompt returned no content.";
-            if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-              promptHistory[pendingAssistantIndex].content = errMsg;
-              delete promptHistory[pendingAssistantIndex].templateSnapshot;
-              setHistory(promptHistory);
-            } else {
-              setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
-              pendingAssistantIndex = promptHistory.length - 1;
-            }
+            setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
             writeHistoryForSelection(promptHistory, selection2);
             renderHistory({ forceScroll: true });
             if (statusEl) {
@@ -1681,7 +1897,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             renderSummary(errMsg);
             return;
           }
-          stopStreaming(stream);
           const templateSnapshot = buildTemplateHistorySnapshot({
             templateText,
             nextCss,
@@ -1703,17 +1918,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             }].slice(-12));
             pendingAssistantIndex = promptHistory.length - 1;
           }
-          writeHistoryForSelection(promptHistory, selection2);
-          renderHistory({ forceScroll: true });
-          if (streamToggleEl && streamToggleEl.checked && templateText) {
-            startStreaming({
+          if (useStreaming) {
+            finishStreaming({
               stream,
-              targetIndex: pendingAssistantIndex != null ? pendingAssistantIndex : promptHistory.length - 1,
-              fullText: templateText,
               history: promptHistory,
+              fullText: templateText,
               renderHistory: () => renderHistory({ forceScroll: true })
             });
           }
+          writeHistoryForSelection(promptHistory, selection2);
+          renderHistory({ forceScroll: true });
           renderContext();
           if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
             systemPromptEl.value = response.systemPrompt;
@@ -1728,6 +1942,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextCss,
             nextJs
           });
+          focusPromptTemplateField(isLayoutTarget);
           if (drawerForm) {
             const templateField = drawerForm.querySelector("#edit-content-template");
             if (!isLayoutTarget && templateField) {
@@ -1867,12 +2082,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             statusEl.className = "edit-status";
           }
           const errMsg = "Prompt failed.";
-          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-            promptHistory[pendingAssistantIndex].content = errMsg;
-            setHistory(promptHistory);
-          } else {
-            setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
-          }
+          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
           writeHistoryForSelection(promptHistory, selection);
           renderHistory({ forceScroll: true });
           renderSummary(errMsg);
@@ -1945,29 +2155,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       suppressSave = false;
       updateProviderUi();
     };
-    const updateProviderUi = () => {
-      const provider = providerEl ? providerEl.value : "local";
-      if (endpointRow) {
-        endpointRow.style.display = provider === "local" ? "block" : "none";
-      }
-      if (modelEl) {
-        modelEl.value = getDefaultModelForProvider(provider);
-      }
+    const persistSettings = () => {
       if (!suppressSave) {
         savePromptSettings(readSettings());
       }
     };
+    const updateProviderUi = ({ resetModel = false } = {}) => {
+      const provider = providerEl ? providerEl.value : "local";
+      if (endpointRow) {
+        endpointRow.style.display = provider === "local" ? "block" : "none";
+      }
+      if (modelEl && resetModel) {
+        modelEl.value = getDefaultModelForProvider(provider);
+      }
+      persistSettings();
+    };
     if (providerEl) {
-      providerEl.addEventListener("change", updateProviderUi);
+      providerEl.addEventListener("change", () => updateProviderUi({ resetModel: true }));
     }
     if (modelEl) {
-      modelEl.addEventListener("input", updateProviderUi);
+      modelEl.addEventListener("input", persistSettings);
     }
     if (endpointEl) {
-      endpointEl.addEventListener("input", updateProviderUi);
+      endpointEl.addEventListener("input", persistSettings);
     }
     if (apiKeyEl) {
-      apiKeyEl.addEventListener("input", updateProviderUi);
+      apiKeyEl.addEventListener("input", persistSettings);
     }
     if (systemPromptEl) {
       systemPromptEl.addEventListener("input", () => {
@@ -1998,7 +2211,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         renderContext();
       });
     }
-    updateProviderUi();
+    updateProviderUi({ resetModel: false });
     syncModeAwareSystemPrompt();
     setHistory(readHistoryForSelection(getActiveSelection2 ? getActiveSelection2() : null));
     renderHistory();
@@ -2162,13 +2375,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           stopStreaming(stream);
           setGeneratingState(false);
-          const errMsg = "Prompt timed out after 95 seconds.";
-          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-            promptHistory[pendingAssistantIndex].content = errMsg;
-            setHistory(promptHistory);
-          } else {
-            setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
-          }
+          const errMsg = "Prompt timed out after 5 minutes.";
+          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
           renderHistory({ forceScroll: true });
           if (statusEl) {
             statusEl.textContent = errMsg;
@@ -2225,7 +2433,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           requestSummary = summarizePromptRequest(payload);
           debugPromptLog("request", requestSummary);
-          const response = await requestPromptTemplate2(payload);
+          const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+          if (useStreaming) {
+            beginStreaming({
+              stream,
+              targetIndex: pendingAssistantIndex,
+              history: promptHistory,
+              renderHistory: () => renderHistory({ forceScroll: true })
+            });
+          }
+          const response = useStreaming ? await requestPromptTemplateStream(payload, {
+            onDelta: (chunk) => appendStreamingChunk({
+              stream,
+              chunk,
+              history: promptHistory,
+              renderHistory: () => renderHistory({ forceScroll: true })
+            })
+          }) : await requestPromptTemplate2(payload);
           settled = true;
           debugPromptLog("response", summarizePromptResponse(response, requestSummary));
           const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
@@ -2253,14 +2477,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             stopStreaming(stream);
             setGeneratingState(false);
             const errMsg = response.error || "Prompt returned no content.";
-            if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-              promptHistory[pendingAssistantIndex].content = errMsg;
-              delete promptHistory[pendingAssistantIndex].templateSnapshot;
-              setHistory(promptHistory);
-            } else {
-              setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
-              pendingAssistantIndex = promptHistory.length - 1;
-            }
+            setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
             writeHistoryForSelection(promptHistory, selection2);
             renderHistory({ forceScroll: true });
             if (statusEl) {
@@ -2270,7 +2487,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             renderSummary(errMsg);
             return;
           }
-          stopStreaming(stream);
           const templateSnapshot = buildTemplateHistorySnapshot({
             templateText,
             nextCss,
@@ -2292,17 +2508,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             }].slice(-12));
             pendingAssistantIndex = promptHistory.length - 1;
           }
-          writeHistoryForSelection(promptHistory, selection2);
-          renderHistory({ forceScroll: true });
-          if (streamToggleEl && streamToggleEl.checked && templateText) {
-            startStreaming({
+          if (useStreaming) {
+            finishStreaming({
               stream,
-              targetIndex: pendingAssistantIndex != null ? pendingAssistantIndex : promptHistory.length - 1,
-              fullText: templateText,
               history: promptHistory,
+              fullText: templateText,
               renderHistory: () => renderHistory({ forceScroll: true })
             });
           }
+          writeHistoryForSelection(promptHistory, selection2);
+          renderHistory({ forceScroll: true });
           renderContext();
           if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
             systemPromptEl.value = response.systemPrompt;
@@ -2317,6 +2532,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextCss,
             nextJs
           });
+          focusPromptTemplateField(isLayoutTarget);
           if (drawerForm) {
             const templateField = drawerForm.querySelector("#edit-content-template");
             if (!isLayoutTarget && templateField) {
@@ -2456,12 +2672,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             statusEl.className = "edit-status";
           }
           const errMsg = "Prompt failed.";
-          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-            promptHistory[pendingAssistantIndex].content = errMsg;
-            setHistory(promptHistory);
-          } else {
-            setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
-          }
+          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
           writeHistoryForSelection(promptHistory, selection);
           renderHistory({ forceScroll: true });
           renderSummary(errMsg);
@@ -2633,7 +2844,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return `
         <div class="prompt-layer" id="promptLayer">
             <button class="prompt-layer-toggle prompt-layer-toggle-close" type="button" id="promptLayerClose" aria-label="Hide prompt window" title="Hide prompt window">&times;</button>
-            <button class="prompt-layer-toggle prompt-layer-toggle-open" type="button" id="promptLayerOpen" aria-label="Show prompt window" title="Show prompt window" hidden>AI</button>
+            <button class="prompt-layer-toggle prompt-layer-toggle-open" type="button" id="promptLayerOpen" aria-label="Show prompt window" title="Show prompt window" hidden>poff</button>
             <div class="prompt-window prompt-inline" id="promptWindow">
                 <div class="prompt-header">
                     <div>
@@ -2852,7 +3063,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onLayoutPresetChange,
     onReturnToWork,
     onUploadFiles,
-    onCreateBlankFile
+    onCreateBlankFile,
+    onCreateFolder,
+    onDeleteTarget
   }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -2889,7 +3102,47 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === "file";
-    const addContentHint = isFileSubject ? `Add content to the containing folder: ${contentTargetLabel || "."}` : "Upload files or create a blank file in this folder.";
+    const uploadSectionHtml = isFileSubject ? "" : `
+        <div class="edit-upload-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">Upload files, create a blank file, or create a folder in this folder.</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">Add work</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                </div>
+                <div class="edit-grid">
+                    <div>
+                        <label class="edit-label" for="edit-upload-source">Source</label>
+                        <select class="form-select" id="edit-upload-source" name="upload_source">
+                            <option value="upload" selected>Upload</option>
+                            <option value="blank">Blank file</option>
+                            <option value="folder">Folder</option>
+                            <option value="url" disabled>From URL (disabled)</option>
+                        </select>
+                    </div>
+                    <div id="editUploadFilesWrap">
+                        <label class="edit-label" for="edit-upload-files">Files</label>
+                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
+                    </div>
+                    <div id="editBlankFileWrap" hidden>
+                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
+                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
+                    </div>
+                </div>
+                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="edit-inline-actions">
+                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
+                </div>
+            </form>
+        </dialog>
+    `;
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
         <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
@@ -2925,44 +3178,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
             </div>
         </form>
-        <div class="edit-upload-launch">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add content</div>
-                <div class="small-note">${escapeHtml(addContentHint)}</div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
-        </div>
-        <dialog class="edit-upload-dialog" id="editUploadDialog">
-            <form method="dialog" class="edit-upload-dialog-form">
-                <div class="drawer-header">
-                    <h4 class="drawer-title">Add content</h4>
-                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
-                </div>
-                <div class="edit-grid">
-                    <div>
-                        <label class="edit-label" for="edit-upload-source">Source</label>
-                        <select class="form-select" id="edit-upload-source" name="upload_source">
-                            <option value="upload" selected>Upload</option>
-                            <option value="blank">Blank file</option>
-                            <option value="url" disabled>From URL (disabled)</option>
-                        </select>
-                    </div>
-                    <div id="editUploadFilesWrap">
-                        <label class="edit-label" for="edit-upload-files">Files</label>
-                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
-                    </div>
-                    <div id="editBlankFileWrap" hidden>
-                        <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
-                        <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
-                    </div>
-                </div>
-                <div class="small-note" id="editUploadSummary">No files selected.</div>
-                <div class="edit-inline-actions">
-                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
-                    <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
-                </div>
-            </form>
-        </dialog>
+        ${uploadSectionHtml}
         ${renderPromptWindow(settings, {
       mode: "layout",
       subjectType: subjectLabel,
@@ -3173,16 +3389,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         });
       });
     }
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function" && typeof onCreateBlankFile === "function") {
+    const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector("label") : null;
+    const uploadNameDrafts = {
+      blank: "",
+      folder: ""
+    };
+    let uploadMode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function" && typeof onCreateBlankFile === "function" && typeof onCreateFolder === "function") {
       const setUploadSummary = () => {
         var _a;
         const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
         if (!uploadSummaryEl) {
           return;
         }
-        if (((uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload") === "blank") {
+        const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        if (mode === "blank" || mode === "folder") {
           const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
-          uploadSummaryEl.textContent = name ? `Will create: ${name}` : "Enter a file name.";
+          uploadSummaryEl.textContent = name ? `Will create: ${name}` : mode === "folder" ? "Enter a folder name." : "Enter a file name.";
           return;
         }
         const validationError = uploadValidationError(files, uploadLimits);
@@ -3194,14 +3417,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       };
       const syncUploadMode = () => {
         const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        if ((uploadMode === "blank" || uploadMode === "folder") && blankFileNameEl) {
+          uploadNameDrafts[uploadMode] = blankFileNameEl.value || "";
+        }
+        uploadMode = mode;
         if (uploadFilesWrapEl) {
           uploadFilesWrapEl.hidden = mode !== "upload";
         }
         if (blankFileWrapEl) {
-          blankFileWrapEl.hidden = mode !== "blank";
+          blankFileWrapEl.hidden = mode !== "blank" && mode !== "folder";
+        }
+        if (blankFileLabelEl) {
+          blankFileLabelEl.textContent = mode === "folder" ? "Folder name" : "Blank file name";
+        }
+        if (blankFileNameEl) {
+          blankFileNameEl.placeholder = mode === "folder" ? "new-folder" : "notes.txt";
+          if (mode === "blank" || mode === "folder") {
+            blankFileNameEl.value = uploadNameDrafts[mode] || "";
+          }
         }
         if (uploadSubmitButton) {
-          uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : "Upload";
+          uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : "Upload";
         }
         setUploadSummary();
       };
@@ -3239,7 +3475,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       if (uploadSubmitButton) {
         uploadSubmitButton.addEventListener("click", async () => {
-          var _a;
+          var _a, _b;
           const source = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
           try {
             uploadSubmitButton.disabled = true;
@@ -3253,6 +3489,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 return;
               }
               await onCreateBlankFile({ source, fileName, statusEl });
+            } else if (source === "folder") {
+              const folderName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
+              if (!folderName) {
+                if (statusEl) {
+                  statusEl.textContent = "Enter a folder name.";
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              await onCreateFolder({ source, folderName, statusEl });
             } else {
               const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
               if (files.length === 0) {
@@ -3302,7 +3548,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onSubmitLayout,
     onLayoutPresetChange,
     onUploadFiles,
-    onCreateBlankFile
+    onCreateBlankFile,
+    onCreateFolder,
+    onDeleteTarget
   }) {
     if (!editPanel) {
       syncPromptDock();
@@ -3341,7 +3589,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onLayoutPresetChange,
         onReturnToWork,
         onUploadFiles,
-        onCreateBlankFile
+        onCreateBlankFile,
+        onCreateFolder
       });
     }
     const label = (status == null ? void 0 : status.target) === "file" ? "Edit mode (file)" : "Edit mode (folder)";
@@ -3350,44 +3599,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const treeItems = Array.isArray(config.tree) ? config.tree : [];
     const isFileTarget = (status == null ? void 0 : status.target) === "file";
     const isEmptyFolder = !isFileTarget && treeItems.length === 0;
-    const addContentHint = isEmptyFolder ? "This folder is empty. Upload a file or create a blank file to start." : isFileTarget ? `Add content to the containing folder: ${contentTargetLabel || "."}` : "Upload files or create a blank file in this folder.";
-    editPanel.innerHTML = `
-        <h3 class="edit-panel-title">${label}</h3>
-        <div class="edit-status" id="editInlineStatus"></div>
-        <form id="inlineEditForm" class="edit-inline">
-            <div>
-                <label class="edit-label" for="edit-title">Title</label>
-                <input class="form-input" id="edit-title" type="text" name="title" value="${escapeHtml(config.title || "")}">
-            </div>
-            <div>
-                <label class="edit-label" for="edit-description">Description</label>
-                <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
-            </div>
-            <div class="edit-inline-actions">
-                <button class="btn" type="submit">Save</button>
-                <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
-            </div>
-        </form>
-        <div class="edit-layout-launch">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Layout</div>
-                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-        </div>
+    const uploadSectionHtml = isFileTarget ? "" : `
         <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
             <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add content</div>
-                <div class="small-note">${escapeHtml(addContentHint)}</div>
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">${isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, or create a folder to start." : "Upload files, create a blank file, or create a folder in this folder."}</div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add content</button>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">Add content</h4>
+                    <h4 class="drawer-title">Add work</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
@@ -3396,6 +3619,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         <select class="form-select" id="edit-upload-source" name="upload_source">
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
+                            <option value="folder">Folder</option>
                             <option value="url" disabled>From URL (disabled)</option>
                         </select>
                     </div>
@@ -3415,11 +3639,46 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
             </form>
         </dialog>
+    `;
+    editPanel.innerHTML = `
+        <h3 class="edit-panel-title">${label}</h3>
+        <div class="edit-status" id="editInlineStatus"></div>
+        <form id="inlineEditForm" class="edit-inline">
+            <div>
+                <label class="edit-label" for="edit-title">Title</label>
+                <input class="form-input" id="edit-title" type="text" name="title" value="${escapeHtml(config.title || "")}">
+            </div>
+            <div>
+                <label class="edit-label" for="edit-description">Description</label>
+                <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
+            </div>
+            <div class="edit-inline-actions">
+                <button class="btn" type="submit">Save</button>
+                <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
+                ${typeof onDeleteTarget === "function" ? `
+                <button class="btn btn-secondary" type="button" id="editDeleteTarget" style="background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;">
+                    <img src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16" style="display:block;">
+                    Delete
+                </button>
+                ` : ""}
+            </div>
+        </form>
+        <div class="edit-layout-launch">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Layout</div>
+                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
+                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
+                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+        </div>
+        ${uploadSectionHtml}
         ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
     const statusEl = editPanel.querySelector("#editInlineStatus");
     const moreToggle = editPanel.querySelector("#editMoreToggle");
+    const deleteTargetButton = editPanel.querySelector("#editDeleteTarget");
     const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
@@ -3462,16 +3721,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (changeLayoutButton && typeof onOpenLayoutPage === "function") {
       changeLayoutButton.addEventListener("click", () => onOpenLayoutPage());
     }
-    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function" && typeof onCreateBlankFile === "function") {
+    if (deleteTargetButton && typeof onDeleteTarget === "function") {
+      deleteTargetButton.addEventListener("click", async () => {
+        const confirmed = window.confirm("Delete this item? This cannot be undone.");
+        if (!confirmed) {
+          return;
+        }
+        await onDeleteTarget({ statusEl });
+      });
+    }
+    const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector("label") : null;
+    const uploadNameDrafts = {
+      blank: "",
+      folder: ""
+    };
+    let uploadMode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+    if (uploadDialog && openUploadDialogButton && typeof onUploadFiles === "function" && typeof onCreateBlankFile === "function" && typeof onCreateFolder === "function") {
       const setUploadSummary = () => {
         var _a;
         const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
         if (!uploadSummaryEl) {
           return;
         }
-        if (((uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload") === "blank") {
+        const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        if (mode === "blank" || mode === "folder") {
           const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
-          uploadSummaryEl.textContent = name ? `Will create: ${name}` : "Enter a file name.";
+          uploadSummaryEl.textContent = name ? `Will create: ${name}` : mode === "folder" ? "Enter a folder name." : "Enter a file name.";
           return;
         }
         const validationError = uploadValidationError(files, uploadLimits);
@@ -3483,14 +3758,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       };
       const syncUploadMode = () => {
         const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        if ((uploadMode === "blank" || uploadMode === "folder") && blankFileNameEl) {
+          uploadNameDrafts[uploadMode] = blankFileNameEl.value || "";
+        }
+        uploadMode = mode;
         if (uploadFilesWrapEl) {
           uploadFilesWrapEl.hidden = mode !== "upload";
         }
         if (blankFileWrapEl) {
-          blankFileWrapEl.hidden = mode !== "blank";
+          blankFileWrapEl.hidden = mode !== "blank" && mode !== "folder";
+        }
+        if (blankFileLabelEl) {
+          blankFileLabelEl.textContent = mode === "folder" ? "Folder name" : "Blank file name";
+        }
+        if (blankFileNameEl) {
+          blankFileNameEl.placeholder = mode === "folder" ? "new-folder" : "notes.txt";
+          if (mode === "blank" || mode === "folder") {
+            blankFileNameEl.value = uploadNameDrafts[mode] || "";
+          }
         }
         if (uploadSubmitButton) {
-          uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : "Upload";
+          uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : "Upload";
         }
         setUploadSummary();
       };
@@ -3528,7 +3816,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       if (uploadSubmitButton) {
         uploadSubmitButton.addEventListener("click", async () => {
-          var _a;
+          var _a, _b;
           const source = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
           try {
             uploadSubmitButton.disabled = true;
@@ -3544,6 +3832,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               await onCreateBlankFile({
                 source,
                 fileName,
+                statusEl
+              });
+            } else if (source === "folder") {
+              const folderName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
+              if (!folderName) {
+                if (statusEl) {
+                  statusEl.textContent = "Enter a folder name.";
+                  statusEl.className = "edit-status";
+                }
+                return;
+              }
+              await onCreateFolder({
+                source,
+                folderName,
                 statusEl
               });
             } else {
@@ -3769,6 +4071,34 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           syncDrawerVisibility();
           window.location.hash = `#/${nextPath}`;
         },
+        onDeleteTarget: async ({ statusEl }) => {
+          const selection2 = getActiveSelection();
+          const targetPath = getEditTargetPath(selection2);
+          if (!targetPath) {
+            throw new Error("Delete target unavailable.");
+          }
+          const data = await requestEditDelete({
+            path: targetPath,
+            return: selection2.previewPath || selection2.path || ""
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Delete failed.");
+          }
+          drawerOpen = false;
+          syncDrawerVisibility();
+          if (statusEl) {
+            statusEl.textContent = "Deleted.";
+            statusEl.className = "edit-status edit-status-success";
+          }
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
+          if (nextPath) {
+            window.location.hash = `#/${nextPath}`;
+          } else {
+            window.location.hash = "";
+          }
+          await refreshCurrentEditState(getActiveSelection());
+        },
         onReturnToWork: () => {
           const selection2 = getActiveSelection();
           const nextPath = selection2.previewPath || "";
@@ -3867,6 +4197,52 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             inlineStatus.className = "edit-status edit-status-success";
           }
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        },
+        onCreateFolder: async ({ source, folderName, statusEl }) => {
+          var _a;
+          const selection2 = getActiveSelection();
+          const data = await requestEditUpload({
+            path: getContentTargetPath(selection2),
+            source,
+            fileName: folderName,
+            files: []
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Create folder failed.");
+          }
+          await refreshCurrentEditState(selection2);
+          const inlineStatus = document.getElementById("editInlineStatus");
+          if (inlineStatus) {
+            const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : folderName;
+            inlineStatus.textContent = `Created folder ${createdName}.`;
+            inlineStatus.className = "edit-status edit-status-success";
+          }
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        },
+        onDeleteTarget: async ({ statusEl }) => {
+          const selection2 = getActiveSelection();
+          const targetPath = getEditTargetPath(selection2);
+          if (!targetPath) {
+            throw new Error("Delete target unavailable.");
+          }
+          const data = await requestEditDelete({
+            path: targetPath,
+            return: selection2.previewPath || selection2.path || ""
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Delete failed.");
+          }
+          if (statusEl) {
+            statusEl.textContent = "Deleted.";
+            statusEl.className = "edit-status edit-status-success";
+          }
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
+          if (nextPath) {
+            window.location.hash = `#/${nextPath}`;
+          } else {
+            window.location.hash = "";
+          }
         }
       });
       const drawerState = renderEditDrawer({
@@ -4220,7 +4596,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setActiveFileLink(fileName);
     }
     function navigateToPath(path = "", options = {}) {
-      const selection2 = getSelectionFromPath(path);
+      const selection2 = getSelectionFromPath(path, { isFile: options == null ? void 0 : options.isFile });
       navigateToSelection(selection2, options);
     }
     function navigateToSelection(selectionInput, options = {}) {
@@ -4345,7 +4721,41 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         navigateToPath(nextTarget.path, { isFile: nextTarget.isFile });
       });
     }
+    function scopePreviewRootSelector(selector = "") {
+      const trimmed = selector.trim();
+      if (trimmed === "body") {
+        return "#contentFrame > .viewer";
+      }
+      if (trimmed === "html") {
+        return "#contentFrame";
+      }
+      if (trimmed === "html body" || trimmed === "body html") {
+        return "#contentFrame > .viewer";
+      }
+      if (trimmed.startsWith("body.")) {
+        return `#contentFrame > .viewer${trimmed.slice("body".length)}`;
+      }
+      if (trimmed.startsWith("html.")) {
+        return `#contentFrame${trimmed.slice("html".length)}`;
+      }
+      return selector;
+    }
+    function scopePreviewStyleText(css = "") {
+      return String(css || "").replace(/(^|})\s*([^@{}][^{]*)\{/g, (match, prefix, selectorList) => {
+        const scopedSelectors = selectorList.split(",").map(scopePreviewRootSelector).join(", ");
+        return `${prefix} ${scopedSelectors} {`;
+      });
+    }
+    function normalizePreviewStyleNode(node) {
+      if (!(node instanceof HTMLStyleElement)) {
+        return node.outerHTML;
+      }
+      const clone = node.cloneNode(true);
+      clone.textContent = scopePreviewStyleText(node.textContent || "");
+      return clone.outerHTML;
+    }
     async function renderPreview(url) {
+      var _a;
       if (!contentFrame) {
         return;
       }
@@ -4369,7 +4779,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const doc = parser.parseFromString(html, "text/html");
         const fragments = [];
         doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-          fragments.push(node.outerHTML);
+          fragments.push(normalizePreviewStyleNode(node));
+        });
+        (_a = doc.body) == null ? void 0 : _a.querySelectorAll("style").forEach((node) => {
+          node.textContent = scopePreviewStyleText(node.textContent || "");
         });
         doc.querySelectorAll("script").forEach((node) => node.remove());
         const bodyHtml = doc.body ? doc.body.innerHTML : html;

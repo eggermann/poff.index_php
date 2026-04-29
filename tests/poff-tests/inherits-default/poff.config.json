@@ -5,19 +5,19 @@
     "title": "inherits-default",
     "description": "",
     "type": "folder",
-    "id": "poff_cc92f3fc3b4c6c11",
+    "id": "poff_c47f7c8657684271",
     "tree": [
         {
             "name": "child.txt",
             "slug": "child-txt",
             "type": "file",
             "path": "child.txt",
-            "modifiedAt": "2026-04-27T23:06:15+00:00",
+            "modifiedAt": "2026-04-28T22:32:31+00:00",
             "visible": true
         }
     ],
-    "treeHash": "3303167bfb977f0fee1c42c0e15338387810f40fb11d144b7722b1357d59974d",
-    "updatedAt": "2026-04-27T23:06:17+00:00",
+    "treeHash": "9a85b8f52880018b6d2810081aa90373d6be229288eb813ab6355eb30fae3b1d",
+    "updatedAt": "2026-04-28T22:32:33+00:00",
     "work": {
         "type": "folder",
         "layout": {

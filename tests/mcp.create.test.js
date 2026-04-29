@@ -23,6 +23,8 @@ const PERSIST_LAYOUT_DIR = path.join(POFF_DIR, 'persist-layout');
 const INVALID_TEMPLATE_DIR = path.join(POFF_DIR, 'invalid-json-template');
 const INHERITED_DEFAULT_DIR = path.join(POFF_DIR, 'inherits-default');
 const INHERITED_SECTION_DIR = path.join(POFF_DIR, 'inherits-section-default');
+const DELETE_FILE_DIR = path.join(POFF_DIR, 'delete-file-target');
+const DELETE_FOLDER_DIR = path.join(POFF_DIR, 'delete-folder-target');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
 const VIRTUAL_LINK_DIR = path.join(POFF_DIR, 'virtual-links');
 
@@ -181,6 +183,25 @@ function runBlankFile(targetDir, fileName, contents = '') {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`blank file helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runDeleteTarget(targetDir, relativePath) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_delete_item.php'), targetDir, relativePath];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`delete helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -450,6 +471,24 @@ describe('MCP create route helper (CLI)', () => {
     fs.writeFileSync(path.join(INHERITED_DEFAULT_DIR, 'child.txt'), 'child');
     fs.mkdirSync(INHERITED_SECTION_DIR, { recursive: true });
     fs.writeFileSync(path.join(INHERITED_SECTION_DIR, 'hero.txt'), 'hero');
+    fs.mkdirSync(DELETE_FILE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(DELETE_FILE_DIR, 'remove-me.txt'), 'remove me');
+    fs.mkdirSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.layout'), { recursive: true });
+    fs.writeFileSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.config.json'), JSON.stringify({
+      title: 'Remove Me',
+      description: 'Delete target file',
+      work: {
+        type: 'text',
+        layout: {
+          name: 'filesystem-file-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+    fs.writeFileSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.layout', 'template.hbs'), '<div class="delete-target-file">{{title}}</div>');
+    fs.mkdirSync(path.join(DELETE_FOLDER_DIR, 'nested', 'child'), { recursive: true });
+    fs.writeFileSync(path.join(DELETE_FOLDER_DIR, 'nested', 'child', 'deep.txt'), 'deep');
     fs.mkdirSync(PERSIST_LAYOUT_DIR, { recursive: true });
     fs.mkdirSync(path.join(INVALID_TEMPLATE_DIR, '.layout'), { recursive: true });
     fs.writeFileSync(path.join(INVALID_TEMPLATE_DIR, 'poster.txt'), 'poster');
@@ -1732,6 +1771,40 @@ describe('Worktype HBS renderer', () => {
     expect(result.config.tree).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'assets', type: 'folder' }),
+      ]),
+    );
+  });
+
+  test('deletes a file target and its metadata', async () => {
+    const output = await runDeleteTarget(DELETE_FILE_DIR, 'remove-me.txt');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.deleted).toEqual([
+      expect.objectContaining({ name: 'remove-me.txt', path: 'remove-me.txt', type: 'file' }),
+    ]);
+    expect(fs.existsSync(path.join(DELETE_FILE_DIR, 'remove-me.txt'))).toBe(false);
+    expect(fs.existsSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.config.json'))).toBe(false);
+    expect(fs.existsSync(path.join(DELETE_FILE_DIR, '.works', 'remove-me.txt.layout'))).toBe(false);
+    expect(result.config.tree).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'remove-me.txt' }),
+      ]),
+    );
+  });
+
+  test('deletes a folder target recursively', async () => {
+    const output = await runDeleteTarget(DELETE_FOLDER_DIR, 'nested');
+    const result = JSON.parse(output);
+
+    expect(result.errors).toEqual([]);
+    expect(result.deleted).toEqual([
+      expect.objectContaining({ name: 'nested', path: 'nested', type: 'folder' }),
+    ]);
+    expect(fs.existsSync(path.join(DELETE_FOLDER_DIR, 'nested'))).toBe(false);
+    expect(result.config.tree).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'nested' }),
       ]),
     );
   });

@@ -307,7 +307,7 @@ export function initNavigation({
     }
 
     function navigateToPath(path = '', options = {}) {
-        const selection = getSelectionFromPath(path);
+        const selection = getSelectionFromPath(path, { isFile: options?.isFile });
         navigateToSelection(selection, options);
     }
 
@@ -441,6 +441,45 @@ export function initNavigation({
         });
     }
 
+    function scopePreviewRootSelector(selector = '') {
+        const trimmed = selector.trim();
+        if (trimmed === 'body') {
+            return '#contentFrame > .viewer';
+        }
+        if (trimmed === 'html') {
+            return '#contentFrame';
+        }
+        if (trimmed === 'html body' || trimmed === 'body html') {
+            return '#contentFrame > .viewer';
+        }
+        if (trimmed.startsWith('body.')) {
+            return `#contentFrame > .viewer${trimmed.slice('body'.length)}`;
+        }
+        if (trimmed.startsWith('html.')) {
+            return `#contentFrame${trimmed.slice('html'.length)}`;
+        }
+        return selector;
+    }
+
+    function scopePreviewStyleText(css = '') {
+        return String(css || '').replace(/(^|})\s*([^@{}][^{]*)\{/g, (match, prefix, selectorList) => {
+            const scopedSelectors = selectorList
+                .split(',')
+                .map(scopePreviewRootSelector)
+                .join(', ');
+            return `${prefix} ${scopedSelectors} {`;
+        });
+    }
+
+    function normalizePreviewStyleNode(node) {
+        if (!(node instanceof HTMLStyleElement)) {
+            return node.outerHTML;
+        }
+        const clone = node.cloneNode(true);
+        clone.textContent = scopePreviewStyleText(node.textContent || '');
+        return clone.outerHTML;
+    }
+
     async function renderPreview(url) {
         if (!contentFrame) {
             return;
@@ -467,7 +506,10 @@ export function initNavigation({
             const doc = parser.parseFromString(html, 'text/html');
             const fragments = [];
             doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-                fragments.push(node.outerHTML);
+                fragments.push(normalizePreviewStyleNode(node));
+            });
+            doc.body?.querySelectorAll('style').forEach((node) => {
+                node.textContent = scopePreviewStyleText(node.textContent || '');
             });
             doc.querySelectorAll('script').forEach((node) => node.remove());
             const bodyHtml = doc.body ? doc.body.innerHTML : html;

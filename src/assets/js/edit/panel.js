@@ -143,6 +143,7 @@ function renderEditLayoutPanel({
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onDeleteTarget,
 }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -654,6 +655,7 @@ export function renderEditPanel({
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onDeleteTarget,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -761,6 +763,12 @@ export function renderEditPanel({
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
+                ${typeof onDeleteTarget === 'function' ? `
+                <button class="btn btn-secondary" type="button" id="editDeleteTarget" style="background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;">
+                    <img src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16" style="display:block;">
+                    Delete
+                </button>
+                ` : ''}
             </div>
         </form>
         <div class="edit-layout-launch">
@@ -779,6 +787,7 @@ export function renderEditPanel({
     const form = editPanel.querySelector('#inlineEditForm');
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
+    const deleteTargetButton = editPanel.querySelector('#editDeleteTarget');
     const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
@@ -821,6 +830,15 @@ export function renderEditPanel({
     }
     if (changeLayoutButton && typeof onOpenLayoutPage === 'function') {
         changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
+    }
+    if (deleteTargetButton && typeof onDeleteTarget === 'function') {
+        deleteTargetButton.addEventListener('click', async () => {
+            const confirmed = window.confirm('Delete this item? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+            await onDeleteTarget({ statusEl });
+        });
     }
 
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;

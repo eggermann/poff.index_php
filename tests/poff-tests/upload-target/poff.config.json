@@ -5,14 +5,22 @@
     "title": "upload-target",
     "description": "",
     "type": "folder",
-    "id": "poff_15977452a5bcdffa",
+    "id": "poff_20bd65e0dfe998c4",
     "tree": [
+        {
+            "name": "assets",
+            "slug": "assets",
+            "type": "folder",
+            "path": "assets",
+            "modifiedAt": "2026-04-28T22:32:35+00:00",
+            "visible": true
+        },
         {
             "name": "draft.txt",
             "slug": "draft-txt",
             "type": "file",
             "path": "draft.txt",
-            "modifiedAt": "2026-04-27T23:06:18+00:00",
+            "modifiedAt": "2026-04-28T22:32:35+00:00",
             "visible": true
         },
         {
@@ -20,12 +28,12 @@
             "slug": "slides-pdf",
             "type": "file",
             "path": "slides.pdf",
-            "modifiedAt": "2026-04-27T23:06:18+00:00",
+            "modifiedAt": "2026-04-28T22:32:35+00:00",
             "visible": true
         }
     ],
-    "treeHash": "c6f4c1c66d04c5547a2b9f17efa87591de6ce3f5be8b1de1f68a56843d4a5297",
-    "updatedAt": "2026-04-27T23:06:18+00:00",
+    "treeHash": "e9297553f0774d36d18fe174d330553a6eb81d68f19d87612dd578902dff7d5c",
+    "updatedAt": "2026-04-28T22:32:35+00:00",
     "work": {
         "type": "folder",
         "layout": {

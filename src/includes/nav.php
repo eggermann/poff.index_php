@@ -28,6 +28,14 @@ echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . 
 
 
 $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
+$navKind = file_exists($navAbsolutePath) ? (is_dir($navAbsolutePath) ? 'dir' : 'file') : 'missing';
+if ($navKind === 'file') {
+    $navFolder = dirname($navFolder);
+    if ($navFolder === '.') {
+        $navFolder = '';
+    }
+    $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
+}
 $directories = $files = [];
 $tree = $folderPoffConfig['tree'] ?? null;
 
@@ -48,6 +56,7 @@ if (is_array($tree)) {
         if ($itemType === 'folder') {
             $directories[] = [
                 'name' => $itemName,
+                'path' => $relativePath,
                 'link' => '?path=' . urlencode($relativePath) . $editQuery,
                 'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>',
             ];
@@ -87,11 +96,12 @@ if (is_array($tree)) {
             $itemRelativePath = $navFolder ? rtrim($navFolder, "/\\") . '/' . $item : $item;
 
             if ($isDir) {
-                $directories[] = [
-                    'name' => $item,
-                    'link' => '?path=' . urlencode($itemRelativePath) . $editQuery,
-                    'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>',
-                ];
+            $directories[] = [
+                'name' => $item,
+                'path' => $itemRelativePath,
+                'link' => '?path=' . urlencode($itemRelativePath) . $editQuery,
+                'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>',
+            ];
             } else {
                 $files[] = [
                     'name' => $item,
