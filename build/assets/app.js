@@ -246,6 +246,41 @@
     return normalize({ mode: "poff-layout", template: "", css: "", js: "", model: "", engine: "lightncandy", directory: "", storage: "", section: inferredSection, sectionTemplate: "", sectionDirectory: "", assets: [] });
   }
 
+  // src/assets/js/edit/prompt/mode.js
+  function getPromptMode(selection = null) {
+    if (selection == null ? void 0 : selection.isLayout) {
+      return "layout";
+    }
+    return (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder";
+  }
+  function getDefaultSystemPromptForMode(mode, prompts = {}) {
+    if (mode === "layout") {
+      return prompts.layout || "";
+    }
+    if (mode === "folder") {
+      return prompts.folder || "";
+    }
+    return prompts.file || "";
+  }
+  function getSystemPromptSettingKeyForMode(mode) {
+    if (mode === "layout") {
+      return "systemPromptLayout";
+    }
+    if (mode === "folder") {
+      return "systemPromptFolder";
+    }
+    return "systemPromptFile";
+  }
+  function getPromptPlaceholderForMode(mode, defaultPlaceholder = "Describe the component you want...") {
+    if (mode === "layout") {
+      return "Describe the layout you want...";
+    }
+    if (mode === "folder") {
+      return "Describe the folder component you want...";
+    }
+    return defaultPlaceholder;
+  }
+
   // src/assets/js/edit/prompt/constants.js
   var promptSettingsKey = "poffEditPromptSettings";
   var promptHistoryKey = "poffEditPromptHistory";
@@ -734,39 +769,8 @@
     }, 18);
   }
 
-  // src/assets/js/edit/prompt.js
-  var PROMPT_FALLBACK_TIMEOUT_MS = 95e3;
-  var PROMPT_LAYER_STATE_KEY = "poffEditPromptLayerState";
-  var promptHistory = [];
-  var stream = createStreamState();
-  var summarizePromptRequest = (payload) => ({
-    path: typeof (payload == null ? void 0 : payload.path) === "string" ? payload.path : "",
-    provider: typeof (payload == null ? void 0 : payload.provider) === "string" ? payload.provider : "local",
-    model: typeof (payload == null ? void 0 : payload.model) === "string" ? payload.model : "",
-    endpoint: typeof (payload == null ? void 0 : payload.endpoint) === "string" ? payload.endpoint : "",
-    promptLength: typeof (payload == null ? void 0 : payload.prompt) === "string" ? payload.prompt.length : 0,
-    historyCount: Array.isArray(payload == null ? void 0 : payload.history) ? payload.history.length : 0,
-    hasApiKey: typeof (payload == null ? void 0 : payload.apiKey) === "string" ? payload.apiKey.trim() !== "" : false,
-    hasImage: !!(payload == null ? void 0 : payload.image),
-    systemPromptLength: typeof (payload == null ? void 0 : payload.systemPrompt) === "string" ? payload.systemPrompt.length : 0
-  });
-  var summarizePromptResponse = (response, requestSummary) => ({
-    path: (requestSummary == null ? void 0 : requestSummary.path) || "",
-    provider: (response == null ? void 0 : response.provider) || (requestSummary == null ? void 0 : requestSummary.provider) || "local",
-    model: (response == null ? void 0 : response.model) || (requestSummary == null ? void 0 : requestSummary.model) || "",
-    allowed: (response == null ? void 0 : response.allowed) === true,
-    hasTemplate: typeof (response == null ? void 0 : response.template) === "string" && response.template.trim() !== "",
-    templateLength: typeof (response == null ? void 0 : response.template) === "string" ? response.template.trim().length : 0,
-    error: typeof (response == null ? void 0 : response.error) === "string" ? response.error : ""
-  });
-  var summarizePromptError = (err, requestSummary) => ({
-    path: (requestSummary == null ? void 0 : requestSummary.path) || "",
-    provider: (requestSummary == null ? void 0 : requestSummary.provider) || "local",
-    model: (requestSummary == null ? void 0 : requestSummary.model) || "",
-    name: typeof (err == null ? void 0 : err.name) === "string" ? err.name : "Error",
-    message: typeof (err == null ? void 0 : err.message) === "string" ? err.message : String(err || "Prompt failed.")
-  });
-  var updatePromptEditorFields = ({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget, nextCss = null, nextJs = null }) => {
+  // src/assets/js/edit/prompt/editor-fields.js
+  function updatePromptEditorFields({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget, nextCss = null, nextJs = null }) {
     const templateSelectors = isLayoutTarget ? ["#edit-layout-primary-template"] : ["#edit-content-template"];
     templateSelectors.forEach((selector) => {
       document.querySelectorAll(selector).forEach((field) => {
@@ -810,13 +814,155 @@
         }
       });
     }
-  };
-  var debugPromptLog = (label, payload) => {
+  }
+
+  // src/assets/js/edit/prompt/actions.js
+  function bindPromptActions({
+    promptClearEl,
+    promptTemplateResetEl,
+    promptSendEl,
+    promptInputEl,
+    promptAttachEl,
+    promptImageInputEl,
+    promptAttachmentRemoveEl,
+    layoutPresetEl,
+    onClearChat,
+    onResetTemplate,
+    onSendPrompt,
+    onAttachImage,
+    onRemoveImage,
+    onTemplateInput,
+    onLayoutPresetChange
+  }) {
+    if (layoutPresetEl && typeof onLayoutPresetChange === "function") {
+      layoutPresetEl.addEventListener("change", onLayoutPresetChange);
+    }
+    if (promptClearEl && typeof onClearChat === "function") {
+      promptClearEl.addEventListener("click", onClearChat);
+    }
+    if (promptTemplateResetEl && typeof onResetTemplate === "function") {
+      promptTemplateResetEl.addEventListener("click", onResetTemplate);
+    }
+    if (promptSendEl && promptInputEl && typeof onSendPrompt === "function") {
+      promptSendEl.addEventListener("click", () => {
+        void onSendPrompt();
+      });
+      promptInputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing) {
+          event.preventDefault();
+          void onSendPrompt();
+        }
+      });
+      promptInputEl.addEventListener("paste", (event) => {
+        var _a;
+        const items = ((_a = event.clipboardData) == null ? void 0 : _a.items) ? Array.from(event.clipboardData.items) : [];
+        const imageItem = items.find((item) => typeof item.type === "string" && item.type.startsWith("image/"));
+        if (!imageItem) {
+          return;
+        }
+        const file = imageItem.getAsFile();
+        if (!file) {
+          return;
+        }
+        event.preventDefault();
+        if (typeof onAttachImage === "function") {
+          void onAttachImage(file);
+        }
+      });
+    }
+    if (promptAttachEl && promptImageInputEl) {
+      promptAttachEl.addEventListener("click", () => {
+        promptImageInputEl.click();
+      });
+      promptImageInputEl.addEventListener("change", async () => {
+        const file = promptImageInputEl.files && promptImageInputEl.files[0] ? promptImageInputEl.files[0] : null;
+        if (!file || typeof onAttachImage !== "function") {
+          return;
+        }
+        await onAttachImage(file);
+      });
+    }
+    if (promptAttachmentRemoveEl && typeof onRemoveImage === "function") {
+      promptAttachmentRemoveEl.addEventListener("click", onRemoveImage);
+    }
+  }
+
+  // src/assets/js/edit/prompt/log.js
+  function debugPromptLog(label, payload) {
     try {
       console.info(`[prompt] ${label}`, payload);
     } catch (err) {
     }
-  };
+  }
+
+  // src/assets/js/edit/prompt/image.js
+  function isSupportedImageFile(file) {
+    return !!file && typeof file.type === "string" && file.type.startsWith("image/");
+  }
+  function readImageFile(file) {
+    return new Promise((resolve, reject) => {
+      if (!isSupportedImageFile(file)) {
+        reject(new Error("Only image files are supported."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = typeof reader.result === "string" ? reader.result : "";
+        if (!dataUrl.startsWith("data:image/")) {
+          reject(new Error("Invalid image data."));
+          return;
+        }
+        resolve({
+          name: file.name || "clipboard-image.png",
+          mimeType: file.type || "image/png",
+          dataUrl
+        });
+      };
+      reader.onerror = () => reject(new Error("Failed to read image."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // src/assets/js/edit/prompt/summary.js
+  function summarizePromptRequest(payload) {
+    return {
+      path: typeof (payload == null ? void 0 : payload.path) === "string" ? payload.path : "",
+      provider: typeof (payload == null ? void 0 : payload.provider) === "string" ? payload.provider : "local",
+      model: typeof (payload == null ? void 0 : payload.model) === "string" ? payload.model : "",
+      endpoint: typeof (payload == null ? void 0 : payload.endpoint) === "string" ? payload.endpoint : "",
+      promptLength: typeof (payload == null ? void 0 : payload.prompt) === "string" ? payload.prompt.length : 0,
+      historyCount: Array.isArray(payload == null ? void 0 : payload.history) ? payload.history.length : 0,
+      hasApiKey: typeof (payload == null ? void 0 : payload.apiKey) === "string" ? payload.apiKey.trim() !== "" : false,
+      hasImage: !!(payload == null ? void 0 : payload.image),
+      systemPromptLength: typeof (payload == null ? void 0 : payload.systemPrompt) === "string" ? payload.systemPrompt.length : 0
+    };
+  }
+  function summarizePromptResponse(response, requestSummary) {
+    return {
+      path: (requestSummary == null ? void 0 : requestSummary.path) || "",
+      provider: (response == null ? void 0 : response.provider) || (requestSummary == null ? void 0 : requestSummary.provider) || "local",
+      model: (response == null ? void 0 : response.model) || (requestSummary == null ? void 0 : requestSummary.model) || "",
+      allowed: (response == null ? void 0 : response.allowed) === true,
+      hasTemplate: typeof (response == null ? void 0 : response.template) === "string" && response.template.trim() !== "",
+      templateLength: typeof (response == null ? void 0 : response.template) === "string" ? response.template.trim().length : 0,
+      error: typeof (response == null ? void 0 : response.error) === "string" ? response.error : ""
+    };
+  }
+  function summarizePromptError(err, requestSummary) {
+    return {
+      path: (requestSummary == null ? void 0 : requestSummary.path) || "",
+      provider: (requestSummary == null ? void 0 : requestSummary.provider) || "local",
+      model: (requestSummary == null ? void 0 : requestSummary.model) || "",
+      name: typeof (err == null ? void 0 : err.name) === "string" ? err.name : "Error",
+      message: typeof (err == null ? void 0 : err.message) === "string" ? err.message : String(err || "Prompt failed.")
+    };
+  }
+
+  // src/assets/js/edit/prompt.js
+  var PROMPT_FALLBACK_TIMEOUT_MS = 95e3;
+  var PROMPT_LAYER_STATE_KEY = "poffEditPromptLayerState";
+  var promptHistory = [];
+  var stream = createStreamState();
   var builtInSystemPrompts = /* @__PURE__ */ new Set([
     legacyWorkSystemPrompt,
     defaultFileSystemPrompt,
@@ -872,43 +1018,14 @@
     let promptLayerCollapsed = false;
     const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
     const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
-    const currentPromptPlaceholder = () => {
-      const mode = currentPromptMode();
-      if (mode === "layout") {
-        return "Describe the layout you want...";
-      }
-      if (mode === "folder") {
-        return "Describe the folder component you want...";
-      }
-      return defaultPromptPlaceholder;
-    };
-    const currentPromptMode = () => {
-      const selection = getActiveSelection2 == null ? void 0 : getActiveSelection2();
-      if (selection == null ? void 0 : selection.isLayout) {
-        return "layout";
-      }
-      return (selection == null ? void 0 : selection.previewIsFile) ? "file" : "folder";
-    };
-    const currentDefaultSystemPrompt = () => {
-      const mode = currentPromptMode();
-      if (mode === "layout") {
-        return defaultLayoutSystemPrompt;
-      }
-      if (mode === "folder") {
-        return defaultFolderSystemPrompt;
-      }
-      return defaultFileSystemPrompt;
-    };
-    const currentSystemPromptSettingKey = () => {
-      const mode = currentPromptMode();
-      if (mode === "layout") {
-        return "systemPromptLayout";
-      }
-      if (mode === "folder") {
-        return "systemPromptFolder";
-      }
-      return "systemPromptFile";
-    };
+    const currentPromptMode = () => getPromptMode(getActiveSelection2 == null ? void 0 : getActiveSelection2());
+    const currentPromptPlaceholder = () => getPromptPlaceholderForMode(currentPromptMode(), defaultPromptPlaceholder);
+    const currentDefaultSystemPrompt = () => getDefaultSystemPromptForMode(currentPromptMode(), {
+      file: defaultFileSystemPrompt,
+      folder: defaultFolderSystemPrompt,
+      layout: defaultLayoutSystemPrompt
+    });
+    const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
     const currentHasImageContext = () => {
       const selection = getActiveSelection2 ? getActiveSelection2() : null;
       const selectionPath = typeof (selection == null ? void 0 : selection.previewPath) === "string" && selection.previewPath.trim() !== "" ? selection.previewPath : typeof (selection == null ? void 0 : selection.path) === "string" ? selection.path : "";
@@ -1028,28 +1145,6 @@
       }
       updateAttachmentUi();
     };
-    const isSupportedImageFile = (file) => !!file && typeof file.type === "string" && file.type.startsWith("image/");
-    const readImageFile = (file) => new Promise((resolve, reject) => {
-      if (!isSupportedImageFile(file)) {
-        reject(new Error("Only image files are supported."));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = typeof reader.result === "string" ? reader.result : "";
-        if (!dataUrl.startsWith("data:image/")) {
-          reject(new Error("Invalid image data."));
-          return;
-        }
-        resolve({
-          name: file.name || "clipboard-image.png",
-          mimeType: file.type || "image/png",
-          dataUrl
-        });
-      };
-      reader.onerror = () => reject(new Error("Failed to read image."));
-      reader.readAsDataURL(file);
-    });
     const attachImageFile = async (file) => {
       try {
         imageAttachment = await readImageFile(file);
@@ -1097,6 +1192,433 @@
     };
     promptLayerCollapsed = readPromptLayerState();
     applyPromptLayerState(promptLayerCollapsed, { skipPersist: true });
+    bindPromptActions({
+      promptClearEl,
+      promptTemplateResetEl,
+      promptSendEl,
+      promptInputEl,
+      promptAttachEl,
+      promptImageInputEl,
+      promptAttachmentRemoveEl,
+      layoutPresetEl: document.getElementById("edit-layout-preset"),
+      onClearChat: () => {
+        syncHistoryForPath();
+        stopStreaming(stream);
+        setHistory([]);
+        writeStoredHistory(activePath, promptHistory);
+        renderHistory();
+        clearAttachment();
+        if (statusEl) {
+          statusEl.textContent = "Chat cleared.";
+          statusEl.className = "edit-status";
+        }
+      },
+      onResetTemplate: async () => {
+        var _a, _b, _c, _d;
+        if (isSending) {
+          return;
+        }
+        const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false };
+        const isLayoutTarget = !!(selection == null ? void 0 : selection.isLayout);
+        const resetLabel = isLayoutTarget ? "current layout wrapper template" : "current wrapped partial template";
+        if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
+          return;
+        }
+        try {
+          isSending = true;
+          setGeneratingState(true, "Resetting template...");
+          if (statusEl) {
+            statusEl.textContent = "Resetting template...";
+            statusEl.className = "edit-status";
+          }
+          const currentConfig = getConfig ? getConfig() || {} : {};
+          const layoutState = getLayoutState(currentConfig || {});
+          const layoutPayload = {
+            name: ((_b = (_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) == null ? void 0 : _b.name) || "poff-layout",
+            engine: ((_d = (_c = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _c.layout) == null ? void 0 : _d.engine) || "lightncandy"
+          };
+          if (isLayoutTarget) {
+            const layoutPresetEl2 = document.getElementById("edit-layout-preset");
+            const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
+            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
+            const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
+            const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
+            layoutPayload.preset = preset;
+            layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
+            if (shouldPersistToLocalWrapper) {
+              layoutPayload.template = "";
+            } else if (canEditResolvedFilesystemTarget) {
+              layoutPayload.originalTarget = resolvedLayoutDirectory;
+              layoutPayload.originalTemplate = "";
+            } else {
+              layoutPayload.template = "";
+            }
+            updatePromptEditorFields({
+              templateText: "",
+              nextTitle: null,
+              nextDescription: null,
+              nextWork: null,
+              isLayoutTarget: true
+            });
+          } else {
+            layoutPayload.sectionTemplate = "";
+            updatePromptEditorFields({
+              templateText: "",
+              nextTitle: null,
+              nextDescription: null,
+              nextWork: null,
+              isLayoutTarget: false
+            });
+          }
+          await saveConfig({
+            path: activePath,
+            layout: layoutPayload
+          }, statusEl);
+          renderContext();
+          renderSummary(`Reset ${isLayoutTarget ? "layout wrapper" : "wrapped partial"} to inherited/default template.`);
+          reloadViewer();
+          if (statusEl) {
+            statusEl.textContent = `${isLayoutTarget ? "Layout wrapper" : "Wrapped partial"} reset to inherited/default template.`;
+            statusEl.className = "edit-status edit-status-success";
+          }
+        } catch (err) {
+          if (statusEl) {
+            statusEl.textContent = (err == null ? void 0 : err.message) || "Template reset failed.";
+            statusEl.className = "edit-status";
+          }
+          renderSummary("Template reset failed.");
+        } finally {
+          setGeneratingState(false);
+          isSending = false;
+        }
+      },
+      onSendPrompt: async () => {
+        if (isSending || !promptInputEl.value.trim() && !imageAttachment) {
+          return;
+        }
+        isSending = true;
+        setGeneratingState(true, "Generating answer...");
+        stopStreaming(stream);
+        let pendingAssistantIndex = null;
+        let settled = false;
+        let requestSummary = null;
+        const fallbackTimer = window.setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          stopStreaming(stream);
+          setGeneratingState(false);
+          const errMsg = "Prompt timed out after 95 seconds.";
+          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
+            promptHistory[pendingAssistantIndex].content = errMsg;
+            setHistory(promptHistory);
+          } else {
+            setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
+          }
+          renderHistory({ forceScroll: true });
+          if (statusEl) {
+            statusEl.textContent = errMsg;
+            statusEl.className = "edit-status";
+          }
+          isSending = false;
+        }, PROMPT_FALLBACK_TIMEOUT_MS);
+        try {
+          const userPrompt = promptInputEl.value.trim();
+          const providerValue = providerEl ? providerEl.value : "local";
+          const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
+          if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
+            setGeneratingState(false);
+            if (statusEl) {
+              statusEl.textContent = providerValue === "openai" ? "Add an OpenAI API key to send prompts." : "Add a Gemini API key to send prompts.";
+              statusEl.className = "edit-status";
+            }
+            isSending = false;
+            return;
+          }
+          setHistory([...promptHistory, { role: "user", content: userPrompt }].slice(-12));
+          setHistory([...promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
+          pendingAssistantIndex = promptHistory.length - 1;
+          writeStoredHistory(activePath, promptHistory);
+          renderHistory({ forceScroll: true });
+          renderContext();
+          promptInputEl.value = "";
+          if (statusEl) {
+            statusEl.textContent = "Generating answer...";
+            statusEl.className = "edit-status";
+          }
+          renderSummary("Generating answer...");
+          const historyForRequest = promptHistory.slice(0, -1).map((item) => ({
+            role: item.role,
+            content: item.content
+          }));
+          const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
+          const selection = getActiveSelection2 ? getActiveSelection2() : { path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false };
+          const payload = {
+            path: activePath,
+            provider: providerEl ? providerEl.value : "local",
+            model: modelEl ? modelEl.value.trim() : "",
+            endpoint: endpointEl ? endpointEl.value.trim() : "",
+            apiKey: apiKeyEl ? apiKeyEl.value.trim() : "",
+            prompt: userPrompt,
+            history: historyForRequest,
+            systemPrompt: systemPromptValue
+          };
+          if (selection == null ? void 0 : selection.isLayout) {
+            const layoutPresetEl2 = document.getElementById("edit-layout-preset");
+            if (layoutPresetEl2 && typeof layoutPresetEl2.value === "string" && layoutPresetEl2.value.trim() !== "") {
+              payload.layoutPreset = layoutPresetEl2.value.trim();
+            }
+          }
+          if (imageAttachment) {
+            payload.image = { ...imageAttachment };
+          }
+          requestSummary = summarizePromptRequest(payload);
+          debugPromptLog("request", requestSummary);
+          const response = await requestPromptTemplate2(payload);
+          settled = true;
+          debugPromptLog("response", summarizePromptResponse(response, requestSummary));
+          const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
+          const nextTitle = typeof response.title === "string" ? response.title.trim() : null;
+          const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
+          const nextCss = typeof response.css === "string" ? response.css : null;
+          const nextJs = typeof response.js === "string" ? response.js : null;
+          const isLayoutTarget = !!selection.isLayout;
+          const currentConfig = getConfig ? getConfig() : null;
+          const layoutSectionKey = isLayoutTarget ? (selection == null ? void 0 : selection.previewIsFile) || (selection == null ? void 0 : selection.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
+          const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
+          const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
+          const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
+          const mergedWork = {
+            ...inferredWork || {},
+            ...rawResponseWork || {}
+          };
+          const nextWork = filterAllowedWork(mergedWork, currentConfig);
+          const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, "layout") ? nextWork.layout : null;
+          const persistedWork = nextWork && typeof nextWork === "object" ? { ...nextWork } : null;
+          if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, "layout")) {
+            delete persistedWork.layout;
+          }
+          if (response.error || !templateText) {
+            stopStreaming(stream);
+            setGeneratingState(false);
+            const errMsg = response.error || "Prompt returned no content.";
+            if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
+              promptHistory[pendingAssistantIndex].content = errMsg;
+              setHistory(promptHistory);
+            } else {
+              setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
+              pendingAssistantIndex = promptHistory.length - 1;
+            }
+            writeStoredHistory(activePath, promptHistory);
+            renderHistory({ forceScroll: true });
+            if (statusEl) {
+              statusEl.textContent = errMsg;
+              statusEl.className = "edit-status";
+            }
+            renderSummary(errMsg);
+            return;
+          }
+          stopStreaming(stream);
+          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
+            promptHistory[pendingAssistantIndex].content = templateText;
+            setHistory(promptHistory);
+          } else {
+            setHistory([...promptHistory, { role: "assistant", content: templateText }].slice(-12));
+            pendingAssistantIndex = promptHistory.length - 1;
+          }
+          writeStoredHistory(activePath, promptHistory);
+          renderHistory({ forceScroll: true });
+          if (streamToggleEl && streamToggleEl.checked && templateText) {
+            startStreaming({
+              stream,
+              targetIndex: pendingAssistantIndex != null ? pendingAssistantIndex : promptHistory.length - 1,
+              fullText: templateText,
+              history: promptHistory,
+              renderHistory: () => renderHistory({ forceScroll: true })
+            });
+          }
+          renderContext();
+          if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
+            systemPromptEl.value = response.systemPrompt;
+            savePromptSettings(readSettings());
+          }
+          updatePromptEditorFields({
+            templateText,
+            nextTitle,
+            nextDescription,
+            nextWork,
+            isLayoutTarget,
+            nextCss,
+            nextJs
+          });
+          if (drawerForm) {
+            const templateField = drawerForm.querySelector("#edit-content-template");
+            if (!isLayoutTarget && templateField) {
+              templateField.value = templateText;
+            }
+            const layoutNameField = drawerForm.querySelector("#edit-work-layout");
+            if (layoutNameField && !layoutNameField.value.trim()) {
+              layoutNameField.value = "poff-layout";
+            }
+            if (nextWork && typeof nextWork.type === "string") {
+              const workTypeField = drawerForm.querySelector("#edit-work-type");
+              if (workTypeField) {
+                workTypeField.value = nextWork.type;
+              }
+            }
+          }
+          const elements2 = drawerForm ? drawerForm.elements : null;
+          const resolvedLayoutName = (() => {
+            var _a, _b, _c;
+            if (typeof nextLayoutValue === "string" && nextLayoutValue.trim()) {
+              return nextLayoutValue.trim();
+            }
+            if (nextLayoutValue && typeof nextLayoutValue === "object") {
+              const candidate = nextLayoutValue.name || nextLayoutValue.mode || nextLayoutValue.value || "";
+              if (typeof candidate === "string" && candidate.trim()) {
+                return candidate.trim();
+              }
+            }
+            return (((_a = elements2 == null ? void 0 : elements2.work_layout) == null ? void 0 : _a.value) || ((_c = (_b = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _b.layout) == null ? void 0 : _c.name) || "poff-layout").trim();
+          })();
+          const layoutPayload = {
+            name: resolvedLayoutName,
+            engine: "lightncandy"
+          };
+          if (nextLayoutValue && typeof nextLayoutValue === "object") {
+            if (typeof nextLayoutValue.engine === "string" && nextLayoutValue.engine.trim()) {
+              layoutPayload.engine = nextLayoutValue.engine.trim();
+            }
+            if (typeof nextLayoutValue.model === "string" && nextLayoutValue.model.trim()) {
+              layoutPayload.model = nextLayoutValue.model.trim();
+            }
+          }
+          if (response.model) {
+            layoutPayload.model = response.model;
+          }
+          if (isLayoutTarget) {
+            const layoutState = getLayoutState(currentConfig || {});
+            const layoutPresetEl2 = document.getElementById("edit-layout-preset");
+            const preset = ((layoutPresetEl2 == null ? void 0 : layoutPresetEl2.value) || layoutState.preset || "actual").trim();
+            layoutPayload.preset = preset;
+            const layoutPathName = (selection.previewPath || "").split("/").pop() || "item";
+            const localLayoutDirectory = selection.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+            const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
+            const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
+            const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
+            layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
+            if (shouldPersistToLocalWrapper) {
+              layoutPayload.template = templateText;
+              if (responseSectionTemplate !== null) {
+                layoutPayload.sectionTemplate = responseSectionTemplate;
+              }
+              if (nextCss !== null) {
+                layoutPayload.css = nextCss;
+              }
+              if (nextJs !== null) {
+                layoutPayload.js = nextJs;
+              }
+            } else if (canEditResolvedFilesystemTarget) {
+              layoutPayload.originalTarget = resolvedLayoutDirectory;
+              layoutPayload.originalTemplate = templateText;
+              if (responseSectionTemplate !== null) {
+                layoutPayload.sectionTemplate = responseSectionTemplate;
+              }
+              if (nextCss !== null) {
+                layoutPayload.originalCss = nextCss;
+              }
+              if (nextJs !== null) {
+                layoutPayload.originalJs = nextJs;
+              }
+            } else {
+              layoutPayload.name = "custom-layout";
+              layoutPayload.template = templateText;
+              if (responseSectionTemplate !== null) {
+                layoutPayload.sectionTemplate = responseSectionTemplate;
+              }
+              if (nextCss !== null) {
+                layoutPayload.css = nextCss;
+              }
+              if (nextJs !== null) {
+                layoutPayload.js = nextJs;
+              }
+            }
+          } else {
+            layoutPayload.sectionTemplate = templateText;
+          }
+          const savePayload = {
+            path: activePath,
+            layout: layoutPayload
+          };
+          if (nextTitle !== null) {
+            savePayload.title = nextTitle;
+          }
+          if (nextDescription !== null) {
+            savePayload.description = nextDescription;
+          }
+          if (persistedWork && Object.keys(persistedWork).length) {
+            savePayload.work = persistedWork;
+          }
+          await saveConfig(savePayload, statusEl);
+          renderContext();
+          if (statusEl) {
+            const providerLabel2 = response.provider || payload.provider;
+            const modelLabel2 = response.model || payload.model;
+            statusEl.textContent = `${isLayoutTarget ? "Layout" : "Template"} updated via ${providerLabel2}${modelLabel2 ? ` \xB7 ${modelLabel2}` : ""}`;
+            statusEl.className = "edit-status edit-status-success";
+          }
+          const providerLabel = response.provider || payload.provider;
+          const modelLabel = response.model || payload.model || "";
+          const extra = [];
+          if (nextTitle !== null) extra.push("title");
+          if (nextDescription !== null) extra.push("description");
+          if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(", ")}`);
+          if (nextLayoutValue) extra.push("layout");
+          if (nextCss !== null) extra.push("css");
+          if (nextJs !== null) extra.push("js");
+          const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? "layout " : ""}HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
+          renderSummary(summaryText);
+          clearAttachment();
+          reloadViewer();
+        } catch (err) {
+          settled = true;
+          stopStreaming(stream);
+          setGeneratingState(false);
+          debugPromptLog("error", summarizePromptError(err, requestSummary || (activePath ? { path: activePath } : null)));
+          if (statusEl) {
+            statusEl.textContent = "Prompt failed.";
+            statusEl.className = "edit-status";
+          }
+          const errMsg = "Prompt failed.";
+          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
+            promptHistory[pendingAssistantIndex].content = errMsg;
+            setHistory(promptHistory);
+          } else {
+            setHistory([...promptHistory, { role: "assistant", content: errMsg }].slice(-12));
+          }
+          writeStoredHistory(activePath, promptHistory);
+          renderHistory({ forceScroll: true });
+          renderSummary(errMsg);
+        } finally {
+          window.clearTimeout(fallbackTimer);
+          setGeneratingState(false);
+          isSending = false;
+          promptInputEl.focus();
+        }
+      },
+      onAttachImage: attachImageFile,
+      onRemoveImage: () => {
+        clearAttachment();
+        if (statusEl) {
+          statusEl.textContent = "Image removed.";
+          statusEl.className = "edit-status";
+        }
+      },
+      onTemplateInput: renderTemplatePreview,
+      onLayoutPresetChange: renderContext
+    });
     if (promptLayerCloseEl) {
       promptLayerCloseEl.addEventListener("click", () => {
         applyPromptLayerState(true);
@@ -3635,23 +4157,81 @@
     };
   }
 
-  // src/assets/js/app.js
-  if (window.location.hash === "#mcp") {
+  // src/assets/js/app/constants.js
+  var APP_ELEMENT_IDS = {
+    appShell: "appShell",
+    appSidebar: "appSidebar",
+    navList: "navList",
+    contentFrame: "contentFrame",
+    editPanel: "editPanel",
+    editDrawer: "editDrawer",
+    editToggle: "editToggle",
+    sidebarToggle: "sidebarToggle",
+    iframeLoading: "iframeLoading",
+    sidebarLoading: "sidebarLoading"
+  };
+  var APP_HASHES = {
+    legacyMcp: "#mcp",
+    preview: "#preview"
+  };
+  var APP_LABELS = {
+    openNavigation: "Open navigation",
+    closeNavigation: "Close navigation"
+  };
+
+  // src/assets/js/app/helpers.js
+  function redirectLegacyMcpHash() {
+    if (window.location.hash !== APP_HASHES.legacyMcp) {
+      return false;
+    }
     const basePath = window.location.pathname.split("#")[0];
     window.location.href = `${basePath}?mcp=1`;
+    return true;
   }
-  var elements = {
-    appShell: document.getElementById("appShell"),
-    appSidebar: document.getElementById("appSidebar"),
-    navList: document.getElementById("navList"),
-    contentFrame: document.getElementById("contentFrame"),
-    editPanel: document.getElementById("editPanel"),
-    editDrawer: document.getElementById("editDrawer"),
-    editToggle: document.getElementById("editToggle"),
-    sidebarToggle: document.getElementById("sidebarToggle"),
-    iframeLoading: document.getElementById("iframeLoading"),
-    sidebarLoading: document.getElementById("sidebarLoading")
-  };
+  function createAppElements() {
+    return Object.fromEntries(
+      Object.entries(APP_ELEMENT_IDS).map(([key, id]) => [key, document.getElementById(id)])
+    );
+  }
+  function isPreviewHashActive() {
+    return window.location.hash === APP_HASHES.preview;
+  }
+  function scrollToPreview() {
+    const previewEl = document.getElementById("preview");
+    if (!previewEl) {
+      return;
+    }
+    previewEl.scrollIntoView({ block: "start" });
+  }
+  function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
+    if (!appShell || !appSidebar || !sidebarToggle) {
+      return null;
+    }
+    const syncSidebarState = (isOpen) => {
+      appShell.classList.toggle("sidebar-collapsed", !isOpen);
+      appSidebar.hidden = !isOpen;
+      appSidebar.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      sidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      sidebarToggle.setAttribute("aria-label", isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
+      sidebarToggle.setAttribute("title", isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
+    };
+    syncSidebarState(true);
+    const onToggleClick = () => {
+      const isOpen = !appShell.classList.contains("sidebar-collapsed");
+      syncSidebarState(!isOpen);
+    };
+    sidebarToggle.addEventListener("click", onToggleClick);
+    return {
+      syncSidebarState,
+      destroy() {
+        sidebarToggle.removeEventListener("click", onToggleClick);
+      }
+    };
+  }
+
+  // src/assets/js/app.js
+  redirectLegacyMcpHash();
+  var elements = createAppElements();
   var poffContext = window.POFF_CONTEXT || {};
   var currentPathForIframe = Object.prototype.hasOwnProperty.call(poffContext, "currentPathForIframe") ? poffContext.currentPathForIframe : null;
   var editRequested = new URLSearchParams(window.location.search).get("edit") === "true";
@@ -3668,40 +4248,14 @@
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode
   });
-  function previewHashActive() {
-    return window.location.hash === "#preview";
-  }
-  function scrollToPreview() {
-    const previewEl = document.getElementById("preview");
-    if (!previewEl) {
-      return;
-    }
-    previewEl.scrollIntoView({ block: "start" });
-  }
-  function bindSidebarToggle() {
-    const { appShell, appSidebar, sidebarToggle } = elements;
-    if (!appShell || !appSidebar || !sidebarToggle) {
-      return;
-    }
-    const syncSidebarState = (isOpen) => {
-      appShell.classList.toggle("sidebar-collapsed", !isOpen);
-      appSidebar.hidden = !isOpen;
-      appSidebar.setAttribute("aria-hidden", isOpen ? "false" : "true");
-      sidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      sidebarToggle.setAttribute("aria-label", isOpen ? "Close navigation" : "Open navigation");
-      sidebarToggle.setAttribute("title", isOpen ? "Close navigation" : "Open navigation");
-    };
-    syncSidebarState(true);
-    sidebarToggle.addEventListener("click", () => {
-      const isOpen = !appShell.classList.contains("sidebar-collapsed");
-      syncSidebarState(!isOpen);
-    });
-  }
+  var sidebarController = bindSidebarToggle(elements);
   document.addEventListener("DOMContentLoaded", () => {
-    bindSidebarToggle();
+    if (sidebarController) {
+      sidebarController.syncSidebarState(true);
+    }
     editController.syncEditToggle();
     editController.bindEditToggle();
-    if (previewHashActive()) {
+    if (isPreviewHashActive()) {
       navigation.loadCurrentFolderInIframe();
       requestAnimationFrame(() => scrollToPreview());
     } else if (window.location.hash && window.location.hash.length > 1) {
@@ -3712,7 +4266,7 @@
     editController.initEditMode();
   });
   window.addEventListener("hashchange", () => {
-    if (previewHashActive()) {
+    if (isPreviewHashActive()) {
       scrollToPreview();
       if (editRequested) {
         editController.initEditMode();
