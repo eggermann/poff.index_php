@@ -6,7 +6,7 @@ import { renderEditPanel } from './panel.js';
 import { materializeWorkFields } from './work-fields.js';
 import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layout.js';
 import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
-import { setItemStatus } from './controller/mutations.js';
+import { setStatusMessage } from './status.js';
 
 export function createEditController({ elements, context, editRequested }) {
     const { editPanel, editDrawer, editToggle } = elements;
@@ -49,7 +49,7 @@ export function createEditController({ elements, context, editRequested }) {
 
     async function saveConfig(payload, statusEl) {
         try {
-            setItemStatus(statusEl, 'Saving...');
+            setStatusMessage(statusEl, 'Saving...');
             const data = await requestEditConfig('save', payload);
             if (!data || data.error) {
                 throw new Error(data?.error || 'Save failed.');
@@ -60,7 +60,7 @@ export function createEditController({ elements, context, editRequested }) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
-            setItemStatus(statusEl, 'Config saved.', true);
+            setStatusMessage(statusEl, 'Config saved.', true);
             window.dispatchEvent(new CustomEvent('poff:content-updated', {
                 detail: {
                     path: payload?.path || '',
@@ -70,7 +70,7 @@ export function createEditController({ elements, context, editRequested }) {
             }));
             return data.config;
         } catch (err) {
-            setItemStatus(statusEl, err.message || 'Save failed.');
+            setStatusMessage(statusEl, err.message || 'Save failed.');
             throw err;
         }
     }
@@ -184,7 +184,7 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 drawerOpen = false;
                 syncDrawerVisibility();
-                setItemStatus(statusEl, 'Deleted.', true);
+                setStatusMessage(statusEl, 'Deleted.', true);
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
                 const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
                 window.location.hash = nextPath ? `#/${nextPath}` : '';
@@ -237,7 +237,7 @@ export function createEditController({ elements, context, editRequested }) {
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
-                    setItemStatus(inlineStatus, count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`, true);
+                    setStatusMessage(inlineStatus, count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
@@ -258,7 +258,7 @@ export function createEditController({ elements, context, editRequested }) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : fileName;
-                    setItemStatus(inlineStatus, `Created ${createdName}.`, true);
+                    setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
@@ -279,7 +279,7 @@ export function createEditController({ elements, context, editRequested }) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : folderName;
-                    setItemStatus(inlineStatus, `Created folder ${createdName}.`, true);
+                    setStatusMessage(inlineStatus, `Created folder ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },

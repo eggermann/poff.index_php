@@ -1,4 +1,5 @@
 import { uploadValidationError } from './shared.js';
+import { setStatusMessage } from '../status.js';
 
 export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
     if (isFileTarget) {
@@ -167,50 +168,38 @@ export function bindUploadDialog({
             try {
                 uploadSubmitButton.disabled = true;
                 if (source === 'blank') {
-                    const fileName = blankFileNameEl?.value?.trim() || '';
-                    if (!fileName) {
-                        if (statusEl) {
-                            statusEl.textContent = 'Enter a file name.';
-                            statusEl.className = 'edit-status';
+                        const fileName = blankFileNameEl?.value?.trim() || '';
+                        if (!fileName) {
+                            setStatusMessage(statusEl, 'Enter a file name.');
+                            return;
                         }
-                        return;
-                    }
                     await onCreateBlankFile({
                         source,
                         fileName,
                         statusEl,
                     });
                 } else if (source === 'folder') {
-                    const folderName = blankFileNameEl?.value?.trim() || '';
-                    if (!folderName) {
-                        if (statusEl) {
-                            statusEl.textContent = 'Enter a folder name.';
-                            statusEl.className = 'edit-status';
+                        const folderName = blankFileNameEl?.value?.trim() || '';
+                        if (!folderName) {
+                            setStatusMessage(statusEl, 'Enter a folder name.');
+                            return;
                         }
-                        return;
-                    }
                     await onCreateFolder({
                         source,
                         folderName,
                         statusEl,
                     });
                 } else {
-                    const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
-                    if (files.length === 0) {
-                        if (statusEl) {
-                            statusEl.textContent = 'Choose at least one file.';
-                            statusEl.className = 'edit-status';
+                        const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
+                        if (files.length === 0) {
+                            setStatusMessage(statusEl, 'Choose at least one file.');
+                            return;
                         }
-                        return;
-                    }
-                    const validationError = uploadValidationError(files, uploadLimits);
-                    if (validationError) {
-                        if (statusEl) {
-                            statusEl.textContent = validationError;
-                            statusEl.className = 'edit-status';
+                        const validationError = uploadValidationError(files, uploadLimits);
+                        if (validationError) {
+                            setStatusMessage(statusEl, validationError);
+                            return;
                         }
-                        return;
-                    }
                     await onUploadFiles({
                         source,
                         files,
@@ -218,14 +207,11 @@ export function bindUploadDialog({
                     });
                 }
                 closeUploadDialog();
-            } catch (err) {
-                if (statusEl) {
-                    statusEl.textContent = err.message || 'Upload failed.';
-                    statusEl.className = 'edit-status';
+                } catch (err) {
+                    setStatusMessage(statusEl, err.message || 'Upload failed.');
+                } finally {
+                    uploadSubmitButton.disabled = false;
                 }
-            } finally {
-                uploadSubmitButton.disabled = false;
-            }
         });
     }
     syncUploadMode();
