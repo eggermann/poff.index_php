@@ -48,7 +48,7 @@ export function bindPromptSettings({
         if (endpointRow) {
             endpointRow.style.display = provider === 'local' ? 'block' : 'none';
         }
-        if (modelEl && resetModel) {
+        if (modelEl && resetModel && !modelEl.value.trim()) {
             modelEl.value = getDefaultModelForProvider(provider);
         }
         persistSettings();
@@ -90,7 +90,7 @@ export function bindPromptSettings({
     };
 
     if (providerEl) {
-        providerEl.addEventListener('change', () => updateProviderUi({ resetModel: true }));
+        providerEl.addEventListener('change', () => updateProviderUi({ resetModel: false }));
     }
     if (modelEl) {
         modelEl.addEventListener('input', persistSettings);

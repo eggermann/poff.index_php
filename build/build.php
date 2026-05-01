@@ -142,6 +142,7 @@ try {
     $viewerEditPromptContext = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-context.php');
     $viewerEditPromptCompact = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-compact.php');
     $viewerEditUpload = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/upload.php');
+    $viewerEditDelete = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/delete.php');
     $viewerRenderEntry = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/entry.php');
     $viewerRenderFile = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/file.php');
     $viewerRenderFolder = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/folder.php');
@@ -157,6 +158,7 @@ try {
     $viewerEditPromptContext = $stripRequires($viewerEditPromptContext);
     $viewerEditPromptCompact = $stripRequires($viewerEditPromptCompact);
     $viewerEditUpload = $stripRequires($viewerEditUpload);
+    $viewerEditDelete = $stripRequires($viewerEditDelete);
     $viewerRenderEntry = $stripRequires($viewerRenderEntry);
     $viewerRenderFile = $stripRequires($viewerRenderFile);
     $viewerRenderFolder = $stripRequires($viewerRenderFolder);
@@ -169,6 +171,7 @@ try {
     $buildContent .= trim($viewerEditPromptContext) . "\n\n";
     $buildContent .= trim($viewerEditPromptCompact) . "\n\n";
     $buildContent .= trim($viewerEditUpload) . "\n\n";
+    $buildContent .= trim($viewerEditDelete) . "\n\n";
     $buildContent .= trim($viewerRenderEntry) . "\n\n";
     $buildContent .= trim($viewerRenderFile) . "\n\n";
     $buildContent .= trim($viewerRenderFolder) . "\n\n";
