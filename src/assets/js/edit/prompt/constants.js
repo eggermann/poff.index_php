@@ -18,6 +18,8 @@ export const legacyWorkSystemPrompt = [
     'Return only the template (no Markdown, no fences).',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
     'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
+    'When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.',
+    'Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.',
     'Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
     'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
     'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
