@@ -1,6 +1,6 @@
 import { getLayoutState } from '../core/utils.js';
 import { getDefaultSystemPromptForMode, getPromptMode, getPromptPlaceholderForMode, getSystemPromptSettingKeyForMode } from './prompt/mode.js';
-import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt, defaultPromptSettings, getDefaultModelForProvider, legacyWorkSystemPrompt } from './prompt/constants.js';
+import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt, defaultPromptSettings, getDefaultModelForProvider } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
 import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplateHistorySnapshot, serializeHistoryForRequest } from './prompt/history.js';
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
@@ -13,19 +13,14 @@ import { readImageFile } from './prompt/image.js';
 import { readPromptEditorDraft } from './prompt/draft.js';
 import { materializeWorkFields } from './work-fields.js';
 import { summarizePromptError, summarizePromptRequest, summarizePromptResponse } from './prompt/summary.js';
+import { bindPromptSettings } from './prompt/settings.js';
+import { createPromptLayerController } from './prompt/layer.js';
 
 const PROMPT_FALLBACK_TIMEOUT_MS = 305000;
 const PROMPT_LAYER_STATE_KEY = 'poffEditPromptLayerState';
 
 let promptHistory = [];
 const stream = createStreamState();
-
-const builtInSystemPrompts = new Set([
-    legacyWorkSystemPrompt,
-    defaultFileSystemPrompt,
-    defaultFolderSystemPrompt,
-    defaultLayoutSystemPrompt,
-]);
 
 export function bindPromptWindow({
     root,
@@ -69,12 +64,10 @@ export function bindPromptWindow({
     const promptAttachmentPreviewEl = root.querySelector('#promptAttachmentPreview');
     const promptAttachmentNameEl = root.querySelector('#promptAttachmentName');
     const promptAttachmentRemoveEl = root.querySelector('#prompt-attachment-remove');
-    const settings = loadPromptSettings();
     let isSending = false;
     let activePath = getActiveSelection ? getActiveSelection().path : '';
     let activePromptMode = getActiveSelection?.().isLayout ? 'layout' : (getActiveSelection?.().previewIsFile ? 'file' : 'folder');
     let imageAttachment = null;
-    let promptLayerCollapsed = false;
     const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
     const defaultPromptPlaceholder = promptInputEl?.getAttribute('placeholder') || 'Describe the component you want...';
     const currentPromptMode = () => getPromptMode(getActiveSelection?.());
@@ -100,59 +93,6 @@ export function bindPromptWindow({
             : (typeof selection?.path === 'string' ? selection.path : '');
 
         return imageContextPattern.test(selectionPath);
-    };
-
-    const readPromptLayerState = () => {
-        try {
-            const stored = JSON.parse(localStorage.getItem(PROMPT_LAYER_STATE_KEY) || '{}');
-            return !!stored.collapsed;
-        } catch (err) {
-            return false;
-        }
-    };
-
-    const writePromptLayerState = (collapsed) => {
-        try {
-            localStorage.setItem(PROMPT_LAYER_STATE_KEY, JSON.stringify({ collapsed: !!collapsed }));
-        } catch (err) {
-            // Ignore storage failures.
-        }
-    };
-
-    const applyPromptLayerState = (collapsed, options = {}) => {
-        promptLayerCollapsed = !!collapsed;
-        root.classList.toggle('prompt-layer-collapsed', promptLayerCollapsed);
-        if (promptWindowEl) {
-            promptWindowEl.hidden = promptLayerCollapsed;
-        }
-        if (promptLayerCloseEl) {
-            promptLayerCloseEl.hidden = promptLayerCollapsed;
-        }
-        if (promptLayerOpenEl) {
-            promptLayerOpenEl.hidden = !promptLayerCollapsed;
-        }
-        if (!options.skipPersist) {
-            writePromptLayerState(promptLayerCollapsed);
-        }
-    };
-
-    const syncModeAwareSystemPrompt = () => {
-        if (!systemPromptEl) {
-            return;
-        }
-        const currentValue = (systemPromptEl.value || '').trim();
-        if (currentValue !== '' && !builtInSystemPrompts.has(currentValue)) {
-            return;
-        }
-        const nextValue = currentDefaultSystemPrompt();
-        if (systemPromptEl.value !== nextValue) {
-            systemPromptEl.value = nextValue;
-            settings[currentSystemPromptSettingKey()] = nextValue;
-            savePromptSettings(readSettings());
-        }
-        if (promptInputEl && !isSending) {
-            promptInputEl.placeholder = currentPromptPlaceholder();
-        }
     };
 
     const setHistory = (nextHistory) => {
@@ -217,6 +157,9 @@ export function bindPromptWindow({
         activePath = context.isLayout ? (context.virtualPath || context.path) : context.path;
         activePromptMode = currentPromptMode();
         syncModeAwareSystemPrompt();
+        if (promptInputEl && !isSending) {
+            promptInputEl.placeholder = currentPromptPlaceholder();
+        }
         renderPromptContext(promptContextEl, context);
         renderTemplatePreview();
     };
@@ -307,9 +250,6 @@ export function bindPromptWindow({
             promptInputEl.placeholder = active ? 'Generating answer...' : defaultPromptPlaceholder;
         }
     };
-
-    promptLayerCollapsed = readPromptLayerState();
-    applyPromptLayerState(promptLayerCollapsed, { skipPersist: true });
 
     bindPromptActions({
         promptClearEl,
@@ -793,129 +733,36 @@ export function bindPromptWindow({
         onLayoutPresetChange: renderContext,
     });
 
-    if (promptLayerCloseEl) {
-        promptLayerCloseEl.addEventListener('click', () => {
-            applyPromptLayerState(true);
-        });
-    }
+    const layerController = createPromptLayerController({
+        root,
+        windowEl: promptWindowEl,
+        closeEl: promptLayerCloseEl,
+        openEl: promptLayerOpenEl,
+        storageKey: PROMPT_LAYER_STATE_KEY,
+        storage: localStorage,
+    });
+    layerController.applyState(layerController.readState(), { skipPersist: true });
 
-    if (promptLayerOpenEl) {
-        promptLayerOpenEl.addEventListener('click', () => {
-            applyPromptLayerState(false);
-        });
-    }
-
-    if (providerEl) {
-        providerEl.value = settings.provider || 'local';
-    }
-    if (systemPromptEl) {
-        const mode = currentPromptMode();
-        systemPromptEl.value = mode === 'layout'
-            ? (settings.systemPromptLayout || settings.systemPrompt || currentDefaultSystemPrompt())
-            : mode === 'folder'
-                ? (settings.systemPromptFolder || settings.systemPrompt || currentDefaultSystemPrompt())
-                : (settings.systemPromptFile || settings.systemPrompt || currentDefaultSystemPrompt());
-    }
-    if (streamToggleEl) {
-        streamToggleEl.checked = settings.streamPreview !== false;
-    }
-
-    const readSettings = () => {
-        const systemPrompt = (systemPromptEl?.value || '').trim() || currentDefaultSystemPrompt();
-        const nextSettings = {
-            provider: providerEl ? providerEl.value : 'local',
-            model: modelEl ? modelEl.value : '',
-            endpoint: endpointEl ? endpointEl.value : '',
-            apiKey: apiKeyEl ? apiKeyEl.value : '',
-            systemPrompt,
-            systemPromptFile: settings.systemPromptFile || defaultFileSystemPrompt,
-            systemPromptFolder: settings.systemPromptFolder || defaultFolderSystemPrompt,
-            systemPromptLayout: settings.systemPromptLayout || defaultLayoutSystemPrompt,
-            streamPreview: streamToggleEl ? !!streamToggleEl.checked : true,
-        };
-        nextSettings[currentSystemPromptSettingKey()] = systemPrompt;
-        return nextSettings;
-    };
-    let suppressSave = false;
-
-    const applySettingsToUi = (s) => {
-        suppressSave = true;
-        if (providerEl) providerEl.value = s.provider || defaultPromptSettings.provider;
-        if (modelEl) modelEl.value = s.model || '';
-        if (endpointEl) endpointEl.value = s.endpoint || '';
-        if (apiKeyEl) apiKeyEl.value = s.apiKey || '';
-        if (systemPromptEl) {
-            const mode = currentPromptMode();
-            systemPromptEl.value = mode === 'layout'
-                ? (s.systemPromptLayout || s.systemPrompt || currentDefaultSystemPrompt())
-                : mode === 'folder'
-                    ? (s.systemPromptFolder || s.systemPrompt || currentDefaultSystemPrompt())
-                    : (s.systemPromptFile || s.systemPrompt || currentDefaultSystemPrompt());
-        }
-        if (streamToggleEl) streamToggleEl.checked = s.streamPreview !== false;
-        suppressSave = false;
-        updateProviderUi();
-    };
-
-    const persistSettings = () => {
-        if (!suppressSave) {
-            savePromptSettings(readSettings());
-        }
-    };
-
-    const updateProviderUi = ({ resetModel = false } = {}) => {
-        const provider = providerEl ? providerEl.value : 'local';
-        if (endpointRow) {
-            endpointRow.style.display = provider === 'local' ? 'block' : 'none';
-        }
-        if (modelEl && resetModel) {
-            modelEl.value = getDefaultModelForProvider(provider);
-        }
-        persistSettings();
-    };
-
-    if (providerEl) {
-        providerEl.addEventListener('change', () => updateProviderUi({ resetModel: true }));
-    }
-    if (modelEl) {
-        modelEl.addEventListener('input', persistSettings);
-    }
-    if (endpointEl) {
-        endpointEl.addEventListener('input', persistSettings);
-    }
-    if (apiKeyEl) {
-        apiKeyEl.addEventListener('input', persistSettings);
-    }
-    if (systemPromptEl) {
-        systemPromptEl.addEventListener('input', () => {
-            settings[currentSystemPromptSettingKey()] = (systemPromptEl.value || '').trim() || currentDefaultSystemPrompt();
-            savePromptSettings(readSettings());
-        });
-    }
-    if (streamToggleEl) {
-        streamToggleEl.addEventListener('change', () => {
-            savePromptSettings(readSettings());
-        });
-    }
-    if (systemResetEl && systemPromptEl) {
-        systemResetEl.addEventListener('click', () => {
-            systemPromptEl.value = currentDefaultSystemPrompt();
-            settings[currentSystemPromptSettingKey()] = systemPromptEl.value;
-            savePromptSettings(readSettings());
-        });
-    }
-    if (settingsResetEl) {
-        settingsResetEl.addEventListener('click', () => {
-            const nextSettings = {
-                ...defaultPromptSettings,
-                systemPrompt: currentDefaultSystemPrompt(),
-            };
-            applySettingsToUi(nextSettings);
-            savePromptSettings(nextSettings);
-            renderContext();
-        });
-    }
-
+    const settingsController = bindPromptSettings({
+        providerEl,
+        modelEl,
+        endpointRow,
+        endpointEl,
+        apiKeyEl,
+        systemPromptEl,
+        systemResetEl,
+        settingsResetEl,
+        streamToggleEl,
+        defaultPromptSettings,
+        currentDefaultSystemPrompt,
+        currentPromptMode,
+        currentSystemPromptSettingKey,
+        getDefaultModelForProvider,
+        loadPromptSettings,
+        savePromptSettings,
+        onRenderContext: renderContext,
+    });
+    const { readSettings, updateProviderUi, syncModeAwareSystemPrompt } = settingsController;
     updateProviderUi({ resetModel: false });
     syncModeAwareSystemPrompt();
     setHistory(readHistoryForSelection(getActiveSelection ? getActiveSelection() : null));

@@ -4,6 +4,9 @@ import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
 import { materializeWorkFields } from './work-fields.js';
+import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layout.js';
+import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
+import { setItemStatus } from './controller/mutations.js';
 
 export function createEditController({ elements, context, editRequested }) {
     const { editPanel, editDrawer, editToggle } = elements;
@@ -15,31 +18,6 @@ export function createEditController({ elements, context, editRequested }) {
     let editConfig = currentPoffConfig;
     let editTarget = 'folder';
     let drawerOpen = false;
-
-    function getContentTargetPath(selection = getActiveSelection()) {
-        if (selection?.isLayout) {
-            return selection.path || '';
-        }
-        const previewPath = selection?.previewPath || selection?.path || '';
-        if (selection?.previewIsFile) {
-            return previewPath.split('/').slice(0, -1).join('/');
-        }
-        return previewPath;
-    }
-
-    function getEditTargetPath(selection = getActiveSelection()) {
-        if (selection?.isLayout) {
-            return selection.path || '';
-        }
-        if (selection?.previewIsFile) {
-            const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
-            const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
-            if (navPath) {
-                return navPath;
-            }
-        }
-        return selection?.previewPath || selection?.path || '';
-    }
 
     function renderFolderMeta() {
         return folderConfig;
@@ -71,10 +49,7 @@ export function createEditController({ elements, context, editRequested }) {
 
     async function saveConfig(payload, statusEl) {
         try {
-            if (statusEl) {
-                statusEl.textContent = 'Saving...';
-                statusEl.className = 'edit-status';
-            }
+            setItemStatus(statusEl, 'Saving...');
             const data = await requestEditConfig('save', payload);
             if (!data || data.error) {
                 throw new Error(data?.error || 'Save failed.');
@@ -85,10 +60,7 @@ export function createEditController({ elements, context, editRequested }) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
-            if (statusEl) {
-                statusEl.textContent = 'Config saved.';
-                statusEl.className = 'edit-status edit-status-success';
-            }
+            setItemStatus(statusEl, 'Config saved.', true);
             window.dispatchEvent(new CustomEvent('poff:content-updated', {
                 detail: {
                     path: payload?.path || '',
@@ -98,10 +70,7 @@ export function createEditController({ elements, context, editRequested }) {
             }));
             return data.config;
         } catch (err) {
-            if (statusEl) {
-                statusEl.textContent = err.message || 'Save failed.';
-                statusEl.className = 'edit-status';
-            }
+            setItemStatus(statusEl, err.message || 'Save failed.');
             throw err;
         }
     }
@@ -139,28 +108,7 @@ export function createEditController({ elements, context, editRequested }) {
     }
 
     function renderEditUI(config, status) {
-        const layoutNameForPreset = (layoutPreset = 'actual') => {
-            const preset = String(layoutPreset || 'actual').trim() === 'inherit'
-                ? 'actual'
-                : String(layoutPreset || 'actual').trim();
-            if (preset === 'none') {
-                return 'none';
-            }
-            if (preset === 'custom') {
-                return 'custom-layout';
-            }
-            const currentLayout = editConfig?.work?.layout;
-            const hasFilesystemSource = !!(
-                currentLayout
-                && typeof currentLayout === 'object'
-                && (
-                    currentLayout.storage === 'filesystem'
-                    || (typeof currentLayout.directory === 'string' && currentLayout.directory.trim() !== '')
-                    || (typeof currentLayout.inheritedDirectory === 'string' && currentLayout.inheritedDirectory.trim() !== '')
-                )
-            );
-            return hasFilesystemSource ? 'filesystem-layout' : 'poff-layout';
-        };
+        const layoutNameForPreset = createLayoutNameForPreset(editConfig);
         const panelState = renderEditPanel({
             editPanel,
             editRequested,
@@ -236,17 +184,10 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 drawerOpen = false;
                 syncDrawerVisibility();
-                if (statusEl) {
-                    statusEl.textContent = 'Deleted.';
-                    statusEl.className = 'edit-status edit-status-success';
-                }
+                setItemStatus(statusEl, 'Deleted.', true);
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
                 const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
-                if (nextPath) {
-                    window.location.hash = `#/${nextPath}`;
-                } else {
-                    window.location.hash = '';
-                }
+                window.location.hash = nextPath ? `#/${nextPath}` : '';
                 await refreshCurrentEditState(getActiveSelection());
             },
             onReturnToWork: () => {
@@ -263,45 +204,16 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onSubmitLayout: async ({ payload, statusEl }) => {
                 const selection = getActiveSelection();
-                const rawLayoutPreset = (payload.layoutPreset || 'actual').trim();
-                const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
-                const layoutName = layoutNameForPreset(layoutPreset);
-                const layoutPayload = {
-                    name: layoutName,
-                    engine: 'lightncandy',
-                    preset: layoutPreset,
-                };
-                if (Object.prototype.hasOwnProperty.call(payload, 'contentTemplate')) {
-                    layoutPayload.sectionTemplate = payload.contentTemplate ?? '';
-                }
-                if (Object.prototype.hasOwnProperty.call(payload, 'layoutTemplate')) {
-                    layoutPayload.template = payload.layoutTemplate ?? '';
-                }
-                if (Object.prototype.hasOwnProperty.call(payload, 'layoutCss')) {
-                    layoutPayload.css = payload.layoutCss ?? '';
-                }
-                if (Object.prototype.hasOwnProperty.call(payload, 'layoutJs')) {
-                    layoutPayload.js = payload.layoutJs ?? '';
-                }
-                const hasOriginalDraftWrite = (
-                    Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTemplate')
-                    || Object.prototype.hasOwnProperty.call(payload, 'originalLayoutCss')
-                    || Object.prototype.hasOwnProperty.call(payload, 'originalLayoutJs')
-                );
-                if (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget') && hasOriginalDraftWrite) {
-                    layoutPayload.originalTarget = payload.originalLayoutTarget ?? '';
-                    layoutPayload.originalTemplate = payload.originalLayoutTemplate ?? '';
-                    layoutPayload.originalCss = payload.originalLayoutCss ?? '';
-                    layoutPayload.originalJs = payload.originalLayoutJs ?? '';
-                }
+                const { layoutPayload } = buildLayoutPayload(payload, layoutNameForPreset);
                 await saveConfig({
                     path: getEditTargetPath(selection),
                     layout: layoutPayload,
                 }, statusEl);
             },
             onLayoutPresetChange: async ({ payload, statusEl }) => {
-                const rawLayoutPreset = (payload?.layoutPreset || 'actual').trim();
-                const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
+                const layoutPreset = (payload?.layoutPreset || 'actual').trim() === 'inherit'
+                    ? 'actual'
+                    : (payload?.layoutPreset || 'actual').trim();
                 await saveConfig({
                     path: getEditTargetPath(getActiveSelection()),
                     layout: {
@@ -311,7 +223,7 @@ export function createEditController({ elements, context, editRequested }) {
                     },
                 }, statusEl);
             },
-            onUploadFiles: async ({ source, files, statusEl }) => {
+            onUploadFiles: async ({ source, files }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
@@ -321,17 +233,15 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Upload failed.');
                 }
-
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
-                    inlineStatus.textContent = count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`;
-                    inlineStatus.className = 'edit-status edit-status-success';
+                    setItemStatus(inlineStatus, count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateBlankFile: async ({ source, fileName, statusEl }) => {
+            onCreateBlankFile: async ({ source, fileName }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
@@ -342,19 +252,17 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create blank file failed.');
                 }
-
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : fileName;
-                    inlineStatus.textContent = `Created ${createdName}.`;
-                    inlineStatus.className = 'edit-status edit-status-success';
+                    setItemStatus(inlineStatus, `Created ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateFolder: async ({ source, folderName, statusEl }) => {
+            onCreateFolder: async ({ source, folderName }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
@@ -365,42 +273,15 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create folder failed.');
                 }
-
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : folderName;
-                    inlineStatus.textContent = `Created folder ${createdName}.`;
-                    inlineStatus.className = 'edit-status edit-status-success';
+                    setItemStatus(inlineStatus, `Created folder ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
-            },
-            onDeleteTarget: async ({ statusEl }) => {
-                const selection = getActiveSelection();
-                const targetPath = getEditTargetPath(selection);
-                if (!targetPath) {
-                    throw new Error('Delete target unavailable.');
-                }
-                const data = await requestEditDelete({
-                    path: targetPath,
-                    return: selection.previewPath || selection.path || '',
-                });
-                if (!data || data.error) {
-                    throw new Error(data?.error || 'Delete failed.');
-                }
-                if (statusEl) {
-                    statusEl.textContent = 'Deleted.';
-                    statusEl.className = 'edit-status edit-status-success';
-                }
-                window.dispatchEvent(new CustomEvent('poff:content-updated'));
-                const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
-                if (nextPath) {
-                    window.location.hash = `#/${nextPath}`;
-                } else {
-                    window.location.hash = '';
-                }
             },
         });
 
