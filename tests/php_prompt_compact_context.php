@@ -22,7 +22,17 @@ if (!is_array($fileConfig)) {
     fwrite(STDERR, "Invalid file config\n");
     exit(1);
 }
+$fileConfig['work']['fields'] = [
+    [
+        'type' => 'text',
+        'name' => 'text1',
+        'label' => 'Text 1',
+        'value' => 'Prominent section copy',
+    ],
+];
+$fileConfig['work']['text1'] = 'Prominent section copy';
 $fileContext = cmsPromptCompactContext(cmsBuildPromptContext($fileName, 'file', $fileConfig, $fileName));
+$fileCompactConfig = cmsPromptCompactConfig($fileConfig, false);
 
 $folderConfigPath = $root . DIRECTORY_SEPARATOR . 'viewer-folder' . DIRECTORY_SEPARATOR . 'poff.config.json';
 $folderConfig = json_decode((string) file_get_contents($folderConfigPath), true);
@@ -30,9 +40,21 @@ if (!is_array($folderConfig)) {
     fwrite(STDERR, "Invalid folder config\n");
     exit(1);
 }
+$folderConfig['work']['fields'] = [
+    [
+        'type' => 'text',
+        'name' => 'text1',
+        'label' => 'Text 1',
+        'value' => 'Folder prominent copy',
+    ],
+];
+$folderConfig['work']['text1'] = 'Folder prominent copy';
 $folderContext = cmsPromptCompactContext(cmsBuildPromptContext('viewer-folder', 'folder', $folderConfig));
+$folderCompactConfig = cmsPromptCompactConfig($folderConfig, false);
 
 echo json_encode([
     'file' => $fileContext,
+    'fileConfig' => $fileCompactConfig,
     'folder' => $folderContext,
+    'folderConfig' => $folderCompactConfig,
 ], JSON_UNESCAPED_SLASHES);

@@ -6,11 +6,12 @@ import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplat
 import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
 import { appendStreamingChunk, beginStreaming, createStreamState, finishStreaming, stopStreaming } from './prompt/stream.js';
 import { requestPromptTemplateStream } from '../api/edit.js';
-import { focusPromptTemplateField, updatePromptEditorFields } from './prompt/editor-fields.js';
+import { focusPromptTemplateField, syncWorkFieldEditors, updatePromptEditorFields } from './prompt/editor-fields.js';
 import { bindPromptActions } from './prompt/actions.js';
 import { debugPromptLog } from './prompt/log.js';
 import { readImageFile } from './prompt/image.js';
 import { readPromptEditorDraft } from './prompt/draft.js';
+import { materializeWorkFields } from './work-fields.js';
 import { summarizePromptError, summarizePromptRequest, summarizePromptResponse } from './prompt/summary.js';
 
 const PROMPT_FALLBACK_TIMEOUT_MS = 305000;
@@ -555,7 +556,7 @@ export function bindPromptWindow({
                     ? nextWork.layout
                     : null;
                 const persistedWork = nextWork && typeof nextWork === 'object'
-                    ? { ...nextWork }
+                    ? materializeWorkFields(nextWork)
                     : null;
                 if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, 'layout')) {
                     delete persistedWork.layout;
@@ -580,7 +581,7 @@ export function bindPromptWindow({
                     nextJs,
                     nextTitle,
                     nextDescription,
-                    nextWork,
+                    nextWork: persistedWork || nextWork,
                     isLayoutTarget,
                 });
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
@@ -619,6 +620,7 @@ export function bindPromptWindow({
                     nextCss,
                     nextJs,
                 });
+                syncWorkFieldEditors(nextWork);
                 focusPromptTemplateField(isLayoutTarget);
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');
@@ -1211,7 +1213,7 @@ export function bindPromptWindow({
                     ? nextWork.layout
                     : null;
                 const persistedWork = nextWork && typeof nextWork === 'object'
-                    ? { ...nextWork }
+                    ? materializeWorkFields(nextWork)
                     : null;
                 if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, 'layout')) {
                     delete persistedWork.layout;
@@ -1236,7 +1238,7 @@ export function bindPromptWindow({
                     nextJs,
                     nextTitle,
                     nextDescription,
-                    nextWork,
+                    nextWork: persistedWork || nextWork,
                     isLayoutTarget,
                 });
                 if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
@@ -1275,6 +1277,7 @@ export function bindPromptWindow({
                     nextCss,
                     nextJs,
                 });
+                syncWorkFieldEditors(nextWork);
                 focusPromptTemplateField(isLayoutTarget);
                 if (drawerForm) {
                     const templateField = drawerForm.querySelector('#edit-content-template');

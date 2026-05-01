@@ -52,6 +52,12 @@ export function buildTemplateHistorySnapshot({
         if (keys.length) {
             snapshot.workKeys = keys;
         }
+        if (Array.isArray(nextWork.fields) && nextWork.fields.length) {
+            snapshot.workFieldNames = nextWork.fields
+                .map((field) => (field && typeof field.name === 'string') ? field.name.trim() : '')
+                .filter(Boolean)
+                .slice(0, 8);
+        }
         if (nextWork.layout && typeof nextWork.layout === 'object') {
             const layoutCandidate = nextWork.layout.name || nextWork.layout.mode || nextWork.layout.value || '';
             if (typeof layoutCandidate === 'string' && layoutCandidate.trim() !== '') {
@@ -93,6 +99,9 @@ export function serializeHistoryForRequest(history) {
             }
             if (Array.isArray(snapshot.workKeys) && snapshot.workKeys.length) {
                 lines.push(`Work keys updated: ${snapshot.workKeys.join(', ')}`);
+            }
+            if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
+                lines.push(`Work fields snapshot: ${snapshot.workFieldNames.join(', ')}`);
             }
             if (typeof snapshot.layoutName === 'string' && snapshot.layoutName) {
                 lines.push(`Layout name snapshot: ${snapshot.layoutName}`);

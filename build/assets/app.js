@@ -493,6 +493,7 @@
     "Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.",
     "Return only the template (no Markdown, no fences).",
     "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
+    "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
     "Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
     "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
     "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
@@ -682,6 +683,9 @@
       if (keys.length) {
         snapshot.workKeys = keys;
       }
+      if (Array.isArray(nextWork.fields) && nextWork.fields.length) {
+        snapshot.workFieldNames = nextWork.fields.map((field) => field && typeof field.name === "string" ? field.name.trim() : "").filter(Boolean).slice(0, 8);
+      }
       if (nextWork.layout && typeof nextWork.layout === "object") {
         const layoutCandidate = nextWork.layout.name || nextWork.layout.mode || nextWork.layout.value || "";
         if (typeof layoutCandidate === "string" && layoutCandidate.trim() !== "") {
@@ -724,6 +728,9 @@ ${snapshot.js}`);
         }
         if (Array.isArray(snapshot.workKeys) && snapshot.workKeys.length) {
           lines.push(`Work keys updated: ${snapshot.workKeys.join(", ")}`);
+        }
+        if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
+          lines.push(`Work fields snapshot: ${snapshot.workFieldNames.join(", ")}`);
         }
         if (typeof snapshot.layoutName === "string" && snapshot.layoutName) {
           lines.push(`Layout name snapshot: ${snapshot.layoutName}`);
@@ -853,6 +860,274 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return draft;
   }
 
+  // src/assets/js/edit/work-fields.js
+  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType"]);
+  var SUPPORTED_WORK_FIELD_TYPES = /* @__PURE__ */ new Set(["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"]);
+  var SCHEMA_NUMBER_KEYS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "step"];
+  var WORK_FIELD_SCHEMA_PROFILES = {
+    text: {
+      defaults: {},
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "placeholder", "const", "default", "format", "pattern", "minLength", "maxLength", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    textarea: {
+      defaults: {},
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "placeholder", "const", "default", "format", "pattern", "minLength", "maxLength", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    number: {
+      defaults: { step: 1 },
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "const", "default", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "step", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    checkbox: {
+      defaults: { default: false },
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "const", "default", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    select: {
+      defaults: {},
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "const", "default", "enum", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    color: {
+      defaults: { format: "color" },
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "placeholder", "const", "default", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    date: {
+      defaults: { format: "date" },
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "placeholder", "const", "default", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    url: {
+      defaults: { format: "uri" },
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "placeholder", "const", "default", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    },
+    email: {
+      defaults: { format: "email" },
+      visibleControls: /* @__PURE__ */ new Set(["title", "description", "placeholder", "const", "default", "examples", "required", "readOnly", "writeOnly", "deprecated", "nullable"])
+    }
+  };
+  function getWorkFieldSchemaProfile(type = "text") {
+    const normalizedType = normalizeFieldType(type);
+    return WORK_FIELD_SCHEMA_PROFILES[normalizedType] || WORK_FIELD_SCHEMA_PROFILES.text;
+  }
+  function normalizeFieldName(value, fallbackIndex = 1) {
+    const trimmed = String(value != null ? value : "").trim().toLowerCase();
+    const compact = trimmed.replace(/[^a-z0-9]+/g, "");
+    return compact || `text${fallbackIndex}`;
+  }
+  function normalizeFieldLabel(value, fallbackIndex = 1) {
+    const trimmed = String(value != null ? value : "").trim();
+    if (!trimmed) {
+      return `Text ${fallbackIndex}`;
+    }
+    return trimmed.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([a-zA-Z])([0-9])/g, "$1 $2").replace(/([0-9])([a-zA-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().replace(/(^|\s)\w/g, (match) => match.toUpperCase());
+  }
+  function normalizeFieldType(value) {
+    const type = String(value != null ? value : "").trim().toLowerCase();
+    return SUPPORTED_WORK_FIELD_TYPES.has(type) ? type : "text";
+  }
+  function normalizeBoolean(value, fallback = false) {
+    if (value === null || value === void 0 || value === "") {
+      return !!fallback;
+    }
+    if (typeof value === "boolean") {
+      return value;
+    }
+    const token = String(value).trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(token)) {
+      return true;
+    }
+    if (["false", "0", "no", "off"].includes(token)) {
+      return false;
+    }
+    return !!fallback;
+  }
+  function normalizeNullableNumber(value) {
+    if (value === null || value === void 0 || value === "") {
+      return null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+  function normalizeText(value) {
+    return String(value != null ? value : "");
+  }
+  function normalizeList(value) {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item != null ? item : "").trim()).filter(Boolean);
+    }
+    const normalized = String(value != null ? value : "").trim();
+    if (!normalized) {
+      return [];
+    }
+    return normalized.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+  }
+  function normalizeFieldValue(type, value) {
+    if (type === "checkbox") {
+      return normalizeBoolean(value);
+    }
+    if (type === "number") {
+      const number = normalizeNullableNumber(value);
+      return number === null ? "" : number;
+    }
+    return normalizeText(value);
+  }
+  function normalizePreservedExtras(candidate = {}) {
+    const extras = {};
+    Object.keys(candidate || {}).forEach((key) => {
+      if (key === "type" || key === "name" || key === "key" || key === "label" || key === "title" || key === "description" || key === "placeholder" || key === "value" || key === "default" || key === "const" || key === "text" || key === "fields" || key === "options" || key === "enum" || key === "examples" || key === "required" || key === "readOnly" || key === "writeOnly" || key === "deprecated" || key === "nullable" || key === "uniqueItems" || key === "format" || key === "pattern" || key === "contentMediaType" || key === "contentEncoding" || SCHEMA_NUMBER_KEYS.includes(key) || RESERVED_WORK_FIELD_NAMES.has(String(key).trim().toLowerCase())) {
+        return;
+      }
+      extras[key] = candidate[key];
+    });
+    return extras;
+  }
+  function isReservedWorkFieldName(name = "") {
+    return RESERVED_WORK_FIELD_NAMES.has(String(name || "").trim().toLowerCase());
+  }
+  function createDefaultWorkField(fields = []) {
+    const index = Array.isArray(fields) ? fields.length + 1 : 1;
+    const base = {
+      type: "text",
+      name: `text${index}`,
+      title: `Text ${index}`,
+      label: `Text ${index}`,
+      description: "",
+      placeholder: "",
+      const: "",
+      value: "",
+      default: "",
+      required: false,
+      readOnly: false,
+      writeOnly: false,
+      nullable: false,
+      deprecated: false,
+      uniqueItems: false,
+      format: "",
+      pattern: "",
+      enum: [],
+      examples: []
+    };
+    return applyWorkFieldTypeDefaults(base, base.type);
+  }
+  function applyWorkFieldTypeDefaults(field = {}, type = (field == null ? void 0 : field.type) || "text") {
+    const profile = getWorkFieldSchemaProfile(type);
+    const nextField = { ...field || {}, type: normalizeFieldType(type) };
+    Object.entries(profile.defaults || {}).forEach(([key, value]) => {
+      if (nextField[key] === void 0 || nextField[key] === null || nextField[key] === "") {
+        nextField[key] = value;
+      }
+    });
+    return nextField;
+  }
+  function normalizeWorkField(entry = {}, index = 0) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    const candidate = entry && typeof entry === "object" ? entry : {};
+    const type = normalizeFieldType(candidate.type);
+    const name = normalizeFieldName((_c = (_b = (_a = candidate.name) != null ? _a : candidate.key) != null ? _b : candidate.label) != null ? _c : candidate.title, index + 1);
+    const title = normalizeFieldLabel((_f = (_e = (_d = candidate.title) != null ? _d : candidate.label) != null ? _e : candidate.name) != null ? _f : name, index + 1);
+    const description = normalizeText((_g = candidate.description) != null ? _g : "");
+    const placeholder = normalizeText((_h = candidate.placeholder) != null ? _h : "");
+    const valueSource = Object.prototype.hasOwnProperty.call(candidate, "value") ? candidate.value : Object.prototype.hasOwnProperty.call(candidate, "text") ? candidate.text : Object.prototype.hasOwnProperty.call(candidate, "const") ? candidate.const : candidate.default;
+    const normalized = {
+      type,
+      name,
+      title,
+      label: title,
+      description,
+      placeholder,
+      const: normalizeText((_i = candidate.const) != null ? _i : ""),
+      value: normalizeFieldValue(type, valueSource),
+      default: Object.prototype.hasOwnProperty.call(candidate, "default") ? normalizeFieldValue(type, candidate.default) : normalizeFieldValue(type, valueSource),
+      required: normalizeBoolean(candidate.required, false),
+      readOnly: normalizeBoolean(candidate.readOnly, false),
+      writeOnly: normalizeBoolean(candidate.writeOnly, false),
+      nullable: normalizeBoolean(candidate.nullable, false),
+      deprecated: normalizeBoolean(candidate.deprecated, false),
+      uniqueItems: normalizeBoolean(candidate.uniqueItems, false),
+      format: normalizeText((_j = candidate.format) != null ? _j : ""),
+      pattern: normalizeText((_k = candidate.pattern) != null ? _k : ""),
+      contentMediaType: normalizeText((_l = candidate.contentMediaType) != null ? _l : ""),
+      contentEncoding: normalizeText((_m = candidate.contentEncoding) != null ? _m : "")
+    };
+    SCHEMA_NUMBER_KEYS.forEach((key) => {
+      const numberValue = normalizeNullableNumber(candidate[key]);
+      if (numberValue !== null) {
+        normalized[key] = numberValue;
+      }
+    });
+    const enumValues = normalizeList((_o = (_n = candidate.enum) != null ? _n : candidate.options) != null ? _o : []);
+    if (enumValues.length) {
+      normalized.enum = enumValues;
+      normalized.options = enumValues.slice();
+    } else {
+      normalized.enum = [];
+      normalized.options = [];
+    }
+    const examples = normalizeList((_p = candidate.examples) != null ? _p : []);
+    normalized.examples = examples;
+    const extras = normalizePreservedExtras(candidate);
+    Object.assign(normalized, extras);
+    return normalized;
+  }
+  function extractWorkFields(work = {}) {
+    if (!work || typeof work !== "object" || !Array.isArray(work.fields)) {
+      return [];
+    }
+    return work.fields.map((field, index) => normalizeWorkField(field, index)).filter((field) => field.name && !isReservedWorkFieldName(field.name));
+  }
+  function materializeWorkFields(work = {}, fields = null) {
+    const nextWork = { ...work || {} };
+    const sourceFields = Array.isArray(fields) ? fields : extractWorkFields(work);
+    const hasFieldsInput = Array.isArray(fields) || Array.isArray(work == null ? void 0 : work.fields);
+    const allowTopLevelOverrides = fields === null;
+    const previousFields = extractWorkFields(work);
+    const previousNames = new Set(previousFields.map((field) => field.name));
+    const normalized = sourceFields.map((field, index) => {
+      const normalizedField = normalizeWorkField(field, index);
+      if (allowTopLevelOverrides && Object.prototype.hasOwnProperty.call(nextWork, normalizedField.name)) {
+        normalizedField.value = normalizeFieldValue(normalizedField.type, nextWork[normalizedField.name]);
+      }
+      return normalizedField;
+    }).filter((field) => field.name && !isReservedWorkFieldName(field.name));
+    const normalizedNames = new Set(normalized.map((field) => field.name));
+    previousNames.forEach((name) => {
+      if (!normalizedNames.has(name)) {
+        delete nextWork[name];
+      }
+    });
+    if (normalized.length || hasFieldsInput) {
+      nextWork.fields = normalized.map((field) => ({ ...field }));
+    } else {
+      delete nextWork.fields;
+    }
+    normalized.forEach((field) => {
+      nextWork[field.name] = field.value;
+    });
+    return nextWork;
+  }
+  function summarizeWorkFieldValue(field = {}) {
+    var _a, _b, _c, _d;
+    const normalized = normalizeWorkField(field);
+    if (normalized.type === "checkbox") {
+      return normalized.value ? "true" : "false";
+    }
+    if (normalized.type === "select" && Array.isArray(normalized.enum) && normalized.enum.length) {
+      return String((_c = (_b = (_a = normalized.value) != null ? _a : normalized.default) != null ? _b : normalized.enum[0]) != null ? _c : "").trim() || "-";
+    }
+    const text = String((_d = normalized.value) != null ? _d : "").trim();
+    return text || "-";
+  }
+  function summarizeWorkFields(fields = []) {
+    const normalized = (Array.isArray(fields) ? fields : []).map((field, index) => normalizeWorkField(field, index)).filter((field) => field.name && !isReservedWorkFieldName(field.name));
+    if (!normalized.length) {
+      return "";
+    }
+    return normalized.slice(0, 6).map((field) => {
+      const nameLabel = field.title || field.label || field.name;
+      return `${nameLabel}: ${summarizeWorkFieldValue(field)}`;
+    }).join(" | ");
+  }
+  function schemaFieldTypeOptions() {
+    return ["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"];
+  }
+
   // src/assets/js/edit/prompt/render.js
   function isExternalPromptLink(value = "") {
     const trimmed = String(value || "").trim();
@@ -938,6 +1213,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (typeof snapshot.templateLength === "number" && snapshot.templateLength > 0) {
           snapshotParts.push(`template: ${snapshot.templateLength} chars`);
         }
+        if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
+          snapshotParts.push(`fields: ${snapshot.workFieldNames.join(", ")}`);
+        }
         if (typeof snapshot.cssLength === "number" && snapshot.cssLength > 0) {
           snapshotParts.push(`css: ${snapshot.cssLength}`);
         }
@@ -1006,9 +1284,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const tree = Array.isArray(config == null ? void 0 : config.tree) ? config.tree : [];
     const folderBasePath = ((selection2 == null ? void 0 : selection2.isFile) ? path.split("/").slice(0, -1).join("/") : path).replace(/^\/+|\/+$/g, "");
     const ellipsis = "\u2026";
+    const workFields = extractWorkFields(work);
     const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
+      if (key === "fields" && Array.isArray(value)) {
+        const summary = summarizeWorkFields(value);
+        return summary ? `fields: ${summary}` : `fields: ${value.length} item(s)`;
+      }
       if (typeof value === "boolean") {
         return `${key}: ${value ? "true" : "false"}`;
+      }
+      if (Array.isArray(value)) {
+        return `${key}: [${value.length} item(s)]`;
+      }
+      if (value && typeof value === "object") {
+        const keys = Object.keys(value).slice(0, 4);
+        return `${key}: {${keys.join(", ")}}`;
       }
       if (value === null || value === void 0) {
         return `${key}: null`;
@@ -1016,6 +1306,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const str = String(value);
       return `${key}: ${str.length > 28 ? str.slice(0, 25) + ellipsis : str}`;
     }).join(", ");
+    const workFieldsPreview = summarizeWorkFields(workFields);
     const refPreview = tree.slice(0, 4).map((item) => {
       const itemName = (item == null ? void 0 : item.name) || (item == null ? void 0 : item.path) || "";
       if (!itemName) {
@@ -1052,6 +1343,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       layoutAssetsPreview,
       editorDraft,
       workData: work,
+      workFields,
+      workFieldsPreview,
       workPreview,
       refPreview
     };
@@ -1129,6 +1422,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const layoutAssetsPreview = (context == null ? void 0 : context.layoutAssetsPreview) || "";
     const editorDraft = (context == null ? void 0 : context.editorDraft) && typeof context.editorDraft === "object" ? context.editorDraft : null;
     const workData = (context == null ? void 0 : context.workData) && typeof context.workData === "object" ? context.workData : {};
+    const workFields = Array.isArray(context == null ? void 0 : context.workFields) ? context.workFields : [];
+    const workFieldsPreview = (context == null ? void 0 : context.workFieldsPreview) || "";
     const refPreview = (context == null ? void 0 : context.refPreview) || "";
     const partials = ["poff-layout", "filesystem-layout", "works", "work"];
     const refItems = refPreview ? refPreview.split(" | ").filter(Boolean) : [];
@@ -1151,6 +1446,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         ${renderList("partials", partials)}
         ${renderList("layoutAssets", layoutAssetItems)}
         ${renderList("refs", refItems)}
+        ${workFieldsPreview ? renderRow("work.fields", workFields) : ""}
         ${Object.keys(workData).length ? renderRow("work.*", workData) : ""}
     `;
   }
@@ -1258,6 +1554,71 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       field.setSelectionRange(value.length, value.length);
     }
     field.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function syncWorkFieldEditors(nextWork = null) {
+    if (!nextWork || typeof nextWork !== "object") {
+      return;
+    }
+    const fields = Array.isArray(nextWork.fields) ? nextWork.fields : [];
+    const fieldsByName = /* @__PURE__ */ new Map();
+    fields.forEach((field) => {
+      if (!field || typeof field !== "object" || typeof field.name !== "string" || !field.name.trim()) {
+        return;
+      }
+      fieldsByName.set(field.name.trim(), field);
+    });
+    document.querySelectorAll("[data-work-field-row]").forEach((row) => {
+      const nameInput = row.querySelector("[data-work-field-name]");
+      const typeInput = row.querySelector("[data-work-field-type]");
+      const valueInput = row.querySelector("[data-work-field-value]");
+      const currentName = nameInput && typeof nameInput.value === "string" ? nameInput.value.trim() : "";
+      if (!currentName) {
+        return;
+      }
+      const nextField = fieldsByName.get(currentName) || (Object.prototype.hasOwnProperty.call(nextWork, currentName) ? { name: currentName, type: "text", value: nextWork[currentName] } : null);
+      if (!nextField) {
+        return;
+      }
+      const setText = (selector, value) => {
+        const input = row.querySelector(selector);
+        if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+          input.value = Array.isArray(value) ? value.join("\n") : String(value != null ? value : "");
+        }
+      };
+      const setChecked = (selector, value) => {
+        const input = row.querySelector(selector);
+        if (input instanceof HTMLInputElement && input.type === "checkbox") {
+          input.checked = !!value;
+        }
+      };
+      setText("[data-work-field-type]", nextField.type);
+      setText("[data-work-field-name]", nextField.name);
+      setText("[data-work-field-value]", nextField.value);
+      setText("[data-work-field-title]", nextField.title);
+      setText("[data-work-field-description]", nextField.description);
+      setText("[data-work-field-placeholder]", nextField.placeholder);
+      setText("[data-work-field-const]", nextField.const);
+      setText("[data-work-field-default]", nextField.default);
+      setText("[data-work-field-format]", nextField.format);
+      setText("[data-work-field-contentMediaType]", nextField.contentMediaType);
+      setText("[data-work-field-contentEncoding]", nextField.contentEncoding);
+      setText("[data-work-field-pattern]", nextField.pattern);
+      setText("[data-work-field-minLength]", nextField.minLength);
+      setText("[data-work-field-maxLength]", nextField.maxLength);
+      setText("[data-work-field-minimum]", nextField.minimum);
+      setText("[data-work-field-maximum]", nextField.maximum);
+      setText("[data-work-field-step]", nextField.step);
+      setText("[data-work-field-minProperties]", nextField.minProperties);
+      setText("[data-work-field-maxProperties]", nextField.maxProperties);
+      setText("[data-work-field-enum]", Array.isArray(nextField.enum) ? nextField.enum : []);
+      setText("[data-work-field-examples]", Array.isArray(nextField.examples) ? nextField.examples : []);
+      setChecked("[data-work-field-required]", nextField.required);
+      setChecked("[data-work-field-readOnly]", nextField.readOnly);
+      setChecked("[data-work-field-writeOnly]", nextField.writeOnly);
+      setChecked("[data-work-field-deprecated]", nextField.deprecated);
+      setChecked("[data-work-field-nullable]", nextField.nullable);
+      setChecked("[data-work-field-uniqueItems]", nextField.uniqueItems);
+    });
   }
 
   // src/assets/js/edit/prompt/actions.js
@@ -1879,7 +2240,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           };
           const nextWork = filterAllowedWork(mergedWork, currentConfig);
           const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, "layout") ? nextWork.layout : null;
-          const persistedWork = nextWork && typeof nextWork === "object" ? { ...nextWork } : null;
+          const persistedWork = nextWork && typeof nextWork === "object" ? materializeWorkFields(nextWork) : null;
           if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, "layout")) {
             delete persistedWork.layout;
           }
@@ -1903,7 +2264,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextJs,
             nextTitle,
             nextDescription,
-            nextWork,
+            nextWork: persistedWork || nextWork,
             isLayoutTarget
           });
           if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
@@ -1942,6 +2303,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextCss,
             nextJs
           });
+          syncWorkFieldEditors(nextWork);
           focusPromptTemplateField(isLayoutTarget);
           if (drawerForm) {
             const templateField = drawerForm.querySelector("#edit-content-template");
@@ -2469,7 +2831,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           };
           const nextWork = filterAllowedWork(mergedWork, currentConfig);
           const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, "layout") ? nextWork.layout : null;
-          const persistedWork = nextWork && typeof nextWork === "object" ? { ...nextWork } : null;
+          const persistedWork = nextWork && typeof nextWork === "object" ? materializeWorkFields(nextWork) : null;
           if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, "layout")) {
             delete persistedWork.layout;
           }
@@ -2493,7 +2855,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextJs,
             nextTitle,
             nextDescription,
-            nextWork,
+            nextWork: persistedWork || nextWork,
             isLayoutTarget
           });
           if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
@@ -2532,6 +2894,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextCss,
             nextJs
           });
+          syncWorkFieldEditors(nextWork);
           focusPromptTemplateField(isLayoutTarget);
           if (drawerForm) {
             const templateField = drawerForm.querySelector("#edit-content-template");
@@ -3541,6 +3904,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     contentTargetLabel,
     onTitleInput,
     onDescriptionInput,
+    onWorkFieldsInput,
     onSubmit,
     onToggleDrawer,
     onOpenLayoutPage,
@@ -3599,6 +3963,311 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const treeItems = Array.isArray(config.tree) ? config.tree : [];
     const isFileTarget = (status == null ? void 0 : status.target) === "file";
     const isEmptyFolder = !isFileTarget && treeItems.length === 0;
+    let workFieldState = extractWorkFields((config == null ? void 0 : config.work) || {}).map((field, index) => applyWorkFieldTypeDefaults(normalizeWorkField(field, index), field.type));
+    const typeOptions = schemaFieldTypeOptions();
+    const renderSchemaCheckbox = (checked = false) => `<label class="edit-work-field-check"><input type="checkbox"${checked ? " checked" : ""}><span>Yes</span></label>`;
+    const renderSchemaControl = (field, index, key, html) => {
+      const visible = getWorkFieldSchemaProfile(field.type).visibleControls.has(key);
+      return visible ? html : "";
+    };
+    const renderSchemaGroup = (field, keys, html) => {
+      const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
+      return visible ? html : "";
+    };
+    const renderValueControl = (field, index) => {
+      const value = field.value;
+      if (field.type === "checkbox") {
+        return `
+                <label class="edit-work-field-value-toggle">
+                    <input class="edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="checkbox"${value ? " checked" : ""}>
+                </label>
+            `;
+      }
+      if (field.type === "number") {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="number" step="any" value="${escapeHtml(value != null ? value : "")}" placeholder="Value">`;
+      }
+      if (field.type === "select") {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="text" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="Selected value">`;
+      }
+      if (field.type === "color") {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="color" value="${escapeHtml(value || "#000000")}">`;
+      }
+      if (field.type === "date") {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="date" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}">`;
+      }
+      if (field.type === "url") {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="url" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="https://example.com">`;
+      }
+      if (field.type === "email") {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="email" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="name@example.com">`;
+      }
+      return `<textarea class="form-textarea edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value rows="${field.type === "textarea" ? "5" : "2"}" placeholder="Value">${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}</textarea>`;
+    };
+    const readRowText = (row, selector) => {
+      const field = row.querySelector(selector);
+      return field && typeof field.value === "string" ? field.value : "";
+    };
+    const readRowNumber = (row, selector) => {
+      const value = readRowText(row, selector).trim();
+      return value === "" ? "" : Number(value);
+    };
+    const readRowList = (row, selector) => {
+      const value = readRowText(row, selector);
+      return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+    };
+    const readRowBool = (row, selector) => {
+      const field = row.querySelector(selector);
+      return !!(field == null ? void 0 : field.checked);
+    };
+    const readRowValue = (row, selector) => {
+      const field = row.querySelector(selector);
+      if (!field) {
+        return "";
+      }
+      if (field instanceof HTMLInputElement && field.type === "checkbox") {
+        return field.checked;
+      }
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+        return field.value;
+      }
+      return "";
+    };
+    const renderWorkFieldRows = (fields = []) => {
+      if (!fields.length) {
+        return '<div class="small-note edit-work-fields-empty">No extra work fields yet.</div>';
+      }
+      return fields.map((field, index) => {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+        return `
+            <div class="edit-work-field-row" data-work-field-row="${index}">
+                <div class="edit-work-field-main">
+                    <div class="edit-work-field-head">
+                        <div>
+                            <label class="edit-label" for="edit-work-field-type-${index}">Type</label>
+                            <select class="form-select edit-work-field-type" id="edit-work-field-type-${index}" data-work-field-type>
+                                ${typeOptions.map((option) => `<option value="${option}" ${field.type === option ? "selected" : ""}>${option}</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="edit-work-field-name-wrap">
+                            <label class="edit-label" for="edit-work-field-name-${index}">Name</label>
+                            <input class="form-input edit-work-field-name" id="edit-work-field-name-${index}" data-work-field-name type="text" value="${escapeHtml(field.name || "")}" placeholder="text1">
+                            <div class="small-note">Use <code>work.${escapeHtml(field.name || "text1")}</code> or <code>{{${escapeHtml(field.name || "text1")}}}</code> in templates.</div>
+                        </div>
+                        <button class="btn btn-secondary edit-work-field-remove" type="button" data-work-field-remove aria-label="Remove work field">\xD7</button>
+                    </div>
+                    <div class="edit-work-field-value-row">
+                        <div class="edit-work-field-value-wrap">
+                            <label class="edit-label" for="edit-work-field-value-${index}">Value</label>
+                            ${renderValueControl(field, index)}
+                        </div>
+                    </div>
+                    <details class="edit-work-field-advanced">
+                        <summary>Schema options</summary>
+                        <div class="edit-work-field-advanced-grid">
+                            ${renderSchemaGroup(field, ["title", "description", "placeholder", "const", "default"], `
+                            <section class="edit-work-field-schema-group">
+                                <div class="edit-work-field-schema-group-title">Text</div>
+                                <div class="edit-work-field-schema-group-grid">
+                                    ${renderSchemaControl(field, index, "title", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-title-${index}">Title</label>
+                                        <input class="form-input edit-work-field-title" id="edit-work-field-title-${index}" data-work-field-title type="text" value="${escapeHtml(field.title || "")}" placeholder="Label title">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, index, "description", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-description-${index}">Description</label>
+                                        <textarea class="form-textarea edit-work-field-description" id="edit-work-field-description-${index}" data-work-field-description rows="2" placeholder="Short help text">${escapeHtml(field.description || "")}</textarea>
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, index, "placeholder", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-placeholder-${index}">Placeholder</label>
+                                        <input class="form-input edit-work-field-placeholder" id="edit-work-field-placeholder-${index}" data-work-field-placeholder type="text" value="${escapeHtml(field.placeholder || "")}" placeholder="Placeholder">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, index, "const", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-const-${index}">Const</label>
+                                        ${field.type === "checkbox" ? `<input class="form-input edit-work-field-const" id="edit-work-field-const-${index}" data-work-field-const type="checkbox"${field.const ? " checked" : ""}>` : field.type === "number" ? `<input class="form-input edit-work-field-const" id="edit-work-field-const-${index}" data-work-field-const type="number" step="any" value="${escapeHtml((_a = field.const) != null ? _a : "")}" placeholder="Locked value">` : `<textarea class="form-textarea edit-work-field-const" id="edit-work-field-const-${index}" data-work-field-const rows="2" placeholder="Locked value">${escapeHtml(typeof field.const === "string" ? field.const : String((_b = field.const) != null ? _b : ""))}</textarea>`}
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, index, "default", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-default-${index}">Default</label>
+                                        ${field.type === "checkbox" ? `<input class="form-input edit-work-field-default" id="edit-work-field-default-${index}" data-work-field-default type="checkbox"${field.default ? " checked" : ""}>` : field.type === "number" ? `<input class="form-input edit-work-field-default" id="edit-work-field-default-${index}" data-work-field-default type="number" step="any" value="${escapeHtml((_c = field.default) != null ? _c : "")}" placeholder="Default value">` : `<textarea class="form-textarea edit-work-field-default" id="edit-work-field-default-${index}" data-work-field-default rows="2" placeholder="Default value">${escapeHtml(typeof field.default === "string" ? field.default : String((_d = field.default) != null ? _d : ""))}</textarea>`}
+                                    </div>
+                                    `)}
+                                </div>
+                            </section>
+                            `)}
+                            ${renderSchemaGroup(field, ["format", "pattern", "minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "step"], `
+                            <section class="edit-work-field-schema-group">
+                                <div class="edit-work-field-schema-group-title">Constraints</div>
+                                <div class="edit-work-field-schema-group-grid">
+                                    ${renderSchemaControl(field, index, "format", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-format-${index}">Format</label>
+                                        <input class="form-input edit-work-field-format" id="edit-work-field-format-${index}" data-work-field-format type="text" value="${escapeHtml(field.format || "")}" placeholder="date-time, uri, email">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, index, "pattern", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-pattern-${index}">Pattern</label>
+                                        <input class="form-input edit-work-field-pattern" id="edit-work-field-pattern-${index}" data-work-field-pattern type="text" value="${escapeHtml(field.pattern || "")}" placeholder="Regex">
+                                    </div>
+                                    `)}
+                                    <div class="edit-work-field-small-grid">
+                                        ${renderSchemaControl(field, index, "minLength", `
+                                        <div>
+                                            <label class="edit-label" for="edit-work-field-minLength-${index}">Min length</label>
+                                            <input class="form-input edit-work-field-minLength" id="edit-work-field-minLength-${index}" data-work-field-minLength type="number" step="1" value="${escapeHtml((_e = field.minLength) != null ? _e : "")}" placeholder="0">
+                                        </div>
+                                        `)}
+                                        ${renderSchemaControl(field, index, "maxLength", `
+                                        <div>
+                                            <label class="edit-label" for="edit-work-field-maxLength-${index}">Max length</label>
+                                            <input class="form-input edit-work-field-maxLength" id="edit-work-field-maxLength-${index}" data-work-field-maxLength type="number" step="1" value="${escapeHtml((_f = field.maxLength) != null ? _f : "")}" placeholder="0">
+                                        </div>
+                                        `)}
+                                        ${renderSchemaControl(field, index, "minimum", `
+                                        <div>
+                                            <label class="edit-label" for="edit-work-field-minimum-${index}">Minimum</label>
+                                            <input class="form-input edit-work-field-minimum" id="edit-work-field-minimum-${index}" data-work-field-minimum type="number" step="any" value="${escapeHtml((_g = field.minimum) != null ? _g : "")}" placeholder="0">
+                                        </div>
+                                        `)}
+                                        ${renderSchemaControl(field, index, "maximum", `
+                                        <div>
+                                            <label class="edit-label" for="edit-work-field-maximum-${index}">Maximum</label>
+                                            <input class="form-input edit-work-field-maximum" id="edit-work-field-maximum-${index}" data-work-field-maximum type="number" step="any" value="${escapeHtml((_h = field.maximum) != null ? _h : "")}" placeholder="0">
+                                        </div>
+                                        `)}
+                                        ${renderSchemaControl(field, index, "step", `
+                                        <div>
+                                            <label class="edit-label" for="edit-work-field-step-${index}">Step</label>
+                                            <input class="form-input edit-work-field-step" id="edit-work-field-step-${index}" data-work-field-step type="number" step="any" value="${escapeHtml((_i = field.step) != null ? _i : "")}" placeholder="1">
+                                        </div>
+                                        `)}
+                                    </div>
+                                </div>
+                            </section>
+                            `)}
+                            ${renderSchemaGroup(field, ["enum", "examples"], `
+                            <section class="edit-work-field-schema-group">
+                                <div class="edit-work-field-schema-group-title">Values</div>
+                                <div class="edit-work-field-schema-group-grid">
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-enum-${index}">Enum</label>
+                                        <textarea class="form-textarea edit-work-field-enum" id="edit-work-field-enum-${index}" data-work-field-enum rows="2" placeholder="One option per line">${escapeHtml(Array.isArray(field.enum) ? field.enum.join("\n") : "")}</textarea>
+                                    </div>
+                                    ${renderSchemaControl(field, index, "examples", `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-examples-${index}">Examples</label>
+                                        <textarea class="form-textarea edit-work-field-examples" id="edit-work-field-examples-${index}" data-work-field-examples rows="2" placeholder="One example per line">${escapeHtml(Array.isArray(field.examples) ? field.examples.join("\n") : "")}</textarea>
+                                    </div>
+                                    `)}
+                                </div>
+                            </section>
+                            `)}
+                            ${renderSchemaGroup(field, ["required", "readOnly", "writeOnly", "deprecated", "nullable"], `
+                            <section class="edit-work-field-schema-group">
+                                <div class="edit-work-field-schema-group-title">Flags</div>
+                                <div class="edit-work-field-bools">
+                                    <label class="edit-work-field-check"><input type="checkbox" data-work-field-required${field.required ? " checked" : ""}><span>required</span></label>
+                                    <label class="edit-work-field-check"><input type="checkbox" data-work-field-readOnly${field.readOnly ? " checked" : ""}><span>readOnly</span></label>
+                                    <label class="edit-work-field-check"><input type="checkbox" data-work-field-writeOnly${field.writeOnly ? " checked" : ""}><span>writeOnly</span></label>
+                                    <label class="edit-work-field-check"><input type="checkbox" data-work-field-deprecated${field.deprecated ? " checked" : ""}><span>deprecated</span></label>
+                                    <label class="edit-work-field-check"><input type="checkbox" data-work-field-nullable${field.nullable ? " checked" : ""}><span>nullable</span></label>
+                                </div>
+                            </section>
+                            `)}
+                        </div>
+                    </details>
+                </div>
+            </div>
+        `;
+      }).join("");
+    };
+    const commitWorkFieldState = () => {
+      if (typeof onWorkFieldsInput !== "function") {
+        return;
+      }
+      workFieldState = workFieldState.map((field, index) => normalizeWorkField(field, index));
+      onWorkFieldsInput(workFieldState);
+    };
+    const syncWorkFieldsFromDom = () => {
+      const rows = Array.from(editPanel.querySelectorAll("[data-work-field-row]"));
+      workFieldState = rows.map((row, index) => {
+        const previous = workFieldState[index] && typeof workFieldState[index] === "object" ? workFieldState[index] : {};
+        const candidate = {
+          ...previous,
+          type: readRowText(row, "[data-work-field-type]") || "text",
+          name: readRowText(row, "[data-work-field-name]") || "",
+          title: readRowText(row, "[data-work-field-title]") || "",
+          description: readRowText(row, "[data-work-field-description]") || "",
+          placeholder: readRowText(row, "[data-work-field-placeholder]") || "",
+          const: readRowText(row, "[data-work-field-const]") || "",
+          value: readRowValue(row, "[data-work-field-value]"),
+          default: readRowValue(row, "[data-work-field-default]"),
+          format: readRowText(row, "[data-work-field-format]") || "",
+          pattern: readRowText(row, "[data-work-field-pattern]") || "",
+          required: readRowBool(row, "[data-work-field-required]"),
+          readOnly: readRowBool(row, "[data-work-field-readOnly]"),
+          writeOnly: readRowBool(row, "[data-work-field-writeOnly]"),
+          deprecated: readRowBool(row, "[data-work-field-deprecated]"),
+          nullable: readRowBool(row, "[data-work-field-nullable]"),
+          minLength: readRowNumber(row, "[data-work-field-minLength]"),
+          maxLength: readRowNumber(row, "[data-work-field-maxLength]"),
+          minimum: readRowNumber(row, "[data-work-field-minimum]"),
+          maximum: readRowNumber(row, "[data-work-field-maximum]"),
+          step: readRowNumber(row, "[data-work-field-step]"),
+          enum: readRowList(row, "[data-work-field-enum]"),
+          examples: readRowList(row, "[data-work-field-examples]")
+        };
+        return applyWorkFieldTypeDefaults(normalizeWorkField(candidate, index), candidate.type);
+      });
+      commitWorkFieldState();
+    };
+    const rerenderWorkFields = () => {
+      const listEl = editPanel.querySelector("#editWorkFieldsList");
+      if (!listEl) {
+        return;
+      }
+      listEl.innerHTML = renderWorkFieldRows(workFieldState);
+      listEl.querySelectorAll("[data-work-field-row]").forEach((row) => {
+        const typeEl = row.querySelector("[data-work-field-type]");
+        const nameEl = row.querySelector("[data-work-field-name]");
+        const valueEl = row.querySelector("[data-work-field-value]");
+        const removeEl = row.querySelector("[data-work-field-remove]");
+        const updateFromRow = () => syncWorkFieldsFromDom();
+        if (typeEl) {
+          typeEl.addEventListener("change", () => {
+            syncWorkFieldsFromDom();
+            rerenderWorkFields();
+          });
+          typeEl.addEventListener("input", updateFromRow);
+        }
+        if (nameEl) {
+          nameEl.addEventListener("input", updateFromRow);
+        }
+        if (valueEl) {
+          valueEl.addEventListener("input", updateFromRow);
+        }
+        if (removeEl) {
+          removeEl.addEventListener("click", () => {
+            const index = Number(row.getAttribute("data-work-field-row") || "0");
+            workFieldState.splice(index, 1);
+            rerenderWorkFields();
+            commitWorkFieldState();
+          });
+        }
+      });
+    };
+    const addWorkField = () => {
+      workFieldState = [...workFieldState, createDefaultWorkField(workFieldState)];
+      rerenderWorkFields();
+      commitWorkFieldState();
+    };
     const uploadSectionHtml = isFileTarget ? "" : `
         <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
             <div class="edit-layout-copy">
@@ -3652,6 +4321,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <label class="edit-label" for="edit-description">Description</label>
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
             </div>
+            <div class="edit-work-fields">
+                <div class="edit-work-fields-header">
+                    <div>
+                        <div class="edit-work-fields-title">Work fields</div>
+                        <div class="small-note">Add extra values below Description. Saved as <code>work.&lt;name&gt;</code> and shown in prompt context.</div>
+                    </div>
+                    <button class="btn btn-secondary edit-work-fields-add" type="button" id="editWorkFieldAdd" aria-label="Add work field">+</button>
+                </div>
+                <div class="edit-work-fields-list" id="editWorkFieldsList">
+                    ${renderWorkFieldRows(workFieldState)}
+                </div>
+            </div>
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
@@ -3682,6 +4363,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
+    const addWorkFieldButton = editPanel.querySelector("#editWorkFieldAdd");
     const promptRoot = editPanel.querySelector("#promptLayer");
     const uploadDialog = editPanel.querySelector("#editUploadDialog");
     syncPromptDock(promptRoot);
@@ -3696,6 +4378,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const blankFileWrapEl = editPanel.querySelector("#editBlankFileWrap");
     const blankFileNameEl = editPanel.querySelector("#edit-blank-file-name");
     const uploadLimits = (status == null ? void 0 : status.uploadLimits) || null;
+    rerenderWorkFields();
     if (titleInput && typeof onTitleInput === "function") {
       titleInput.addEventListener("input", () => {
         onTitleInput(titleInput.value);
@@ -3706,9 +4389,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onDescriptionInput(descInput.value);
       });
     }
+    if (addWorkFieldButton) {
+      addWorkFieldButton.addEventListener("click", () => {
+        addWorkField();
+      });
+    }
     if (form && typeof onSubmit === "function") {
       form.addEventListener("submit", (event) => {
         event.preventDefault();
+        syncWorkFieldsFromDom();
         onSubmit({
           elements: form.elements,
           statusEl
@@ -4049,6 +4738,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             renderFolderMeta();
           }
         },
+        onWorkFieldsInput: (fields) => {
+          if (!editConfig) {
+            return;
+          }
+          const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
+          editConfig.work = materializeWorkFields(currentWork, fields);
+          if ((status == null ? void 0 : status.target) !== "file") {
+            folderConfig = editConfig;
+            renderFolderMeta();
+          }
+        },
         onSubmit: async ({ elements: elements3, statusEl }) => {
           var _a, _b;
           const selection2 = getActiveSelection();
@@ -4057,6 +4757,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             title: (((_a = elements3.title) == null ? void 0 : _a.value) || "").trim(),
             description: (((_b = elements3.description) == null ? void 0 : _b.value) || "").trim()
           };
+          if ((editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object") {
+            payload.work = materializeWorkFields(editConfig.work);
+          }
           await saveConfig(payload, statusEl);
         },
         onToggleDrawer: () => {

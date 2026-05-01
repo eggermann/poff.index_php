@@ -446,6 +446,11 @@ class Worktype
         }
 
         foreach ($work as $key => $value) {
+            if ($key === 'fields' && is_array($value)) {
+                $context['fields'] = $value;
+                $context['work']['fields'] = $value;
+                continue;
+            }
             if (is_bool($value)) {
                 $context[$key] = $value;
                 $context[$key . 'Attr'] = $value ? $key : '';

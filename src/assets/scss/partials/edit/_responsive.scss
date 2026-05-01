@@ -45,6 +45,16 @@
     .prompt-template-viewer-head {
         align-items: stretch;
     }
+    .edit-panel .edit-work-field-row {
+        grid-template-columns: 1fr;
+    }
+    .edit-panel .edit-work-field-head {
+        grid-template-columns: 1fr;
+    }
+    .edit-panel .edit-work-field-schema-group-grid,
+    .edit-panel .edit-work-field-small-grid {
+        grid-template-columns: 1fr;
+    }
     .prompt-dock {
         top: 12px;
         right: 12px;

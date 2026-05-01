@@ -638,7 +638,7 @@ function cmsHandleEditAction(): void
                 'Response format: return strict JSON.',
                 'Required key: "template" with the outer layout wrapper HBS string.',
                 'Optional keys: "css" and "js" for sibling style.css and script.js content.',
-                'Optional key: "work" for work.* updates when the user explicitly requests them.',
+                'Optional key: "work" for work.* updates when the user explicitly requests them, including custom work.fields entries.',
                 'Template requirement: keep a <main class="poff-default-layout__main"> block that renders {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}.',
                 'Example: {"template":"<div class=\"poff-default-layout\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","css":".poff-default-layout{min-height:100dvh;}","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
             ]
@@ -653,6 +653,7 @@ function cmsHandleEditAction(): void
             'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
             'Return only the template (no Markdown, no fences).',
             'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+            'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
             'Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
             'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
             'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',

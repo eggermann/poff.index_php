@@ -1,6 +1,7 @@
 import { escapeHtml } from '../../core/utils.js';
 import { readPromptEditorDraft } from './draft.js';
 import { summarizeSerializedHistory } from './history.js';
+import { extractWorkFields, summarizeWorkFields } from '../work-fields.js';
 
 function isExternalPromptLink(value = '') {
     const trimmed = String(value || '').trim();
@@ -100,6 +101,9 @@ export function renderPromptHistory(container, history, streamState, options = {
             if (typeof snapshot.templateLength === 'number' && snapshot.templateLength > 0) {
                 snapshotParts.push(`template: ${snapshot.templateLength} chars`);
             }
+            if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
+                snapshotParts.push(`fields: ${snapshot.workFieldNames.join(', ')}`);
+            }
             if (typeof snapshot.cssLength === 'number' && snapshot.cssLength > 0) {
                 snapshotParts.push(`css: ${snapshot.cssLength}`);
             }
@@ -179,9 +183,21 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const tree = Array.isArray(config?.tree) ? config.tree : [];
     const folderBasePath = (selection?.isFile ? path.split('/').slice(0, -1).join('/') : path).replace(/^\/+|\/+$/g, '');
     const ellipsis = '\u2026';
+    const workFields = extractWorkFields(work);
     const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
+        if (key === 'fields' && Array.isArray(value)) {
+            const summary = summarizeWorkFields(value);
+            return summary ? `fields: ${summary}` : `fields: ${value.length} item(s)`;
+        }
         if (typeof value === 'boolean') {
             return `${key}: ${value ? 'true' : 'false'}`;
+        }
+        if (Array.isArray(value)) {
+            return `${key}: [${value.length} item(s)]`;
+        }
+        if (value && typeof value === 'object') {
+            const keys = Object.keys(value).slice(0, 4);
+            return `${key}: {${keys.join(', ')}}`;
         }
         if (value === null || value === undefined) {
             return `${key}: null`;
@@ -189,6 +205,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         const str = String(value);
         return `${key}: ${str.length > 28 ? str.slice(0, 25) + ellipsis : str}`;
     }).join(', ');
+    const workFieldsPreview = summarizeWorkFields(workFields);
     const refPreview = tree.slice(0, 4).map((item) => {
         const itemName = item?.name || item?.path || '';
         if (!itemName) {
@@ -231,6 +248,8 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         layoutAssetsPreview,
         editorDraft,
         workData: work,
+        workFields,
+        workFieldsPreview,
         workPreview,
         refPreview,
     };
@@ -310,6 +329,8 @@ export function renderPromptContext(contextEl, context) {
     const layoutAssetsPreview = context?.layoutAssetsPreview || '';
     const editorDraft = (context?.editorDraft && typeof context.editorDraft === 'object') ? context.editorDraft : null;
     const workData = (context?.workData && typeof context.workData === 'object') ? context.workData : {};
+    const workFields = Array.isArray(context?.workFields) ? context.workFields : [];
+    const workFieldsPreview = context?.workFieldsPreview || '';
     const refPreview = context?.refPreview || '';
     const partials = ['poff-layout', 'filesystem-layout', 'works', 'work'];
     const refItems = refPreview ? refPreview.split(' | ').filter(Boolean) : [];
@@ -332,6 +353,7 @@ export function renderPromptContext(contextEl, context) {
         ${renderList('partials', partials)}
         ${renderList('layoutAssets', layoutAssetItems)}
         ${renderList('refs', refItems)}
+        ${workFieldsPreview ? renderRow('work.fields', workFields) : ''}
         ${Object.keys(workData).length ? renderRow('work.*', workData) : ''}
     `;
 }

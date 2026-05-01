@@ -300,6 +300,35 @@ module.exports = {
   return module.exports;
 }
 
+function loadWorkFieldHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/edit/work-fields.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    document: null,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  createDefaultWorkField,
+  extractWorkFields,
+  materializeWorkFields,
+  normalizeWorkField,
+  summarizeWorkFields,
+};
+`, context);
+
+  return module.exports;
+}
+
 function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '') {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [
@@ -822,6 +851,46 @@ describe('MCP create route helper (CLI)', () => {
     expect(Array.isArray(result.folder.items)).toBe(true);
   });
 
+  test('includes custom work fields in prompt compact output', async () => {
+    const result = await runPhpJson('php_prompt_compact_context.php');
+
+    expect(result.fileConfig).toEqual(expect.objectContaining({
+      work: expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'text',
+            name: 'text1',
+            label: 'Text 1',
+            value: 'Prominent section copy',
+          }),
+        ]),
+        text1: 'Prominent section copy',
+      }),
+    }));
+    expect(result.folderConfig).toEqual(expect.objectContaining({
+      work: expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'text',
+            name: 'text1',
+            label: 'Text 1',
+            value: 'Folder prominent copy',
+          }),
+        ]),
+        text1: 'Folder prominent copy',
+      }),
+    }));
+    expect(result.file.current).toEqual(expect.objectContaining({
+      workFields: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'text1',
+          type: 'text',
+          value: 'Prominent section copy',
+        }),
+      ]),
+    }));
+  });
+
   test('keeps explicit internal and external configured tree links intact in prompt context', async () => {
     const result = await runPhpJson('php_virtual_link_context.php');
 
@@ -1096,6 +1165,58 @@ describe('Worktype HBS renderer', () => {
     expect(readPromptEditorDraft({ isLayout: false }, root)).toEqual({
       template: '<article class="draft-section"></article>',
     });
+  });
+
+  test('normalizes and materializes custom work fields', () => {
+    const {
+      createDefaultWorkField,
+      extractWorkFields,
+      materializeWorkFields,
+      summarizeWorkFields,
+    } = loadWorkFieldHelpers();
+
+    const work = {
+      type: 'text',
+      fields: [
+        { type: 'text', name: 'text1', label: 'Text 1', value: 'Primary copy', const: 'Primary copy', uniqueItems: true },
+      ],
+      text1: 'Primary copy',
+    };
+
+    expect(extractWorkFields(work)).toEqual([
+      expect.objectContaining({
+        type: 'text',
+        name: 'text1',
+        label: 'Text 1',
+        value: 'Primary copy',
+        const: 'Primary copy',
+        uniqueItems: true,
+      }),
+    ]);
+    expect(summarizeWorkFields(work.fields)).toContain('Text 1: Primary copy');
+    expect(createDefaultWorkField([])).toEqual(expect.objectContaining({
+      type: 'text',
+      name: 'text1',
+      label: 'Text 1',
+      title: 'Text 1',
+      value: '',
+      description: '',
+      placeholder: '',
+      const: '',
+      uniqueItems: false,
+    }));
+
+    const rematerialized = materializeWorkFields({
+      ...work,
+      text1: 'Updated copy',
+    });
+    expect(rematerialized.fields).toEqual([
+      expect.objectContaining({
+        name: 'text1',
+        value: 'Updated copy',
+      }),
+    ]);
+    expect(rematerialized.text1).toBe('Updated copy');
   });
 
   test('normalizes default layout metadata for files', async () => {

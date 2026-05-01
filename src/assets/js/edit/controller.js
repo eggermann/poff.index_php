@@ -3,6 +3,7 @@ import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
+import { materializeWorkFields } from './work-fields.js';
 
 export function createEditController({ elements, context, editRequested }) {
     const { editPanel, editDrawer, editToggle } = elements;
@@ -186,6 +187,17 @@ export function createEditController({ elements, context, editRequested }) {
                     renderFolderMeta();
                 }
             },
+            onWorkFieldsInput: (fields) => {
+                if (!editConfig) {
+                    return;
+                }
+                const currentWork = (editConfig.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                editConfig.work = materializeWorkFields(currentWork, fields);
+                if (status?.target !== 'file') {
+                    folderConfig = editConfig;
+                    renderFolderMeta();
+                }
+            },
             onSubmit: async ({ elements, statusEl }) => {
                 const selection = getActiveSelection();
                 const payload = {
@@ -193,6 +205,9 @@ export function createEditController({ elements, context, editRequested }) {
                     title: (elements.title?.value || '').trim(),
                     description: (elements.description?.value || '').trim(),
                 };
+                if (editConfig?.work && typeof editConfig.work === 'object') {
+                    payload.work = materializeWorkFields(editConfig.work);
+                }
                 await saveConfig(payload, statusEl);
             },
             onToggleDrawer: () => {

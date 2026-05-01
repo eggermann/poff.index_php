@@ -70,6 +70,36 @@ function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource
                 continue;
             }
 
+            if ($key === 'fields' && is_array($value)) {
+                $fieldSummary = [];
+                foreach (array_slice($value, 0, 12) as $field) {
+                    if (!is_array($field)) {
+                        continue;
+                    }
+                    $entry = [];
+                    foreach (['type', 'name', 'label'] as $fieldKey) {
+                        if (array_key_exists($fieldKey, $field) && is_scalar($field[$fieldKey])) {
+                            $entry[$fieldKey] = is_string($field[$fieldKey])
+                                ? cmsPromptTrimText((string) $field[$fieldKey], 96)
+                                : $field[$fieldKey];
+                        }
+                    }
+                    if (array_key_exists('value', $field)) {
+                        $entry['value'] = is_string($field['value'])
+                            ? cmsPromptTrimText((string) $field['value'], 160)
+                            : $field['value'];
+                    }
+                    if ($entry !== []) {
+                        $fieldSummary[] = $entry;
+                    }
+                }
+                if ($fieldSummary !== []) {
+                    $summary['work']['fields'] = $fieldSummary;
+                    $summary['work']['fieldCount'] = count($value);
+                }
+                continue;
+            }
+
             if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
                 $summary['work'][$key] = $value;
                 continue;
@@ -147,6 +177,31 @@ function cmsPromptCompactContext(array $context): array
             }
         }
         $current['outerWrapper'] = $outerWrapper;
+    }
+    if (is_array($current['workFields'] ?? null)) {
+        $workFields = [];
+        foreach (array_slice($current['workFields'], 0, 12) as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+            $compactField = [];
+            foreach (['type', 'name', 'label'] as $key) {
+                if (array_key_exists($key, $field) && is_scalar($field[$key])) {
+                    $compactField[$key] = is_string($field[$key])
+                        ? cmsPromptTrimText((string) $field[$key], 96)
+                        : $field[$key];
+                }
+            }
+            if (array_key_exists('value', $field)) {
+                $compactField['value'] = is_string($field['value'])
+                    ? cmsPromptTrimText((string) $field['value'], 180)
+                    : $field['value'];
+            }
+            if ($compactField !== []) {
+                $workFields[] = $compactField;
+            }
+        }
+        $current['workFields'] = $workFields;
     }
 
     $compact = [
