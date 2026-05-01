@@ -45,6 +45,11 @@ export function renderPromptWindow(settings = {}, options = {}) {
         : mode === 'folder'
             ? 'Describe the folder component you want...'
             : 'Describe the file component you want...';
+    const provider = settings.provider === 'openai'
+        ? 'openai'
+        : settings.provider === 'gemini'
+            ? 'gemini'
+            : 'local';
 
     return `
         <div class="prompt-layer" id="promptLayer">
@@ -63,9 +68,9 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         <div>
                             <label class="edit-label" for="prompt-provider">Provider</label>
                             <select class="form-input" id="prompt-provider">
-                                <option value="local">LM Studio</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="gemini">Gemini</option>
+                                <option value="local" ${provider === 'local' ? 'selected' : ''}>LM Studio</option>
+                                <option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+                                <option value="gemini" ${provider === 'gemini' ? 'selected' : ''}>Gemini</option>
                             </select>
                         </div>
                         <div>
