@@ -458,8 +458,8 @@ export function renderEditPanel({
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
                 ${typeof onDeleteTarget === 'function' ? `
-                <button class="btn btn-secondary" type="button" id="editDeleteTarget" style="background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;">
-                    <img src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16" style="display:block;">
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDeleteTarget">
+                    <img class="block" src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16">
                     Delete
                 </button>
                 ` : ''}

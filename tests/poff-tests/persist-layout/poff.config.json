@@ -5,10 +5,19 @@
     "title": "persist-layout",
     "description": "",
     "type": "folder",
-    "id": "poff_761b3b013176f24e",
-    "tree": [],
-    "treeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "updatedAt": "2026-05-01T11:23:35+00:00",
+    "id": "poff_4ce4be2113cbd55a",
+    "tree": [
+        {
+            "name": "shared-file.txt",
+            "slug": "shared-file-txt",
+            "type": "file",
+            "path": "shared-file.txt",
+            "modifiedAt": "2026-05-01T21:06:25+00:00",
+            "visible": true
+        }
+    ],
+    "treeHash": "2999a3a6b1038ccb728cfdf9dde07b88963f9b7a96113294015c9ecfb6e2c61a",
+    "updatedAt": "2026-05-01T21:06:26+00:00",
     "work": {
         "type": "folder",
         "layout": {

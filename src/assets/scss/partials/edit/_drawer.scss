@@ -13,7 +13,6 @@
     transition: transform 0.2s ease;
     z-index: 30;
 }
-.edit-drawer.open,
 .edit-drawer.edit-drawer-open {
     transform: translateX(0%);
 }

@@ -343,6 +343,7 @@ export function createEditController({ elements, context, editRequested }) {
             allowed: data.allowed !== false,
             error: data.error,
             target: editTarget,
+            subjectTarget: data.subjectTarget,
             uploadLimits: data.uploadLimits,
         });
     }

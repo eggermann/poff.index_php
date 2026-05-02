@@ -237,7 +237,7 @@ export function renderEditLayoutPanel({
     });
 
     if (presetEl) {
-        presetEl.addEventListener('change', () => {
+        presetEl.addEventListener('change', async () => {
             storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
             syncLayoutMode({
                 modePreviewEl,
@@ -248,6 +248,14 @@ export function renderEditLayoutPanel({
                 primaryCssEl,
                 primaryJsEl,
             });
+            if (typeof onLayoutPresetChange === 'function') {
+                await onLayoutPresetChange({
+                    payload: {
+                        layoutPreset: (presetEl.value || 'actual').trim(),
+                    },
+                    statusEl,
+                });
+            }
         });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {

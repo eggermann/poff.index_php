@@ -12,10 +12,10 @@ export function getClosestElementByTag(target, tagName) {
     return null;
 }
 
-export function setElementVisibility(element, visible, display = 'block') {
+export function setElementVisibility(element, visible) {
     if (!element) {
         return;
     }
 
-    element.style.display = visible ? display : 'none';
+    element.hidden = !visible;
 }

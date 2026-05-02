@@ -154,19 +154,19 @@
     background: #fff;
     border: 1px solid #e5e7eb;
 }
-.prompt-message .role {
+.prompt-message-role {
     font-weight: 600;
     margin-right: 6px;
 }
-.prompt-message.user {
+.prompt-message.prompt-message-user {
     background: #eff6ff;
     border-color: #dbeafe;
 }
-.prompt-message.assistant {
+.prompt-message.prompt-message-assistant {
     background: #ecfdf3;
     border-color: #bbf7d0;
 }
-.prompt-message .content {
+.prompt-message-content {
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -207,7 +207,7 @@
     border-radius: 10px;
     padding: 8px 10px;
 }
-.prompt-allowed .dot {
+.prompt-allowed .prompt-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
@@ -239,17 +239,6 @@
 .prompt-generation-label {
     font-weight: 700;
     letter-spacing: 0.01em;
-}
-.stream-cursor {
-    display: inline-block;
-    width: 8px;
-    height: 14px;
-    background: #9ca3af;
-    margin-left: 2px;
-    animation: blink 1s steps(1) infinite;
-}
-@keyframes blink {
-    50% { opacity: 0; }
 }
 @keyframes prompt-pulse {
     0% {

@@ -1310,9 +1310,9 @@ describe('Worktype HBS renderer', () => {
       return;
     }
 
-    expect(output).toContain('<div class="poff-default-layout poff-default-layout--image">');
+    expect(output).toContain('<div class="poff-default-layout poff-default-layout--image ');
     expect(output).toContain('poff-default-layout__sidebar');
-    expect(output).toContain('<img src="assets/photo.png" alt="Project Photo"');
+    expect(output).toContain('src="assets/photo.png" alt="Project Photo"');
     expect(output).toContain('Inline description');
   });
 
@@ -1359,7 +1359,7 @@ describe('Worktype HBS renderer', () => {
 
     expect(output).toContain('<div class="custom-shell">');
     expect(output).toContain('href="?view&#x3D;1&amp;path&#x3D;projects"');
-    expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+    expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder ');
     expect(output).toContain('<span class="entry">notes.txt</span>');
     expect(output).toContain('projects');
     expect(output).toContain('alpha');
@@ -1404,7 +1404,7 @@ describe('Worktype HBS renderer', () => {
 
     expect(output).not.toContain('<iframe ');
     if (lightnCandyInstalled) {
-      expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+      expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder ');
     } else {
       expect(output).toContain('<div class="poff-folder-fallback">');
     }
@@ -1452,7 +1452,7 @@ describe('Worktype HBS renderer', () => {
     expect(result.stderr).toBe('');
     expect(result.stdout).not.toContain('<iframe ');
     if (lightnCandyInstalled) {
-      expect(result.stdout).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+      expect(result.stdout).toContain('<div class="poff-default-layout poff-default-layout--folder ');
     } else {
       expect(result.stdout).toContain('<div class="poff-folder-fallback">');
     }
@@ -1523,7 +1523,7 @@ describe('Worktype HBS renderer', () => {
     const output = await runViewer('inherits-default');
     expect(output).not.toContain('<div class="default-fs-layout">');
     expect(output).not.toContain('tests/poff-tests/.layout/style.css');
-    expect(output).toContain('<div class="folder-view">');
+    expect(output).toContain('<div class="folder-view ');
     expect(output).toContain('child.txt');
 
     await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
@@ -1729,8 +1729,11 @@ describe('Worktype HBS renderer', () => {
       template: '<div class="persisted-layout">Persisted</div>',
       css: '.persisted-layout{color:#fff;}',
       js: 'window.__persistedLayout = true;',
+      worksTemplate: '<div class="persisted-folder-inner">{{#each items}}<span>{{name}}</span>{{/each}}</div>',
+      workTemplate: '<div class="persisted-file-inner">{{name}}</div>',
     };
 
+    fs.writeFileSync(path.join(PERSIST_LAYOUT_DIR, 'shared-file.txt'), 'shared');
     const output = await runLayoutFilesystem('persist-folder', PERSIST_LAYOUT_DIR, '', payload);
     const serializedLayout = JSON.parse(output);
 
@@ -1743,6 +1746,8 @@ describe('Worktype HBS renderer', () => {
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('Persisted');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.persisted-layout');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__persistedLayout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('persisted-folder-inner');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'work.hbs'), 'utf8')).toContain('persisted-file-inner');
     await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
     const persistConfigPath = path.join(PERSIST_LAYOUT_DIR, 'poff.config.json');
     const persistConfig = JSON.parse(fs.readFileSync(persistConfigPath, 'utf8'));
@@ -1757,6 +1762,11 @@ describe('Worktype HBS renderer', () => {
     expect(ensuredConfig.work.layout.template).toContain('Persisted');
     expect(ensuredConfig.work.layout.storage).toBe('filesystem');
     expect(ensuredConfig.work.layout.preset).toBe('actual');
+
+    const ensuredFileOutput = await runLayoutFilesystem('ensure-file', PERSIST_LAYOUT_DIR, 'shared-file.txt');
+    const ensuredFileConfig = JSON.parse(ensuredFileOutput);
+    expect(ensuredFileConfig.work.layout.directory).toBe('tests/poff-tests/persist-layout/.layout');
+    expect(ensuredFileConfig.work.layout.sectionTemplate).toContain('persisted-file-inner');
   });
 
   test('keeps custom layout files when switching presets away from custom', async () => {

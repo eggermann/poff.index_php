@@ -1,12 +1,3 @@
-.edit-layout-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    background: rgba(15, 23, 42, 0.42);
-    backdrop-filter: blur(2px);
-    padding: 16px;
-    overflow: auto;
-}
 .edit-layout-overlay-shell {
     width: min(1080px, calc(100% - 16px));
     min-height: calc(100% - 12px);
@@ -25,11 +16,6 @@
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-.edit-layout-meta {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 .edit-layout-meta-card,
 .edit-layout-editor {
@@ -92,10 +78,6 @@
 .edit-layout-manual {
     margin-top: 18px;
 }
-.edit-layout-workspace {
-    display: grid;
-    gap: 16px;
-}
 .edit-layout-advanced {
     border: 1px solid #e5e7eb;
     border-radius: 14px;
@@ -121,12 +103,6 @@
 }
 .edit-panel .edit-layout-launch button {
     white-space: nowrap;
-}
-.edit-panel .edit-secondary {
-    background: #f97316;
-}
-.edit-panel .edit-secondary:hover {
-    background: #ea580c;
 }
 
 @media (max-width: 720px) {

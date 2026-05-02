@@ -46,7 +46,7 @@ export function bindPromptSettings({
     const updateProviderUi = ({ resetModel = false } = {}) => {
         const provider = providerEl ? providerEl.value : 'local';
         if (endpointRow) {
-            endpointRow.style.display = provider === 'local' ? 'block' : 'none';
+            endpointRow.hidden = provider !== 'local';
         }
         if (modelEl && resetModel && !modelEl.value.trim()) {
             modelEl.value = getDefaultModelForProvider(provider);

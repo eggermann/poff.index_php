@@ -464,6 +464,12 @@ export function bindPromptWindow({
                 const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === 'string'
                     ? rawResponseWork[layoutSectionKey]
                     : null;
+                const responseWorkTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork['work.hbs'] === 'string'
+                    ? rawResponseWork['work.hbs']
+                    : null;
+                const responseWorksTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork['works.hbs'] === 'string'
+                    ? rawResponseWork['works.hbs']
+                    : null;
                 const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
                 const mergedWork = {
                     ...(inferredWork || {}),
@@ -559,6 +565,8 @@ export function bindPromptWindow({
                     drawerForm,
                     templateText,
                     responseSectionTemplate,
+                    responseWorkTemplate,
+                    responseWorksTemplate,
                     nextCss,
                     nextJs,
                     nextLayoutValue,

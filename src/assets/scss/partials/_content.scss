@@ -63,11 +63,6 @@
     width: 100%;
 }
 
-.content-frame > .viewer .viewer-template--folder {
-    padding-inline-end: calc(24px + var(--prompt-dock-reserve));
-    transition: padding-inline-end 0.18s ease;
-}
-
 .content-frame > .viewer .poff-default-layout__main {
     padding-inline-end: calc(var(--poff-shell-main-padding) + var(--prompt-dock-reserve));
     transition: padding-inline-end 0.18s ease;

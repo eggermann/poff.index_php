@@ -512,12 +512,17 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
     "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
     "Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.",
-    "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
+    "Tailwind first. Use utility classes for the common layout and visual structure.",
+    "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
+    "Do not embed global CSS, and do not use inline style attributes.",
+    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
+    "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
   var defaultFileSystemPrompt = [
     legacyWorkSystemPrompt,
     "Save target is work.hbs for the current file inside the active item layout folder.",
+    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
     "Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.",
     "Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.",
     "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
@@ -530,6 +535,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   var defaultFolderSystemPrompt = [
     legacyWorkSystemPrompt,
     "Save target is works.hbs for the current folder inside the active item layout folder.",
+    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
     "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
     "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
@@ -546,6 +552,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "You are a Handlebars (HBS) layout generator for this single-page CMS.",
     "Transform the user description into an updated outer layout wrapper rendered by LightnCandy.",
     'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
+    'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
     "Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, sectionTemplate, css, and js after filesystem, inheritance, and preset resolution.",
     "When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.",
     "The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.",
@@ -553,7 +560,12 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.",
     'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
     "Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.",
-    'Prefer returning sibling "css" and "js" strings too, so the custom layout can create template.hbs, style.css, and script.js together.',
+    "Tailwind first. Put standard layout styling in class attributes.",
+    "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
+    "Do not embed global CSS, and do not use inline style attributes.",
+    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
+    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
+    "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
@@ -561,14 +573,19 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
     "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
     "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
-    "Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.",
+    "Avoid CSS variable theme systems unless explicitly requested; prefer direct Tailwind utility classes.",
     "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
     "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
     "If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.",
     "Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.",
     "Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
-    "You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.",
+    "Tailwind first. Use utility classes for the common layout and visual structure.",
+    "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
+    "Do not embed global CSS, and do not use inline style attributes.",
+    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
+    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
+    "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
   var defaultPromptSettings = {
@@ -1823,7 +1840,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const updateProviderUi = ({ resetModel = false } = {}) => {
       const provider = providerEl ? providerEl.value : "local";
       if (endpointRow) {
-        endpointRow.style.display = provider === "local" ? "block" : "none";
+        endpointRow.hidden = provider !== "local";
       }
       if (modelEl && resetModel && !modelEl.value.trim()) {
         modelEl.value = getDefaultModelForProvider2(provider);
@@ -1997,6 +2014,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     drawerForm,
     templateText,
     responseSectionTemplate = null,
+    responseWorkTemplate = null,
+    responseWorksTemplate = null,
     nextCss = null,
     nextJs = null,
     nextLayoutValue = null,
@@ -2024,6 +2043,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       layoutPayload.sectionTemplate = templateText;
       return { layoutPayload, layoutState, resolvedLayoutName };
     }
+    const attachSiblingSectionTemplates = () => {
+      if (responseWorkTemplate !== null) {
+        layoutPayload.workTemplate = responseWorkTemplate;
+      }
+      if (responseWorksTemplate !== null) {
+        layoutPayload.worksTemplate = responseWorksTemplate;
+      }
+    };
     const preset = (layoutPreset || layoutState.preset || "actual").trim();
     layoutPayload.preset = preset;
     const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
@@ -2037,6 +2064,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (responseSectionTemplate !== null) {
         layoutPayload.sectionTemplate = responseSectionTemplate;
       }
+      attachSiblingSectionTemplates();
       if (nextCss !== null) {
         layoutPayload.css = nextCss;
       }
@@ -2049,6 +2077,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (responseSectionTemplate !== null) {
         layoutPayload.sectionTemplate = responseSectionTemplate;
       }
+      attachSiblingSectionTemplates();
       if (nextCss !== null) {
         layoutPayload.originalCss = nextCss;
       }
@@ -2061,6 +2090,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (responseSectionTemplate !== null) {
         layoutPayload.sectionTemplate = responseSectionTemplate;
       }
+      attachSiblingSectionTemplates();
       if (nextCss !== null) {
         layoutPayload.css = nextCss;
       }
@@ -2470,6 +2500,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const layoutSectionKey = isLayoutTarget ? (selection2 == null ? void 0 : selection2.previewIsFile) || (selection2 == null ? void 0 : selection2.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
           const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
           const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
+          const responseWorkTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork["work.hbs"] === "string" ? rawResponseWork["work.hbs"] : null;
+          const responseWorksTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork["works.hbs"] === "string" ? rawResponseWork["works.hbs"] : null;
           const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
           const mergedWork = {
             ...inferredWork || {},
@@ -2561,6 +2593,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             drawerForm,
             templateText,
             responseSectionTemplate,
+            responseWorkTemplate,
+            responseWorksTemplate,
             nextCss,
             nextJs,
             nextLayoutValue,
@@ -3595,7 +3629,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       drafts
     });
     if (presetEl) {
-      presetEl.addEventListener("change", () => {
+      presetEl.addEventListener("change", async () => {
         storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
         syncLayoutMode({
           modePreviewEl,
@@ -3606,6 +3640,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           primaryCssEl,
           primaryJsEl
         });
+        if (typeof onLayoutPresetChange === "function") {
+          await onLayoutPresetChange({
+            payload: {
+              layoutPreset: (presetEl.value || "actual").trim()
+            },
+            statusEl
+          });
+        }
       });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
@@ -4078,8 +4120,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
                 ${typeof onDeleteTarget === "function" ? `
-                <button class="btn btn-secondary" type="button" id="editDeleteTarget" style="background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;">
-                    <img src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16" style="display:block;">
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDeleteTarget">
+                    <img class="block" src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16">
                     Delete
                 </button>
                 ` : ""}
@@ -4552,6 +4594,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         allowed: data.allowed !== false,
         error: data.error,
         target: editTarget,
+        subjectTarget: data.subjectTarget,
         uploadLimits: data.uploadLimits
       });
     }
@@ -4755,11 +4798,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     function showNavLoading() {
       if (!navList) return;
       navList.innerHTML = `
-            <div id="navLoading" class="loading-row" style="display:flex;align-items:center;">
+            <div id="navLoading" class="loading-row flex items-center">
                 <span class="loader"></span>
                 <span class="loader-label">Loading...</span>
             </div>
         `;
+    }
+    function setLoadingVisible(element, visible) {
+      if (!element) {
+        return;
+      }
+      element.classList.toggle("flex", visible);
+      element.classList.toggle("items-center", visible);
     }
     function loadNav(relPath = "") {
       if (!navList) return;
@@ -4858,9 +4908,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const previewPath = selection2.previewPath || "";
       const previewIsFile = !!selection2.previewIsFile;
       const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
-      if (iframeLoading) {
-        iframeLoading.style.display = "block";
-      }
+      setLoadingVisible(iframeLoading, true);
       if (contentFrame) {
         contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
         syncPreviewDisabledState(!!selection2.isLayout);
@@ -4870,19 +4918,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         writeHashPath(selection2.path || "");
       }
       if (navList) {
-        if (sidebarLoading) {
-          sidebarLoading.style.display = "block";
-        }
+        setLoadingVisible(sidebarLoading, true);
         loadNav(folderPath).then(() => {
           syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          if (sidebarLoading) {
-            sidebarLoading.style.display = "none";
-          }
+          setLoadingVisible(sidebarLoading, false);
         }).catch(() => {
           syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          if (sidebarLoading) {
-            sidebarLoading.style.display = "none";
-          }
+          setLoadingVisible(sidebarLoading, false);
         });
       }
       if (initEditMode) {
@@ -5065,8 +5107,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
         contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
       } finally {
-        if (requestId === previewRequestId && iframeLoading) {
-          iframeLoading.style.display = "none";
+        if (requestId === previewRequestId) {
+          setLoadingVisible(iframeLoading, false);
         }
       }
     }

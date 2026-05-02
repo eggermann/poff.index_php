@@ -144,6 +144,8 @@ class Worktype
             'inheritedDirectory',
             'baseHref',
             'sectionTemplate',
+            'workTemplate',
+            'worksTemplate',
             'sectionDirectory',
             'sectionBaseHref',
             'cssHref',

@@ -21,6 +21,8 @@ export function buildPromptLayoutPayload({
     drawerForm,
     templateText,
     responseSectionTemplate = null,
+    responseWorkTemplate = null,
+    responseWorksTemplate = null,
     nextCss = null,
     nextJs = null,
     nextLayoutValue = null,
@@ -51,6 +53,15 @@ export function buildPromptLayoutPayload({
         return { layoutPayload, layoutState, resolvedLayoutName };
     }
 
+    const attachSiblingSectionTemplates = () => {
+        if (responseWorkTemplate !== null) {
+            layoutPayload.workTemplate = responseWorkTemplate;
+        }
+        if (responseWorksTemplate !== null) {
+            layoutPayload.worksTemplate = responseWorksTemplate;
+        }
+    };
+
     const preset = (layoutPreset || layoutState.preset || 'actual').trim();
     layoutPayload.preset = preset;
     const layoutPathName = (selection.previewPath || '').split('/').pop() || 'item';
@@ -76,6 +87,7 @@ export function buildPromptLayoutPayload({
         if (responseSectionTemplate !== null) {
             layoutPayload.sectionTemplate = responseSectionTemplate;
         }
+        attachSiblingSectionTemplates();
         if (nextCss !== null) {
             layoutPayload.css = nextCss;
         }
@@ -88,6 +100,7 @@ export function buildPromptLayoutPayload({
         if (responseSectionTemplate !== null) {
             layoutPayload.sectionTemplate = responseSectionTemplate;
         }
+        attachSiblingSectionTemplates();
         if (nextCss !== null) {
             layoutPayload.originalCss = nextCss;
         }
@@ -100,6 +113,7 @@ export function buildPromptLayoutPayload({
         if (responseSectionTemplate !== null) {
             layoutPayload.sectionTemplate = responseSectionTemplate;
         }
+        attachSiblingSectionTemplates();
         if (nextCss !== null) {
             layoutPayload.css = nextCss;
         }

@@ -204,11 +204,19 @@ export function initNavigation({
     function showNavLoading() {
         if (!navList) return;
         navList.innerHTML = `
-            <div id="navLoading" class="loading-row" style="display:flex;align-items:center;">
+            <div id="navLoading" class="loading-row flex items-center">
                 <span class="loader"></span>
                 <span class="loader-label">Loading...</span>
             </div>
         `;
+    }
+
+    function setLoadingVisible(element, visible) {
+        if (!element) {
+            return;
+        }
+        element.classList.toggle('flex', visible);
+        element.classList.toggle('items-center', visible);
     }
 
     function loadNav(relPath = '') {
@@ -323,9 +331,7 @@ export function initNavigation({
         const previewIsFile = !!selection.previewIsFile;
         const folderPath = previewIsFile ? previewPath.split('/').slice(0, -1).join('/') : previewPath;
 
-        if (iframeLoading) {
-            iframeLoading.style.display = 'block';
-        }
+        setLoadingVisible(iframeLoading, true);
         if (contentFrame) {
             contentFrame.classList.toggle('content-frame-layout-target', !!selection.isLayout);
             syncPreviewDisabledState(!!selection.isLayout);
@@ -335,21 +341,15 @@ export function initNavigation({
             writeHashPath(selection.path || '');
         }
         if (navList) {
-            if (sidebarLoading) {
-                sidebarLoading.style.display = 'block';
-            }
+            setLoadingVisible(sidebarLoading, true);
             loadNav(folderPath)
                 .then(() => {
                     syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
-                    if (sidebarLoading) {
-                        sidebarLoading.style.display = 'none';
-                    }
+                    setLoadingVisible(sidebarLoading, false);
                 })
                 .catch(() => {
                     syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
-                    if (sidebarLoading) {
-                        sidebarLoading.style.display = 'none';
-                    }
+                    setLoadingVisible(sidebarLoading, false);
                 });
         }
         if (initEditMode) {
@@ -543,8 +543,8 @@ export function initNavigation({
             }
             contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
         } finally {
-            if (requestId === previewRequestId && iframeLoading) {
-                iframeLoading.style.display = 'none';
+            if (requestId === previewRequestId) {
+                setLoadingVisible(iframeLoading, false);
             }
         }
     }

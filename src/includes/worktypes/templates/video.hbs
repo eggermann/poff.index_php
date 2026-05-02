@@ -1,4 +1,4 @@
-<video controls style="display:block;max-width:100%;max-height:var(--poff-work-max-height, calc(100dvh - 11.5rem));margin-inline:auto;" {{#if work.autoplay}}autoplay{{/if}} {{#if work.loop}}loop{{/if}} {{#if work.muted}}muted{{/if}} {{#if work.poster}}poster="{{work.poster}}"{{/if}}>
+<video class="mx-auto block max-h-screen max-w-full" controls {{#if work.autoplay}}autoplay{{/if}} {{#if work.loop}}loop{{/if}} {{#if work.muted}}muted{{/if}} {{#if work.poster}}poster="{{work.poster}}"{{/if}}>
     <source src="{{srcUrl}}">
     Your browser does not support the video tag.
 </video>

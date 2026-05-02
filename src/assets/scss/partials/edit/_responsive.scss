@@ -16,17 +16,14 @@
 .prompt-dock .prompt-context-object-value,
 .prompt-dock .prompt-inline-toggle,
 .prompt-dock .prompt-message,
-.prompt-dock .prompt-message .content {
+.prompt-dock .prompt-message-content {
     color: #334155;
 }
-.prompt-dock .prompt-message.user,
-.prompt-dock .prompt-message.assistant {
+.prompt-dock .prompt-message-user,
+.prompt-dock .prompt-message-assistant {
     color: #1f2937;
 }
 @media (max-width: 640px) {
-    .edit-layout-overlay {
-        padding: 12px;
-    }
     .edit-layout-overlay-shell {
         width: 100%;
         min-height: auto;

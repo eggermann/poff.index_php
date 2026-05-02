@@ -325,6 +325,11 @@ function cmsHandleEditAction(): void
                 $layoutSectionTemplateProvided = true;
                 $layoutSectionTemplate = (string) $layoutPayload['sectionTemplate'];
             }
+            foreach (['workTemplate', 'worksTemplate'] as $siblingSectionKey) {
+                if (array_key_exists($siblingSectionKey, $layoutPayload)) {
+                    $hasLayoutUpdate = true;
+                }
+            }
             if (array_key_exists('css', $layoutPayload) || array_key_exists('style', $layoutPayload)) {
                 $layoutCssProvided = true;
                 $layoutCss = (string) ($layoutPayload['css'] ?? $layoutPayload['style'] ?? '');
@@ -467,6 +472,11 @@ function cmsHandleEditAction(): void
             if ($layoutSectionTemplateProvided) {
                 $layout['sectionTemplate'] = $layoutSectionTemplate;
             }
+            foreach (['workTemplate', 'worksTemplate'] as $siblingSectionKey) {
+                if (is_array($layoutPayload) && array_key_exists($siblingSectionKey, $layoutPayload)) {
+                    $layout[$siblingSectionKey] = (string) $layoutPayload[$siblingSectionKey];
+                }
+            }
             if ($layoutCssProvided) {
                 $layout['css'] = $layoutCss;
             }
@@ -479,6 +489,8 @@ function cmsHandleEditAction(): void
             foreach ([
                 'template' => $layoutTemplateProvided,
                 'sectionTemplate' => $layoutSectionTemplateProvided,
+                'workTemplate' => is_array($layoutPayload) && array_key_exists('workTemplate', $layoutPayload),
+                'worksTemplate' => is_array($layoutPayload) && array_key_exists('worksTemplate', $layoutPayload),
                 'css' => $layoutCssProvided,
                 'js' => $layoutJsProvided,
             ] as $layoutFileKey => $wasProvided) {
@@ -637,10 +649,11 @@ function cmsHandleEditAction(): void
             ? [
                 'Response format: return strict JSON.',
                 'Required key: "template" with the outer layout wrapper HBS string.',
-                'Optional keys: "css" and "js" for sibling style.css and script.js content.',
+                'Optional keys: "css", "js", and "work". Prefer utility classes; use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
+                'For layouts shared by folders and files, return sibling partials in "work": {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
                 'Optional key: "work" for work.* updates when the user explicitly requests them, including custom work.fields entries.',
                 'Template requirement: keep a <main class="poff-default-layout__main"> block that renders {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}.',
-                'Example: {"template":"<div class=\"poff-default-layout\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","css":".poff-default-layout{min-height:100dvh;}","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
+                'Example: {"template":"<div class=\"poff-default-layout min-h-screen\"><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>","js":"document.documentElement.dataset.layout = \'custom\';","work":{"layout":"custom-layout"}}',
             ]
             : [
                 'Response format: return raw HBS only for the current inner partial save target.',
@@ -659,7 +672,12 @@ function cmsHandleEditAction(): void
             'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
             'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
             'If Prompt context JSON current.editorDraft is present, treat it as the latest unsaved editor state and revise that draft before falling back to saved config or saved template sources.',
-            'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
+            'Tailwind first. Use utility classes for the common layout and visual structure.',
+            'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
+            'Do not embed global CSS, and do not use inline style attributes.',
+            'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
+            'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
+            'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
             'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
         ];
         $fileWorkSystemPrompt = array_merge($sharedWorkSystemPrompt, [
@@ -695,10 +713,16 @@ function cmsHandleEditAction(): void
                 'The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.',
                 'Keep the wrapped content chain active and preserve the data flow from the current item context all the way down to the inner partial. Use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.',
                 'The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.',
+                'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
                 'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
                 'Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.',
                 'If Prompt context JSON current.editorDraft is present, treat those unsaved draft template/css/js values as the latest version to evolve from before falling back to current.activeLayout.',
-                'Prefer returning sibling "css" and "js" strings too, so the layout prompt can design template.hbs, style.css, and script.js together for files and folders.',
+                'Tailwind first. Put standard layout styling in class attributes.',
+                'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
+                'Do not embed global CSS, and do not use inline style attributes.',
+                'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
+                'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
+                'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
                 'Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.',
                 'When the current layout mode stays inherited/inherit, edits should target the inherited/original filesystem layout source. When the user chooses Custom, edits target the local .layout/template.hbs wrapper.',
                 'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.',
@@ -707,7 +731,7 @@ function cmsHandleEditAction(): void
                 'For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.',
                 'Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.',
                 'Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets to help you choose the right asset path and understand whether the wrapper comes from a parent folder .layout.',
-                'Theme overrides can target .poff-default-layout from top to down with CSS variables like --poff-shell-bg, --poff-shell-color, --poff-shell-title-color, --poff-shell-description-color, --poff-shell-footer-color, --poff-shell-header-border, --poff-shell-footer-border, --poff-shell-card-bg, and --poff-shell-card-border.',
+                'Avoid CSS variable theme systems unless explicitly requested; prefer direct Tailwind utility classes.',
                 'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
                 'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
                 'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
@@ -715,7 +739,12 @@ function cmsHandleEditAction(): void
                 'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
                 'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
                 'Prompt context JSON includes resolved refs for the current item and current folder contents. Use those refs directly instead of inventing paths.',
-                'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
+                'Tailwind first. Use utility classes for the common layout and visual structure.',
+                'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
+                'Do not embed global CSS, and do not use inline style attributes.',
+                'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
+                'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
+                'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
                 'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
             ]
             : ($subjectType === 'folder' ? $folderWorkSystemPrompt : $fileWorkSystemPrompt));

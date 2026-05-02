@@ -422,18 +422,20 @@ class PoffConfig
         if (array_key_exists('template', $normalized)) {
             $normalized['template'] = self::sanitizeStoredPromptTemplate((string) $normalized['template'], true);
         }
-        if (array_key_exists('sectionTemplate', $normalized)) {
-            $normalized['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $normalized['sectionTemplate'], false);
+        foreach (['sectionTemplate', 'workTemplate', 'worksTemplate'] as $sectionKey) {
+            if (array_key_exists($sectionKey, $normalized)) {
+                $normalized[$sectionKey] = self::sanitizeStoredPromptTemplate((string) $normalized[$sectionKey], false);
+            }
         }
         if ($inactivePreset) {
-            foreach (['template', 'css', 'js', 'sectionTemplate'] as $key) {
+            foreach (['template', 'css', 'js', 'sectionTemplate', 'workTemplate', 'worksTemplate'] as $key) {
                 unset($normalized[$key]);
             }
         }
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
-        $managedLayoutKeys = ['template', 'css', 'js', 'sectionTemplate'];
+        $managedLayoutKeys = ['template', 'css', 'js', 'sectionTemplate', 'workTemplate', 'worksTemplate'];
         $providedManagedKeys = array_values(array_filter(
             $managedLayoutKeys,
             static fn(string $key): bool => array_key_exists($key, $normalized)
@@ -453,12 +455,22 @@ class PoffConfig
             }
         }
         self::writeManagedLayoutFiles($layoutDir, self::defaultLayoutFiles($section));
+        $sectionFiles = [];
+        if (array_key_exists('sectionTemplate', $normalized)) {
+            $sectionFiles[self::sectionTemplateFile($section)] = (string) $normalized['sectionTemplate'];
+        }
+        if (array_key_exists('workTemplate', $normalized)) {
+            $sectionFiles[self::WORK_SECTION_TEMPLATE_FILE] = (string) $normalized['workTemplate'];
+        }
+        if (array_key_exists('worksTemplate', $normalized)) {
+            $sectionFiles[self::WORKS_SECTION_TEMPLATE_FILE] = (string) $normalized['worksTemplate'];
+        }
+
         self::writeManagedLayoutFiles($layoutDir, [
             self::LAYOUT_TEMPLATE_FILE => array_key_exists('template', $normalized) ? (string) $normalized['template'] : null,
             self::LAYOUT_STYLE_FILE => array_key_exists('css', $normalized) ? (string) $normalized['css'] : null,
             self::LAYOUT_SCRIPT_FILE => array_key_exists('js', $normalized) ? (string) $normalized['js'] : null,
-            self::sectionTemplateFile($section) => array_key_exists('sectionTemplate', $normalized) ? (string) $normalized['sectionTemplate'] : null,
-        ]);
+        ] + $sectionFiles);
 
         return self::serializeLayout($normalized, $section);
     }
