@@ -409,6 +409,10 @@ class PoffConfig
         $layoutMode = trim((string) ($normalized['mode'] ?? ''));
         $layoutName = trim((string) ($normalized['name'] ?? ''));
         $layoutPreset = trim((string) ($normalized['preset'] ?? ''));
+        $isSharedPreset = $layoutPreset === 'shared'
+            || $layoutMode === 'shared'
+            || (($normalized['source'] ?? '') === 'shared')
+            || (($normalized['sharedName'] ?? '') !== '');
         $inactivePreset = $layoutMode === 'none'
             || $layoutName === 'none'
             || $layoutPreset === 'none'
@@ -431,6 +435,9 @@ class PoffConfig
             foreach (['template', 'css', 'js', 'sectionTemplate', 'workTemplate', 'worksTemplate'] as $key) {
                 unset($normalized[$key]);
             }
+        }
+        if ($isSharedPreset) {
+            return $normalized;
         }
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
@@ -611,6 +618,42 @@ class PoffConfig
             $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $resolved['sectionTemplate'], false);
         }
         $resolved['phpTemplate'] = Worktype::template((string) ($resolved['name'] ?? Worktype::defaultLayoutName())) ?? '';
+        $resolved['sharedLayouts'] = Worktype::sharedLayoutChoices($section);
+        $sharedName = trim((string) ($resolved['sharedName'] ?? ''));
+        $sharedPreset = $preset === 'shared'
+            || $mode === 'shared'
+            || (($resolved['source'] ?? '') === 'shared');
+        if ($sharedPreset) {
+            if ($sharedName === '' && isset($resolved['sharedLayouts'][0]['name'])) {
+                $sharedName = trim((string) $resolved['sharedLayouts'][0]['name']);
+            }
+            $sharedPackage = $sharedName !== '' ? Worktype::sharedLayoutPackage($section, $sharedName) : null;
+            if (is_array($sharedPackage)) {
+                $resolved['storage'] = 'shared';
+                $resolved['source'] = 'shared';
+                $resolved['sharedName'] = $sharedName;
+                $resolved['directory'] = 'shared/' . $section . '/' . $sharedName;
+                $resolved['sectionDirectory'] = $resolved['directory'];
+                if (!array_key_exists('template', $resolved) || trim((string) $resolved['template']) === '') {
+                    $resolved['template'] = self::sanitizeStoredPromptTemplate((string) ($sharedPackage['template'] ?? ''), true);
+                }
+                if (!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') {
+                    $resolved['css'] = (string) ($sharedPackage['css'] ?? '');
+                }
+                if (!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') {
+                    $resolved['js'] = (string) ($sharedPackage['js'] ?? '');
+                }
+                if (!array_key_exists('sectionTemplate', $resolved) || trim((string) ($resolved['sectionTemplate'] ?? '')) === '') {
+                    $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) ($sharedPackage['sectionTemplate'] ?? ''), false);
+                }
+                $resolved['phpTemplate'] = (string) ($sharedPackage['template'] ?? $resolved['phpTemplate'] ?? '');
+                $resolved['assets'] = [];
+                $resolved['files'] = [];
+                $resolved['assetCount'] = 0;
+
+                return $resolved;
+            }
+        }
         $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)
             : self::fileLayoutDir($dir, $fileName);
@@ -686,6 +729,11 @@ class PoffConfig
 
         if (is_string($sectionTemplatePath) && $sectionTemplatePath !== '') {
             $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($sectionTemplatePath), false);
+        } elseif ($section === 'work') {
+            $sharedLayout = Worktype::sharedLayoutPackage($section, (string) ($resolved['name'] ?? Worktype::defaultLayoutName()));
+            if (is_array($sharedLayout) && isset($sharedLayout['sectionTemplate']) && is_string($sharedLayout['sectionTemplate']) && trim($sharedLayout['sectionTemplate']) !== '') {
+                $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) $sharedLayout['sectionTemplate'], false);
+            }
         }
 
         $resolved['assets'] = $assets;
@@ -935,7 +983,7 @@ class PoffConfig
             'section' => $resolved['section'],
         ];
 
-        foreach (['preset', 'model', 'stylePrompt'] as $key) {
+        foreach (['preset', 'source', 'sharedName', 'model', 'stylePrompt'] as $key) {
             if (array_key_exists($key, $resolved)) {
                 $serialized[$key] = $resolved[$key];
             }

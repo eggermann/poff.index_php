@@ -20,6 +20,8 @@ export function createLayoutDraftState({
 
 export function createLayoutModeController({
     presetEl,
+    getSharedLayoutName = () => '',
+    getSharedLayoutPackage = () => null,
     wrapperTarget,
     originalTarget,
     originalEditable,
@@ -31,7 +33,7 @@ export function createLayoutModeController({
         if (preset === 'custom') {
             return 'local';
         }
-        if (preset === 'actual') {
+        if (preset === 'actual' || preset === 'shared') {
             return 'virtual';
         }
         return hasVirtualSource ? 'virtual' : 'local';
@@ -39,16 +41,27 @@ export function createLayoutModeController({
 
     const syncLayoutMode = ({ modePreviewEl, sourcePreviewEl, primaryTitleEl, primaryHintEl, primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
         const preset = (presetEl?.value || 'actual').trim();
+        const sharedPackage = preset === 'shared' ? getSharedLayoutPackage() : null;
+        if (preset === 'shared' && sharedPackage) {
+            drafts.virtualTemplate = sharedPackage.template || drafts.virtualTemplate;
+            drafts.virtualCss = sharedPackage.css || drafts.virtualCss;
+            drafts.virtualJs = sharedPackage.js || drafts.virtualJs;
+        }
         const nextMode = preset === 'none'
             ? 'none'
             : preset === 'custom'
                 ? 'custom-layout'
+                : preset === 'shared'
+                    ? 'marketplace-layout'
                 : (originalEditable ? 'custom-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
         const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');
+        const sharedLayoutName = String(getSharedLayoutName() || '').trim();
         const sourcePreview = isVirtual
-            ? (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout')
+            ? (preset === 'shared'
+                ? `Marketplace: ${sharedLayoutName || 'shared'}`
+                : (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout'))
             : `Filesystem: ${localWrapperDirectory}`;
 
         if (modePreviewEl) {
@@ -58,10 +71,14 @@ export function createLayoutModeController({
             sourcePreviewEl.textContent = sourcePreview;
         }
         if (primaryTitleEl) {
-            primaryTitleEl.textContent = isVirtual ? 'Virtual layout' : 'Custom layout';
+            primaryTitleEl.textContent = preset === 'shared'
+                ? 'Shared layout'
+                : (isVirtual ? 'Virtual layout' : 'Custom layout');
         }
         if (primaryHintEl) {
-            if (isVirtual) {
+            if (preset === 'shared') {
+                primaryHintEl.innerHTML = `Editing shared marketplace layout <code>${escapeHtml(sharedLayoutName || 'shared')}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
+            } else if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
                     ? (originalTarget === localWrapperDirectory
                         ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.`
@@ -73,15 +90,15 @@ export function createLayoutModeController({
         }
         if (primaryTemplateEl) {
             primaryTemplateEl.value = isVirtual ? drafts.virtualTemplate : drafts.localTemplate;
-            primaryTemplateEl.disabled = isVirtual && !originalEditable;
+            primaryTemplateEl.disabled = isVirtual && !originalEditable && preset !== 'shared';
         }
         if (primaryCssEl) {
             primaryCssEl.value = isVirtual ? drafts.virtualCss : drafts.localCss;
-            primaryCssEl.disabled = isVirtual && !originalEditable;
+            primaryCssEl.disabled = isVirtual && !originalEditable && preset !== 'shared';
         }
         if (primaryJsEl) {
             primaryJsEl.value = isVirtual ? drafts.virtualJs : drafts.localJs;
-            primaryJsEl.disabled = isVirtual && !originalEditable;
+            primaryJsEl.disabled = isVirtual && !originalEditable && preset !== 'shared';
         }
     };
 
@@ -107,6 +124,7 @@ export function createLayoutModeController({
 
 export function buildLayoutSubmitPayload({
     preset,
+    sharedLayoutName = '',
     currentSectionTemplate,
     sectionWasLocal,
     contentTemplateEl,
@@ -118,11 +136,19 @@ export function buildLayoutSubmitPayload({
 }) {
     const payload = {
         layoutPreset: preset,
+        layoutSharedName: sharedLayoutName,
     };
 
     const contentTemplateValue = contentTemplateEl?.value ?? '';
     if (sectionWasLocal || contentTemplateValue !== currentSectionTemplate) {
         payload.contentTemplate = contentTemplateValue;
+    }
+
+    if (preset === 'shared') {
+        payload.layoutTemplate = drafts.virtualTemplate;
+        payload.layoutCss = drafts.virtualCss;
+        payload.layoutJs = drafts.virtualJs;
+        return payload;
     }
 
     if (currentPrimaryMode() === 'virtual') {

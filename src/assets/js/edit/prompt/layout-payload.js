@@ -35,6 +35,9 @@ export function buildPromptLayoutPayload({
         name: resolvedLayoutName,
         engine: 'lightncandy',
     };
+    const resolvedSharedName = typeof nextLayoutValue === 'object' && nextLayoutValue && typeof nextLayoutValue.sharedName === 'string'
+        ? nextLayoutValue.sharedName.trim()
+        : String(currentConfig?.work?.layout?.sharedName || '').trim();
 
     if (nextLayoutValue && typeof nextLayoutValue === 'object') {
         if (typeof nextLayoutValue.engine === 'string' && nextLayoutValue.engine.trim()) {
@@ -64,6 +67,10 @@ export function buildPromptLayoutPayload({
 
     const preset = (layoutPreset || layoutState.preset || 'actual').trim();
     layoutPayload.preset = preset;
+    if (preset === 'shared') {
+        layoutPayload.source = 'shared';
+        layoutPayload.sharedName = resolvedSharedName || resolvedLayoutName;
+    }
     const layoutPathName = (selection.previewPath || '').split('/').pop() || 'item';
     const localLayoutDirectory = selection.layoutIsFile
         ? `.works/${layoutPathName}.layout`
@@ -80,6 +87,8 @@ export function buildPromptLayoutPayload({
         ? 'none'
         : preset === 'custom'
             ? 'custom-layout'
+            : preset === 'shared'
+                ? (resolvedSharedName || resolvedLayoutName || 'poff-layout')
             : (canEditResolvedFilesystemTarget ? 'filesystem-layout' : 'poff-layout');
 
     if (shouldPersistToLocalWrapper) {

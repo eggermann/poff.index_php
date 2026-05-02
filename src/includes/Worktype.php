@@ -136,6 +136,8 @@ class Worktype
 
         foreach ([
             'preset',
+            'source',
+            'sharedName',
             'template',
             'model',
             'stylePrompt',
@@ -225,6 +227,22 @@ class Worktype
             return $layout['template'];
         }
 
+        $sharedName = trim((string) ($layout['sharedName'] ?? ''));
+        $isSharedLayout = in_array((string) ($layout['preset'] ?? ''), ['shared'], true)
+            || in_array((string) ($layout['source'] ?? ''), ['shared'], true)
+            || in_array((string) ($layout['storage'] ?? ''), ['shared'], true);
+        if ($isSharedLayout) {
+            if ($sharedName === '') {
+                $sharedName = trim((string) ($layout['name'] ?? ''));
+            }
+        }
+        if ($sharedName !== '') {
+            $sharedLayout = self::sharedLayoutPackage($kind === 'folder' ? 'works' : 'work', $sharedName);
+            if (is_array($sharedLayout) && is_string($sharedLayout['template'] ?? null) && trim((string) $sharedLayout['template']) !== '') {
+                return (string) $sharedLayout['template'];
+            }
+        }
+
         $namedTemplate = self::template($layout['name']);
         if (is_string($namedTemplate) && $namedTemplate !== '') {
             return $namedTemplate;
@@ -246,6 +264,85 @@ class Worktype
     public static function filesystemLayoutName(): string
     {
         return self::FILESYSTEM_LAYOUT_NAME;
+    }
+
+    public static function sharedLayoutChoices(string $section): array
+    {
+        $choices = [];
+        foreach ([self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME] as $name) {
+            $package = self::sharedLayoutPackage($section, $name);
+            if (is_array($package)) {
+                $package['source'] = 'bundled';
+                $choices[] = $package;
+            }
+        }
+
+        $sharedBase = __DIR__ . '/worktypes/templates/layout/shared/' . $section;
+        foreach ((glob($sharedBase . '/*/template.hbs') ?: []) as $path) {
+            $name = basename(dirname($path));
+            if ($name === '' || in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)) {
+                continue;
+            }
+            $package = self::sharedLayoutPackage($section, $name);
+            if (is_array($package)) {
+                $package['source'] = 'shared';
+                $choices[] = $package;
+            }
+        }
+
+        usort($choices, static fn(array $left, array $right): int => strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? '')));
+
+        return $choices;
+    }
+
+    public static function sharedLayoutPackage(string $section, string $name): ?array
+    {
+        $directory = self::sharedLayoutDirectory($section, $name);
+        if ($directory === null) {
+            return null;
+        }
+
+        $template = self::readLayoutPackageFile($directory, 'template.hbs');
+        if (!is_string($template) || trim($template) === '') {
+            return null;
+        }
+
+        return [
+            'name' => $name,
+            'label' => self::sharedLayoutLabel($name),
+            'section' => $section,
+            'directory' => $directory,
+            'template' => $template,
+            'css' => self::readLayoutPackageFile($directory, 'style.css') ?? '',
+            'js' => self::readLayoutPackageFile($directory, 'script.js') ?? '',
+            'sectionTemplate' => self::readLayoutPackageFile($directory, $section === 'works' ? 'works.hbs' : 'work.hbs') ?? '',
+        ];
+    }
+
+    private static function sharedLayoutLabel(string $name): string
+    {
+        return ucwords(str_replace(['-', '_'], ' ', trim($name)));
+    }
+
+    private static function sharedLayoutDirectory(string $section, string $name): ?string
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+
+        if (in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)) {
+            return self::layoutBundleDirectory($name);
+        }
+
+        $candidate = __DIR__ . '/worktypes/templates/layout/shared/' . $section . '/' . $name;
+        return is_dir($candidate) ? $candidate : null;
+    }
+
+    private static function readLayoutPackageFile(string $directory, string $file): ?string
+    {
+        $path = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($file, '/');
+        return is_file($path) ? (string) file_get_contents($path) : null;
     }
 
     public static function layoutBundleAsset(string $name, string $file): ?string
@@ -634,8 +731,22 @@ class Worktype
 
     private static function ensureTemplateIncludesSectionPartial(string $template, string $section, array $layout): string
     {
-        if (($layout['storage'] ?? '') !== 'filesystem') {
+        if (strpos($template, '{{#if isFolder}}') !== false && strpos($template, '{{else}}') !== false) {
             return $template;
+        }
+
+        $hasWorks = preg_match('/\{\{\s*>\s*works\b/', $template) === 1;
+        $hasWork = preg_match('/\{\{\s*>\s*work\b/', $template) === 1;
+        $sharedBlock = '{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}';
+
+        if ($hasWorks && !$hasWork) {
+            $updated = preg_replace('/\{\{\s*>\s*works\b[^}]*\}\}/', $sharedBlock, $template, 1);
+            return is_string($updated) ? $updated : $template;
+        }
+
+        if ($hasWork && !$hasWorks) {
+            $updated = preg_replace('/\{\{\s*>\s*work\b[^}]*\}\}/', $sharedBlock, $template, 1);
+            return is_string($updated) ? $updated : $template;
         }
 
         $partialPattern = '/\{\{\s*>\s*' . preg_quote($section, '/') . '\b/';

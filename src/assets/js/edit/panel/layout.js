@@ -26,9 +26,28 @@ function renderLayoutModeSummary({ subjectLabel, displayMode, wrapperSourceLabel
     `;
 }
 
+function renderSharedLayoutOptions(sharedLayouts = [], selectedName = '') {
+    if (!Array.isArray(sharedLayouts) || sharedLayouts.length === 0) {
+        return '<div class="small-note">No shared layouts available for this worktype.</div>';
+    }
+
+    return `
+        <label class="edit-label" for="edit-layout-shared">Shared layout</label>
+        <select class="form-select" id="edit-layout-shared" name="layout_shared">
+            ${sharedLayouts.map((option) => `
+                <option value="${escapeHtml(option.name || '')}" ${String(selectedName || '') === String(option.name || '') ? 'selected' : ''}>
+                    ${escapeHtml(option.label || option.name || 'shared')}
+                </option>
+            `).join('')}
+        </select>
+        <div class="small-note">Choose a marketplace layout from the same worktype.</div>
+    `;
+}
+
 function bindLayoutForm({
     form,
     presetEl,
+    sharedLayoutEl,
     contentTemplateEl,
     currentSectionTemplate,
     sectionWasLocal,
@@ -53,6 +72,7 @@ function bindLayoutForm({
         storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
         const payload = buildLayoutSubmitPayload({
             preset: (presetEl?.value || 'actual').trim(),
+            sharedLayoutName: sharedLayoutEl?.value || '',
             currentSectionTemplate,
             sectionWasLocal,
             contentTemplateEl,
@@ -81,6 +101,7 @@ export function renderEditLayoutPanel({
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onResetFolderWork,
 }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -114,9 +135,12 @@ export function renderEditLayoutPanel({
         { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
+        { value: 'shared', label: 'Shared' },
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === 'file';
+    const sharedLayouts = Array.isArray(layoutState.sharedLayouts) ? layoutState.sharedLayouts : [];
+    const sharedLayoutName = String(layoutState.sharedName || layoutState.name || '').trim();
     const uploadSectionHtml = renderUploadSectionHtml({
         isFileTarget: isFileSubject,
         isEmptyFolder: false,
@@ -136,6 +160,9 @@ export function renderEditLayoutPanel({
                             <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
                         `).join('')}
                     </select>
+                    <div class="mt-3${layoutState.preset === 'shared' ? '' : ' hidden'}" id="edit-layout-shared-wrap">
+                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName)}
+                    </div>
                 </div>
                 <div class="edit-layout-copy edit-layout-section-note">
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
@@ -206,6 +233,8 @@ export function renderEditLayoutPanel({
     const moreButton = editPanel.querySelector('#editLayoutMore');
     const manualDetailsEl = editPanel.querySelector('#editLayoutManual');
     const presetEl = editPanel.querySelector('#edit-layout-preset');
+    const sharedLayoutWrapEl = editPanel.querySelector('#edit-layout-shared-wrap');
+    const sharedLayoutEl = editPanel.querySelector('#edit-layout-shared');
     const modePreviewEl = editPanel.querySelector('#edit-layout-mode-preview');
     const sourcePreviewEl = editPanel.querySelector('#edit-layout-source-preview');
     const primaryTitleEl = editPanel.querySelector('#edit-layout-primary-title');
@@ -229,6 +258,8 @@ export function renderEditLayoutPanel({
 
     const { currentPrimaryMode, syncLayoutMode, storePrimaryDraft } = createLayoutModeController({
         presetEl,
+        getSharedLayoutName: () => sharedLayoutEl?.value || sharedLayoutName,
+        getSharedLayoutPackage: () => (sharedLayouts || []).find((option) => String(option.name || '') === String(sharedLayoutEl?.value || sharedLayoutName)) || null,
         wrapperTarget,
         originalTarget,
         originalEditable,
@@ -238,6 +269,9 @@ export function renderEditLayoutPanel({
 
     if (presetEl) {
         presetEl.addEventListener('change', async () => {
+            if (sharedLayoutWrapEl) {
+                sharedLayoutWrapEl.classList.toggle('hidden', presetEl.value !== 'shared');
+            }
             storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
             syncLayoutMode({
                 modePreviewEl,
@@ -252,10 +286,33 @@ export function renderEditLayoutPanel({
                 await onLayoutPresetChange({
                     payload: {
                         layoutPreset: (presetEl.value || 'actual').trim(),
+                        layoutSharedName: sharedLayoutEl?.value || sharedLayoutName,
                     },
                     statusEl,
                 });
             }
+        });
+    }
+    if (sharedLayoutEl) {
+        sharedLayoutEl.addEventListener('change', async () => {
+            if (typeof onLayoutPresetChange === 'function') {
+                await onLayoutPresetChange({
+                    payload: {
+                        layoutPreset: (presetEl?.value || 'actual').trim(),
+                        layoutSharedName: sharedLayoutEl.value,
+                    },
+                    statusEl,
+                });
+            }
+            syncLayoutMode({
+                modePreviewEl,
+                sourcePreviewEl,
+                primaryTitleEl,
+                primaryHintEl,
+                primaryTemplateEl,
+                primaryCssEl,
+                primaryJsEl,
+            });
         });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
@@ -286,6 +343,7 @@ export function renderEditLayoutPanel({
     bindLayoutForm({
         form,
         presetEl,
+        sharedLayoutEl,
         contentTemplateEl,
         currentSectionTemplate,
         sectionWasLocal,
@@ -309,6 +367,7 @@ export function renderEditLayoutPanel({
         onUploadFiles,
         onCreateBlankFile,
         onCreateFolder,
+        onResetFolderWork,
     });
 
     return { statusEl, promptRoot };
@@ -364,8 +423,11 @@ export function renderEditLayoutOverlay({
         { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
+        { value: 'shared', label: 'Shared' },
     ];
     const hasVirtualSource = !wrapperWasLocal && !originalUsesLocal;
+    const sharedLayouts = Array.isArray(layoutState.sharedLayouts) ? layoutState.sharedLayouts : [];
+    const sharedLayoutName = String(layoutState.sharedName || layoutState.name || '').trim();
 
     editLayoutOverlay.hidden = false;
     editLayoutOverlay.innerHTML = `
@@ -388,6 +450,9 @@ export function renderEditLayoutOverlay({
                                 <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
                             `).join('')}
                         </select>
+                        <div class="mt-3${layoutState.preset === 'shared' ? '' : ' hidden'}" id="edit-layout-shared-wrap">
+                            ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName)}
+                        </div>
                         <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                         <div class="small-note">Resolved wrapper: <code>${escapeHtml(wrapperSourceLabel)}</code></div>
                     </div>
@@ -451,6 +516,8 @@ export function renderEditLayoutOverlay({
     const closeButton = editLayoutOverlay.querySelector('#editLayoutOverlayClose');
     const cancelButton = editLayoutOverlay.querySelector('#editLayoutOverlayCancel');
     const presetEl = editLayoutOverlay.querySelector('#edit-layout-preset');
+    const sharedLayoutWrapEl = editLayoutOverlay.querySelector('#edit-layout-shared-wrap');
+    const sharedLayoutEl = editLayoutOverlay.querySelector('#edit-layout-shared');
     const modePreviewEl = editLayoutOverlay.querySelector('#edit-layout-mode-preview');
     const primaryTitleEl = editLayoutOverlay.querySelector('#edit-layout-primary-title');
     const primaryHintEl = editLayoutOverlay.querySelector('#edit-layout-primary-hint');
@@ -471,6 +538,8 @@ export function renderEditLayoutOverlay({
 
     const { currentPrimaryMode, syncLayoutMode, storePrimaryDraft } = createLayoutModeController({
         presetEl,
+        getSharedLayoutName: () => sharedLayoutEl?.value || sharedLayoutName,
+        getSharedLayoutPackage: () => (sharedLayouts || []).find((option) => String(option.name || '') === String(sharedLayoutEl?.value || sharedLayoutName)) || null,
         wrapperTarget,
         originalTarget,
         originalEditable,
@@ -500,6 +569,7 @@ export function renderEditLayoutOverlay({
             storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
             const payload = buildLayoutSubmitPayload({
                 preset: (presetEl?.value || 'actual').trim(),
+                sharedLayoutName: sharedLayoutEl?.value || sharedLayoutName,
                 currentSectionTemplate,
                 sectionWasLocal,
                 contentTemplateEl,
@@ -517,6 +587,33 @@ export function renderEditLayoutOverlay({
             if (typeof onClose === 'function') {
                 onClose();
             }
+        });
+    }
+    if (presetEl) {
+        presetEl.addEventListener('change', () => {
+            if (sharedLayoutWrapEl) {
+                sharedLayoutWrapEl.classList.toggle('hidden', presetEl.value !== 'shared');
+            }
+            syncLayoutMode({
+                modePreviewEl,
+                primaryTitleEl,
+                primaryHintEl,
+                primaryTemplateEl,
+                primaryCssEl,
+                primaryJsEl,
+            });
+        });
+    }
+    if (sharedLayoutEl) {
+        sharedLayoutEl.addEventListener('change', () => {
+            syncLayoutMode({
+                modePreviewEl,
+                primaryTitleEl,
+                primaryHintEl,
+                primaryTemplateEl,
+                primaryCssEl,
+                primaryJsEl,
+            });
         });
     }
 

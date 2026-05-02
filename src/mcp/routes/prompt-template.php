@@ -881,6 +881,7 @@ function handlePromptTemplate(array $opts): array
         'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
         'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
         'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this prompt.',
+        'If the current layout preset is shared, keep the selected sharedName within the same worktype family instead of inventing a new wrapper name.',
         'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this prompt.',
         'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
         'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',

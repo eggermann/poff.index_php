@@ -28,7 +28,7 @@ export function getLayoutState(config) {
         if (preset === 'inherit') {
             return 'actual';
         }
-        return ['actual', 'none', 'custom'].includes(preset) ? preset : '';
+        return ['actual', 'none', 'custom', 'shared'].includes(preset) ? preset : '';
     };
     const inferredSection = layoutValue && typeof layoutValue === 'object' && !Array.isArray(layoutValue) && layoutValue.section
         ? String(layoutValue.section)
@@ -46,21 +46,29 @@ export function getLayoutState(config) {
         if (!normalizePreset(state.preset)) {
             if (mode === 'none') {
                 preset = 'none';
+            } else if (storage === 'shared' || state.source === 'shared') {
+                preset = 'shared';
             } else if (storage === 'filesystem' && (directory === '.layout' || directory.startsWith('.works/'))) {
                 preset = 'custom';
             }
         }
         const sourceLabel = mode === 'none'
             ? 'No outer layout'
+            : preset === 'shared' || storage === 'shared' || state.source === 'shared'
+                ? `Marketplace: ${state.sharedName || state.name || 'shared'}`
             : storage === 'filesystem'
                 ? `Filesystem: ${directory || '.layout'}`
-                : storage === 'default'
+            : storage === 'default'
                     ? 'Built-in poff-layout'
                     : 'Current resolved layout';
+        const displayMode = preset === 'shared' || storage === 'shared' || state.source === 'shared'
+            ? 'marketplace-layout'
+            : mode;
 
         return {
             ...state,
-            mode,
+            mode: displayMode,
+            resolvedMode: mode,
             storage,
             directory,
             inheritedDirectory: state.inheritedDirectory || '',
@@ -69,6 +77,9 @@ export function getLayoutState(config) {
             sectionDirectory: state.sectionDirectory || '',
             phpTemplate: state.phpTemplate || '',
             preset,
+            source: state.source || '',
+            sharedName: state.sharedName || '',
+            sharedLayouts: Array.isArray(state.sharedLayouts) ? state.sharedLayouts : [],
             sourceLabel,
         };
     };
@@ -88,6 +99,9 @@ export function getLayoutState(config) {
             sectionDirectory: layoutValue.sectionDirectory || '',
             phpTemplate: layoutValue.phpTemplate || '',
             preset: layoutValue.preset || '',
+            source: layoutValue.source || '',
+            sharedName: layoutValue.sharedName || '',
+            sharedLayouts: Array.isArray(layoutValue.sharedLayouts) ? layoutValue.sharedLayouts : [],
             assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : [],
         });
     }

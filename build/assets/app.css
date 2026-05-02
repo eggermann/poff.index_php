@@ -217,6 +217,7 @@
 .bg-slate-900\/80{background-color:rgb(15 23 42 / 0.8);}
 .bg-slate-900\/90{background-color:rgb(15 23 42 / 0.9);}
 .bg-slate-950{--un-bg-opacity:1;background-color:rgb(2 6 23 / var(--un-bg-opacity));}
+.bg-slate-950\/60{background-color:rgb(2 6 23 / 0.6);}
 .bg-slate-950\/70{background-color:rgb(2 6 23 / 0.7);}
 .bg-slate-950\/80{background-color:rgb(2 6 23 / 0.8);}
 .bg-white{--un-bg-opacity:1;background-color:rgb(255 255 255 / var(--un-bg-opacity));}

@@ -10,6 +10,7 @@ require_once __DIR__ . '/edit/prompt-context.php';
 require_once __DIR__ . '/edit/prompt-compact.php';
 require_once __DIR__ . '/edit/upload.php';
 require_once __DIR__ . '/edit/delete.php';
+require_once __DIR__ . '/edit/reset.php';
 
 function cmsIniBytes(string $value): int
 {
@@ -238,6 +239,29 @@ function cmsHandleEditAction(): void
         exit;
     }
 
+    if ($action === 'reset') {
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => 'Reset requires POST.',
+            ], 405);
+        }
+
+        $resetResult = cmsResetFolderTarget($rootDir, $path);
+        if (($resetResult['errors'] ?? []) !== []) {
+            cmsJsonResponse([
+                'allowed' => true,
+                'error' => $resetResult['errors'][0] ?? 'Reset failed.',
+            ], 400);
+        }
+
+        cmsJsonResponse([
+            'allowed' => true,
+            'reset' => $resetResult['reset'],
+            'config' => $resetResult['config'],
+        ]);
+    }
+
     if ($action === 'save') {
         if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
             cmsJsonResponse([
@@ -463,8 +487,14 @@ function cmsHandleEditAction(): void
             if ($layoutPreset === 'inherit') {
                 $layoutPreset = 'actual';
             }
-            if (in_array($layoutPreset, ['actual', 'none', 'custom'], true)) {
+            if (in_array($layoutPreset, ['actual', 'none', 'custom', 'shared'], true)) {
                 $layout['preset'] = $layoutPreset;
+            }
+            if (array_key_exists('source', $layoutPayload)) {
+                $layout['source'] = trim((string) $layoutPayload['source']);
+            }
+            if (array_key_exists('sharedName', $layoutPayload)) {
+                $layout['sharedName'] = trim((string) $layoutPayload['sharedName']);
             }
             if ($layoutTemplateProvided) {
                 $layout['template'] = $layoutTemplate;
@@ -634,9 +664,11 @@ function cmsHandleEditAction(): void
                 'name' => (string) ($config['work']['layout']['name'] ?? ''),
                 'mode' => (string) ($config['work']['layout']['mode'] ?? ''),
                 'storage' => (string) ($config['work']['layout']['storage'] ?? ''),
+                'source' => (string) ($config['work']['layout']['source'] ?? ''),
                 'directory' => (string) ($config['work']['layout']['directory'] ?? ''),
                 'inheritedDirectory' => (string) ($config['work']['layout']['inheritedDirectory'] ?? ''),
                 'sectionDirectory' => (string) ($config['work']['layout']['sectionDirectory'] ?? ''),
+                'sharedName' => (string) ($config['work']['layout']['sharedName'] ?? ''),
                 'template' => (string) ($config['work']['layout']['template'] ?? ''),
                 'sectionTemplate' => (string) ($config['work']['layout']['sectionTemplate'] ?? ''),
                 'css' => (string) ($config['work']['layout']['css'] ?? ($config['work']['layout']['style'] ?? '')),
@@ -650,6 +682,7 @@ function cmsHandleEditAction(): void
                 'Response format: return strict JSON.',
                 'Required key: "template" with the outer layout wrapper HBS string.',
                 'Optional keys: "css", "js", and "work". Prefer utility classes; use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
+                'If the user chooses a shared/marketplace layout, include "source":"shared" and "sharedName":"<layout>" so the same worktype family can resolve the imported template.',
                 'For layouts shared by folders and files, return sibling partials in "work": {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
                 'Optional key: "work" for work.* updates when the user explicitly requests them, including custom work.fields entries.',
                 'Template requirement: keep a <main class="poff-default-layout__main"> block that renders {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}.',

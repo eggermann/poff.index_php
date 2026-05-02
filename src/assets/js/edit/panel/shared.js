@@ -88,18 +88,26 @@ export function layoutOverlayState(config, status) {
         originalTemplate = layoutState.template || '';
         originalCss = layoutState.css || '';
         originalJs = layoutState.js || '';
+    } else if (layoutState.storage === 'shared') {
+        originalTemplate = layoutState.template || '';
+        originalCss = layoutState.css || '';
+        originalJs = layoutState.js || '';
     } else if (!originalEditable) {
         originalTemplate = layoutState.phpTemplate || '';
     }
 
     const wrapperSourceLabel = layoutState.storage === 'filesystem'
         ? `Filesystem: ${layoutState.directory || localLayoutDirectory}`
+        : layoutState.storage === 'shared'
+            ? (layoutState.sourceLabel || `Marketplace: ${layoutState.sharedName || layoutState.name || 'shared'}`)
         : 'PHP built-in poff-layout';
     const inheritedLayoutLabel = hasInheritedLayout
         ? layoutState.inheritedDirectory
         : 'No parent .layout found';
     const originalLabel = originalEditable
         ? `Editable source: ${originalTarget}`
+        : layoutState.storage === 'shared'
+            ? `Marketplace layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || 'shared'}`
         : 'PHP built-in poff-layout is read-only until a parent .layout exists';
     const displayMode = layoutState.mode === 'filesystem-layout'
         ? 'custom-layout'

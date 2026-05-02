@@ -368,6 +368,7 @@ export function renderEditPanel({
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onResetFolderWork,
     onDeleteTarget,
 }) {
     if (!editPanel) {
@@ -472,7 +473,14 @@ export function renderEditPanel({
                 <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
                 <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+            <div class="edit-inline-actions">
+                ${!isFileTarget && typeof onResetFolderWork === 'function' ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
+                    Reset work
+                </button>
+                ` : ''}
+                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+            </div>
         </div>
         ${uploadSectionHtml}
         ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
@@ -482,6 +490,7 @@ export function renderEditPanel({
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
     const deleteTargetButton = editPanel.querySelector('#editDeleteTarget');
+    const resetFolderWorkButton = editPanel.querySelector('#editResetFolderWork');
     const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
@@ -519,6 +528,15 @@ export function renderEditPanel({
     }
     if (changeLayoutButton && typeof onOpenLayoutPage === 'function') {
         changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
+    }
+    if (resetFolderWorkButton && typeof onResetFolderWork === 'function') {
+        resetFolderWorkButton.addEventListener('click', async () => {
+            const confirmed = window.prompt('Type rm -rf to reset this folder work to the default inherited layout. This removes the local .layout override.');
+            if ((confirmed || '').trim() !== 'rm -rf') {
+                return;
+            }
+            await onResetFolderWork({ statusEl });
+        });
     }
     if (deleteTargetButton && typeof onDeleteTarget === 'function') {
         deleteTargetButton.addEventListener('click', async () => {

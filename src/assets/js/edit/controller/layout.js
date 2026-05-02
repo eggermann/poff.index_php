@@ -1,10 +1,13 @@
 export function createLayoutNameForPreset(editConfig) {
-    return (layoutPreset = 'actual') => {
+    return (layoutPreset = 'actual', sharedLayoutName = '') => {
         const preset = String(layoutPreset || 'actual').trim() === 'inherit'
             ? 'actual'
             : String(layoutPreset || 'actual').trim();
         if (preset === 'none') {
             return 'none';
+        }
+        if (preset === 'shared') {
+            return String(sharedLayoutName || editConfig?.work?.layout?.sharedName || editConfig?.work?.layout?.name || 'poff-layout').trim() || 'poff-layout';
         }
         if (preset === 'custom') {
             return 'custom-layout';
@@ -27,10 +30,14 @@ export function buildLayoutPayload(payload, layoutNameForPreset) {
     const rawLayoutPreset = (payload.layoutPreset || 'actual').trim();
     const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
     const layoutPayload = {
-        name: layoutNameForPreset(layoutPreset),
+        name: layoutNameForPreset(layoutPreset, payload.layoutSharedName || ''),
         engine: 'lightncandy',
         preset: layoutPreset,
     };
+    if (layoutPreset === 'shared') {
+        layoutPayload.source = 'shared';
+        layoutPayload.sharedName = payload.layoutSharedName || layoutPayload.name;
+    }
     if (Object.prototype.hasOwnProperty.call(payload, 'contentTemplate')) {
         layoutPayload.sectionTemplate = payload.contentTemplate ?? '';
     }

@@ -164,13 +164,18 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const resolvedLayoutDirectory = layout?.directory ? String(layout.directory) : '';
     const inheritedLayoutDirectory = layout?.inheritedDirectory ? String(layout.inheritedDirectory) : '';
     const presetEl = isLayout ? document.getElementById('edit-layout-preset') : null;
+    const sharedPresetEl = isLayout ? document.getElementById('edit-layout-shared') : null;
     const layoutPreset = isLayout && presetEl ? String(presetEl.value || '').trim() : '';
+    const layoutSharedName = isLayout && sharedPresetEl ? String(sharedPresetEl.value || '').trim() : '';
     const activeLayoutDirectory = (() => {
         if (!isLayout) {
             return resolvedLayoutDirectory || localLayoutDirectory;
         }
         if (layoutPreset === 'custom') {
             return localLayoutDirectory;
+        }
+        if (layoutStorage === 'shared' && resolvedLayoutDirectory) {
+            return resolvedLayoutDirectory;
         }
         if (layoutStorage === 'filesystem' && resolvedLayoutDirectory) {
             return resolvedLayoutDirectory;
@@ -237,6 +242,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         virtualPath,
         isLayout,
         layoutPreset,
+        layoutSharedName,
         name,
         pageLink: viewUrl,
         viewUrl,
@@ -318,6 +324,7 @@ export function renderPromptContext(contextEl, context) {
     const path = context?.path || '';
     const virtualPath = context?.virtualPath || '';
     const layoutPreset = context?.layoutPreset || '';
+    const layoutSharedName = context?.layoutSharedName || '';
     const name = context?.name || '';
     const pageLink = context?.pageLink || context?.viewUrl || '';
     const viewUrl = context?.viewUrl || '';
@@ -339,6 +346,7 @@ export function renderPromptContext(contextEl, context) {
         <div class="prompt-context-grid">
             ${context?.isLayout ? renderRow('virtualPath', virtualPath) : ''}
             ${context?.isLayout && layoutPreset ? renderRow('layoutPreset', layoutPreset) : ''}
+            ${context?.isLayout && layoutSharedName ? renderRow('layoutSharedName', layoutSharedName) : ''}
             ${renderRow('pageLink', pageLink)}
             ${renderRow('path', path)}
             ${renderRow('name', name)}

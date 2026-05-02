@@ -111,6 +111,42 @@ export async function requestEditDelete(payload) {
     }
 }
 
+export async function requestEditReset(payload) {
+    const url = buildCmsUrl('reset', payload.path || '');
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return data || {
+                allowed: false,
+                error: responseText.trim() || `Reset endpoint failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || {
+            allowed: false,
+            error: responseText.trim() || 'Reset endpoint returned invalid JSON.',
+        };
+    } catch (err) {
+        return {
+            allowed: false,
+            error: err?.message || 'Reset endpoint unavailable.',
+        };
+    }
+}
+
 export async function requestPromptTemplate(payload) {
     const url = buildCmsUrl('prompt', payload.path || '');
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;

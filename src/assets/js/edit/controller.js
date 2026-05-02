@@ -1,4 +1,4 @@
-import { requestEditConfig, requestEditDelete, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
+import { requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
@@ -190,6 +190,25 @@ export function createEditController({ elements, context, editRequested }) {
                 window.location.hash = nextPath ? `#/${nextPath}` : '';
                 await refreshCurrentEditState(getActiveSelection());
             },
+            onResetFolderWork: async ({ statusEl }) => {
+                const selection = getActiveSelection();
+                const targetPath = getEditTargetPath(selection);
+                if (!targetPath) {
+                    throw new Error('Reset target unavailable.');
+                }
+                const data = await requestEditReset({
+                    path: targetPath,
+                    return: selection.previewPath || selection.path || '',
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Reset failed.');
+                }
+                drawerOpen = false;
+                syncDrawerVisibility();
+                setStatusMessage(statusEl, 'Folder work reset to default.', true);
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                await refreshCurrentEditState(getActiveSelection());
+            },
             onReturnToWork: () => {
                 const selection = getActiveSelection();
                 const nextPath = selection.previewPath || '';
@@ -217,9 +236,15 @@ export function createEditController({ elements, context, editRequested }) {
                 await saveConfig({
                     path: getEditTargetPath(getActiveSelection()),
                     layout: {
-                        name: layoutNameForPreset(layoutPreset),
+                        name: layoutNameForPreset(layoutPreset, payload?.layoutSharedName || ''),
                         engine: 'lightncandy',
                         preset: layoutPreset,
+                        ...(layoutPreset === 'shared'
+                            ? {
+                                source: 'shared',
+                                sharedName: payload?.layoutSharedName || layoutNameForPreset(layoutPreset, payload?.layoutSharedName || ''),
+                            }
+                            : {}),
                     },
                 }, statusEl);
             },
@@ -261,6 +286,23 @@ export function createEditController({ elements, context, editRequested }) {
                     setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            },
+            onResetFolderWork: async ({ statusEl }) => {
+                const selection = getActiveSelection();
+                const targetPath = getEditTargetPath(selection);
+                if (!targetPath) {
+                    throw new Error('Reset target unavailable.');
+                }
+                const data = await requestEditReset({
+                    path: targetPath,
+                    return: selection.previewPath || selection.path || '',
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Reset failed.');
+                }
+                setStatusMessage(statusEl, 'Folder work reset to default.', true);
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                await refreshCurrentEditState(getActiveSelection());
             },
             onCreateFolder: async ({ source, folderName }) => {
                 const selection = getActiveSelection();

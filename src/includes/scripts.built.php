@@ -120,6 +120,41 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       };
     }
   }
+  async function requestEditReset(payload) {
+    const url = buildCmsUrl("reset", payload.path || "");
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
+      }
+      if (!res.ok) {
+        return data || {
+          allowed: false,
+          error: responseText.trim() || `Reset endpoint failed (HTTP ${res.status}).`
+        };
+      }
+      return data || {
+        allowed: false,
+        error: responseText.trim() || "Reset endpoint returned invalid JSON."
+      };
+    } catch (err) {
+      return {
+        allowed: false,
+        error: (err == null ? void 0 : err.message) || "Reset endpoint unavailable."
+      };
+    }
+  }
   async function requestPromptTemplate(payload) {
     const url = buildCmsUrl("prompt", payload.path || "");
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -396,7 +431,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       if (preset === "inherit") {
         return "actual";
       }
-      return ["actual", "none", "custom"].includes(preset) ? preset : "";
+      return ["actual", "none", "custom", "shared"].includes(preset) ? preset : "";
     };
     const inferredSection = layoutValue && typeof layoutValue === "object" && !Array.isArray(layoutValue) && layoutValue.section ? String(layoutValue.section) : (config == null ? void 0 : config.type) === "folder" || ((_b = config == null ? void 0 : config.work) == null ? void 0 : _b.type) === "folder" && !(config == null ? void 0 : config.name) ? "works" : "work";
     const normalize = (state) => {
@@ -408,14 +443,18 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       if (!normalizePreset(state.preset)) {
         if (mode === "none") {
           preset = "none";
+        } else if (storage === "shared" || state.source === "shared") {
+          preset = "shared";
         } else if (storage === "filesystem" && (directory === ".layout" || directory.startsWith(".works/"))) {
           preset = "custom";
         }
       }
-      const sourceLabel = mode === "none" ? "No outer layout" : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in poff-layout" : "Current resolved layout";
+      const sourceLabel = mode === "none" ? "No outer layout" : preset === "shared" || storage === "shared" || state.source === "shared" ? `Marketplace: ${state.sharedName || state.name || "shared"}` : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in poff-layout" : "Current resolved layout";
+      const displayMode = preset === "shared" || storage === "shared" || state.source === "shared" ? "marketplace-layout" : mode;
       return {
         ...state,
-        mode,
+        mode: displayMode,
+        resolvedMode: mode,
         storage,
         directory,
         inheritedDirectory: state.inheritedDirectory || "",
@@ -424,6 +463,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         sectionDirectory: state.sectionDirectory || "",
         phpTemplate: state.phpTemplate || "",
         preset,
+        source: state.source || "",
+        sharedName: state.sharedName || "",
+        sharedLayouts: Array.isArray(state.sharedLayouts) ? state.sharedLayouts : [],
         sourceLabel
       };
     };
@@ -443,6 +485,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         sectionDirectory: layoutValue.sectionDirectory || "",
         phpTemplate: layoutValue.phpTemplate || "",
         preset: layoutValue.preset || "",
+        source: layoutValue.source || "",
+        sharedName: layoutValue.sharedName || "",
+        sharedLayouts: Array.isArray(layoutValue.sharedLayouts) ? layoutValue.sharedLayouts : [],
         assets: Array.isArray(layoutValue.assets) ? layoutValue.assets : []
       });
     }
@@ -568,6 +613,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
+    "When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
     "Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
@@ -1298,13 +1344,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const resolvedLayoutDirectory = (layout == null ? void 0 : layout.directory) ? String(layout.directory) : "";
     const inheritedLayoutDirectory = (layout == null ? void 0 : layout.inheritedDirectory) ? String(layout.inheritedDirectory) : "";
     const presetEl = isLayout ? document.getElementById("edit-layout-preset") : null;
+    const sharedPresetEl = isLayout ? document.getElementById("edit-layout-shared") : null;
     const layoutPreset = isLayout && presetEl ? String(presetEl.value || "").trim() : "";
+    const layoutSharedName = isLayout && sharedPresetEl ? String(sharedPresetEl.value || "").trim() : "";
     const activeLayoutDirectory = (() => {
       if (!isLayout) {
         return resolvedLayoutDirectory || localLayoutDirectory;
       }
       if (layoutPreset === "custom") {
         return localLayoutDirectory;
+      }
+      if (layoutStorage === "shared" && resolvedLayoutDirectory) {
+        return resolvedLayoutDirectory;
       }
       if (layoutStorage === "filesystem" && resolvedLayoutDirectory) {
         return resolvedLayoutDirectory;
@@ -1363,6 +1414,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       virtualPath,
       isLayout,
       layoutPreset,
+      layoutSharedName,
       name,
       pageLink: viewUrl,
       viewUrl,
@@ -1442,6 +1494,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const path = (context == null ? void 0 : context.path) || "";
     const virtualPath = (context == null ? void 0 : context.virtualPath) || "";
     const layoutPreset = (context == null ? void 0 : context.layoutPreset) || "";
+    const layoutSharedName = (context == null ? void 0 : context.layoutSharedName) || "";
     const name = (context == null ? void 0 : context.name) || "";
     const pageLink = (context == null ? void 0 : context.pageLink) || (context == null ? void 0 : context.viewUrl) || "";
     const viewUrl = (context == null ? void 0 : context.viewUrl) || "";
@@ -1463,6 +1516,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         <div class="prompt-context-grid">
             ${(context == null ? void 0 : context.isLayout) ? renderRow("virtualPath", virtualPath) : ""}
             ${(context == null ? void 0 : context.isLayout) && layoutPreset ? renderRow("layoutPreset", layoutPreset) : ""}
+            ${(context == null ? void 0 : context.isLayout) && layoutSharedName ? renderRow("layoutSharedName", layoutSharedName) : ""}
             ${renderRow("pageLink", pageLink)}
             ${renderRow("path", path)}
             ${renderRow("name", name)}
@@ -2022,12 +2076,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     responseModel = "",
     layoutPreset = getLayoutPresetValue()
   }) {
+    var _a, _b;
     const layoutState = getLayoutState(currentConfig || {});
     const resolvedLayoutName = resolveLayoutName(nextLayoutValue, drawerForm, currentConfig);
     const layoutPayload = {
       name: resolvedLayoutName,
       engine: "lightncandy"
     };
+    const resolvedSharedName = typeof nextLayoutValue === "object" && nextLayoutValue && typeof nextLayoutValue.sharedName === "string" ? nextLayoutValue.sharedName.trim() : String(((_b = (_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) == null ? void 0 : _b.sharedName) || "").trim();
     if (nextLayoutValue && typeof nextLayoutValue === "object") {
       if (typeof nextLayoutValue.engine === "string" && nextLayoutValue.engine.trim()) {
         layoutPayload.engine = nextLayoutValue.engine.trim();
@@ -2053,12 +2109,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     };
     const preset = (layoutPreset || layoutState.preset || "actual").trim();
     layoutPayload.preset = preset;
+    if (preset === "shared") {
+      layoutPayload.source = "shared";
+      layoutPayload.sharedName = resolvedSharedName || resolvedLayoutName;
+    }
     const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
     const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
     const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
     const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
     const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
-    layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
+    layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? resolvedSharedName || resolvedLayoutName || "poff-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
     if (shouldPersistToLocalWrapper) {
       layoutPayload.template = templateText;
       if (responseSectionTemplate !== null) {
@@ -3041,12 +3101,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       originalTemplate = layoutState.template || "";
       originalCss = layoutState.css || "";
       originalJs = layoutState.js || "";
+    } else if (layoutState.storage === "shared") {
+      originalTemplate = layoutState.template || "";
+      originalCss = layoutState.css || "";
+      originalJs = layoutState.js || "";
     } else if (!originalEditable) {
       originalTemplate = layoutState.phpTemplate || "";
     }
-    const wrapperSourceLabel = layoutState.storage === "filesystem" ? `Filesystem: ${layoutState.directory || localLayoutDirectory}` : "PHP built-in poff-layout";
+    const wrapperSourceLabel = layoutState.storage === "filesystem" ? `Filesystem: ${layoutState.directory || localLayoutDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Marketplace: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
     const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
-    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
+    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Marketplace layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
     const displayMode = layoutState.mode === "filesystem-layout" ? "custom-layout" : layoutState.mode;
     return {
       layoutState,
@@ -3301,6 +3365,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
   function createLayoutModeController({
     presetEl,
+    getSharedLayoutName = () => "",
+    getSharedLayoutPackage = () => null,
     wrapperTarget,
     originalTarget,
     originalEditable,
@@ -3312,18 +3378,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (preset === "custom") {
         return "local";
       }
-      if (preset === "actual") {
+      if (preset === "actual" || preset === "shared") {
         return "virtual";
       }
       return hasVirtualSource ? "virtual" : "local";
     };
     const syncLayoutMode = ({ modePreviewEl, sourcePreviewEl, primaryTitleEl, primaryHintEl, primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
       const preset = ((presetEl == null ? void 0 : presetEl.value) || "actual").trim();
-      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : originalEditable ? "custom-layout" : "poff-layout";
+      const sharedPackage = preset === "shared" ? getSharedLayoutPackage() : null;
+      if (preset === "shared" && sharedPackage) {
+        drafts.virtualTemplate = sharedPackage.template || drafts.virtualTemplate;
+        drafts.virtualCss = sharedPackage.css || drafts.virtualCss;
+        drafts.virtualJs = sharedPackage.js || drafts.virtualJs;
+      }
+      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? "marketplace-layout" : originalEditable ? "custom-layout" : "poff-layout";
       const primaryMode = currentPrimaryMode();
       const isVirtual = primaryMode === "virtual";
       const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, "");
-      const sourcePreview = isVirtual ? originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
+      const sharedLayoutName = String(getSharedLayoutName() || "").trim();
+      const sourcePreview = isVirtual ? preset === "shared" ? `Marketplace: ${sharedLayoutName || "shared"}` : originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
       if (modePreviewEl) {
         modePreviewEl.textContent = nextMode;
       }
@@ -3331,10 +3404,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         sourcePreviewEl.textContent = sourcePreview;
       }
       if (primaryTitleEl) {
-        primaryTitleEl.textContent = isVirtual ? "Virtual layout" : "Custom layout";
+        primaryTitleEl.textContent = preset === "shared" ? "Shared layout" : isVirtual ? "Virtual layout" : "Custom layout";
       }
       if (primaryHintEl) {
-        if (isVirtual) {
+        if (preset === "shared") {
+          primaryHintEl.innerHTML = `Editing shared marketplace layout <code>${escapeHtml(sharedLayoutName || "shared")}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
+        } else if (isVirtual) {
           primaryHintEl.innerHTML = originalEditable ? originalTarget === localWrapperDirectory ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.` : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled poff-layout. It stays read-only until a parent .layout exists.";
         } else {
           primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
@@ -3342,15 +3417,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       if (primaryTemplateEl) {
         primaryTemplateEl.value = isVirtual ? drafts.virtualTemplate : drafts.localTemplate;
-        primaryTemplateEl.disabled = isVirtual && !originalEditable;
+        primaryTemplateEl.disabled = isVirtual && !originalEditable && preset !== "shared";
       }
       if (primaryCssEl) {
         primaryCssEl.value = isVirtual ? drafts.virtualCss : drafts.localCss;
-        primaryCssEl.disabled = isVirtual && !originalEditable;
+        primaryCssEl.disabled = isVirtual && !originalEditable && preset !== "shared";
       }
       if (primaryJsEl) {
         primaryJsEl.value = isVirtual ? drafts.virtualJs : drafts.localJs;
-        primaryJsEl.disabled = isVirtual && !originalEditable;
+        primaryJsEl.disabled = isVirtual && !originalEditable && preset !== "shared";
       }
     };
     const storePrimaryDraft = ({ primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
@@ -3374,6 +3449,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
   function buildLayoutSubmitPayload({
     preset,
+    sharedLayoutName = "",
     currentSectionTemplate,
     sectionWasLocal,
     contentTemplateEl,
@@ -3385,11 +3461,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }) {
     var _a;
     const payload = {
-      layoutPreset: preset
+      layoutPreset: preset,
+      layoutSharedName: sharedLayoutName
     };
     const contentTemplateValue = (_a = contentTemplateEl == null ? void 0 : contentTemplateEl.value) != null ? _a : "";
     if (sectionWasLocal || contentTemplateValue !== currentSectionTemplate) {
       payload.contentTemplate = contentTemplateValue;
+    }
+    if (preset === "shared") {
+      payload.layoutTemplate = drafts.virtualTemplate;
+      payload.layoutCss = drafts.virtualCss;
+      payload.layoutJs = drafts.virtualJs;
+      return payload;
     }
     if (currentPrimaryMode() === "virtual") {
       if (originalEditable) {
@@ -3426,9 +3509,26 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         </div>
     `;
   }
+  function renderSharedLayoutOptions(sharedLayouts = [], selectedName = "") {
+    if (!Array.isArray(sharedLayouts) || sharedLayouts.length === 0) {
+      return '<div class="small-note">No shared layouts available for this worktype.</div>';
+    }
+    return `
+        <label class="edit-label" for="edit-layout-shared">Shared layout</label>
+        <select class="form-select" id="edit-layout-shared" name="layout_shared">
+            ${sharedLayouts.map((option) => `
+                <option value="${escapeHtml(option.name || "")}" ${String(selectedName || "") === String(option.name || "") ? "selected" : ""}>
+                    ${escapeHtml(option.label || option.name || "shared")}
+                </option>
+            `).join("")}
+        </select>
+        <div class="small-note">Choose a marketplace layout from the same worktype.</div>
+    `;
+  }
   function bindLayoutForm({
     form,
     presetEl,
+    sharedLayoutEl,
     contentTemplateEl,
     currentSectionTemplate,
     sectionWasLocal,
@@ -3452,6 +3552,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
       const payload = buildLayoutSubmitPayload({
         preset: ((presetEl == null ? void 0 : presetEl.value) || "actual").trim(),
+        sharedLayoutName: (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || "",
         currentSectionTemplate,
         sectionWasLocal,
         contentTemplateEl,
@@ -3477,7 +3578,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onReturnToWork,
     onUploadFiles,
     onCreateBlankFile,
-    onCreateFolder
+    onCreateFolder,
+    onResetFolderWork
   }) {
     const settings = loadPromptSettings();
     const subjectStatus = {
@@ -3510,10 +3612,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const layoutPresetOptions = [
       { value: "actual", label: "Inherit" },
       { value: "none", label: "None" },
-      { value: "custom", label: "Custom" }
+      { value: "custom", label: "Custom" },
+      { value: "shared", label: "Shared" }
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === "file";
+    const sharedLayouts = Array.isArray(layoutState.sharedLayouts) ? layoutState.sharedLayouts : [];
+    const sharedLayoutName = String(layoutState.sharedName || layoutState.name || "").trim();
     const uploadSectionHtml = renderUploadSectionHtml({
       isFileTarget: isFileSubject,
       isEmptyFolder: false
@@ -3532,6 +3637,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <option value="${option.value}" ${layoutState.preset === option.value ? "selected" : ""}>${option.label}</option>
                         `).join("")}
                     </select>
+                    <div class="mt-3${layoutState.preset === "shared" ? "" : " hidden"}" id="edit-layout-shared-wrap">
+                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName)}
+                    </div>
                 </div>
                 <div class="edit-layout-copy edit-layout-section-note">
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
@@ -3601,6 +3709,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const moreButton = editPanel.querySelector("#editLayoutMore");
     const manualDetailsEl = editPanel.querySelector("#editLayoutManual");
     const presetEl = editPanel.querySelector("#edit-layout-preset");
+    const sharedLayoutWrapEl = editPanel.querySelector("#edit-layout-shared-wrap");
+    const sharedLayoutEl = editPanel.querySelector("#edit-layout-shared");
     const modePreviewEl = editPanel.querySelector("#edit-layout-mode-preview");
     const sourcePreviewEl = editPanel.querySelector("#edit-layout-source-preview");
     const primaryTitleEl = editPanel.querySelector("#edit-layout-primary-title");
@@ -3622,6 +3732,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     });
     const { currentPrimaryMode, syncLayoutMode, storePrimaryDraft } = createLayoutModeController({
       presetEl,
+      getSharedLayoutName: () => (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName,
+      getSharedLayoutPackage: () => (sharedLayouts || []).find((option) => String(option.name || "") === String((sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName)) || null,
       wrapperTarget,
       originalTarget,
       originalEditable,
@@ -3630,6 +3742,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     });
     if (presetEl) {
       presetEl.addEventListener("change", async () => {
+        if (sharedLayoutWrapEl) {
+          sharedLayoutWrapEl.classList.toggle("hidden", presetEl.value !== "shared");
+        }
         storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
         syncLayoutMode({
           modePreviewEl,
@@ -3643,11 +3758,34 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (typeof onLayoutPresetChange === "function") {
           await onLayoutPresetChange({
             payload: {
-              layoutPreset: (presetEl.value || "actual").trim()
+              layoutPreset: (presetEl.value || "actual").trim(),
+              layoutSharedName: (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName
             },
             statusEl
           });
         }
+      });
+    }
+    if (sharedLayoutEl) {
+      sharedLayoutEl.addEventListener("change", async () => {
+        if (typeof onLayoutPresetChange === "function") {
+          await onLayoutPresetChange({
+            payload: {
+              layoutPreset: ((presetEl == null ? void 0 : presetEl.value) || "actual").trim(),
+              layoutSharedName: sharedLayoutEl.value
+            },
+            statusEl
+          });
+        }
+        syncLayoutMode({
+          modePreviewEl,
+          sourcePreviewEl,
+          primaryTitleEl,
+          primaryHintEl,
+          primaryTemplateEl,
+          primaryCssEl,
+          primaryJsEl
+        });
       });
     }
     [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
@@ -3676,6 +3814,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     bindLayoutForm({
       form,
       presetEl,
+      sharedLayoutEl,
       contentTemplateEl,
       currentSectionTemplate,
       sectionWasLocal,
@@ -3697,7 +3836,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
       onUploadFiles,
       onCreateBlankFile,
-      onCreateFolder
+      onCreateFolder,
+      onResetFolderWork
     });
     return { statusEl, promptRoot };
   }
@@ -4033,6 +4173,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onResetFolderWork,
     onDeleteTarget
   }) {
     if (!editPanel) {
@@ -4134,7 +4275,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
                 <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
             </div>
-            <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+            <div class="edit-inline-actions">
+                ${!isFileTarget && typeof onResetFolderWork === "function" ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
+                    Reset work
+                </button>
+                ` : ""}
+                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+            </div>
         </div>
         ${uploadSectionHtml}
         ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
@@ -4143,6 +4291,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const statusEl = editPanel.querySelector("#editInlineStatus");
     const moreToggle = editPanel.querySelector("#editMoreToggle");
     const deleteTargetButton = editPanel.querySelector("#editDeleteTarget");
+    const resetFolderWorkButton = editPanel.querySelector("#editResetFolderWork");
     const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
@@ -4180,6 +4329,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (changeLayoutButton && typeof onOpenLayoutPage === "function") {
       changeLayoutButton.addEventListener("click", () => onOpenLayoutPage());
     }
+    if (resetFolderWorkButton && typeof onResetFolderWork === "function") {
+      resetFolderWorkButton.addEventListener("click", async () => {
+        const confirmed = window.prompt("Type rm -rf to reset this folder work to the default inherited layout. This removes the local .layout override.");
+        if ((confirmed || "").trim() !== "rm -rf") {
+          return;
+        }
+        await onResetFolderWork({ statusEl });
+      });
+    }
     if (deleteTargetButton && typeof onDeleteTarget === "function") {
       deleteTargetButton.addEventListener("click", async () => {
         const confirmed = window.confirm("Delete this item? This cannot be undone.");
@@ -4202,16 +4360,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
 
   // src/assets/js/edit/controller/layout.js
   function createLayoutNameForPreset(editConfig) {
-    return (layoutPreset = "actual") => {
-      var _a;
+    return (layoutPreset = "actual", sharedLayoutName = "") => {
+      var _a, _b, _c, _d, _e;
       const preset = String(layoutPreset || "actual").trim() === "inherit" ? "actual" : String(layoutPreset || "actual").trim();
       if (preset === "none") {
         return "none";
       }
+      if (preset === "shared") {
+        return String(sharedLayoutName || ((_b = (_a = editConfig == null ? void 0 : editConfig.work) == null ? void 0 : _a.layout) == null ? void 0 : _b.sharedName) || ((_d = (_c = editConfig == null ? void 0 : editConfig.work) == null ? void 0 : _c.layout) == null ? void 0 : _d.name) || "poff-layout").trim() || "poff-layout";
+      }
       if (preset === "custom") {
         return "custom-layout";
       }
-      const currentLayout = (_a = editConfig == null ? void 0 : editConfig.work) == null ? void 0 : _a.layout;
+      const currentLayout = (_e = editConfig == null ? void 0 : editConfig.work) == null ? void 0 : _e.layout;
       const hasFilesystemSource = !!(currentLayout && typeof currentLayout === "object" && (currentLayout.storage === "filesystem" || typeof currentLayout.directory === "string" && currentLayout.directory.trim() !== "" || typeof currentLayout.inheritedDirectory === "string" && currentLayout.inheritedDirectory.trim() !== ""));
       return hasFilesystemSource ? "filesystem-layout" : "poff-layout";
     };
@@ -4221,10 +4382,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const rawLayoutPreset = (payload.layoutPreset || "actual").trim();
     const layoutPreset = rawLayoutPreset === "inherit" ? "actual" : rawLayoutPreset;
     const layoutPayload = {
-      name: layoutNameForPreset(layoutPreset),
+      name: layoutNameForPreset(layoutPreset, payload.layoutSharedName || ""),
       engine: "lightncandy",
       preset: layoutPreset
     };
+    if (layoutPreset === "shared") {
+      layoutPayload.source = "shared";
+      layoutPayload.sharedName = payload.layoutSharedName || layoutPayload.name;
+    }
     if (Object.prototype.hasOwnProperty.call(payload, "contentTemplate")) {
       layoutPayload.sectionTemplate = (_a = payload.contentTemplate) != null ? _a : "";
     }
@@ -4447,6 +4612,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           window.location.hash = nextPath ? `#/${nextPath}` : "";
           await refreshCurrentEditState(getActiveSelection());
         },
+        onResetFolderWork: async ({ statusEl }) => {
+          const selection2 = getActiveSelection();
+          const targetPath = getEditTargetPath(selection2);
+          if (!targetPath) {
+            throw new Error("Reset target unavailable.");
+          }
+          const data = await requestEditReset({
+            path: targetPath,
+            return: selection2.previewPath || selection2.path || ""
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Reset failed.");
+          }
+          drawerOpen = false;
+          syncDrawerVisibility();
+          setStatusMessage(statusEl, "Folder work reset to default.", true);
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          await refreshCurrentEditState(getActiveSelection());
+        },
         onReturnToWork: () => {
           const selection2 = getActiveSelection();
           const nextPath = selection2.previewPath || "";
@@ -4472,9 +4656,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           await saveConfig({
             path: getEditTargetPath(getActiveSelection()),
             layout: {
-              name: layoutNameForPreset(layoutPreset),
+              name: layoutNameForPreset(layoutPreset, (payload == null ? void 0 : payload.layoutSharedName) || ""),
               engine: "lightncandy",
-              preset: layoutPreset
+              preset: layoutPreset,
+              ...layoutPreset === "shared" ? {
+                source: "shared",
+                sharedName: (payload == null ? void 0 : payload.layoutSharedName) || layoutNameForPreset(layoutPreset, (payload == null ? void 0 : payload.layoutSharedName) || "")
+              } : {}
             }
           }, statusEl);
         },
@@ -4515,6 +4703,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
           }
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        },
+        onResetFolderWork: async ({ statusEl }) => {
+          const selection2 = getActiveSelection();
+          const targetPath = getEditTargetPath(selection2);
+          if (!targetPath) {
+            throw new Error("Reset target unavailable.");
+          }
+          const data = await requestEditReset({
+            path: targetPath,
+            return: selection2.previewPath || selection2.path || ""
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Reset failed.");
+          }
+          setStatusMessage(statusEl, "Folder work reset to default.", true);
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          await refreshCurrentEditState(getActiveSelection());
         },
         onCreateFolder: async ({ source, folderName }) => {
           var _a;

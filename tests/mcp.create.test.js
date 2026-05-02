@@ -206,6 +206,25 @@ function runDeleteTarget(targetDir, relativePath) {
   });
 }
 
+function runResetFolder(targetDir, relativePath) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_reset_folder.php'), targetDir, relativePath];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env, POFF_BASE: POFF_DIR },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`reset helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runCreateFolder(targetDir, folderName) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_create_folder.php'), targetDir, folderName];
@@ -1938,5 +1957,97 @@ describe('Worktype HBS renderer', () => {
         expect.objectContaining({ name: 'nested' }),
       ]),
     );
+  });
+
+  test('resets a folder work override back to the inherited default layout', async () => {
+    const tempDir = path.join(POFF_DIR, `reset-layout-${Date.now()}`);
+    copyDirSync(PERSIST_LAYOUT_DIR, tempDir);
+
+    try {
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(true);
+
+      const output = await runResetFolder(tempDir, '');
+      const result = JSON.parse(output);
+
+      expect(result.errors).toEqual([]);
+      expect(result.reset).toEqual([
+        expect.objectContaining({ name: '.layout', path: '.layout', type: 'layout' }),
+      ]);
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(false);
+      expect(result.config.work.layout).toEqual(
+        expect.objectContaining({
+          name: 'filesystem-layout',
+          mode: 'filesystem-layout',
+          section: 'works',
+        }),
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('hydrates a shared marketplace layout without creating local wrapper files', async () => {
+    const tempDir = path.join(POFF_DIR, `shared-layout-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'story.txt'), 'shared');
+
+    try {
+      const output = await runLayoutFilesystem('persist-folder', tempDir, '', {
+        name: 'filesystem-layout',
+        engine: 'lightncandy',
+        section: 'works',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'filesystem-layout',
+      });
+      const serializedLayout = JSON.parse(output);
+
+      expect(serializedLayout).toMatchObject({
+        name: 'filesystem-layout',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'filesystem-layout',
+      });
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(false);
+
+      const configPath = path.join(tempDir, 'poff.config.json');
+      fs.writeFileSync(configPath, JSON.stringify({
+        folderName: 'shared-layout',
+        slug: 'shared-layout',
+        title: 'shared-layout',
+        description: '',
+        type: 'folder',
+        id: 'poff_shared_layout',
+        tree: [
+          {
+            name: 'story.txt',
+            slug: 'story-txt',
+            type: 'file',
+            path: 'story.txt',
+            modifiedAt: new Date().toISOString(),
+            visible: true,
+          },
+        ],
+        treeHash: 'shared',
+        updatedAt: new Date().toISOString(),
+        work: {
+          type: 'folder',
+          layout: serializedLayout,
+        },
+      }, null, 2));
+
+      const ensuredOutput = await runLayoutFilesystem('ensure-folder', tempDir);
+      const ensuredConfig = JSON.parse(ensuredOutput);
+      expect(ensuredConfig.work.layout).toEqual(
+        expect.objectContaining({
+          preset: 'shared',
+          source: 'shared',
+          sharedName: 'filesystem-layout',
+          storage: 'shared',
+        }),
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
