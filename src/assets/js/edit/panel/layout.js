@@ -26,21 +26,48 @@ function renderLayoutModeSummary({ subjectLabel, displayMode, wrapperSourceLabel
     `;
 }
 
-function renderSharedLayoutOptions(sharedLayouts = [], selectedName = '') {
+function renderSharedLayoutOptions(sharedLayouts = [], selectedName = '', currentLayoutDirectory = '') {
     if (!Array.isArray(sharedLayouts) || sharedLayouts.length === 0) {
-        return '<div class="small-note">No shared layouts available for this worktype.</div>';
+        return '<div class="small-note">No collection layouts available for this worktype.</div>';
     }
 
+    const groupedLayouts = sharedLayouts.reduce((groups, option) => {
+        const groupKey = String(option?.source || 'collection').trim() === 'bundled' ? 'built-in' : 'collection';
+        if (!groups[groupKey]) {
+            groups[groupKey] = [];
+        }
+        groups[groupKey].push(option);
+        return groups;
+    }, {});
+    const isCurrentOption = (option) => String(option?.directory || option?.name || '') === String(currentLayoutDirectory || '');
+    const optionLabel = (option, fallback) => {
+        const label = option?.label || option?.name || fallback;
+        return `${label}${isCurrentOption(option) ? ' (current)' : ''}`;
+    };
+
     return `
-        <label class="edit-label" for="edit-layout-shared">Shared layout</label>
+        <label class="edit-label" for="edit-layout-shared">Collection layout</label>
         <select class="form-select" id="edit-layout-shared" name="layout_shared">
-            ${sharedLayouts.map((option) => `
-                <option value="${escapeHtml(option.name || '')}" ${String(selectedName || '') === String(option.name || '') ? 'selected' : ''}>
-                    ${escapeHtml(option.label || option.name || 'shared')}
-                </option>
-            `).join('')}
+            ${groupedLayouts['built-in']?.length ? `
+                <optgroup label="Built-in">
+                    ${groupedLayouts['built-in'].map((option) => `
+                        <option value="${escapeHtml(option.name || '')}" ${String(selectedName || '') === String(option.name || '') ? 'selected' : ''}>
+                            ${escapeHtml(optionLabel(option, 'built-in'))}
+                        </option>
+                    `).join('')}
+                </optgroup>
+            ` : ''}
+            ${groupedLayouts.collection?.length ? `
+                <optgroup label="Collection">
+                    ${groupedLayouts.collection.map((option) => `
+                        <option value="${escapeHtml(option.name || '')}" ${String(selectedName || '') === String(option.name || '') ? 'selected' : ''}>
+                            ${escapeHtml(optionLabel(option, 'collection'))}
+                        </option>
+                    `).join('')}
+                </optgroup>
+            ` : ''}
         </select>
-        <div class="small-note">Choose a marketplace layout from the same worktype.</div>
+        <div class="small-note">Choose a layout from the same worktype. The visible names come from the folder names.</div>
     `;
 }
 
@@ -135,7 +162,7 @@ export function renderEditLayoutPanel({
         { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
-        { value: 'shared', label: 'Shared' },
+        { value: 'shared', label: 'Collection' },
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === 'file';
@@ -161,7 +188,7 @@ export function renderEditLayoutPanel({
                         `).join('')}
                     </select>
                     <div class="mt-3${layoutState.preset === 'shared' ? '' : ' hidden'}" id="edit-layout-shared-wrap">
-                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName)}
+                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName, layoutState.directory || '')}
                     </div>
                 </div>
                 <div class="edit-layout-copy edit-layout-section-note">
@@ -423,7 +450,7 @@ export function renderEditLayoutOverlay({
         { value: 'actual', label: 'Inherit' },
         { value: 'none', label: 'None' },
         { value: 'custom', label: 'Custom' },
-        { value: 'shared', label: 'Shared' },
+        { value: 'shared', label: 'Collection' },
     ];
     const hasVirtualSource = !wrapperWasLocal && !originalUsesLocal;
     const sharedLayouts = Array.isArray(layoutState.sharedLayouts) ? layoutState.sharedLayouts : [];
@@ -451,7 +478,7 @@ export function renderEditLayoutOverlay({
                             `).join('')}
                         </select>
                         <div class="mt-3${layoutState.preset === 'shared' ? '' : ' hidden'}" id="edit-layout-shared-wrap">
-                            ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName)}
+                            ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName, layoutState.directory || '')}
                         </div>
                         <div class="small-note">Resolved mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                         <div class="small-note">Resolved wrapper: <code>${escapeHtml(wrapperSourceLabel)}</code></div>

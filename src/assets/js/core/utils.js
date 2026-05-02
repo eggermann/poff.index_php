@@ -55,14 +55,14 @@ export function getLayoutState(config) {
         const sourceLabel = mode === 'none'
             ? 'No outer layout'
             : preset === 'shared' || storage === 'shared' || state.source === 'shared'
-                ? `Marketplace: ${state.sharedName || state.name || 'shared'}`
+                ? `Collection: ${state.sharedName || state.name || 'shared'}`
             : storage === 'filesystem'
                 ? `Filesystem: ${directory || '.layout'}`
             : storage === 'default'
                     ? 'Built-in poff-layout'
                     : 'Current resolved layout';
         const displayMode = preset === 'shared' || storage === 'shared' || state.source === 'shared'
-            ? 'marketplace-layout'
+            ? 'collection-layout'
             : mode;
 
         return {

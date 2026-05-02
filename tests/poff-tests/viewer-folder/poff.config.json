@@ -5,14 +5,14 @@
     "title": "Folder Preview",
     "description": "Folder layout from prompt",
     "type": "folder",
-    "id": "poff_54da7d1971f62fe0",
+    "id": "poff_6752b6b2f4d483ab",
     "tree": [
         {
             "name": "child.txt",
             "slug": "child-txt",
             "type": "file",
             "path": "child.txt",
-            "modifiedAt": "2026-05-02T21:25:10+00:00",
+            "modifiedAt": "2026-05-02T22:36:13+00:00",
             "visible": true
         },
         {
@@ -20,12 +20,12 @@
             "slug": "nested-child",
             "type": "folder",
             "path": "nested-child",
-            "modifiedAt": "2026-05-02T21:25:10+00:00",
+            "modifiedAt": "2026-05-02T22:36:13+00:00",
             "visible": true
         }
     ],
-    "treeHash": "16af1b076f45c66814c89c3f53d70e519292f85200bb36bd5ce30ce01b2bc393",
-    "updatedAt": "2026-05-02T21:25:11+00:00",
+    "treeHash": "fcf7b173e887a61a7876f940a60b1c0cf7b74f8f7dbe34ee4202678d7a01b7e0",
+    "updatedAt": "2026-05-02T22:36:13+00:00",
     "work": {
         "type": "folder",
         "layout": {

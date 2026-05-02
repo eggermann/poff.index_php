@@ -28,6 +28,12 @@ export function createLayoutModeController({
     hasVirtualSource,
     drafts,
 }) {
+    const getSharedLayoutLabel = () => {
+        const sharedPackage = getSharedLayoutPackage?.();
+        const sharedName = String(getSharedLayoutName() || '').trim();
+        return String(sharedPackage?.label || sharedPackage?.name || sharedName || 'shared').trim();
+    };
+
     const currentPrimaryMode = () => {
         const preset = (presetEl?.value || 'actual').trim();
         if (preset === 'custom') {
@@ -52,15 +58,15 @@ export function createLayoutModeController({
             : preset === 'custom'
                 ? 'custom-layout'
                 : preset === 'shared'
-                    ? 'marketplace-layout'
+                    ? 'collection-layout'
                 : (originalEditable ? 'custom-layout' : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
         const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');
-        const sharedLayoutName = String(getSharedLayoutName() || '').trim();
+        const sharedLayoutName = getSharedLayoutLabel();
         const sourcePreview = isVirtual
             ? (preset === 'shared'
-                ? `Marketplace: ${sharedLayoutName || 'shared'}`
+                ? `Collection: ${sharedLayoutName || 'shared'}`
                 : (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout'))
             : `Filesystem: ${localWrapperDirectory}`;
 
@@ -72,12 +78,12 @@ export function createLayoutModeController({
         }
         if (primaryTitleEl) {
             primaryTitleEl.textContent = preset === 'shared'
-                ? 'Shared layout'
+                ? 'Collection layout'
                 : (isVirtual ? 'Virtual layout' : 'Custom layout');
         }
         if (primaryHintEl) {
             if (preset === 'shared') {
-                primaryHintEl.innerHTML = `Editing shared marketplace layout <code>${escapeHtml(sharedLayoutName || 'shared')}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
+                primaryHintEl.innerHTML = `Editing collection layout <code>${escapeHtml(sharedLayoutName || 'shared')}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
             } else if (isVirtual) {
                 primaryHintEl.innerHTML = originalEditable
                     ? (originalTarget === localWrapperDirectory

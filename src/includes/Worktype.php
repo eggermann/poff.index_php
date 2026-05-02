@@ -269,28 +269,22 @@ class Worktype
     public static function sharedLayoutChoices(string $section): array
     {
         $choices = [];
-        foreach ([self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME] as $name) {
-            $package = self::sharedLayoutPackage($section, $name);
-            if (is_array($package)) {
-                $package['source'] = 'bundled';
-                $choices[] = $package;
-            }
-        }
-
-        $sharedBase = __DIR__ . '/worktypes/templates/layout/shared/' . $section;
-        foreach ((glob($sharedBase . '/*/template.hbs') ?: []) as $path) {
+        $layoutBase = __DIR__ . '/worktypes/templates/layout';
+        foreach ((glob($layoutBase . '/*/template.hbs') ?: []) as $path) {
             $name = basename(dirname($path));
-            if ($name === '' || in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)) {
+            if ($name === '' || $name === 'shared') {
                 continue;
             }
             $package = self::sharedLayoutPackage($section, $name);
             if (is_array($package)) {
-                $package['source'] = 'shared';
+                $package['source'] = in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)
+                    ? 'bundled'
+                    : 'shared';
                 $choices[] = $package;
             }
         }
 
-        usort($choices, static fn(array $left, array $right): int => strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? '')));
+        usort($choices, static fn(array $left, array $right): int => strcasecmp((string) ($left['folderName'] ?? $left['label'] ?? ''), (string) ($right['folderName'] ?? $right['label'] ?? '')));
 
         return $choices;
     }
@@ -309,7 +303,8 @@ class Worktype
 
         return [
             'name' => $name,
-            'label' => self::sharedLayoutLabel($name),
+            'folderName' => self::sharedLayoutFolderName($directory),
+            'label' => self::sharedLayoutFolderName($directory),
             'section' => $section,
             'directory' => $directory,
             'template' => $template,
@@ -319,9 +314,10 @@ class Worktype
         ];
     }
 
-    private static function sharedLayoutLabel(string $name): string
+    private static function sharedLayoutFolderName(string $directory): string
     {
-        return ucwords(str_replace(['-', '_'], ' ', trim($name)));
+        $folderName = basename(rtrim($directory, DIRECTORY_SEPARATOR));
+        return trim($folderName) !== '' ? $folderName : 'shared';
     }
 
     private static function sharedLayoutDirectory(string $section, string $name): ?string
@@ -333,6 +329,11 @@ class Worktype
 
         if (in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)) {
             return self::layoutBundleDirectory($name);
+        }
+
+        $candidate = __DIR__ . '/worktypes/templates/layout/' . $name;
+        if (is_dir($candidate) && is_file($candidate . DIRECTORY_SEPARATOR . 'template.hbs')) {
+            return $candidate;
         }
 
         $candidate = __DIR__ . '/worktypes/templates/layout/shared/' . $section . '/' . $name;
@@ -697,7 +698,8 @@ class Worktype
                 return null;
             }
 
-            return $renderer(self::buildRenderContext($kind, $ctx, $work, $layout));
+            $rendered = $renderer(self::buildRenderContext($kind, $ctx, $work, $layout));
+            return is_string($rendered) ? self::normalizeRenderedViewerUrls($rendered) : null;
         } catch (\Throwable $error) {
             return null;
         } finally {
@@ -727,6 +729,29 @@ class Worktype
         }
 
         return $sanitized;
+    }
+
+    private static function normalizeRenderedViewerUrls(string $html): string
+    {
+        return preg_replace_callback(
+            '/\b(href|src)=([\'"])(.*?)\2/i',
+            static function (array $matches): string {
+                $value = html_entity_decode((string) $matches[3], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (substr_count($value, '?view=1&') < 2) {
+                    return $matches[0];
+                }
+
+                $lastQueryStart = strrpos($value, '?view=1&');
+                if ($lastQueryStart === false) {
+                    return $matches[0];
+                }
+
+                $normalized = substr($value, $lastQueryStart);
+                $escaped = htmlspecialchars($normalized, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                return $matches[1] . '=' . $matches[2] . $escaped . $matches[2];
+            },
+            $html
+        ) ?? $html;
     }
 
     private static function ensureTemplateIncludesSectionPartial(string $template, string $section, array $layout): string

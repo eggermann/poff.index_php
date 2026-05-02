@@ -471,7 +471,7 @@ export function renderEditPanel({
                 <div class="edit-layout-title">Layout</div>
                 <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
                 <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
+                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
             </div>
             <div class="edit-inline-actions">
                 ${!isFileTarget && typeof onResetFolderWork === 'function' ? `

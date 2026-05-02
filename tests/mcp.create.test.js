@@ -1629,6 +1629,59 @@ describe('Worktype HBS renderer', () => {
     expect(output).not.toContain('%3Fview%3D1%26path%3Dlinkone');
   });
 
+  test('normalizes duplicated viewer urls in custom layout links', async () => {
+    const tempDir = path.join(POFF_DIR, 'viewer-link-normalize');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'note.txt'), 'note');
+
+    try {
+      await runLayoutFilesystem('persist-folder', tempDir, '', {
+        name: 'custom-layout',
+        engine: 'lightncandy',
+        section: 'works',
+        template: '<header class="poff-default-layout__header"><div class="poff-default-layout__content"><a href="{{pageLink}}?view=1&path=linkone">Portfolio</a></div></header><main class="poff-default-layout__main">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main>',
+        worksTemplate: '<div>{{#each items}}<a href="{{pageLink}}">{{name}}</a>{{/each}}</div>',
+        workTemplate: '<span>{{name}}</span>',
+      });
+
+      const template = fs.readFileSync(path.join(tempDir, '.layout', 'template.hbs'), 'utf8');
+      const output = await runViewer('', tempDir);
+
+      expect(template).toContain('href="?view=1&path=linkone"');
+      expect(template).not.toContain('{{pageLink}}?view=1&path=linkone');
+      expect(output).toContain('href="?view=1&path=linkone"');
+      expect(output).not.toContain('?view=1&amp;path=viewer-link-normalize?view=1&amp;path=linkone');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('file views inherit the containing folder work partial over stale file-local sections', async () => {
+    const tempDir = path.join(POFF_DIR, 'file-layout-inheritance');
+    const fileName = 'clip.mp4';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.works', `${fileName}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'video');
+    fs.writeFileSync(
+      path.join(tempDir, '.layout', 'template.hbs'),
+      '<div class="folder-shell">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+    );
+    fs.writeFileSync(path.join(tempDir, '.layout', 'work.hbs'), '<article class="folder-work">{{name}}</article>');
+    fs.writeFileSync(path.join(tempDir, '.works', `${fileName}.layout`, 'work.hbs'), '<article class="stale-file-work">{{name}}</article>');
+
+    try {
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-file', tempDir, fileName));
+      expect(ensured.work.layout.directory).toBe('tests/poff-tests/file-layout-inheritance/.layout');
+      expect(ensured.work.layout.sectionDirectory).toBe('tests/poff-tests/file-layout-inheritance/.layout');
+      expect(ensured.work.layout.sectionTemplate).toContain('folder-work');
+      expect(ensured.work.layout.sectionTemplate).not.toContain('stale-file-work');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('renders file previews from .works/<file>.layout', async () => {
     const output = await runViewer(VIEWER_FILE_NAME);
 
@@ -2046,6 +2099,73 @@ describe('Worktype HBS renderer', () => {
           storage: 'shared',
         }),
       );
+      expect(Array.isArray(ensuredConfig.work.layout.sharedLayouts)).toBe(true);
+      expect(ensuredConfig.work.layout.sharedLayouts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'default', folderName: 'default', label: 'default' }),
+          expect.objectContaining({ name: 'file-system', folderName: 'file-system', label: 'file-system' }),
+          expect.objectContaining({ name: 'viewer-folder/.layout', folderName: 'viewer-folder', label: 'viewer-folder', source: 'collection' }),
+        ]),
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('hydrates a recursive folder collection layout by relative layout path', async () => {
+    const tempDir = path.join(POFF_DIR, `recursive-layout-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'story.txt'), 'recursive shared');
+
+    try {
+      const output = await runLayoutFilesystem('persist-folder', tempDir, '', {
+        name: 'viewer-folder/.layout',
+        engine: 'lightncandy',
+        section: 'works',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'viewer-folder/.layout',
+      });
+      const serializedLayout = JSON.parse(output);
+
+      const configPath = path.join(tempDir, 'poff.config.json');
+      fs.writeFileSync(configPath, JSON.stringify({
+        folderName: 'recursive-layout',
+        slug: 'recursive-layout',
+        title: 'recursive-layout',
+        description: '',
+        type: 'folder',
+        id: 'poff_recursive_layout',
+        tree: [
+          {
+            name: 'story.txt',
+            slug: 'story-txt',
+            type: 'file',
+            path: 'story.txt',
+            modifiedAt: new Date().toISOString(),
+            visible: true,
+          },
+        ],
+        treeHash: 'recursive',
+        updatedAt: new Date().toISOString(),
+        work: {
+          type: 'folder',
+          layout: serializedLayout,
+        },
+      }, null, 2));
+
+      const ensuredOutput = await runLayoutFilesystem('ensure-folder', tempDir);
+      const ensuredConfig = JSON.parse(ensuredOutput);
+      expect(ensuredConfig.work.layout).toEqual(
+        expect.objectContaining({
+          preset: 'shared',
+          source: 'shared',
+          sharedName: 'viewer-folder/.layout',
+          storage: 'shared',
+          directory: 'viewer-folder/.layout',
+        }),
+      );
+      expect(ensuredConfig.work.layout.template).toContain('folder-custom');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

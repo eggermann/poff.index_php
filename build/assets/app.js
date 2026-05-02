@@ -437,8 +437,8 @@
           preset = "custom";
         }
       }
-      const sourceLabel = mode === "none" ? "No outer layout" : preset === "shared" || storage === "shared" || state.source === "shared" ? `Marketplace: ${state.sharedName || state.name || "shared"}` : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in poff-layout" : "Current resolved layout";
-      const displayMode = preset === "shared" || storage === "shared" || state.source === "shared" ? "marketplace-layout" : mode;
+      const sourceLabel = mode === "none" ? "No outer layout" : preset === "shared" || storage === "shared" || state.source === "shared" ? `Collection: ${state.sharedName || state.name || "shared"}` : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in poff-layout" : "Current resolved layout";
+      const displayMode = preset === "shared" || storage === "shared" || state.source === "shared" ? "collection-layout" : mode;
       return {
         ...state,
         mode: displayMode,
@@ -3072,7 +3072,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const sectionName = layoutState.section || (isFile ? "work" : "works");
     const localLayoutDirectory = isFile ? `.works/${config.name || config.path || "item"}.layout` : ".layout";
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
-    const sectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
+    const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
+    const activeSectionDirectory = String(layoutState.sectionDirectory || "").trim();
+    const sectionTarget = activeSectionDirectory ? `${activeSectionDirectory}/${sectionName}.hbs` : isFile && layoutState.storage === "filesystem" && layoutState.directory !== localLayoutDirectory ? `built-in ${sectionName}.hbs` : localSectionTarget;
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
     const hasInheritedLayout = !!layoutState.inheritedDirectory;
@@ -3096,9 +3098,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     } else if (!originalEditable) {
       originalTemplate = layoutState.phpTemplate || "";
     }
-    const wrapperSourceLabel = layoutState.storage === "filesystem" ? `Filesystem: ${layoutState.directory || localLayoutDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Marketplace: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
+    const resolvedDirectory = layoutState.directory || localLayoutDirectory;
+    const wrapperSourceLabel = layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
     const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
-    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Marketplace layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
+    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
     const displayMode = layoutState.mode === "filesystem-layout" ? "custom-layout" : layoutState.mode;
     return {
       layoutState,
@@ -3106,6 +3109,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       sectionName,
       localLayoutDirectory,
       wrapperTarget,
+      localSectionTarget,
       sectionTarget,
       wrapperWasLocal,
       sectionWasLocal,
@@ -3361,6 +3365,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     hasVirtualSource,
     drafts
   }) {
+    const getSharedLayoutLabel = () => {
+      const sharedPackage = getSharedLayoutPackage == null ? void 0 : getSharedLayoutPackage();
+      const sharedName = String(getSharedLayoutName() || "").trim();
+      return String((sharedPackage == null ? void 0 : sharedPackage.label) || (sharedPackage == null ? void 0 : sharedPackage.name) || sharedName || "shared").trim();
+    };
     const currentPrimaryMode = () => {
       const preset = ((presetEl == null ? void 0 : presetEl.value) || "actual").trim();
       if (preset === "custom") {
@@ -3379,12 +3388,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         drafts.virtualCss = sharedPackage.css || drafts.virtualCss;
         drafts.virtualJs = sharedPackage.js || drafts.virtualJs;
       }
-      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? "marketplace-layout" : originalEditable ? "custom-layout" : "poff-layout";
+      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? "collection-layout" : originalEditable ? "custom-layout" : "poff-layout";
       const primaryMode = currentPrimaryMode();
       const isVirtual = primaryMode === "virtual";
       const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, "");
-      const sharedLayoutName = String(getSharedLayoutName() || "").trim();
-      const sourcePreview = isVirtual ? preset === "shared" ? `Marketplace: ${sharedLayoutName || "shared"}` : originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
+      const sharedLayoutName = getSharedLayoutLabel();
+      const sourcePreview = isVirtual ? preset === "shared" ? `Collection: ${sharedLayoutName || "shared"}` : originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
       if (modePreviewEl) {
         modePreviewEl.textContent = nextMode;
       }
@@ -3392,11 +3401,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         sourcePreviewEl.textContent = sourcePreview;
       }
       if (primaryTitleEl) {
-        primaryTitleEl.textContent = preset === "shared" ? "Shared layout" : isVirtual ? "Virtual layout" : "Custom layout";
+        primaryTitleEl.textContent = preset === "shared" ? "Collection layout" : isVirtual ? "Virtual layout" : "Custom layout";
       }
       if (primaryHintEl) {
         if (preset === "shared") {
-          primaryHintEl.innerHTML = `Editing shared marketplace layout <code>${escapeHtml(sharedLayoutName || "shared")}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
+          primaryHintEl.innerHTML = `Editing collection layout <code>${escapeHtml(sharedLayoutName || "shared")}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
         } else if (isVirtual) {
           primaryHintEl.innerHTML = originalEditable ? originalTarget === localWrapperDirectory ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.` : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled poff-layout. It stays read-only until a parent .layout exists.";
         } else {
@@ -3497,20 +3506,47 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         </div>
     `;
   }
-  function renderSharedLayoutOptions(sharedLayouts = [], selectedName = "") {
+  function renderSharedLayoutOptions(sharedLayouts = [], selectedName = "", currentLayoutDirectory = "") {
+    var _a, _b;
     if (!Array.isArray(sharedLayouts) || sharedLayouts.length === 0) {
-      return '<div class="small-note">No shared layouts available for this worktype.</div>';
+      return '<div class="small-note">No collection layouts available for this worktype.</div>';
     }
+    const groupedLayouts = sharedLayouts.reduce((groups, option) => {
+      const groupKey = String((option == null ? void 0 : option.source) || "collection").trim() === "bundled" ? "built-in" : "collection";
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(option);
+      return groups;
+    }, {});
+    const isCurrentOption = (option) => String((option == null ? void 0 : option.directory) || (option == null ? void 0 : option.name) || "") === String(currentLayoutDirectory || "");
+    const optionLabel = (option, fallback) => {
+      const label = (option == null ? void 0 : option.label) || (option == null ? void 0 : option.name) || fallback;
+      return `${label}${isCurrentOption(option) ? " (current)" : ""}`;
+    };
     return `
-        <label class="edit-label" for="edit-layout-shared">Shared layout</label>
+        <label class="edit-label" for="edit-layout-shared">Collection layout</label>
         <select class="form-select" id="edit-layout-shared" name="layout_shared">
-            ${sharedLayouts.map((option) => `
-                <option value="${escapeHtml(option.name || "")}" ${String(selectedName || "") === String(option.name || "") ? "selected" : ""}>
-                    ${escapeHtml(option.label || option.name || "shared")}
-                </option>
-            `).join("")}
+            ${((_a = groupedLayouts["built-in"]) == null ? void 0 : _a.length) ? `
+                <optgroup label="Built-in">
+                    ${groupedLayouts["built-in"].map((option) => `
+                        <option value="${escapeHtml(option.name || "")}" ${String(selectedName || "") === String(option.name || "") ? "selected" : ""}>
+                            ${escapeHtml(optionLabel(option, "built-in"))}
+                        </option>
+                    `).join("")}
+                </optgroup>
+            ` : ""}
+            ${((_b = groupedLayouts.collection) == null ? void 0 : _b.length) ? `
+                <optgroup label="Collection">
+                    ${groupedLayouts.collection.map((option) => `
+                        <option value="${escapeHtml(option.name || "")}" ${String(selectedName || "") === String(option.name || "") ? "selected" : ""}>
+                            ${escapeHtml(optionLabel(option, "collection"))}
+                        </option>
+                    `).join("")}
+                </optgroup>
+            ` : ""}
         </select>
-        <div class="small-note">Choose a marketplace layout from the same worktype.</div>
+        <div class="small-note">Choose a layout from the same worktype. The visible names come from the folder names.</div>
     `;
   }
   function bindLayoutForm({
@@ -3601,7 +3637,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       { value: "actual", label: "Inherit" },
       { value: "none", label: "None" },
       { value: "custom", label: "Custom" },
-      { value: "shared", label: "Shared" }
+      { value: "shared", label: "Collection" }
     ];
     const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
     const isFileSubject = subjectStatus.target === "file";
@@ -3626,7 +3662,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         `).join("")}
                     </select>
                     <div class="mt-3${layoutState.preset === "shared" ? "" : " hidden"}" id="edit-layout-shared-wrap">
-                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName)}
+                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName, layoutState.directory || "")}
                     </div>
                 </div>
                 <div class="edit-layout-copy edit-layout-section-note">
@@ -4261,7 +4297,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div class="edit-layout-title">Layout</div>
                 <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
                 <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.layoutState.mode)}</code></div>
+                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
             </div>
             <div class="edit-inline-actions">
                 ${!isFileTarget && typeof onResetFolderWork === "function" ? `
@@ -4691,23 +4727,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
           }
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
-        },
-        onResetFolderWork: async ({ statusEl }) => {
-          const selection2 = getActiveSelection();
-          const targetPath = getEditTargetPath(selection2);
-          if (!targetPath) {
-            throw new Error("Reset target unavailable.");
-          }
-          const data = await requestEditReset({
-            path: targetPath,
-            return: selection2.previewPath || selection2.path || ""
-          });
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Reset failed.");
-          }
-          setStatusMessage(statusEl, "Folder work reset to default.", true);
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
-          await refreshCurrentEditState(getActiveSelection());
         },
         onCreateFolder: async ({ source, folderName }) => {
           var _a;

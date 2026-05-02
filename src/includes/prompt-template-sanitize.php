@@ -19,6 +19,7 @@ function cmsNormalizeLayoutPromptTemplate(string $template): string
     if ($trimmed === '') {
         return '';
     }
+    $trimmed = cmsNormalizePromptViewerLinkConcatenation($trimmed);
 
     $requiredPartials = str_contains($trimmed, '{{> works}}') && str_contains($trimmed, '{{> work}}');
     $mainPattern = '/<main\b[^>]*class\s*=\s*["\'][^"\']*\bpoff-default-layout__main\b[^"\']*["\'][^>]*>.*?<\/main>/is';
@@ -44,6 +45,17 @@ function cmsNormalizeLayoutPromptTemplate(string $template): string
     }
 
     return $trimmed . "\n\n" . $mainBlock;
+}
+
+function cmsNormalizePromptViewerLinkConcatenation(string $template): string
+{
+    $viewerFields = 'pageLink|pageUrl|workUrl|viewUrl|viewerHref';
+
+    return preg_replace(
+        '/{{\s*(?:' . $viewerFields . ')\s*}}\s*(\?view=1(?:&|&amp;)(?:path|file)=[^"\'<>\s]+)/i',
+        '$1',
+        $template
+    ) ?? $template;
 }
 
 function cmsStripPromptClassBlock(string $template, string $tag, string $className): string

@@ -287,23 +287,6 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onResetFolderWork: async ({ statusEl }) => {
-                const selection = getActiveSelection();
-                const targetPath = getEditTargetPath(selection);
-                if (!targetPath) {
-                    throw new Error('Reset target unavailable.');
-                }
-                const data = await requestEditReset({
-                    path: targetPath,
-                    return: selection.previewPath || selection.path || '',
-                });
-                if (!data || data.error) {
-                    throw new Error(data?.error || 'Reset failed.');
-                }
-                setStatusMessage(statusEl, 'Folder work reset to default.', true);
-                window.dispatchEvent(new CustomEvent('poff:content-updated'));
-                await refreshCurrentEditState(getActiveSelection());
-            },
             onCreateFolder: async ({ source, folderName }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({

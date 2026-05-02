@@ -61,7 +61,13 @@ export function layoutOverlayState(config, status) {
         ? `.works/${config.name || config.path || 'item'}.layout`
         : '.layout';
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
-    const sectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
+    const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
+    const activeSectionDirectory = String(layoutState.sectionDirectory || '').trim();
+    const sectionTarget = activeSectionDirectory
+        ? `${activeSectionDirectory}/${sectionName}.hbs`
+        : (isFile && layoutState.storage === 'filesystem' && layoutState.directory !== localLayoutDirectory
+            ? `built-in ${sectionName}.hbs`
+            : localSectionTarget);
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
     const hasInheritedLayout = !!layoutState.inheritedDirectory;
@@ -96,10 +102,13 @@ export function layoutOverlayState(config, status) {
         originalTemplate = layoutState.phpTemplate || '';
     }
 
+    const resolvedDirectory = layoutState.directory || localLayoutDirectory;
     const wrapperSourceLabel = layoutState.storage === 'filesystem'
-        ? `Filesystem: ${layoutState.directory || localLayoutDirectory}`
+        ? (isFile && resolvedDirectory !== localLayoutDirectory
+            ? `Folder layout: ${resolvedDirectory}`
+            : `${isFile ? 'File layout' : 'Folder layout'}: ${resolvedDirectory}`)
         : layoutState.storage === 'shared'
-            ? (layoutState.sourceLabel || `Marketplace: ${layoutState.sharedName || layoutState.name || 'shared'}`)
+            ? (layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || 'shared'}`)
         : 'PHP built-in poff-layout';
     const inheritedLayoutLabel = hasInheritedLayout
         ? layoutState.inheritedDirectory
@@ -107,7 +116,7 @@ export function layoutOverlayState(config, status) {
     const originalLabel = originalEditable
         ? `Editable source: ${originalTarget}`
         : layoutState.storage === 'shared'
-            ? `Marketplace layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || 'shared'}`
+            ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || 'shared'}`
         : 'PHP built-in poff-layout is read-only until a parent .layout exists';
     const displayMode = layoutState.mode === 'filesystem-layout'
         ? 'custom-layout'
@@ -119,6 +128,7 @@ export function layoutOverlayState(config, status) {
         sectionName,
         localLayoutDirectory,
         wrapperTarget,
+        localSectionTarget,
         sectionTarget,
         wrapperWasLocal,
         sectionWasLocal,
