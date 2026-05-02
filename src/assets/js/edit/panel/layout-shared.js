@@ -59,7 +59,9 @@ export function createLayoutModeController({
                 ? 'custom-layout'
                 : preset === 'shared'
                     ? 'collection-layout'
-                : (originalEditable ? 'custom-layout' : 'poff-layout');
+                    : (originalEditable
+                        ? (originalTarget === wrapperTarget.replace(/\/template\.hbs$/, '') ? 'custom-layout' : 'inherit-layout')
+                        : 'poff-layout');
         const primaryMode = currentPrimaryMode();
         const isVirtual = primaryMode === 'virtual';
         const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, '');

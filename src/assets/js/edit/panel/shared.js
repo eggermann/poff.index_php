@@ -57,9 +57,9 @@ export function layoutOverlayState(config, status) {
     const layoutState = getLayoutState(config);
     const isFile = status?.target === 'file';
     const sectionName = layoutState.section || (isFile ? 'work' : 'works');
-    const localLayoutDirectory = isFile
+    const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile
         ? `.works/${config.name || config.path || 'item'}.layout`
-        : '.layout';
+        : '.layout');
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
     const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const activeSectionDirectory = String(layoutState.sectionDirectory || '').trim();
@@ -119,7 +119,7 @@ export function layoutOverlayState(config, status) {
             ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || 'shared'}`
         : 'PHP built-in poff-layout is read-only until a parent .layout exists';
     const displayMode = layoutState.mode === 'filesystem-layout'
-        ? 'custom-layout'
+        ? (layoutState.directory === localLayoutDirectory ? 'custom-layout' : 'inherit-layout')
         : layoutState.mode;
 
     return {

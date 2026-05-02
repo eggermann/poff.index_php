@@ -23,6 +23,22 @@ export function extractNavHtml(html) {
 
 export function getLayoutState(config) {
     const layoutValue = config?.work?.layout;
+    const normalizePath = (value = '') => String(value || '')
+        .replace(/\\/g, '/')
+        .replace(/^\/+|\/+$/g, '');
+    const localLayoutDirectoryForConfig = (state = {}) => {
+        const hasAnnotatedPath = Object.prototype.hasOwnProperty.call(config || {}, '__poffRelativePath');
+        const relativePath = normalizePath(hasAnnotatedPath ? config.__poffRelativePath : '');
+        const isFile = config?.__poffIsFile === true;
+        if (!isFile) {
+            return relativePath ? `${relativePath}/.layout` : '.layout';
+        }
+        const parts = relativePath.split('/').filter(Boolean);
+        const fileName = parts.pop() || config?.name || 'item';
+        const dirName = parts.join('/');
+        const inferredDirectory = `${dirName ? `${dirName}/` : ''}.works/${fileName}.layout`;
+        return inferredDirectory || normalizePath(state.localDirectory || '');
+    };
     const normalizePreset = (value) => {
         const preset = String(value || '').trim();
         if (preset === 'inherit') {
@@ -42,13 +58,14 @@ export function getLayoutState(config) {
                 : rawMode;
         const storage = state.storage || '';
         const directory = state.directory || '';
+        const localLayoutDirectory = localLayoutDirectoryForConfig(state);
         let preset = normalizePreset(state.preset) || 'actual';
         if (!normalizePreset(state.preset)) {
             if (mode === 'none') {
                 preset = 'none';
             } else if (storage === 'shared' || state.source === 'shared') {
                 preset = 'shared';
-            } else if (storage === 'filesystem' && (directory === '.layout' || directory.startsWith('.works/'))) {
+            } else if (storage === 'filesystem' && directory === localLayoutDirectory) {
                 preset = 'custom';
             }
         }
@@ -71,6 +88,8 @@ export function getLayoutState(config) {
             resolvedMode: mode,
             storage,
             directory,
+            localLayoutDirectory,
+            localDirectory: state.localDirectory || localLayoutDirectory,
             inheritedDirectory: state.inheritedDirectory || '',
             section: state.section || inferredSection,
             sectionTemplate: state.sectionTemplate || '',
@@ -92,6 +111,7 @@ export function getLayoutState(config) {
             model: layoutValue.model || '',
             engine: layoutValue.engine || 'lightncandy',
             directory: layoutValue.directory || '',
+            localDirectory: layoutValue.localDirectory || '',
             storage: layoutValue.storage || '',
             inheritedDirectory: layoutValue.inheritedDirectory || '',
             section: layoutValue.section || inferredSection,

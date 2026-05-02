@@ -20,6 +20,17 @@ function renderFileViewer(string $relativePath, string $fullPath): void
     if ($type === 'link') {
         $linkUrl = extractLinkFileUrl($fullPath);
     }
+    $showInlineTextPreview = false;
+    $textContent = '';
+    if ($type === 'text') {
+        $showInlineTextPreview = MediaType::shouldUseInlineTextPreview(basename($fullPath), $mimeType);
+        if ($showInlineTextPreview) {
+            $contents = @file_get_contents($fullPath);
+            if ($contents !== false) {
+                $textContent = $contents;
+            }
+        }
+    }
 
     $rawName = basename($relativePath);
     $rawSlug = $fileConfig['slug'] ?? preg_replace('/[^a-z0-9\-]+/i', '-', $rawName);
@@ -44,6 +55,8 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'descriptionHtml' => $descriptionHtml,
         'linkUrl' => $linkUrl ?? '',
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
+        'showInlineTextPreview' => $showInlineTextPreview,
+        'textContent' => $textContent,
         'work' => $work,
     ]);
 

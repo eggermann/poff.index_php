@@ -660,6 +660,7 @@ class PoffConfig
         $localRelativeDir = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
         $layoutDir = null;
         $resolved['directory'] = $localRelativeDir;
+        $resolved['localDirectory'] = $localRelativeDir;
         $inheritedLayout = self::findInheritedLayoutDir($dir, $localLayoutDir);
         if (is_array($inheritedLayout)) {
             $resolved['inheritedDirectory'] = $inheritedLayout['relative'];

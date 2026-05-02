@@ -19,6 +19,30 @@ export function createEditController({ elements, context, editRequested }) {
     let editTarget = 'folder';
     let drawerOpen = false;
 
+    function annotateConfigPath(config, selection = getActiveSelection(), status = {}) {
+        if (!config || typeof config !== 'object') {
+            return config;
+        }
+        const relativePath = selection?.previewPath || selection?.path || context?.currentPathForIframe || '';
+        const isFile = status?.subjectTarget === 'file'
+            || (status?.target === 'file')
+            || selection?.previewIsFile === true;
+        Object.defineProperties(config, {
+            __poffRelativePath: {
+                value: relativePath,
+                configurable: true,
+            },
+            __poffIsFile: {
+                value: isFile,
+                configurable: true,
+            },
+        });
+        return config;
+    }
+
+    annotateConfigPath(folderConfig, getActiveSelection(), { target: 'folder' });
+    annotateConfigPath(editConfig, getActiveSelection(), { target: editTarget });
+
     function renderFolderMeta() {
         return folderConfig;
     }
@@ -54,7 +78,7 @@ export function createEditController({ elements, context, editRequested }) {
             if (!data || data.error) {
                 throw new Error(data?.error || 'Save failed.');
             }
-            editConfig = data.config || editConfig;
+            editConfig = annotateConfigPath(data.config || editConfig, getActiveSelection(), data);
             editTarget = data.target || editTarget;
             if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
@@ -91,14 +115,14 @@ export function createEditController({ elements, context, editRequested }) {
     async function refreshCurrentEditState(selection = getActiveSelection()) {
         const refreshed = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (refreshed?.config) {
-            editConfig = refreshed.config;
+            editConfig = annotateConfigPath(refreshed.config, selection, refreshed);
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
             if (editTarget === 'folder' || (editTarget === 'layout' && refreshed.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
         }
-        renderEditUI(refreshed?.config || editConfig, {
+        renderEditUI(editConfig, {
             allowed: refreshed?.allowed !== false,
             error: refreshed?.error,
             target: refreshed?.target || editTarget,
@@ -357,14 +381,14 @@ export function createEditController({ elements, context, editRequested }) {
         const selection = getActiveSelection();
         const data = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (data.config) {
-            editConfig = data.config;
+            editConfig = annotateConfigPath(data.config, selection, data);
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');
             if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
         }
-        renderEditUI(data.config || editConfig, {
+        renderEditUI(editConfig, {
             allowed: data.allowed !== false,
             error: data.error,
             target: editTarget,

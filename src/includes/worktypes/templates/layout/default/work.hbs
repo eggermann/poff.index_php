@@ -28,7 +28,11 @@
             <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{srcUrl}}" title="{{title}}"></iframe>
         {{/if}}
         {{#if isText}}
-            <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{srcUrl}}" title="{{title}}"></iframe>
+            {{#if showInlineTextPreview}}
+                <pre class="min-h-screen w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-slate-950 p-4 text-sm text-slate-100">{{textContent}}</pre>
+            {{else}}
+                <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{srcUrl}}" title="{{title}}"></iframe>
+            {{/if}}
         {{/if}}
         {{#if isLink}}
             <div class="message">
