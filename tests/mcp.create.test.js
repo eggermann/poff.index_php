@@ -271,25 +271,6 @@ function runCreateFolder(targetDir, folderName) {
   });
 }
 
-function runCopyBuildAssets(sourceDir, targetDir, targetSubdir = 'build/assets') {
-  return new Promise((resolve, reject) => {
-    const args = [path.join(ROOT, 'tests/php_copy_build_assets.php'), sourceDir, targetDir, targetSubdir];
-    const proc = spawn('php', args, {
-      cwd: ROOT,
-      env: { ...process.env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    proc.stdout.on('data', (d) => (stdout += d.toString()));
-    proc.stderr.on('data', (d) => (stderr += d.toString()));
-    proc.on('exit', (code) => {
-      if (code === 0) return resolve(stdout.trim());
-      reject(new Error(`copy build assets helper failed: ${code} ${stderr}`));
-    });
-  });
-}
-
 function runPhpJson(scriptName) {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [path.join(ROOT, 'tests', scriptName)], {
@@ -1988,27 +1969,11 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
-  test('renders the viewer shell stylesheet from the public build root', async () => {
+  test('renders the viewer shell stylesheet inline in the generated page', async () => {
     const output = await runViewer(VIEWER_FILE_NAME);
 
-    expect(output).toContain('href="/build/assets/app.css"');
-  });
-
-  test('copies build assets into every generated page directory', async () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-build-assets-'));
-    const nestedDir = path.join(tempDir, 'nested', 'child');
-    fs.mkdirSync(nestedDir, { recursive: true });
-
-    try {
-      await runCopyBuildAssets(path.join(ROOT, 'build', 'assets'), tempDir);
-
-      expect(fs.existsSync(path.join(tempDir, 'build', 'assets', 'app.css'))).toBe(true);
-      expect(fs.existsSync(path.join(tempDir, 'build', 'assets', 'app.js'))).toBe(true);
-      expect(fs.existsSync(path.join(nestedDir, 'build', 'assets', 'app.css'))).toBe(true);
-      expect(fs.existsSync(path.join(nestedDir, 'build', 'assets', 'app.js'))).toBe(true);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    expect(output).toContain('<style data-app-style>');
+    expect(output).not.toContain('href="/build/assets/app.css"');
   });
 
   test('sanitizes persisted file work partials that accidentally include outer wrapper shell blocks', async () => {

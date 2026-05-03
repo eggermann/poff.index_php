@@ -13,6 +13,9 @@ function renderViewerShell(array $payload): void
     $layoutJsHref = trim((string) ($layout['jsHref'] ?? ''));
     $layoutCssInline = $layoutCssHref === '' ? trim((string) ($layout['css'] ?? '')) : '';
     $layoutJsInline = $layoutJsHref === '' ? trim((string) ($layout['js'] ?? '')) : '';
+    $projectRootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir() : dirname(__DIR__, 4);
+    $viewerShellCssPath = rtrim($projectRootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'build' . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'app.css';
+    $viewerShellCss = is_file($viewerShellCssPath) ? trim((string) file_get_contents($viewerShellCssPath)) : '';
 
     ?>
 <!DOCTYPE html>
@@ -21,7 +24,9 @@ function renderViewerShell(array $payload): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Viewer - <?= $safeName ?></title>
-    <link rel="stylesheet" href="/build/assets/app.css">
+<?php if ($viewerShellCss !== ''): ?>
+    <style data-app-style><?= $viewerShellCss ?></style>
+<?php endif; ?>
 <?php if ($layoutCssHref !== ''): ?>
     <link rel="stylesheet" href="<?= htmlspecialchars($layoutCssHref, ENT_QUOTES, 'UTF-8') ?>">
 <?php elseif ($layoutCssInline !== ''): ?>
