@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/viewer/link-targets.php';
 require_once __DIR__ . '/../../includes/edit-mode.php';
 require_once __DIR__ . '/../../includes/prompt-template-sanitize.php';
+require_once __DIR__ . '/../helpers.php';
 
 const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 300;
 
@@ -155,7 +156,6 @@ function mcpParsePromptModelResult(string $raw): array
     }
 
     $template = '';
-    $modelReturnedReasoningOnly = false;
     $extractedFromEnvelope = false;
     if (isset($decoded['choices'][0]['message']['content'])) {
         $extractedFromEnvelope = true;
@@ -213,36 +213,6 @@ function mcpParsePromptModelResult(string $raw): array
     }
 
     return $result;
-}
-
-function mcpPromptResolvePath(string $rootDir, string $relativePath): ?string
-{
-    $trimmed = trim($relativePath, "/\\");
-    $base = rtrim($rootDir, DIRECTORY_SEPARATOR);
-    if ($trimmed === '') {
-        return realpath($base) ?: null;
-    }
-    $candidate = realpath($base . DIRECTORY_SEPARATOR . $trimmed);
-    if ($candidate === false) {
-        return null;
-    }
-    if (strpos($candidate, $base) !== 0) {
-        return null;
-    }
-    if (!is_dir($candidate)) {
-        return null;
-    }
-    return $candidate;
-}
-
-function mcpPromptReadJsonBody(): array
-{
-    $raw = (string) file_get_contents('php://input');
-    if ($raw === '') {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
 }
 
 function mcpPromptLoadEnv(string $rootDir): array
@@ -509,6 +479,22 @@ function mcpPromptRefKind(string $name, string $type): string
     return MediaType::classifyExtension($name);
 }
 
+function mcpPromptUrlAliases(string $pageLink, string $assetUrl): array
+{
+    return [
+        'pageLink' => $pageLink,
+        'pageUrl' => $pageLink,
+        'workUrl' => $pageLink,
+        'viewUrl' => $pageLink,
+        'viewerHref' => $pageLink,
+        'assetUrl' => $assetUrl,
+        'assetLink' => $assetUrl,
+        'rawHref' => $assetUrl,
+        'srcUrl' => $assetUrl,
+        'sourceUrl' => $assetUrl,
+    ];
+}
+
 function mcpBuildPromptRef(string $basePath, array $item): ?array
 {
     $name = trim((string) ($item['name'] ?? $item['path'] ?? ''));
@@ -535,27 +521,17 @@ function mcpBuildPromptRef(string $basePath, array $item): ?array
         : mcpPromptAssetUrl($relativePath, !$isFolder);
     $linkUrl = cmsConfiguredTreeExternalLinkUrl($item);
 
-    $result = [
+    $result = array_merge([
         'name' => $name,
         'title' => (string) ($item['title'] ?? $name),
         'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
         'type' => $isFolder ? 'folder' : 'file',
         'kind' => $kind,
         'path' => $relativePath,
-        'pageLink' => $pageLink,
-        'pageUrl' => $pageLink,
-        'workUrl' => $pageLink,
-        'viewUrl' => $pageLink,
-        'viewerHref' => $pageLink,
-        'assetUrl' => $assetUrl,
-        'assetLink' => $assetUrl,
-        'rawHref' => $assetUrl,
-        'srcUrl' => $assetUrl,
-        'sourceUrl' => $assetUrl,
         'isFolder' => $isFolder,
         'isFile' => !$isFolder,
         'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
-    ];
+    ], mcpPromptUrlAliases($pageLink, $assetUrl));
 
     if ($linkUrl !== '') {
         $result['linkUrl'] = $linkUrl;
@@ -575,25 +551,15 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
         : [];
 
     $context = [
-        'current' => [
+        'current' => array_merge([
             'targetType' => 'folder',
             'sectionPartial' => 'works',
             'name' => $currentName,
             'path' => $normalizedPath,
-            'pageLink' => $currentPageLink,
-            'pageUrl' => $currentPageLink,
-            'workUrl' => $currentPageLink,
-            'viewUrl' => $currentPageLink,
-            'viewerHref' => $currentPageLink,
-            'assetUrl' => $currentAssetUrl,
-            'assetLink' => $currentAssetUrl,
-            'rawHref' => $currentAssetUrl,
-            'srcUrl' => $currentAssetUrl,
-            'sourceUrl' => $currentAssetUrl,
             'templateTarget' => mcpPromptTemplateTarget($normalizedPath),
             'layoutTemplateTarget' => mcpPromptLayoutTemplateTarget($normalizedPath),
             'outerWrapper' => mcpPromptOuterWrapperReference($layoutValue),
-        ],
+        ], mcpPromptUrlAliases($currentPageLink, $currentAssetUrl)),
         'items' => [],
         'allItems' => [],
         'allFiles' => [],
@@ -810,63 +776,9 @@ function mcpPromptHistoryText(array $history): string
     return $historyText;
 }
 
-function handlePromptTemplate(array $opts): array
+function mcpPromptSystemPrompt(): string
 {
-    $rootDir = $opts['rootDir'];
-    $path = $opts['path'] ?? '';
-    $allowFile = $opts['allowFile'] ?? null;
-    if (!class_exists('PoffConfig')) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => 'PoffConfig unavailable.',
-        ];
-    }
-
-    $targetDir = mcpPromptResolvePath($rootDir, (string) $path);
-    if ($targetDir === null) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => 'Invalid folder path.',
-        ];
-    }
-
-    $allowed = is_string($allowFile) && $allowFile !== ''
-        ? is_file($allowFile)
-        : cmsEditModeAllowedForDirectory($targetDir, $rootDir);
-    if (!$allowed) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => false,
-            'error' => 'Edit mode not enabled.',
-        ];
-    }
-
-    $data = mcpPromptReadJsonBody();
-    if ($data === []) {
-        $data = $_POST;
-    }
-
-    $provider = strtolower((string) ($data['provider'] ?? 'local'));
-    $prompt = trim((string) ($data['prompt'] ?? ''));
-    $model = trim((string) ($data['model'] ?? ''));
-    $endpoint = trim((string) ($data['endpoint'] ?? ''));
-    $apiKey = trim((string) ($data['apiKey'] ?? ''));
-    $history = is_array($data['history'] ?? null) ? $data['history'] : [];
-    $image = mcpPromptImagePayload($data);
-
-    if ($prompt === '' && !$image) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => 'Missing prompt or image.',
-        ];
-    }
-
-    $config = PoffConfig::ensure($targetDir);
-    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $systemPrompt = implode("\n", [
+    return implode("\n", [
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
         'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
         'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
@@ -895,6 +807,84 @@ function handlePromptTemplate(array $opts): array
         'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
         'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
     ]);
+}
+
+function mcpPromptError(string $message, bool $allowed = true): array
+{
+    return [
+        'route' => 'prompt-template',
+        'allowed' => $allowed,
+        'error' => $message,
+    ];
+}
+
+function mcpPromptUserContent(string $userPrompt, ?array $image)
+{
+    return $image ? [
+        ['type' => 'text', 'text' => $userPrompt],
+        ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+    ] : $userPrompt;
+}
+
+function mcpPromptOpenAiMessages(string $systemPrompt, string $userPrompt, ?array $image, array $history = []): array
+{
+    $messages = [['role' => 'system', 'content' => $systemPrompt]];
+    foreach ($history as $message) {
+        if (!is_array($message)) {
+            continue;
+        }
+        $role = strtolower(trim((string) ($message['role'] ?? 'user')));
+        $content = trim((string) ($message['content'] ?? ''));
+        if ($content !== '' && in_array($role, ['system', 'user', 'assistant'], true)) {
+            $messages[] = ['role' => $role, 'content' => $content];
+        }
+    }
+    $messages[] = [
+        'role' => 'user',
+        'content' => mcpPromptUserContent($userPrompt, $image),
+    ];
+
+    return $messages;
+}
+
+function handlePromptTemplate(array $opts): array
+{
+    $rootDir = $opts['rootDir'];
+    $path = $opts['path'] ?? '';
+    $allowFile = $opts['allowFile'] ?? null;
+    if (!class_exists('PoffConfig')) {
+        return mcpPromptError('PoffConfig unavailable.');
+    }
+
+    $targetDir = mcpResolveDirectoryInsideRoot($rootDir, (string) $path);
+    if ($targetDir === null) {
+        return mcpPromptError('Invalid folder path.');
+    }
+
+    $allowed = is_string($allowFile) && $allowFile !== ''
+        ? is_file($allowFile)
+        : cmsEditModeAllowedForDirectory($targetDir, $rootDir);
+    if (!$allowed) {
+        return mcpPromptError('Edit mode not enabled.', false);
+    }
+
+    $data = mcpReadRequestData();
+
+    $provider = strtolower((string) ($data['provider'] ?? 'local'));
+    $prompt = trim((string) ($data['prompt'] ?? ''));
+    $model = trim((string) ($data['model'] ?? ''));
+    $endpoint = trim((string) ($data['endpoint'] ?? ''));
+    $apiKey = trim((string) ($data['apiKey'] ?? ''));
+    $history = is_array($data['history'] ?? null) ? $data['history'] : [];
+    $image = mcpPromptImagePayload($data);
+
+    if ($prompt === '' && !$image) {
+        return mcpPromptError('Missing prompt or image.');
+    }
+
+    $config = PoffConfig::ensure($targetDir);
+    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $systemPrompt = mcpPromptSystemPrompt();
     $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config));
     $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $historyText = mcpPromptHistoryText($history);
@@ -906,50 +896,33 @@ function handlePromptTemplate(array $opts): array
     $env = mcpPromptLoadEnv($rootDir);
     $template = '';
     $usedModel = $model;
+    $modelReturnedReasoningOnly = false;
 
     if ($provider === 'openai') {
         $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'OPENAI_API_KEY') ?? '');
         if ($key === '') {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => 'OpenAI API key not set.',
-            ];
+            return mcpPromptError('OpenAI API key not set.');
         }
         if ($usedModel === '') {
             $usedModel = 'gpt-4o-mini';
         }
         $payload = [
             'model' => $usedModel,
-            'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $image ? [
-                    ['type' => 'text', 'text' => $userPrompt],
-                    ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
-                ] : $userPrompt],
-            ],
+            'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image),
             'temperature' => 0.4,
         ];
         $response = mcpPromptHttpPost('https://api.openai.com/v1/chat/completions', [
             'Authorization: Bearer ' . $key,
         ], $payload);
         if (!$response['ok']) {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => mcpPromptFormatHttpError('OpenAI', $response),
-            ];
+            return mcpPromptError(mcpPromptFormatHttpError('OpenAI', $response));
         }
         $decoded = json_decode($response['body'], true);
         $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
     } elseif ($provider === 'gemini') {
         $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'GEMINI_API_KEY') ?? '');
         if ($key === '') {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => 'Gemini API key not set.',
-            ];
+            return mcpPromptError('Gemini API key not set.');
         }
         if ($usedModel === '') {
             $usedModel = 'gemini-1.5-flash';
@@ -973,11 +946,7 @@ function handlePromptTemplate(array $opts): array
         $url = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', rawurlencode($usedModel), $key);
         $response = mcpPromptHttpPost($url, [], $payload);
         if (!$response['ok']) {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => mcpPromptFormatHttpError('Gemini', $response),
-            ];
+            return mcpPromptError(mcpPromptFormatHttpError('Gemini', $response));
         }
         $decoded = json_decode($response['body'], true);
         $template = (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
@@ -989,25 +958,9 @@ function handlePromptTemplate(array $opts): array
             $usedModel = 'gemma4';
         }
         if (mcpPromptIsOpenAiCompatibleEndpoint($endpoint)) {
-            $messages = [['role' => 'system', 'content' => $systemPrompt]];
-            foreach ($history as $message) {
-                if (!is_array($message)) {
-                    continue;
-                }
-                $role = strtolower(trim((string) ($message['role'] ?? 'user')));
-                $content = trim((string) ($message['content'] ?? ''));
-                if ($content === '' || !in_array($role, ['system', 'user', 'assistant'], true)) {
-                    continue;
-                }
-                $messages[] = ['role' => $role, 'content' => $content];
-            }
-            $messages[] = ['role' => 'user', 'content' => $image ? [
-                ['type' => 'text', 'text' => $userPrompt],
-                ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
-            ] : $userPrompt];
             $payload = [
                 'model' => $usedModel,
-                'messages' => $messages,
+                'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image, $history),
                 'temperature' => 0.4,
             ];
         } else {
@@ -1021,11 +974,7 @@ function handlePromptTemplate(array $opts): array
         }
         $response = mcpPromptHttpPost($endpoint, [], $payload);
         if (!$response['ok']) {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => mcpPromptFormatHttpError('Local endpoint', $response),
-            ];
+            return mcpPromptError(mcpPromptFormatHttpError('Local endpoint', $response));
         }
         $decoded = json_decode($response['body'], true);
         if (is_array($decoded)) {
@@ -1047,13 +996,11 @@ function handlePromptTemplate(array $opts): array
     $parsedResult = mcpParsePromptModelResult($template);
     $templateText = trim((string) ($parsedResult['template'] ?? ''));
     if ($templateText === '') {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => $modelReturnedReasoningOnly
+        return mcpPromptError(
+            $modelReturnedReasoningOnly
                 ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
-                : 'Template was empty.',
-        ];
+                : 'Template was empty.'
+        );
     }
 
     $response = [

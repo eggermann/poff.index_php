@@ -19,134 +19,43 @@ require_once __DIR__ . '/routes/style.php';
 
 $rootDir = getcwd();
 $configPath = $rootDir . DIRECTORY_SEPARATOR . 'poff.config.toon';
-$route = isset($_GET['route']) ? trim((string) $_GET['route']) : 'info';
-$prompt = isset($_GET['prompt']) ? trim((string) $_GET['prompt']) : '';
-$targetFile = isset($_GET['file']) ? trim((string) $_GET['file']) : '';
-$stylePrompt = isset($_GET['style']) ? trim((string) $_GET['style']) : '';
+$route = mcpQueryString('route', 'info') ?? 'info';
+$prompt = mcpQueryString('prompt', '') ?? '';
+$targetFile = mcpQueryString('file', '') ?? '';
+$stylePrompt = mcpQueryString('style', '') ?? '';
 
 header('Content-Type: application/json');
 
-/**
- * Recursively build a lightweight file tree for the current workspace.
- */
-function buildFileTree(string $dir, string $base): array
-{
-    $items = [];
-    $entries = @scandir($dir) ?: [];
-
-    foreach ($entries as $entry) {
-        if ($entry === '.' || $entry === '..') {
-            continue;
-        }
-        // Ignore common noisy/system folders
-        if (in_array($entry, ['.git', '.DS_Store', 'node_modules', '.works', '.layout'], true)) {
-            continue;
-        }
-
-        $fullPath = $dir . DIRECTORY_SEPARATOR . $entry;
-        $relPath = ltrim(str_replace($base, '', $fullPath), DIRECTORY_SEPARATOR);
-
-        if (is_dir($fullPath)) {
-            $items[] = [
-                'type' => 'directory',
-                'name' => $entry,
-                'path' => $relPath,
-                'children' => buildFileTree($fullPath, $base),
-            ];
-        } elseif (is_file($fullPath)) {
-            $items[] = [
-                'type' => 'file',
-                'name' => $entry,
-                'path' => $relPath,
-                'size' => filesize($fullPath),
-                'updatedAt' => date('c', filemtime($fullPath)),
-            ];
-        }
-    }
-
-    return $items;
-}
-
-/**
- * Create or update the poff.config.toon file with the current tree hash.
- */
-function ensureConfig(string $path, array $tree): array
-{
-    $treeHash = hash('sha256', json_encode($tree));
-    $now = date('c');
-    $created = false;
-    $updated = false;
-    $existing = [];
-    $config = [
-        'name' => basename(getcwd()),
-        'createdAt' => $now,
-        'updatedAt' => $now,
-        'treeHash' => $treeHash,
-        'tree' => $tree,
-    ];
-
-    if (file_exists($path)) {
-        $existing = json_decode((string) file_get_contents($path), true) ?: [];
-        $config['createdAt'] = $existing['createdAt'] ?? $now;
-        if (($existing['treeHash'] ?? null) !== $treeHash) {
-            $updated = true;
-        } else {
-            $config['tree'] = $existing['tree'] ?? $tree;
-        }
-    } else {
-        $created = true;
-    }
-
-    if ($created || $updated) {
-        $config['updatedAt'] = $now;
-        $config['treeHash'] = $treeHash;
-        $config['tree'] = $tree;
-        file_put_contents($path, json_encode($config, JSON_PRETTY_PRINT));
-    } else {
-        $config['updatedAt'] = $existing['updatedAt'] ?? $now;
-    }
-
-    return [
-        'config' => $config,
-        'created' => $created,
-        'updated' => $updated,
-    ];
-}
-
-$tree = mcpLoadTreeFromConfig($configPath) ?? mcpBuildFileTree($rootDir, $rootDir);
+$tree = mcpBuildFileTree($rootDir, $rootDir);
 $configState = mcpEnsureConfig($configPath, $tree);
 
 $mcpUrl = rtrim($_SERVER['SCRIPT_NAME'] ?? '/index.php', '/') . '#mcp';
 
 switch ($route) {
     case 'workprompt':
-        echo json_encode(handleWorkPrompt([
+        mcpJsonResponse(handleWorkPrompt([
             'rootDir' => $rootDir,
             'file' => $targetFile,
             'style' => $stylePrompt,
-        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+        ]));
     case 'create':
-        echo json_encode(handleCreate([
+        mcpJsonResponse(handleCreate([
             'rootDir' => $rootDir,
-            'dest' => isset($_GET['dest']) ? trim((string) $_GET['dest']) : '',
-            'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : null,
-            'url' => isset($_GET['url']) ? trim((string) $_GET['url']) : null,
+            'dest' => mcpQueryString('dest', '') ?? '',
+            'path' => mcpQueryString('path', null),
+            'url' => mcpQueryString('url', null),
             'poffDir' => getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null,
-        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+        ]));
     case 'edit-config':
-        echo json_encode(handleEditConfig([
+        mcpJsonResponse(handleEditConfig([
             'rootDir' => $rootDir,
-            'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : '',
-        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+            'path' => mcpQueryString('path', '') ?? '',
+        ]));
     case 'prompt-template':
-        echo json_encode(handlePromptTemplate([
+        mcpJsonResponse(handlePromptTemplate([
             'rootDir' => $rootDir,
-            'path' => isset($_GET['path']) ? trim((string) $_GET['path']) : '',
-        ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+            'path' => mcpQueryString('path', '') ?? '',
+        ]));
     case 'style':
         $response = handleStyleRoute($prompt, $mcpUrl, $configPath);
         break;
@@ -162,5 +71,4 @@ switch ($route) {
         break;
 }
 
-echo json_encode($response, JSON_PRETTY_PRINT);
-exit;
+mcpJsonResponse($response);

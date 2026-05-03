@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../helpers.php';
+
 function handleWorkPrompt(array $opts): array
 {
     $rootDir = $opts['rootDir'];
@@ -10,8 +12,8 @@ function handleWorkPrompt(array $opts): array
     if ($targetFile === '') {
         mcpJsonError('Missing file parameter (?file=relative/path)', ['route' => 'workprompt']);
     }
-    $absPath = realpath($rootDir . DIRECTORY_SEPARATOR . ltrim($targetFile, '/\\'));
-    if ($absPath === false || strpos($absPath, $rootDir) !== 0 || !is_file($absPath)) {
+    $absPath = mcpResolveFileInsideRoot($rootDir, $targetFile);
+    if ($absPath === null) {
         mcpJsonError('File not found or outside workspace', ['route' => 'workprompt', 'file' => $targetFile]);
     }
 
@@ -48,11 +50,10 @@ function handleWorkPrompt(array $opts): array
         );
         $currentConfig['work'] = $mergedWork;
         $currentConfig['updatedAt'] = date('c');
-        $dirPath = dirname($configPath);
-        if (!is_dir($dirPath)) {
-            mkdir($dirPath, 0755, true);
+        $writeError = mcpWriteJsonFile($configPath, $currentConfig);
+        if ($writeError !== null) {
+            mcpJsonError($writeError, ['route' => 'workprompt', 'file' => $targetFile], 500);
         }
-        file_put_contents($configPath, json_encode($currentConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         $fileConfig = PoffConfig::hydrateConfigLayout($currentConfig, dirname($absPath), basename($absPath));
     }
 

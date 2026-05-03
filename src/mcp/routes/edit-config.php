@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/edit-mode.php';
-require_once __DIR__ . '/edit-config/helpers.php';
+require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/edit-config/payload.php';
 require_once __DIR__ . '/edit-config/apply.php';
 
@@ -20,7 +20,7 @@ function handleEditConfig(array $opts): array
         ];
     }
 
-    $targetDir = mcpResolveEditPath($rootDir, (string) $path);
+    $targetDir = mcpResolveDirectoryInsideRoot($rootDir, (string) $path);
     if ($targetDir === null) {
         return [
             'route' => 'edit-config',
@@ -44,7 +44,7 @@ function handleEditConfig(array $opts): array
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
     if ($method === 'POST') {
-        $data = mcpReadEditConfigRequest();
+        $data = mcpReadRequestData();
         $payload = mcpParseEditConfigPayload($data);
         $result = mcpApplyEditConfigPayload($config, $payload, $targetDir);
 

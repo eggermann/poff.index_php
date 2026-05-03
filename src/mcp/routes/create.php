@@ -1,14 +1,9 @@
 <?php
 declare(strict_types=1);
 
-function mcp_sanitize_name(string $name): string
-{
-    $clean = preg_replace('/[^a-zA-Z0-9._-]+/', '-', trim($name));
-    $clean = trim($clean, '-');
-    return $clean !== '' ? $clean : 'untitled';
-}
+require_once __DIR__ . '/../helpers.php';
 
-function mcp_sanitize_relpath(string $path): string
+function mcpSanitizeRelPath(string $path): string
 {
     $parts = preg_split('/[\\/]+/', $path) ?: [];
     $cleanParts = [];
@@ -28,7 +23,12 @@ function mcp_sanitize_relpath(string $path): string
     return $cleanParts === [] ? 'untitled' : implode(DIRECTORY_SEPARATOR, $cleanParts);
 }
 
-function mcp_copy_recursive(string $src, string $dst): void
+function mcp_sanitize_relpath(string $path): string
+{
+    return mcpSanitizeRelPath($path);
+}
+
+function mcpCopyRecursive(string $src, string $dst): void
 {
     if (is_dir($src)) {
         if (!is_dir($dst)) {
@@ -44,7 +44,7 @@ function mcp_copy_recursive(string $src, string $dst): void
             }
             $from = $src . DIRECTORY_SEPARATOR . $item;
             $to = $dst . DIRECTORY_SEPARATOR . $item;
-            mcp_copy_recursive($from, $to);
+            mcpCopyRecursive($from, $to);
         }
     } else {
         $dir = dirname($dst);
@@ -55,6 +55,60 @@ function mcp_copy_recursive(string $src, string $dst): void
     }
 }
 
+function mcp_copy_recursive(string $src, string $dst): void
+{
+    mcpCopyRecursive($src, $dst);
+}
+
+function mcpUrlHostIsPrivate(string $host): bool
+{
+    if ($host === '') {
+        return true;
+    }
+    if ($host === 'localhost' || str_ends_with($host, '.localhost')) {
+        return true;
+    }
+
+    $ips = gethostbynamel($host);
+    if (!is_array($ips) || $ips === []) {
+        $ips = [$host];
+    }
+
+    foreach ($ips as $ip) {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            $isPublic = filter_var(
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            );
+            if ($isPublic === false) {
+                return true;
+            }
+            continue;
+        }
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            if ($ip === '::1' || str_starts_with(strtolower($ip), 'fe80:') || str_starts_with(strtolower($ip), 'fc') || str_starts_with(strtolower($ip), 'fd')) {
+                return true;
+            }
+            $isPublic = filter_var(
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            );
+            if ($isPublic === false) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function mcp_url_host_is_private(string $host): bool
+{
+    return mcpUrlHostIsPrivate($host);
+}
+
 function handleCreate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
@@ -62,17 +116,18 @@ function handleCreate(array $opts): array
     $path = $opts['path'] ?? null;
     $url = $opts['url'] ?? null;
     $poffDir = $opts['poffDir'] ?? ($rootDir . DIRECTORY_SEPARATOR . 'poff');
+    if (!is_dir($poffDir)) {
+        mkdir($poffDir, 0755, true);
+    }
+    $poffDir = realpath($poffDir) ?: $poffDir;
     $pathBase = $poffDir;
 
     if ($dest === '') {
         mcpJsonError('Missing dest parameter', ['route' => 'create']);
     }
 
-    $safeDest = mcp_sanitize_relpath($dest);
+    $safeDest = mcpSanitizeRelPath($dest);
     $destDir = $poffDir . DIRECTORY_SEPARATOR . $safeDest;
-    if (!is_dir($poffDir)) {
-        mkdir($poffDir, 0755, true);
-    }
 
     $created = false;
     $copied = false;
@@ -81,25 +136,33 @@ function handleCreate(array $opts): array
     $details = [];
 
     if ($path) {
-        $absSrc = realpath($pathBase . DIRECTORY_SEPARATOR . ltrim($path, '/\\'));
-        if ($absSrc === false || strpos($absSrc, $pathBase) !== 0) {
+        $absSrc = mcpResolvePathInsideRoot($pathBase, (string) $path);
+        if ($absSrc === null) {
             $errors[] = 'Source path not found or outside /poff';
         } else {
-            mcp_copy_recursive($absSrc, $destDir);
+            mcpCopyRecursive($absSrc, $destDir);
             $copied = true;
             $details['copiedFrom'] = $absSrc;
         }
     } elseif ($url) {
+        $scheme = strtolower((string) (parse_url((string) $url, PHP_URL_SCHEME) ?? ''));
+        $host = strtolower((string) (parse_url((string) $url, PHP_URL_HOST) ?? ''));
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            $errors[] = 'Only http and https URLs are allowed';
+        }
+        if ($host === '' || mcpUrlHostIsPrivate($host)) {
+            $errors[] = 'URL host is not allowed';
+        }
         $dirOk = is_dir($destDir) || mkdir($destDir, 0755, true);
-        if ($dirOk) {
+        if ($dirOk && $errors === []) {
             $fname = basename(parse_url($url, PHP_URL_PATH) ?: '');
             if ($fname === '' || $fname === '/') {
                 $fname = 'download.bin';
             }
             $targetFile = $destDir . DIRECTORY_SEPARATOR . $fname;
-            $data = @file_get_contents($url);
+            $data = file_get_contents((string) $url);
             if ($data === false) {
-                $errors[] = 'Download failed';
+                $errors[] = 'Download failed or URL was unreachable';
             } else {
                 file_put_contents($targetFile, $data);
                 $downloaded = true;
