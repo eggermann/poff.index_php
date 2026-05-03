@@ -27,8 +27,8 @@ export const legacyWorkSystemPrompt = [
     'Tailwind first. Use utility classes for the common layout and visual structure.',
     'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
     'Do not embed global CSS, and do not use inline style attributes.',
-    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-    'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
+    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
+    'Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
     'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
 ].join('\n');
 
@@ -79,8 +79,8 @@ export const defaultLayoutSystemPrompt = [
     'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
     'Do not embed global CSS, and do not use inline style attributes.',
     'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-    'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
+    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
+    'Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
     'Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.',
     'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.',
     'When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.',
@@ -100,8 +100,8 @@ export const defaultLayoutSystemPrompt = [
     'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
     'Do not embed global CSS, and do not use inline style attributes.',
     'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-    'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
+    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
+    'Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
     'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
 ].join('\n');
 

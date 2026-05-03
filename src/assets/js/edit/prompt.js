@@ -71,6 +71,13 @@ export function bindPromptWindow({
     const currentSelection = (fallback = {}) => getSelectionOrFallback(getActiveSelection, fallback);
     const setPromptStatus = (message, success = false) => setStatusMessage(statusEl, message, success);
     const getLayoutPreset = () => getLayoutPresetValue();
+    const forceLayoutPromptToCustom = () => {
+        const presetEl = document.getElementById('edit-layout-preset');
+        if (presetEl && presetEl.value !== 'custom') {
+            presetEl.value = 'custom';
+        }
+        return 'custom';
+    };
     let activePath = currentSelection({ path: '' }).path;
     let activePromptMode = currentSelection().isLayout ? 'layout' : (currentSelection().previewIsFile ? 'file' : 'folder');
     let imageAttachment = null;
@@ -559,6 +566,9 @@ export function bindPromptWindow({
                         }
                     }
                 }
+                const effectiveLayoutPreset = isLayoutTarget
+                    ? forceLayoutPromptToCustom()
+                    : getLayoutPreset();
                 const { layoutPayload } = buildPromptLayoutPayload({
                     selection,
                     currentConfig,
@@ -571,7 +581,7 @@ export function bindPromptWindow({
                     nextJs,
                     nextLayoutValue,
                     responseModel: response.model || '',
-                    layoutPreset: getLayoutPreset(),
+                    layoutPreset: effectiveLayoutPreset,
                 });
                 const savePayload = {
                     path: activePath,

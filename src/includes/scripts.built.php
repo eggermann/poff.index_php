@@ -426,6 +426,20 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   function getLayoutState(config) {
     var _a, _b;
     const layoutValue = (_a = config == null ? void 0 : config.work) == null ? void 0 : _a.layout;
+    const normalizePath = (value = "") => String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    const localLayoutDirectoryForConfig = (state = {}) => {
+      const hasAnnotatedPath = Object.prototype.hasOwnProperty.call(config || {}, "__poffRelativePath");
+      const relativePath = normalizePath(hasAnnotatedPath ? config.__poffRelativePath : "");
+      const isFile = (config == null ? void 0 : config.__poffIsFile) === true;
+      if (!isFile) {
+        return relativePath ? `${relativePath}/.layout` : ".layout";
+      }
+      const parts = relativePath.split("/").filter(Boolean);
+      const fileName = parts.pop() || (config == null ? void 0 : config.name) || "item";
+      const dirName = parts.join("/");
+      const inferredDirectory = `${dirName ? `${dirName}/` : ""}.works/${fileName}.layout`;
+      return inferredDirectory || normalizePath(state.localDirectory || "");
+    };
     const normalizePreset = (value) => {
       const preset = String(value || "").trim();
       if (preset === "inherit") {
@@ -439,13 +453,14 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       const mode = rawMode === "poff" ? "poff-layout" : rawMode === "filesystem" ? "filesystem-layout" : rawMode;
       const storage = state.storage || "";
       const directory = state.directory || "";
+      const localLayoutDirectory = localLayoutDirectoryForConfig(state);
       let preset = normalizePreset(state.preset) || "actual";
       if (!normalizePreset(state.preset)) {
         if (mode === "none") {
           preset = "none";
         } else if (storage === "shared" || state.source === "shared") {
           preset = "shared";
-        } else if (storage === "filesystem" && (directory === ".layout" || directory.startsWith(".works/"))) {
+        } else if (storage === "filesystem" && directory === localLayoutDirectory) {
           preset = "custom";
         }
       }
@@ -457,6 +472,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         resolvedMode: mode,
         storage,
         directory,
+        localLayoutDirectory,
+        localDirectory: state.localDirectory || localLayoutDirectory,
         inheritedDirectory: state.inheritedDirectory || "",
         section: state.section || inferredSection,
         sectionTemplate: state.sectionTemplate || "",
@@ -478,6 +495,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         model: layoutValue.model || "",
         engine: layoutValue.engine || "lightncandy",
         directory: layoutValue.directory || "",
+        localDirectory: layoutValue.localDirectory || "",
         storage: layoutValue.storage || "",
         inheritedDirectory: layoutValue.inheritedDirectory || "",
         section: layoutValue.section || inferredSection,
@@ -560,8 +578,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Tailwind first. Use utility classes for the common layout and visual structure.",
     "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
     "Do not embed global CSS, and do not use inline style attributes.",
-    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
-    "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
+    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
+    "Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
   var defaultFileSystemPrompt = [
@@ -609,8 +627,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
     "Do not embed global CSS, and do not use inline style attributes.",
     "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
-    "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
+    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
+    "Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
     "When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.",
@@ -630,8 +648,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
     "Do not embed global CSS, and do not use inline style attributes.",
     "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
-    "Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
+    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
+    "Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
     "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
   ].join("\n");
   var defaultPromptSettings = {
@@ -2220,6 +2238,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const currentSelection = (fallback = {}) => getSelectionOrFallback(getActiveSelection2, fallback);
     const setPromptStatus = (message, success = false) => setStatusMessage(statusEl, message, success);
     const getLayoutPreset = () => getLayoutPresetValue();
+    const forceLayoutPromptToCustom = () => {
+      const presetEl = document.getElementById("edit-layout-preset");
+      if (presetEl && presetEl.value !== "custom") {
+        presetEl.value = "custom";
+      }
+      return "custom";
+    };
     let activePath = currentSelection({ path: "" }).path;
     let activePromptMode = currentSelection().isLayout ? "layout" : currentSelection().previewIsFile ? "file" : "folder";
     let imageAttachment = null;
@@ -2647,6 +2672,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               }
             }
           }
+          const effectiveLayoutPreset = isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset();
           const { layoutPayload } = buildPromptLayoutPayload({
             selection: selection2,
             currentConfig,
@@ -2659,7 +2685,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             nextJs,
             nextLayoutValue,
             responseModel: response.model || "",
-            layoutPreset: getLayoutPreset()
+            layoutPreset: effectiveLayoutPreset
           });
           const savePayload = {
             path: activePath,
@@ -3082,7 +3108,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const layoutState = getLayoutState(config);
     const isFile = (status == null ? void 0 : status.target) === "file";
     const sectionName = layoutState.section || (isFile ? "work" : "works");
-    const localLayoutDirectory = isFile ? `.works/${config.name || config.path || "item"}.layout` : ".layout";
+    const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile ? `.works/${config.name || config.path || "item"}.layout` : ".layout");
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
     const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const activeSectionDirectory = String(layoutState.sectionDirectory || "").trim();
@@ -3114,7 +3140,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const wrapperSourceLabel = layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
     const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
     const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
-    const displayMode = layoutState.mode === "filesystem-layout" ? "custom-layout" : layoutState.mode;
+    const displayMode = layoutState.mode === "filesystem-layout" ? layoutState.directory === localLayoutDirectory ? "custom-layout" : "inherit-layout" : layoutState.mode;
     return {
       layoutState,
       displayMode,
@@ -3400,7 +3426,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         drafts.virtualCss = sharedPackage.css || drafts.virtualCss;
         drafts.virtualJs = sharedPackage.js || drafts.virtualJs;
       }
-      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? "collection-layout" : originalEditable ? "custom-layout" : "poff-layout";
+      const nextMode = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? "collection-layout" : originalEditable ? originalTarget === wrapperTarget.replace(/\/template\.hbs$/, "") ? "custom-layout" : "inherit-layout" : "poff-layout";
       const primaryMode = currentPrimaryMode();
       const isVirtual = primaryMode === "virtual";
       const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, "");
@@ -4481,6 +4507,26 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let editConfig = currentPoffConfig;
     let editTarget = "folder";
     let drawerOpen = false;
+    function annotateConfigPath(config, selection2 = getActiveSelection(), status = {}) {
+      if (!config || typeof config !== "object") {
+        return config;
+      }
+      const relativePath = (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || (context == null ? void 0 : context.currentPathForIframe) || "";
+      const isFile = (status == null ? void 0 : status.subjectTarget) === "file" || (status == null ? void 0 : status.target) === "file" || (selection2 == null ? void 0 : selection2.previewIsFile) === true;
+      Object.defineProperties(config, {
+        __poffRelativePath: {
+          value: relativePath,
+          configurable: true
+        },
+        __poffIsFile: {
+          value: isFile,
+          configurable: true
+        }
+      });
+      return config;
+    }
+    annotateConfigPath(folderConfig, getActiveSelection(), { target: "folder" });
+    annotateConfigPath(editConfig, getActiveSelection(), { target: editTarget });
     function renderFolderMeta() {
       return folderConfig;
     }
@@ -4513,7 +4559,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (!data || data.error) {
           throw new Error((data == null ? void 0 : data.error) || "Save failed.");
         }
-        editConfig = data.config || editConfig;
+        editConfig = annotateConfigPath(data.config || editConfig, getActiveSelection(), data);
         editTarget = data.target || editTarget;
         if (editTarget === "folder" || editTarget === "layout" && data.subjectTarget === "folder") {
           folderConfig = editConfig;
@@ -4548,14 +4594,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     async function refreshCurrentEditState(selection2 = getActiveSelection()) {
       const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
       if (refreshed == null ? void 0 : refreshed.config) {
-        editConfig = refreshed.config;
+        editConfig = annotateConfigPath(refreshed.config, selection2, refreshed);
         editTarget = refreshed.target || (selection2.isLayout ? "layout" : selection2.previewIsFile ? "file" : "folder");
         if (editTarget === "folder" || editTarget === "layout" && refreshed.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
         }
       }
-      renderEditUI((refreshed == null ? void 0 : refreshed.config) || editConfig, {
+      renderEditUI(editConfig, {
         allowed: (refreshed == null ? void 0 : refreshed.allowed) !== false,
         error: refreshed == null ? void 0 : refreshed.error,
         target: (refreshed == null ? void 0 : refreshed.target) || editTarget,
@@ -4807,14 +4853,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const selection2 = getActiveSelection();
       const data = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
       if (data.config) {
-        editConfig = data.config;
+        editConfig = annotateConfigPath(data.config, selection2, data);
         editTarget = data.target || (selection2.isFile ? "file" : "folder");
         if (editTarget === "folder" || editTarget === "layout" && data.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
         }
       }
-      renderEditUI(data.config || editConfig, {
+      renderEditUI(editConfig, {
         allowed: data.allowed !== false,
         error: data.error,
         target: editTarget,

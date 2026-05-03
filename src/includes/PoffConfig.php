@@ -409,6 +409,9 @@ class PoffConfig
         $layoutMode = trim((string) ($normalized['mode'] ?? ''));
         $layoutName = trim((string) ($normalized['name'] ?? ''));
         $layoutPreset = trim((string) ($normalized['preset'] ?? ''));
+        if ($layoutPreset !== 'shared') {
+            unset($normalized['source'], $normalized['sharedName']);
+        }
         $isSharedPreset = $layoutPreset === 'shared'
             || $layoutMode === 'shared'
             || (($normalized['source'] ?? '') === 'shared')
@@ -622,7 +625,13 @@ class PoffConfig
         $sharedName = trim((string) ($resolved['sharedName'] ?? ''));
         $sharedPreset = $preset === 'shared'
             || $mode === 'shared'
-            || (($resolved['source'] ?? '') === 'shared');
+            || (
+                $preset === ''
+                && (
+                    (($resolved['source'] ?? '') === 'shared')
+                    || $sharedName !== ''
+                )
+            );
         if ($sharedPreset) {
             if ($sharedName === '' && isset($resolved['sharedLayouts'][0]['name'])) {
                 $sharedName = trim((string) $resolved['sharedLayouts'][0]['name']);
@@ -653,6 +662,9 @@ class PoffConfig
 
                 return $resolved;
             }
+        }
+        if ($preset !== 'shared') {
+            unset($resolved['source'], $resolved['sharedName']);
         }
         $localLayoutDir = $fileName === null
             ? self::folderLayoutDir($dir)

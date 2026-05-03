@@ -1504,6 +1504,55 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });
 
+  test('actual layout preset ignores stale shared source and inherits parent .layout', async () => {
+    const tempRoot = path.join(POFF_DIR, 'stale-shared-inherit');
+    const childDir = path.join(tempRoot, 'child');
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempRoot, '.layout'), { recursive: true });
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(childDir, 'note.txt'), 'note');
+    fs.writeFileSync(
+      path.join(tempRoot, '.layout', 'template.hbs'),
+      '<div class="parent-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+    );
+    fs.writeFileSync(path.join(tempRoot, '.layout', 'works.hbs'), '<section class="parent-works">{{title}}</section>');
+    fs.writeFileSync(path.join(childDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'child',
+      slug: 'child',
+      title: 'child',
+      description: '',
+      type: 'folder',
+      id: 'poff_stale_shared',
+      tree: [],
+      treeHash: 'stale',
+      updatedAt: new Date().toISOString(),
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-layout',
+          engine: 'lightncandy',
+          section: 'works',
+          preset: 'actual',
+          source: 'shared',
+          sharedName: '1er/.layout',
+          storage: 'shared',
+          directory: '1er/.layout',
+          sectionDirectory: '1er/.layout',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', childDir));
+      expect(ensured.work.layout.storage).toBe('filesystem');
+      expect(ensured.work.layout.directory).toBe('tests/poff-tests/stale-shared-inherit/.layout');
+      expect(ensured.work.layout.template).toContain('parent-layout');
+      expect(ensured.work.layout.sectionTemplate).toContain('parent-works');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('can persist edits back into the inherited original filesystem layout source', async () => {
     const originalTarget = path.relative(ROOT, path.join(POFF_DIR, '.layout'));
     await runLayoutFilesystem('persist-original', originalTarget, '', {
