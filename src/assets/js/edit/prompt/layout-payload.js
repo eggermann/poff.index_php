@@ -30,6 +30,16 @@ export function buildPromptLayoutPayload({
     layoutPreset = getLayoutPresetValue(),
 }) {
     const layoutState = getLayoutState(currentConfig || {});
+    if (!selection?.isLayout) {
+        return {
+            layoutPayload: {
+                sectionTemplate: templateText,
+            },
+            layoutState,
+            resolvedLayoutName: resolveLayoutName(nextLayoutValue, drawerForm, currentConfig),
+        };
+    }
+
     const resolvedLayoutName = resolveLayoutName(nextLayoutValue, drawerForm, currentConfig);
     const layoutPayload = {
         name: resolvedLayoutName,
@@ -49,11 +59,6 @@ export function buildPromptLayoutPayload({
     }
     if (responseModel) {
         layoutPayload.model = responseModel;
-    }
-
-    if (!selection?.isLayout) {
-        layoutPayload.sectionTemplate = templateText;
-        return { layoutPayload, layoutState, resolvedLayoutName };
     }
 
     const attachSiblingSectionTemplates = () => {

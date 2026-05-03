@@ -14,8 +14,7 @@ export function getDefaultModelForProvider(provider = 'local') {
 
 export const legacyWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
-    'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
-    'Return only the template (no Markdown, no fences).',
+    'Return strict JSON with a required "template" string and optional "work" field.',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
     'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
     'When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.',
@@ -24,12 +23,9 @@ export const legacyWorkSystemPrompt = [
     'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
     'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
     'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
-    'Tailwind first. Use utility classes for the common layout and visual structure.',
-    'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
-    'Do not embed global CSS, and do not use inline style attributes.',
-    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-    'Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
-    'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
+    'Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.',
+    'Do not return "css" or "js" for work prompts. Work prompts update only the inner HBS partial; layout prompts own wrapper CSS and JS.',
+    'Do not put <style> tags inside template and do not use inline style attributes.',
 ].join('\n');
 
 export const defaultFileSystemPrompt = [
@@ -43,7 +39,7 @@ export const defaultFileSystemPrompt = [
     'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
     'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
     'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
-    'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
+    'The JSON "template" must contain only the inner file partial content rendered inside the existing layout wrapper.',
 ].join('\n');
 
 export const defaultFolderSystemPrompt = [
@@ -60,7 +56,7 @@ export const defaultFolderSystemPrompt = [
     'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
     'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
     'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
-    'Return only the inner folder partial content that will be rendered inside the existing layout wrapper.',
+    'The JSON "template" must contain only the inner folder partial content rendered inside the existing layout wrapper.',
 ].join('\n');
 
 export const defaultLayoutSystemPrompt = [
@@ -75,12 +71,11 @@ export const defaultLayoutSystemPrompt = [
     'The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.',
     'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
     'Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.',
-    'Tailwind first. Put standard layout styling in class attributes.',
-    'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
-    'Do not embed global CSS, and do not use inline style attributes.',
     'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-    'Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
+    'Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.',
+    'Put all wrapper-specific styling in the JSON "css" field as plain CSS that works without a build step.',
+    'Scope CSS under a unique root class used by the returned wrapper. Do not define global selectors like body, a, img, h1 unless nested under that root class.',
+    'Do not put <style> tags inside template and do not use inline style attributes.',
     'Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.',
     'Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.',
     'When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.',
@@ -89,20 +84,13 @@ export const defaultLayoutSystemPrompt = [
     'For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.',
     'Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.',
     'Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.',
-    'Avoid CSS variable theme systems unless explicitly requested; prefer direct Tailwind utility classes.',
     'Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.',
     'Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.',
     'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
     'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
     'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
     'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
-    'Tailwind first. Use utility classes for the common layout and visual structure.',
-    'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
-    'Do not embed global CSS, and do not use inline style attributes.',
-    'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-    'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-    'Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
-    'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
+    'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',
 ].join('\n');
 
 export const defaultSystemPrompt = defaultFileSystemPrompt;

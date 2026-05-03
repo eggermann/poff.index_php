@@ -2,33 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function loadPromptUiHelpers() {
-  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/ui.js');
-  const source = fs.readFileSync(filePath, 'utf8')
-    .replace(/export async function /g, 'async function ')
-    .replace(/export function /g, 'function ');
-
-  const module = { exports: {} };
-  const context = vm.createContext({
-    module,
-    exports: module.exports,
-    console,
-    require,
-    __dirname: path.dirname(filePath),
-    __filename: filePath,
-  });
-
-  vm.runInContext(`${source}
-module.exports = {
-  applyPromptLayerState,
-};
-`, context);
-
-  return module.exports;
-}
-
 function loadSyncPromptDock() {
-  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/panel.js');
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/panel/shared.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/^import .*$/gm, '')
     .replace(/export function /g, 'function ');
@@ -68,6 +43,31 @@ module.exports = {
   return { syncPromptDock: module.exports.syncPromptDock, promptDock };
 }
 
+function loadPromptLayerController(documentMock) {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/layer.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    document: documentMock,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  createPromptLayerController,
+};
+`, context);
+
+  return module.exports;
+}
+
 function createClassList() {
   const classes = new Set();
   return {
@@ -94,7 +94,6 @@ function createClassList() {
 }
 
 describe('prompt floating toggle regressions', () => {
-  const { applyPromptLayerState } = loadPromptUiHelpers();
   const { syncPromptDock, promptDock } = loadSyncPromptDock();
 
   test('syncPromptDock moves the floating prompt root as one docked unit', () => {
@@ -107,42 +106,81 @@ describe('prompt floating toggle regressions', () => {
 
     syncPromptDock(promptRoot);
 
-    expect(promptDock.children).toEqual([floatingRoot]);
+    expect(promptDock.children).toEqual([promptRoot]);
   });
 
-  test('applyPromptLayerState toggles the moved floating root and button visibility', () => {
+  test('prompt layer controller toggles the moved floating root and button visibility', () => {
     const root = {
       classList: createClassList(),
     };
     const promptWindowEl = { hidden: false };
-    const promptLayerCloseEl = { hidden: false };
-    const promptLayerOpenEl = { hidden: true };
-
-    const collapsed = applyPromptLayerState({
+    const promptLayerCloseEl = { hidden: false, addEventListener() {} };
+    const promptLayerOpenEl = { hidden: true, addEventListener() {} };
+    const { createPromptLayerController } = loadPromptLayerController({
+      addEventListener() {},
+    });
+    const controller = createPromptLayerController({
       root,
-      promptWindowEl,
-      promptLayerCloseEl,
-      promptLayerOpenEl,
-      collapsed: true,
+      windowEl: promptWindowEl,
+      closeEl: promptLayerCloseEl,
+      openEl: promptLayerOpenEl,
+      storageKey: 'prompt-layer-state',
+      storage: {
+        getItem() {
+          return null;
+        },
+        setItem() {},
+      },
     });
 
-    expect(collapsed).toBe(true);
+    controller.applyState(true, { skipPersist: true });
     expect(root.classList.contains('prompt-layer-collapsed')).toBe(true);
     expect(promptWindowEl.hidden).toBe(true);
     expect(promptLayerCloseEl.hidden).toBe(true);
     expect(promptLayerOpenEl.hidden).toBe(false);
 
-    applyPromptLayerState({
-      root,
-      promptWindowEl,
-      promptLayerCloseEl,
-      promptLayerOpenEl,
-      collapsed: false,
-    });
+    controller.applyState(false, { skipPersist: true });
 
     expect(root.classList.contains('prompt-layer-collapsed')).toBe(false);
     expect(promptWindowEl.hidden).toBe(false);
     expect(promptLayerCloseEl.hidden).toBe(false);
     expect(promptLayerOpenEl.hidden).toBe(true);
+  });
+
+  test('Escape closes the prompt layer', () => {
+    const listeners = {};
+    const documentMock = {
+      addEventListener(type, handler) {
+        listeners[type] = handler;
+      },
+    };
+    const root = {
+      classList: createClassList(),
+    };
+    const promptWindowEl = { hidden: false };
+    const promptLayerCloseEl = { hidden: false, addEventListener() {} };
+    const promptLayerOpenEl = { hidden: true, addEventListener() {} };
+
+    const { createPromptLayerController } = loadPromptLayerController(documentMock);
+    createPromptLayerController({
+      root,
+      windowEl: promptWindowEl,
+      closeEl: promptLayerCloseEl,
+      openEl: promptLayerOpenEl,
+      storageKey: 'prompt-layer-state',
+      storage: {
+        getItem() {
+          return null;
+        },
+        setItem() {},
+      },
+    });
+
+    expect(typeof listeners.keydown).toBe('function');
+    listeners.keydown({ key: 'Escape' });
+    expect(root.classList.contains('prompt-layer-collapsed')).toBe(true);
+    expect(promptWindowEl.hidden).toBe(true);
+    expect(promptLayerCloseEl.hidden).toBe(true);
+    expect(promptLayerOpenEl.hidden).toBe(false);
   });
 });

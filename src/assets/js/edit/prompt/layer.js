@@ -46,6 +46,14 @@ export function createPromptLayerController({
     if (openEl) {
         openEl.addEventListener('click', () => applyState(false));
     }
+    if (typeof document !== 'undefined' && document && typeof document.addEventListener === 'function') {
+        document.addEventListener('keydown', (event) => {
+            if (!event || event.key !== 'Escape') {
+                return;
+            }
+            applyState(true);
+        });
+    }
 
     return {
         readState,

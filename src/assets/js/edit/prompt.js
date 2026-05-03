@@ -606,8 +606,8 @@ export function bindPromptWindow({
                 if (nextDescription !== null) extra.push('description');
                 if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(', ')}`);
                 if (nextLayoutValue) extra.push('layout');
-                if (nextCss !== null) extra.push('css');
-                if (nextJs !== null) extra.push('js');
+                if (isLayoutTarget && nextCss !== null) extra.push('css');
+                if (isLayoutTarget && nextJs !== null) extra.push('js');
                 const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? 'layout ' : ''}HBS chars via ${providerLabel}${modelLabel ? ` · ${modelLabel}` : ''}${extra.length ? ` · updated ${extra.join('; ')}` : ''}`;
                 renderSummary(summaryText);
                 clearAttachment();

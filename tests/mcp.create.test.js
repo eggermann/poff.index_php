@@ -319,6 +319,39 @@ module.exports = {
   return module.exports;
 }
 
+function loadPromptLayoutPayloadHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/edit/prompt/layout-payload.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*;\n/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    getLayoutState(config) {
+      return config && config.work && config.work.layout && typeof config.work.layout === 'object'
+        ? config.work.layout
+        : {};
+    },
+    getLayoutPresetValue() {
+      return 'actual';
+    },
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  buildPromptLayoutPayload,
+};
+`, context);
+
+  return module.exports;
+}
+
 function loadWorkFieldHelpers() {
   const filePath = path.join(ROOT, 'src/assets/js/edit/work-fields.js');
   const source = fs.readFileSync(filePath, 'utf8')
@@ -1222,6 +1255,45 @@ describe('Worktype HBS renderer', () => {
     expect(readPromptEditorDraft({ isLayout: false }, root)).toEqual({
       template: '<article class="draft-section"></article>',
     });
+  });
+
+  test('builds section-only save payloads for file prompts even when the model returns css/js', () => {
+    const { buildPromptLayoutPayload } = loadPromptLayoutPayloadHelpers();
+
+    const { layoutPayload } = buildPromptLayoutPayload({
+      selection: {
+        isLayout: false,
+        previewIsFile: true,
+        previewPath: '1er/12test2 (Konvertiert).mp4',
+      },
+      currentConfig: {
+        work: {
+          layout: {
+            name: 'poff-layout',
+            directory: '1er/.layout',
+            inheritedDirectory: '.layout',
+          },
+        },
+      },
+      drawerForm: {
+        elements: {
+          work_layout: { value: 'poff-layout' },
+        },
+      },
+      templateText: '<article class="file-prompt-result">{{title}}</article>',
+      nextCss: '.file-prompt-result{color:red;}',
+      nextJs: 'window.__filePrompt = true;',
+      responseModel: 'gpt-4o-mini',
+    });
+
+    expect(layoutPayload).toEqual({
+      sectionTemplate: '<article class="file-prompt-result">{{title}}</article>',
+    });
+    expect(layoutPayload).not.toHaveProperty('name');
+    expect(layoutPayload).not.toHaveProperty('engine');
+    expect(layoutPayload).not.toHaveProperty('css');
+    expect(layoutPayload).not.toHaveProperty('js');
+    expect(layoutPayload).not.toHaveProperty('model');
   });
 
   test('normalizes and materializes custom work fields', () => {
