@@ -1780,6 +1780,72 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
   });
 
+  test('renders built-in file layout assets from the containing folder .layout', async () => {
+    const tempDir = path.join(POFF_DIR, 'default-file-layout-assets');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.works'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'fake image');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'eggman_profile-image.jpg'), 'fake profile image');
+    fs.writeFileSync(path.join(tempDir, '.works', `${fileName}.config.json`), JSON.stringify({
+      title: 'Poster',
+      description: '',
+      work: {
+        type: 'image',
+        layout: {
+          mode: 'poff-layout',
+          name: 'poff-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const output = await runViewer(`default-file-layout-assets/${fileName}`);
+
+      expect(output).toContain('default-file-layout-assets/.layout/eggman_profile-image.jpg');
+      expect(output).not.toContain(`default-file-layout-assets/.works/${fileName}.layout/eggman_profile-image.jpg`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('renders built-in file layout assets from inherited parent .layout', async () => {
+    const tempDir = path.join(POFF_DIR, 'default-file-layout-inherited-assets');
+    const childDir = path.join(tempDir, 'child');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(path.join(childDir, '.works'), { recursive: true });
+    fs.writeFileSync(path.join(childDir, fileName), 'fake image');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'eggman_profile-image.jpg'), 'fake profile image');
+    fs.writeFileSync(path.join(childDir, '.works', `${fileName}.config.json`), JSON.stringify({
+      title: 'Poster',
+      description: '',
+      work: {
+        type: 'image',
+        layout: {
+          mode: 'poff-layout',
+          name: 'poff-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const output = await runViewer(`default-file-layout-inherited-assets/child/${fileName}`);
+
+      expect(output).toContain('default-file-layout-inherited-assets/.layout/eggman_profile-image.jpg');
+      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.layout/eggman_profile-image.jpg`);
+      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.works/${fileName}.layout/eggman_profile-image.jpg`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('sanitizes persisted file work partials that accidentally include outer wrapper shell blocks', async () => {
     await runLayoutFilesystem('persist-file', POFF_DIR, VIEWER_FILE_NAME, {
       name: 'filesystem-layout',

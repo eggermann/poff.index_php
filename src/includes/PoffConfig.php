@@ -532,11 +532,34 @@ class PoffConfig
     public static function prepareLayoutForView(mixed $layout, string $itemPath, bool $isFile, string $section = 'work'): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
+        $resolvedTemplate = '';
+        $defaultLayoutTemplate = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_TEMPLATE_FILE);
+        $filesystemLayoutTemplate = Worktype::layoutBundleAsset(Worktype::filesystemLayoutName(), self::LAYOUT_TEMPLATE_FILE);
+        $defaultTemplateMarkup = is_string($defaultLayoutTemplate) ? trim($defaultLayoutTemplate) : '';
+        $filesystemTemplateMarkup = is_string($filesystemLayoutTemplate) ? trim($filesystemLayoutTemplate) : '';
+
+        if (array_key_exists('phpTemplate', $resolved) && is_string($resolved['phpTemplate'])) {
+            $resolvedTemplate = trim($resolved['phpTemplate']);
+        }
+
+        $usesDefaultBundleTemplate = $resolvedTemplate !== '' && (
+            ($defaultTemplateMarkup !== '' && $resolvedTemplate === $defaultTemplateMarkup)
+            || ($filesystemTemplateMarkup !== '' && $resolvedTemplate === $filesystemTemplateMarkup)
+        );
+
         if (($resolved['storage'] ?? '') !== 'filesystem') {
             if (!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') {
                 $bundleCss = Worktype::layoutBundleAsset((string) ($resolved['name'] ?? ''), self::LAYOUT_STYLE_FILE);
                 if (is_string($bundleCss) && $bundleCss !== '') {
                     $resolved['css'] = $bundleCss;
+                }
+                if ((!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') && $usesDefaultBundleTemplate) {
+                    if ($defaultTemplateMarkup !== '') {
+                        $bundleCss = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_STYLE_FILE);
+                        if (is_string($bundleCss) && $bundleCss !== '') {
+                            $resolved['css'] = $bundleCss;
+                        }
+                    }
                 }
             }
             if (!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') {
@@ -544,11 +567,28 @@ class PoffConfig
                 if (is_string($bundleJs) && $bundleJs !== '') {
                     $resolved['js'] = $bundleJs;
                 }
+                if ((!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') && $usesDefaultBundleTemplate) {
+                    if ($defaultTemplateMarkup !== '') {
+                        $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
+                        if (is_string($bundleJs) && $bundleJs !== '') {
+                            $resolved['js'] = $bundleJs;
+                        }
+                    }
+                }
             }
         }
-        $basePath = isset($resolved['directory']) && is_string($resolved['directory']) && trim($resolved['directory']) !== ''
-            ? str_replace('\\', '/', trim($resolved['directory'], "/\\"))
-            : self::relativeLayoutPath($itemPath, $isFile);
+        $layoutName = Worktype::canonicalLayoutName((string) ($resolved['name'] ?? ''));
+        $publicBundleBasePath = self::publicFolderLayoutPath($itemPath, $isFile);
+        $inheritedDirectory = isset($resolved['inheritedDirectory']) && is_string($resolved['inheritedDirectory'])
+            ? trim($resolved['inheritedDirectory'], "/\\")
+            : '';
+        $resolvedDirectory = isset($resolved['directory']) && is_string($resolved['directory']) ? trim($resolved['directory'], "/\\") : '';
+        $hasFilesystemLayout = ($resolved['storage'] ?? '') === 'filesystem';
+        $usePublicBundleBasePath = in_array($layoutName, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)
+            && !$hasFilesystemLayout;
+        $basePath = $usePublicBundleBasePath
+            ? ($inheritedDirectory !== '' ? str_replace('\\', '/', $inheritedDirectory) : $publicBundleBasePath)
+            : ($resolvedDirectory !== '' ? str_replace('\\', '/', $resolvedDirectory) : ($publicBundleBasePath !== '' ? $publicBundleBasePath : self::relativeLayoutPath($itemPath, $isFile)));
         $resolved['baseHref'] = self::encodeRelativePath($basePath);
         $sectionBasePath = isset($resolved['sectionDirectory']) && is_string($resolved['sectionDirectory']) && trim($resolved['sectionDirectory']) !== ''
             ? str_replace('\\', '/', trim($resolved['sectionDirectory'], "/\\"))

@@ -53,6 +53,7 @@ try {
     $bundlePath = $sourceDir . '/includes/worktypes/worktypes.php';
     $embeddedWorktypes = [];
     $embeddedTemplates = [];
+    $embeddedLayoutAssets = [];
     if (file_exists($bundlePath)) {
         $bundle = include $bundlePath;
         if (is_array($bundle)) {
@@ -108,10 +109,31 @@ try {
             $embeddedTemplates[$key] = file_get_contents($tplFile);
         }
     }
+    foreach ([
+        'poff-layout' => $sourceDir . '/includes/worktypes/templates/layout/default',
+        'filesystem-layout' => $sourceDir . '/includes/worktypes/templates/layout/file-system',
+    ] as $layoutName => $layoutDir) {
+        if (!is_dir($layoutDir)) {
+            continue;
+        }
+        $layoutAssets = [];
+        foreach (['style.css', 'script.js'] as $assetFile) {
+            $assetPath = $layoutDir . DIRECTORY_SEPARATOR . $assetFile;
+            if (!is_file($assetPath)) {
+                continue;
+            }
+            $layoutAssets[$assetFile] = file_get_contents($assetPath);
+        }
+        if ($layoutAssets !== []) {
+            $embeddedLayoutAssets[$layoutName] = $layoutAssets;
+        }
+    }
     $buildContent .= '$__worktypeEmbedded = ' . var_export($embeddedWorktypes, true) . ";\n";
     $buildContent .= "Worktype::setEmbedded(\$__worktypeEmbedded);\n\n";
     $buildContent .= '$__worktypeTemplates = ' . var_export($embeddedTemplates, true) . ";\n";
     $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
+    $buildContent .= '$__worktypeLayoutAssets = ' . var_export($embeddedLayoutAssets, true) . ";\n";
+    $buildContent .= "Worktype::setEmbeddedLayoutAssets(\$__worktypeLayoutAssets);\n\n";
 
     // Add edit-mode helpers, root detection, prompt/template sanitizers, and PoffConfig model so the built output stays single-file.
     $editModeHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/edit-mode.php');
@@ -253,6 +275,12 @@ PHP;
 
     // Copy the built index.php to all directories
     FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
+
+    // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
+    $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/eggman_profile-image.jpg';
+    if (is_file($layoutAsset)) {
+        FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
+    }
 
     // Trigger SSH upload using SSHUploader
     require_once __DIR__ . '/SSHUploader.php';

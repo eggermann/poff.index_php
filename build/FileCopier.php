@@ -19,6 +19,28 @@ class FileCopier {
         }
     }
 
+    public static function copyFileToLayoutDirectories(string $sourceFile, string $targetDir, ?string $targetFileName = null, string $layoutDirName = '.layout'): void {
+        $projectRoot = rtrim($targetDir, '/\\');
+
+        if (!file_exists($sourceFile)) {
+            throw new Exception("Source file not found: $sourceFile");
+        }
+
+        $fileName = $targetFileName ?? basename($sourceFile);
+        $dirs = array_merge([$projectRoot], self::findAllDirectories($projectRoot));
+        foreach ($dirs as $dir) {
+            $destinationDir = $dir . DIRECTORY_SEPARATOR . ltrim($layoutDirName, '/\\');
+            if (!is_dir($destinationDir) && !mkdir($destinationDir, 0755, true) && !is_dir($destinationDir)) {
+                throw new Exception("Failed to create destination directory: $destinationDir");
+            }
+
+            $destination = $destinationDir . DIRECTORY_SEPARATOR . $fileName;
+            if (!copy($sourceFile, $destination)) {
+                throw new Exception("Failed to copy layout asset to: $destination");
+            }
+        }
+    }
+
     public static function mirrorDirectory(string $sourceDir, string $targetDir): void {
         if (!is_dir($sourceDir)) {
             throw new Exception("Source directory not found: $sourceDir");

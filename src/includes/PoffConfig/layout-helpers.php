@@ -42,6 +42,25 @@ trait PoffConfigLayoutHelpers
         return ($dirName !== '' ? $dirName . '/' : '') . '.works/' . $fileName . '.layout';
     }
 
+    public static function publicFolderLayoutPath(string $itemPath, bool $isFile): string
+    {
+        $normalized = str_replace('\\', '/', trim($itemPath, "/\\"));
+        if ($normalized === '') {
+            return '.layout';
+        }
+
+        if (!$isFile) {
+            return $normalized . '/.layout';
+        }
+
+        $dirName = dirname($normalized);
+        if ($dirName === '.' || $dirName === DIRECTORY_SEPARATOR) {
+            return '.layout';
+        }
+
+        return trim($dirName, "/\\") . '/.layout';
+    }
+
     public static function slugify(string $name): string
     {
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($name));

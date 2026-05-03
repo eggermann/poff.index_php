@@ -12,6 +12,7 @@ class Worktype
 
     private static array $embedded = [];
     private static array $embeddedTemplates = [];
+    private static array $embeddedLayoutAssets = [];
     private static array $bundleDefinitions = [];
     private static array $bundleTemplates = [];
     private static bool $bundleLoaded = false;
@@ -350,6 +351,12 @@ class Worktype
     {
         $path = self::layoutBundleAssetPath($name, $file);
         if ($path === null || !is_file($path)) {
+            $layoutName = self::canonicalLayoutName($name);
+            if (isset(self::$embeddedLayoutAssets[$layoutName][$file]) && is_string(self::$embeddedLayoutAssets[$layoutName][$file])) {
+                $embedded = trim(self::$embeddedLayoutAssets[$layoutName][$file]);
+                return $embedded !== '' ? self::$embeddedLayoutAssets[$layoutName][$file] : null;
+            }
+
             return null;
         }
 
@@ -816,6 +823,16 @@ class Worktype
     public static function setEmbeddedTemplates(array $map): void
     {
         self::$embeddedTemplates = $map;
+    }
+
+    /**
+     * Set embedded layout assets (used in built single-file output).
+     *
+     * Expected shape: [layoutName => [fileName => fileContents]].
+     */
+    public static function setEmbeddedLayoutAssets(array $map): void
+    {
+        self::$embeddedLayoutAssets = $map;
     }
 
     /**
