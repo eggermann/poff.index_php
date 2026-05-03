@@ -211,8 +211,66 @@ function mcpParsePromptModelResult(string $raw): array
     if (isset($decoded['work']) && is_array($decoded['work'])) {
         $result['work'] = $decoded['work'];
     }
+    if (array_key_exists('css', $decoded) || array_key_exists('style', $decoded)) {
+        $result['css'] = (string) ($decoded['css'] ?? $decoded['style'] ?? '');
+    }
+    if (array_key_exists('js', $decoded) || array_key_exists('script', $decoded)) {
+        $result['js'] = (string) ($decoded['js'] ?? $decoded['script'] ?? '');
+    }
 
     return $result;
+}
+
+function mcpPromptCssDesignRules(): array
+{
+    return [
+        'CSS quality rules:',
+        '- Use one unique root class for the returned template, for example .work-gallery, .work-profile, .work-reader, .work-index, or a class derived from the requested design.',
+        '- Every CSS selector must be scoped under that root class.',
+        '- Use semantic class names that describe structure or content, not appearance.',
+        '- Use modern plain CSS: custom properties, grid, flexbox, clamp(), minmax(), aspect-ratio, object-fit, media queries, and color-mix() when useful.',
+        '- Put reusable design tokens on the root class: colors, surface, text, muted text, accent, border, radius, shadow, spacing.',
+        '- Prefer fluid spacing and typography with clamp().',
+        '- Create visual depth with subtle gradients, borders, shadows, overlays, and hover/focus states when appropriate.',
+        '- Keep text readable and contrast accessible.',
+        '- Add visible :focus-visible styles for links, buttons, and interactive elements.',
+        '- If transitions or animations are used, add @media (prefers-reduced-motion: reduce).',
+        '- Do not use Tailwind utility classes.',
+        '- Do not use inline style attributes.',
+        '- Do not include <style> tags.',
+        '- Do not use @import.',
+        '- Do not define unscoped global selectors such as body, html, :root, *, a, img, h1, p.',
+        '- Avoid !important unless absolutely necessary.',
+        '- Keep CSS self-contained so it can live in style.css beside the generated template.',
+    ];
+}
+
+function mcpPromptValidateScopedCss(string $css): array
+{
+    $errors = [];
+    $trimmed = trim($css);
+
+    if ($trimmed === '') {
+        return $errors;
+    }
+
+    if (preg_match('/<\s*style\b/i', $trimmed)) {
+        $errors[] = 'CSS must not include <style> tags.';
+    }
+
+    if (preg_match('/@import\s/i', $trimmed)) {
+        $errors[] = 'CSS must not import external stylesheets.';
+    }
+
+    if (preg_match('/(^|[{}>])\s*(html|body|:root|\*)\s*(?:[,{]|$)/i', $trimmed)) {
+        $errors[] = 'CSS must not include global html/body/:root/universal selectors.';
+    }
+
+    if (preg_match('/\b(?:position\s*:\s*fixed|z-index\s*:\s*9999)/i', $trimmed)) {
+        $errors[] = 'CSS should not create global overlay behavior.';
+    }
+
+    return $errors;
 }
 
 function mcpPromptLoadEnv(string $rootDir): array
@@ -780,10 +838,10 @@ function mcpPromptSystemPrompt(): string
 {
     return implode("\n", [
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
-        'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
+        'Return strict JSON with a required "template" string and optional "css", "js", and "work" fields.',
         'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
         'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-        'Return only the template (no Markdown, no fences).',
+        'Return only the JSON object (no Markdown, no fences).',
         'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
@@ -799,13 +857,11 @@ function mcpPromptSystemPrompt(): string
         'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
         'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
         'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
-        'Tailwind first. Use utility classes for the common layout and visual structure.',
-        'Use scoped CSS only for exceptions that are awkward or unreadable as utilities.',
-        'Do not embed global CSS, and do not use inline style attributes.',
+        'Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.',
+        'Put all template-specific styling in the JSON "css" field as plain CSS that works without a build step.',
+        ...mcpPromptCssDesignRules(),
         'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-        'Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.',
-        'Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.',
-        'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
+        'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',
     ]);
 }
 
@@ -994,6 +1050,13 @@ function handlePromptTemplate(array $opts): array
     }
 
     $parsedResult = mcpParsePromptModelResult($template);
+    if (isset($parsedResult['css']) && is_string($parsedResult['css'])) {
+        $cssErrors = mcpPromptValidateScopedCss($parsedResult['css']);
+        if ($cssErrors !== []) {
+            return mcpPromptError('Generated CSS was rejected: ' . implode(' ', $cssErrors));
+        }
+    }
+
     $templateText = trim((string) ($parsedResult['template'] ?? ''));
     if ($templateText === '') {
         return mcpPromptError(
@@ -1010,7 +1073,7 @@ function handlePromptTemplate(array $opts): array
         'model' => $usedModel,
         'template' => $templateText,
     ];
-    foreach (['title', 'description', 'work'] as $key) {
+    foreach (['title', 'description', 'work', 'css', 'js'] as $key) {
         if (array_key_exists($key, $parsedResult)) {
             $response[$key] = $parsedResult[$key];
         }

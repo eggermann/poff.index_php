@@ -681,7 +681,11 @@ describe('MCP create route helper (CLI)', () => {
         choices: [
           {
             message: {
-              content: '<section class="lm-studio-card">{{title}}</section>',
+              content: JSON.stringify({
+                template: '<section class="lm-studio-card">{{title}}</section>',
+                css: '.lm-studio-card{--card-surface:#fff;display:grid;gap:clamp(0.75rem,2vw,1.25rem);}',
+                js: 'document.querySelectorAll(".lm-studio-card").forEach((card) => card.dataset.ready = "true");',
+              }),
             },
           },
         ],
@@ -694,6 +698,8 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.provider).toBe('local');
     expect(result.model).toBe('gemma4');
     expect(result.template).toBe('<section class="lm-studio-card">{{title}}</section>');
+    expect(result.css).toContain('.lm-studio-card');
+    expect(result.js).toContain('dataset.ready');
     expect(captured.url).toBe(endpoint);
     expect(captured.headers).toEqual([]);
     expect(captured.payload.model).toBe('gemma4');
@@ -718,6 +724,38 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).toContain('"outerWrapper"');
     expect(captured.payload.messages[3].content).toContain('"source": "resolved active wrapper"');
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
+  });
+
+  test('rejects prompt-template CSS with unsafe global styles', async () => {
+    const result = await runPromptTemplateLocal(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint: 'http://127.0.0.1:1234/v1/chat/completions',
+      prompt: 'Create a compact image card.',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                template: '<section class="unsafe-card">{{title}}</section>',
+                css: '<style>body{margin:0;} @import url("https://example.com/base.css");</style>',
+              }),
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.error).toContain('Generated CSS was rejected');
+    expect(result.error).toContain('CSS must not include <style> tags.');
+    expect(result.error).toContain('CSS must not import external stylesheets.');
+    expect(result.error).toContain('CSS must not include global html/body/:root/universal selectors.');
+    expect(result.template).toBeUndefined();
   });
 
   test('routes subject-path layout prompts through the layout wrapper handler', async () => {

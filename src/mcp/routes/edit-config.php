@@ -58,15 +58,14 @@ function handleEditConfig(array $opts): array
 
         $config = $result['config'];
         $configPath = PoffConfig::configPath($targetDir);
-        $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($encoded === false) {
+        $writeError = mcpWriteJsonFile($configPath, $config);
+        if ($writeError !== null) {
             return [
                 'route' => 'edit-config',
                 'allowed' => true,
-                'error' => 'Failed to encode config JSON.',
+                'error' => $writeError,
             ];
         }
-        file_put_contents($configPath, $encoded);
 
         return [
             'route' => 'edit-config',
