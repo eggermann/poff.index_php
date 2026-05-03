@@ -11,6 +11,11 @@ require_once __DIR__ . '/../src/includes/viewer/render.php';
 
 $baseDir = $argv[1] ?? '';
 $relativePath = $argv[2] ?? '';
+$editMode = ($argv[3] ?? '') === 'edit';
+
+if ($editMode) {
+    $_GET['edit'] = 'true';
+}
 
 ob_start();
 renderViewer($baseDir, $relativePath);

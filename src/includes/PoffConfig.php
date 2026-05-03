@@ -13,6 +13,7 @@ require_once __DIR__ . '/viewer/link-targets.php';
 class PoffConfig
 {
     private const DEFAULT_LAYOUT_FOLDER = '.layout';
+    private const EDIT_ONLY_TREE_ENTRIES = ['.layout', '.htaccess'];
     private const LAYOUT_TEMPLATE_FILE = 'template.hbs';
     private const LAYOUT_STYLE_FILE = 'style.css';
     private const LAYOUT_SCRIPT_FILE = 'script.js';
@@ -55,7 +56,7 @@ class PoffConfig
                 $entry === '..' ||
                 $entry === 'poff.config.json' ||
                 $entry === '.works' ||
-                $entry === '.layout' ||
+                self::isEditOnlyTreeEntry($entry) ||
                 $entry === '.DS_Store' ||
                 $entry === 'Thumbs.db' ||
                 $entry === '.git' ||
@@ -224,6 +225,9 @@ class PoffConfig
                 if ($name === '' || isset($mergedNames[$name])) {
                     continue;
                 }
+                if (self::isEditOnlyTreeEntry($name)) {
+                    continue;
+                }
                 if (cmsConfiguredTreeLinkTarget($item) === '') {
                     continue;
                 }
@@ -319,6 +323,11 @@ class PoffConfig
         }
 
         return self::hydrateConfigLayout($data, $dir);
+    }
+
+    private static function isEditOnlyTreeEntry(string $entry): bool
+    {
+        return in_array(trim($entry), self::EDIT_ONLY_TREE_ENTRIES, true);
     }
 
     /**

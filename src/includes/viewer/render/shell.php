@@ -21,7 +21,7 @@ function renderViewerShell(array $payload): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Viewer - <?= $safeName ?></title>
-    <link rel="stylesheet" href="build/assets/app.css">
+    <link rel="stylesheet" href="/build/assets/app.css">
 <?php if ($layoutCssHref !== ''): ?>
     <link rel="stylesheet" href="<?= htmlspecialchars($layoutCssHref, ENT_QUOTES, 'UTF-8') ?>">
 <?php elseif ($layoutCssInline !== ''): ?>

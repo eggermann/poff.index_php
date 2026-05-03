@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const vm = require('vm');
 
@@ -109,9 +110,13 @@ function runWorktypeDetailed(action, kind, payload = null) {
   });
 }
 
-function runViewer(relativePath, baseDir = POFF_DIR) {
+function runViewer(relativePath, baseDir = POFF_DIR, editMode = false) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('php', [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath], {
+    const args = [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath];
+    if (editMode) {
+      args.push('edit');
+    }
+    const proc = spawn('php', args, {
       cwd: ROOT,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -123,6 +128,28 @@ function runViewer(relativePath, baseDir = POFF_DIR) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`viewer helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runNav(relativePath, baseDir = POFF_DIR, editMode = false) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_render_nav.php'), baseDir, relativePath];
+    if (editMode) {
+      args.push('edit');
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`nav helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -240,6 +267,25 @@ function runCreateFolder(targetDir, folderName) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`create folder helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runCopyBuildAssets(sourceDir, targetDir, targetSubdir = 'build/assets') {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_copy_build_assets.php'), sourceDir, targetDir, targetSubdir];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`copy build assets helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -1381,6 +1427,30 @@ describe('Worktype HBS renderer', () => {
     expect(config.tree.map((item) => item.name)).not.toContain('.layout');
   });
 
+  test('.htaccess stays hidden in the default tree but is shown in edit mode', async () => {
+    const tempDir = path.join(POFF_DIR, `htaccess-visibility-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, '.htaccess'), 'RewriteEngine On');
+    fs.writeFileSync(path.join(tempDir, 'visible.txt'), 'visible');
+
+    try {
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', tempDir));
+      expect(ensured.tree.map((item) => item.name)).not.toContain('.htaccess');
+      expect(ensured.tree.map((item) => item.name)).toContain('visible.txt');
+
+      const normalNav = await runNav('', tempDir);
+      const editNav = await runNav('', tempDir, true);
+
+      expect(normalNav).not.toContain('data-file=".htaccess"');
+      expect(normalNav).not.toContain('.htaccess</a>');
+      expect(editNav).toContain('data-file=".htaccess"');
+      expect(editNav).toContain('.htaccess</a>');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('sanitizes persisted raw chat JSON in section templates on read', async () => {
     const output = await runLayoutFilesystem('ensure-folder', INVALID_TEMPLATE_DIR);
     const config = JSON.parse(output);
@@ -1913,6 +1983,29 @@ describe('Worktype HBS renderer', () => {
       expect(output).toContain('default-file-layout-inherited-assets/.layout/eggman_profile-image.jpg');
       expect(output).not.toContain(`default-file-layout-inherited-assets/child/.layout/eggman_profile-image.jpg`);
       expect(output).not.toContain(`default-file-layout-inherited-assets/child/.works/${fileName}.layout/eggman_profile-image.jpg`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('renders the viewer shell stylesheet from the public build root', async () => {
+    const output = await runViewer(VIEWER_FILE_NAME);
+
+    expect(output).toContain('href="/build/assets/app.css"');
+  });
+
+  test('copies build assets into every generated page directory', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-build-assets-'));
+    const nestedDir = path.join(tempDir, 'nested', 'child');
+    fs.mkdirSync(nestedDir, { recursive: true });
+
+    try {
+      await runCopyBuildAssets(path.join(ROOT, 'build', 'assets'), tempDir);
+
+      expect(fs.existsSync(path.join(tempDir, 'build', 'assets', 'app.css'))).toBe(true);
+      expect(fs.existsSync(path.join(tempDir, 'build', 'assets', 'app.js'))).toBe(true);
+      expect(fs.existsSync(path.join(nestedDir, 'build', 'assets', 'app.css'))).toBe(true);
+      expect(fs.existsSync(path.join(nestedDir, 'build', 'assets', 'app.js'))).toBe(true);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
