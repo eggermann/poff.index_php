@@ -16,6 +16,158 @@ export function initNavigation({
     let previewClickBound = false;
     let previewDisabled = false;
     let lastPreviewKey = '';
+    const slugToPathAliases = new Map();
+    const pathToSlugAliases = new Map();
+
+    function normalizeHashPath(value = '') {
+        return String(value || '')
+            .replace(/\\/g, '/')
+            .replace(/^#\/?/, '')
+            .replace(/^\/+|\/+$/g, '');
+    }
+
+    function normalizeHashAlias(value = '') {
+        return normalizeHashPath(value).toLowerCase();
+    }
+
+    function routeResolution(path = '', isFile = inferFilePath(path)) {
+        return {
+            path,
+            isFile,
+        };
+    }
+
+    function rememberSlugPathAlias(detail = {}) {
+        const path = normalizeHashPath(detail?.routePath || detail?.path || detail?.relativePath || '');
+        const slug = normalizeHashPath(detail?.routeSlug || detail?.slug || '');
+        if (!path || !slug || slug.includes('/')) {
+            return;
+        }
+
+        slugToPathAliases.set(normalizeHashAlias(slug), path);
+        pathToSlugAliases.set(normalizeHashAlias(path), slug);
+    }
+
+    function findNavLinkByAttribute(attributeName, value = '') {
+        if (!navList || !value) {
+            return null;
+        }
+        const normalizedValue = normalizeHashAlias(value);
+        for (const link of navList.querySelectorAll(`[${attributeName}]`)) {
+            if (normalizeHashAlias(link.getAttribute(attributeName) || '') === normalizedValue) {
+                return link;
+            }
+        }
+        return null;
+    }
+
+    function navTargetPath(link) {
+        if (!link) {
+            return '';
+        }
+        return link.getAttribute('data-layout-path')
+            || link.getAttribute('data-path')
+            || link.getAttribute('data-src')
+            || '';
+    }
+
+    function navTargetIsFile(link, path = '') {
+        if (!link) {
+            return inferFilePath(path);
+        }
+        if (link.hasAttribute('data-layout-path')) {
+            return false;
+        }
+        if (link.hasAttribute('data-file') || link.hasAttribute('data-src')) {
+            return true;
+        }
+        const href = link.getAttribute('href') || '';
+        if (href.startsWith('?path=')) {
+            return false;
+        }
+        return inferFilePath(path);
+    }
+
+    function resolveHashPath(path = '') {
+        const normalizedPath = normalizeHashPath(path);
+        const aliasPath = slugToPathAliases.get(normalizeHashAlias(normalizedPath));
+        if (aliasPath) {
+            return routeResolution(aliasPath);
+        }
+        if (!normalizedPath.includes('/')) {
+            const link = findNavLinkByAttribute('data-slug', normalizedPath);
+            const targetPath = navTargetPath(link);
+            if (targetPath) {
+                rememberSlugPathAlias({
+                    path: targetPath,
+                    slug: normalizedPath,
+                });
+                return routeResolution(targetPath, navTargetIsFile(link, targetPath));
+            }
+        }
+        return routeResolution(normalizedPath);
+    }
+
+    async function resolveHashPathAsync(path = '') {
+        const resolved = resolveHashPath(path);
+        const normalizedPath = normalizeHashPath(path);
+        if (
+            !normalizedPath
+            || normalizedPath.includes('/')
+            || normalizedPath === '.layout'
+            || normalizedPath.endsWith('/.layout')
+            || inferFilePath(normalizedPath)
+            || resolved.path !== normalizedPath
+        ) {
+            return resolved;
+        }
+
+        try {
+            const response = await fetch(`?ajax=resolve&slug=${encodeURIComponent(normalizedPath)}`, {
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+            if (!response.ok) {
+                return resolved;
+            }
+            const data = await response.json();
+            if (!data?.resolved || !data.path) {
+                return resolved;
+            }
+            rememberSlugPathAlias({
+                path: data.path,
+                slug: data.slug || normalizedPath,
+            });
+            return routeResolution(data.path, typeof data.isFile === 'boolean' ? data.isFile : data.type !== 'folder');
+        } catch (err) {
+            return resolved;
+        }
+    }
+
+    function displayHashPath(path = '') {
+        const normalizedPath = normalizeHashPath(path);
+        if (!normalizedPath || normalizedPath.includes('/.layout') || normalizedPath === '.layout') {
+            return normalizedPath;
+        }
+        const aliasSlug = pathToSlugAliases.get(normalizeHashAlias(normalizedPath));
+        if (aliasSlug) {
+            return aliasSlug;
+        }
+        const link = findNavLinkByAttribute('data-path', normalizedPath);
+        const slug = link?.getAttribute('data-slug') || '';
+        if (slug && !slug.includes('/')) {
+            rememberSlugPathAlias({
+                path: normalizedPath,
+                slug,
+            });
+            return slug;
+        }
+        return normalizedPath;
+    }
+
+    window.POFF_RESOLVE_HASH_PATH = resolveHashPath;
 
     function previewStateFromUrl(url) {
         try {
@@ -286,7 +438,8 @@ export function initNavigation({
     }
 
     function writeHashPath(path = '') {
-        const nextHash = path ? `#/${path.replace(/^\/+/, '')}` : '';
+        const hashPath = displayHashPath(path);
+        const nextHash = hashPath ? `#/${hashPath.replace(/^\/+/, '')}` : '';
         if (window.location.hash === nextHash) {
             return;
         }
@@ -315,7 +468,10 @@ export function initNavigation({
     }
 
     function navigateToPath(path = '', options = {}) {
-        const selection = getSelectionFromPath(path, { isFile: options?.isFile });
+        const resolved = resolveHashPath(path);
+        const selection = getSelectionFromPath(resolved.path, {
+            isFile: typeof options?.isFile === 'boolean' ? options.isFile : resolved.isFile,
+        });
         navigateToSelection(selection, options);
     }
 
@@ -557,11 +713,12 @@ export function initNavigation({
         }
     }
 
-    function syncFromLocation(options = {}) {
+    async function syncFromLocation(options = {}) {
         const { forceRefresh = false } = options;
         const hashPath = readHashPath();
         if (hashPath || window.location.hash) {
-            navigateToSelection(getSelectionFromPath(hashPath), {
+            const resolved = await resolveHashPathAsync(hashPath);
+            navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
                 updateHash: false,
                 forceRefresh,
             });
@@ -637,5 +794,7 @@ export function initNavigation({
         loadCurrentFolderInIframe,
         syncFromLocation,
         refreshCurrentLocation,
+        rememberSlugPathAlias,
+        writeHashPath,
     };
 }

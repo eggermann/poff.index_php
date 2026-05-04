@@ -61,8 +61,22 @@ export function getActiveSelection() {
         }
     }
     if (hashPath) {
+        let resolvedIsFile;
+        if (typeof window.POFF_RESOLVE_HASH_PATH === 'function') {
+            const resolvedHash = window.POFF_RESOLVE_HASH_PATH(hashPath);
+            if (resolvedHash && typeof resolvedHash === 'object') {
+                hashPath = resolvedHash.path || hashPath;
+                if (typeof resolvedHash.isFile === 'boolean') {
+                    resolvedIsFile = resolvedHash.isFile;
+                }
+            } else {
+                hashPath = resolvedHash;
+            }
+        }
         const hashMatchesFileParam = filePath !== '' && hashPath === filePath;
-        const isFileHint = hashMatchesFileParam ? true : undefined;
+        const isFileHint = typeof resolvedIsFile === 'boolean'
+            ? resolvedIsFile
+            : (hashMatchesFileParam ? true : undefined);
         return getSelectionFromPath(hashPath, { isFile: isFileHint });
     }
     if (filePath) {

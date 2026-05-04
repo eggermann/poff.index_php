@@ -199,11 +199,13 @@ class PoffConfig
                     }
                     // Preserve any custom keys the user may have added
                     foreach ($existingItem as $k => $v) {
-                        if (in_array($k, ['name', 'slug', 'type', 'path', 'modifiedAt'], true)) {
+                        if (in_array($k, ['name', 'type', 'path', 'modifiedAt'], true)) {
                             continue;
                         }
                         if (!array_key_exists($k, $item)) {
                             $item[$k] = $v;
+                        } elseif ($k === 'slug' && is_string($v) && trim($v) !== '') {
+                            $item[$k] = trim($v);
                         }
                     }
                 }

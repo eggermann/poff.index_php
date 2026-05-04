@@ -36,7 +36,7 @@ const navigation = initNavigation({
 
 const sidebarController = bindSidebarToggle(elements);
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     if (sidebarController) {
         sidebarController.syncSidebarState(true);
     }
@@ -47,14 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
         navigation.loadCurrentFolderInIframe();
         requestAnimationFrame(() => scrollToPreview());
     } else if (window.location.hash && window.location.hash.length > 1) {
-        navigation.syncFromLocation();
+        await navigation.syncFromLocation();
     } else {
         navigation.loadCurrentFolderInIframe();
     }
     editController.initEditMode();
 });
 
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', async () => {
     if (isPreviewHashActive()) {
         scrollToPreview();
         if (editRequested) {
@@ -64,15 +64,20 @@ window.addEventListener('hashchange', () => {
     }
 
     if (!navigation.consumeHashSync()) {
-        navigation.syncFromLocation();
+        await navigation.syncFromLocation();
     }
     if (editRequested) {
         editController.initEditMode();
     }
 });
 
-window.addEventListener('poff:content-updated', () => {
-    navigation.refreshCurrentLocation();
+window.addEventListener('poff:content-updated', async (event) => {
+    navigation.rememberSlugPathAlias(event.detail || {});
+    const nextPath = event.detail?.routePath || event.detail?.path || '';
+    if (nextPath) {
+        navigation.writeHashPath(nextPath);
+    }
+    await navigation.refreshCurrentLocation();
     if (editRequested) {
         editController.initEditMode();
     }

@@ -5,6 +5,43 @@
 $editQuery = (isset($_GET['edit']) && $_GET['edit'] === 'true') ? '&edit=true' : '';
 $navFolder = $currentRelativePath;
 
+if (!function_exists('cmsNavSlug')) {
+    function cmsNavSlug(string $value): string
+    {
+        if (class_exists('PoffConfig')) {
+            return PoffConfig::slugify($value);
+        }
+
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($value));
+        return trim((string) $slug, '-') ?: 'untitled';
+    }
+}
+
+if (!function_exists('cmsNavEntry')) {
+    function cmsNavEntry(string $name, string $path, string $type, string $icon, array $source = [], ?string $dataSrc = null, string $editQuery = ''): array
+    {
+        $title = (string) ($source['title'] ?? $name);
+        $slug = (string) ($source['slug'] ?? cmsNavSlug($title));
+        $entry = [
+            'name' => $name,
+            'path' => $path,
+            'slug' => $slug,
+            'icon' => $icon,
+        ];
+
+        if ($type === 'folder') {
+            $entry['link'] = '?path=' . urlencode($path) . $editQuery;
+        } else {
+            $entry['data_src'] = $dataSrc ?? $path;
+        }
+
+        return $entry;
+    }
+}
+
+$folderIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>';
+$fileIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>';
+
 // If hash contains a folder, prefer that for initial render
 if (isset($_SERVER['QUERY_STRING']) && preg_match('/#\/([^\/]+)(?:\/([^\/]+))?/', $_SERVER['QUERY_STRING'], $matches)) {
     $navFolder = $matches[1];
@@ -24,7 +61,10 @@ if ($navFolder !== '') {
     //root;
 }
 
-echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '">./ ' . htmlspecialchars((string) ($config['folderName'] ?? basename($navFolder))) . '</a></li>';
+$currentNavConfig = is_array($config ?? null) ? $config : [];
+$currentNavName = (string) ($currentNavConfig['folderName'] ?? basename($navFolder));
+$currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavName)));
+echo '<li><a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '">./ ' . htmlspecialchars($currentNavName) . '</a></li>';
 
 
 $navAbsolutePath = $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
@@ -54,23 +94,13 @@ if (is_array($tree)) {
         $linkUrl = ($itemType === 'folder') ? null : extractLinkFileUrl($fullPath);
 
         if ($itemType === 'folder') {
-            $directories[] = [
-                'name' => $itemName,
-                'path' => $relativePath,
-                'link' => '?path=' . urlencode($relativePath) . $editQuery,
-                'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>',
-            ];
+            $directories[] = cmsNavEntry($itemName, $relativePath, 'folder', $folderIcon, $item, null, $editQuery);
         } else {
-            $files[] = [
-                'name' => $itemName,
-                'path' => $relativePath,
-                'data_src' => $linkUrl ?? $relativePath,
-                'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>',
-            ];
+            $files[] = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $linkUrl ?? $relativePath, $editQuery);
         }
     }
 } else {
-    $items = scandir($navAbsolutePath);
+    $items = is_dir($navAbsolutePath) ? scandir($navAbsolutePath) : false;
     if ($items !== false) {
         foreach ($items as $item) {
         if (
@@ -97,19 +127,9 @@ if (is_array($tree)) {
             $itemRelativePath = $navFolder ? rtrim($navFolder, "/\\") . '/' . $item : $item;
 
             if ($isDir) {
-            $directories[] = [
-                'name' => $item,
-                'path' => $itemRelativePath,
-                'link' => '?path=' . urlencode($itemRelativePath) . $editQuery,
-                'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>',
-            ];
+            $directories[] = cmsNavEntry($item, $itemRelativePath, 'folder', $folderIcon, [], null, $editQuery);
             } else {
-                $files[] = [
-                    'name' => $item,
-                    'path' => $itemRelativePath,
-                    'data_src' => $linkUrl ?? $itemRelativePath,
-                    'icon' => '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>',
-                ];
+                $files[] = cmsNavEntry($item, $itemRelativePath, 'file', $fileIcon, [], $linkUrl ?? $itemRelativePath, $editQuery);
             }
         }
     } else {
@@ -121,7 +141,7 @@ usort($directories, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 usort($files, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
 foreach ($directories as $dir) {
-    echo '<li><a class="nav-link" href="' . htmlspecialchars($dir['link']) . '">' . $dir['icon'] . htmlspecialchars($dir['name']) . '</a></li>';
+    echo '<li><a class="nav-link" href="' . htmlspecialchars($dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '">' . $dir['icon'] . htmlspecialchars($dir['name']) . '</a></li>';
 }
 
 if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
@@ -140,5 +160,5 @@ if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
 }
 
 foreach ($files as $file) {
-    echo '<li><a class="nav-link" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '">' . $file['icon'] . htmlspecialchars($file['name']) . '</a></li>';
+    echo '<li><a class="nav-link" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '">' . $file['icon'] . htmlspecialchars($file['name']) . '</a></li>';
 }

@@ -44,6 +44,63 @@ function cmsUploadLimits(): array
     ];
 }
 
+function cmsSyncParentTreeItemMeta(string $rootDir, string $subjectRelativePath, string $subjectType, array $config): void
+{
+    $normalizedPath = trim(str_replace('\\', '/', $subjectRelativePath), '/');
+    if ($normalizedPath === '') {
+        return;
+    }
+
+    $itemName = basename($normalizedPath);
+    $parentRelativePath = dirname($normalizedPath);
+    if ($parentRelativePath === '.' || $parentRelativePath === DIRECTORY_SEPARATOR) {
+        $parentRelativePath = '';
+    }
+
+    $parentDir = rtrim($rootDir, DIRECTORY_SEPARATOR);
+    if ($parentRelativePath !== '') {
+        $parentDir .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $parentRelativePath);
+    }
+    if (!is_dir($parentDir)) {
+        return;
+    }
+
+    $parentConfigPath = PoffConfig::configPath($parentDir);
+    $parentConfig = is_file($parentConfigPath)
+        ? json_decode((string) file_get_contents($parentConfigPath), true)
+        : PoffConfig::ensure($parentDir);
+    if (!is_array($parentConfig) || !is_array($parentConfig['tree'] ?? null)) {
+        return;
+    }
+
+    $changed = false;
+    foreach ($parentConfig['tree'] as &$item) {
+        if (!is_array($item) || (string) ($item['name'] ?? '') !== $itemName) {
+            continue;
+        }
+
+        if (isset($config['slug']) && is_string($config['slug']) && trim($config['slug']) !== '') {
+            $item['slug'] = trim($config['slug']);
+            $changed = true;
+        }
+        if (isset($config['title']) && is_string($config['title'])) {
+            $item['title'] = $config['title'];
+            $changed = true;
+        }
+        $item['type'] = $subjectType;
+        break;
+    }
+    unset($item);
+
+    if (!$changed) {
+        return;
+    }
+
+    $parentConfig['treeHash'] = hash('sha256', json_encode($parentConfig['tree']));
+    $parentConfig['updatedAt'] = date('c');
+    file_put_contents($parentConfigPath, json_encode($parentConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+}
+
 function cmsIsOpenAiCompatibleEndpoint(string $url): bool
 {
     $normalized = strtolower(trim($url));
@@ -272,6 +329,9 @@ function cmsHandleEditAction(): void
 
         if (array_key_exists('title', $data)) {
             $config['title'] = trim((string) $data['title']);
+            if ($config['title'] !== '') {
+                $config['slug'] = PoffConfig::slugify((string) $config['title']);
+            }
         }
         if (array_key_exists('description', $data)) {
             $config['description'] = trim((string) $data['description']);
@@ -610,6 +670,7 @@ function cmsHandleEditAction(): void
             ], 500);
         }
         file_put_contents($configPath, $encoded);
+        cmsSyncParentTreeItemMeta($rootDir, $subjectRelativePath, $subjectType, $config);
 
         $responseConfig = PoffConfig::hydrateConfigLayout(
             $config,
@@ -621,6 +682,8 @@ function cmsHandleEditAction(): void
             'allowed' => true,
             'target' => $isLayoutTarget ? 'layout' : $subjectType,
             'subjectTarget' => $subjectType,
+            'routePath' => $subjectRelativePath,
+            'routeSlug' => (string) ($responseConfig['slug'] ?? $config['slug'] ?? ''),
             'saved' => true,
             'config' => $responseConfig,
         ]);

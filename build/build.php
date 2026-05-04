@@ -225,6 +225,12 @@ if (isset($_GET['view']) && (isset($_GET['file']) || array_key_exists('path', $_
     return;
 }
 
+// Route mapper for hash-only slugs. Browser hashes are not sent on refresh,
+// so the client asks this endpoint to map #slug back to the filesystem item.
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'resolve') {
+    cmsHandleResolveRoute($baseDir);
+}
+
 // Read folder config if it exists
 $folderPoffConfig = null;
 if (is_dir($currentAbsolutePath)) {

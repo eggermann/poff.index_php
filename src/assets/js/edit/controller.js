@@ -87,7 +87,10 @@ export function createEditController({ elements, context, editRequested }) {
             setStatusMessage(statusEl, 'Config saved.', true);
             window.dispatchEvent(new CustomEvent('poff:content-updated', {
                 detail: {
-                    path: payload?.path || '',
+                    path: data.routePath || payload?.path || '',
+                    slug: data.routeSlug || data.config?.slug || '',
+                    routePath: data.routePath || payload?.path || '',
+                    routeSlug: data.routeSlug || data.config?.slug || '',
                     target: editTarget,
                     subjectTarget: data.subjectTarget || editTarget,
                 },
