@@ -1,38 +1,12 @@
 {
-    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
-    "folderName": "viewer-folder",
-    "slug": "viewer-folder",
-    "title": "Folder Preview",
-    "description": "Folder layout from prompt",
+  "title": "Folder Preview",
+  "description": "Folder layout from prompt",
+  "work": {
     "type": "folder",
-    "id": "poff_44fc65df8ea79e2e",
-    "tree": [
-        {
-            "name": "child.txt",
-            "slug": "child-txt",
-            "type": "file",
-            "path": "child.txt",
-            "modifiedAt": "2026-05-03T00:03:17+00:00",
-            "visible": true
-        },
-        {
-            "name": "nested-child",
-            "slug": "nested-child",
-            "type": "folder",
-            "path": "nested-child",
-            "modifiedAt": "2026-05-03T00:03:17+00:00",
-            "visible": true
-        }
-    ],
-    "treeHash": "64308c1f361c1af90c5bcf5cab2a5a5c968ca965e4cdfc6902129607b1ad6f76",
-    "updatedAt": "2026-05-03T00:03:17+00:00",
-    "work": {
-        "type": "folder",
-        "layout": {
-            "mode": "filesystem-folder-layout",
-            "name": "filesystem-folder-layout",
-            "engine": "lightncandy",
-            "section": "works"
-        }
+    "layout": {
+      "name": "filesystem-folder-layout",
+      "engine": "lightncandy",
+      "section": "works"
     }
+  }
 }
