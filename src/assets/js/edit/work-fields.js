@@ -1,4 +1,4 @@
-const RESERVED_WORK_FIELD_NAMES = new Set(['fields', 'layout', 'type', 'model', 'engine', 'syntax', 'mimeType']);
+const RESERVED_WORK_FIELD_NAMES = new Set(['fields', 'layout', 'type', 'model', 'engine', 'syntax', 'mimeType', 'categories', 'category']);
 const SUPPORTED_WORK_FIELD_TYPES = new Set(['text', 'textarea', 'number', 'checkbox', 'select', 'color', 'date', 'url', 'email']);
 const SCHEMA_TEXT_KEYS = ['title', 'description', 'placeholder', 'format', 'pattern', 'contentMediaType', 'contentEncoding', 'const'];
 const SCHEMA_BOOLEAN_KEYS = ['required', 'readOnly', 'writeOnly', 'deprecated', 'nullable', 'uniqueItems'];

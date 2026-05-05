@@ -74,6 +74,55 @@ function getPromptItemDisplayPath(folderBasePath = '', item = {}) {
     return folderBasePath ? `${folderBasePath}/${fallbackName}` : fallbackName;
 }
 
+function getDefaultWorkCategories(type = '') {
+    const normalizedType = String(type || '').trim().toLowerCase();
+    if (normalizedType === 'image') {
+        return ['image', 'media', 'visual'];
+    }
+    if (normalizedType === 'video') {
+        return ['video', 'media', 'motion'];
+    }
+    if (normalizedType === 'audio') {
+        return ['audio', 'media', 'sound'];
+    }
+    if (normalizedType === 'pdf') {
+        return ['pdf', 'document'];
+    }
+    if (normalizedType === 'text') {
+        return ['text', 'document'];
+    }
+    if (normalizedType === 'link') {
+        return ['link', 'reference'];
+    }
+    if (normalizedType === 'folder') {
+        return ['folder', 'collection'];
+    }
+
+    return ['other'];
+}
+
+function normalizeWorkCategories(work = {}) {
+    const rawValue = Array.isArray(work?.categories)
+        ? work.categories
+        : (Array.isArray(work?.category) ? work.category : work?.categories ?? work?.category ?? []);
+    const sourceValues = Array.isArray(rawValue)
+        ? rawValue
+        : (String(rawValue || '').trim() ? String(rawValue).split(/\r?\n|,/) : []);
+    const categories = [];
+    const append = (value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (!normalized || categories.includes(normalized)) {
+            return;
+        }
+        categories.push(normalized);
+    };
+
+    getDefaultWorkCategories(work?.type).forEach(append);
+    sourceValues.forEach(append);
+
+    return categories;
+}
+
 export function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
         return;
@@ -189,6 +238,10 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const folderBasePath = (selection?.isFile ? path.split('/').slice(0, -1).join('/') : path).replace(/^\/+|\/+$/g, '');
     const ellipsis = '\u2026';
     const workFields = extractWorkFields(work);
+    const workWithCategories = {
+        ...work,
+        categories: normalizeWorkCategories(work),
+    };
     const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
         if (key === 'fields' && Array.isArray(value)) {
             const summary = summarizeWorkFields(value);
@@ -253,7 +306,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         inheritedLayoutDirectory,
         layoutAssetsPreview,
         editorDraft,
-        workData: work,
+        workData: workWithCategories,
         workFields,
         workFieldsPreview,
         workPreview,

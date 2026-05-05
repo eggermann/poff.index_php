@@ -1379,6 +1379,7 @@ describe('Worktype HBS renderer', () => {
     const output = await runWorktype('definition', 'image');
     const definition = JSON.parse(output);
 
+    expect(definition.categories).toEqual(expect.arrayContaining(['image', 'media']));
     expect(definition.layout).toMatchObject({
       mode: 'poff-layout',
       name: 'poff-layout',
@@ -1397,6 +1398,7 @@ describe('Worktype HBS renderer', () => {
       storage: 'filesystem',
       directory: '.layout',
     });
+    expect(config.work.categories).toEqual(expect.arrayContaining(['folder', 'collection']));
     expect(config.work.layout.template).toContain('folder-custom');
     expect(config.work.layout.css).toContain('.folder-custom');
     expect(config.work.layout.js).toContain('__folderLayout');

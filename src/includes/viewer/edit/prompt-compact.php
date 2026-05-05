@@ -16,6 +16,23 @@ function cmsPromptTrimText(string $text, int $maxLength = 240): string
     return substr($normalized, 0, max(0, $maxLength - 3)) . '...';
 }
 
+function cmsPromptNormalizeStringList(array|string|null $value): array
+{
+    $items = is_array($value)
+        ? $value
+        : (is_string($value) && trim($value) !== '' ? preg_split('/\r?\n|,/', $value) : []);
+    $result = [];
+    foreach ($items ?: [] as $item) {
+        $normalized = strtolower(trim((string) $item));
+        if ($normalized === '' || in_array($normalized, $result, true)) {
+            continue;
+        }
+        $result[] = $normalized;
+    }
+
+    return $result;
+}
+
 function cmsPromptCompactRef(array $ref): array
 {
     $compact = [];
@@ -102,6 +119,14 @@ function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource
 
             if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
                 $summary['work'][$key] = $value;
+                continue;
+            }
+
+            if ($key === 'categories' || $key === 'category') {
+                $categories = cmsPromptNormalizeStringList($value);
+                if ($categories !== []) {
+                    $summary['work']['categories'] = $categories;
+                }
                 continue;
             }
 

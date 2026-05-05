@@ -19,6 +19,51 @@ class Worktype
     private static array $fileDefinitions = [];
     private static array $fileTemplates = [];
 
+    private static function defaultCategoriesForKind(string $kind): array
+    {
+        return match (strtolower(trim($kind))) {
+            'image' => ['image', 'media', 'visual'],
+            'video' => ['video', 'media', 'motion'],
+            'audio' => ['audio', 'media', 'sound'],
+            'pdf' => ['pdf', 'document'],
+            'text' => ['text', 'document'],
+            'link' => ['link', 'reference'],
+            'folder' => ['folder', 'collection'],
+            default => ['other'],
+        };
+    }
+
+    private static function normalizeCategories(mixed $value, string $kind): array
+    {
+        $categories = [];
+        $append = static function (string $candidate) use (&$categories): void {
+            $normalized = strtolower(trim($candidate));
+            if ($normalized === '' || in_array($normalized, $categories, true)) {
+                return;
+            }
+            $categories[] = $normalized;
+        };
+
+        foreach (self::defaultCategoriesForKind($kind) as $defaultCategory) {
+            $append((string) $defaultCategory);
+        }
+
+        $sourceValues = [];
+        if (is_array($value)) {
+            $sourceValues = $value;
+        } elseif (is_string($value) && trim($value) !== '') {
+            $sourceValues = preg_split('/\r?\n|,/', $value) ?: [];
+        }
+
+        foreach ($sourceValues as $candidate) {
+            if (is_string($candidate) || is_scalar($candidate)) {
+                $append((string) $candidate);
+            }
+        }
+
+        return $categories;
+    }
+
     /**
      * Load a worktype definition for a given kind, preferring /includes/worktypes overrides.
      */
@@ -58,6 +103,7 @@ class Worktype
 
         $base['type'] = $base['type'] ?? $kind;
         $base['layout'] = self::normalizeLayout($base['layout'] ?? null, $base['type'] === 'folder' ? 'works' : 'work');
+        $base['categories'] = self::normalizeCategories($base['categories'] ?? null, (string) $base['type']);
 
         return $base;
     }
@@ -545,6 +591,12 @@ class Worktype
             'isOther' => $kind === 'other',
         ];
 
+        $categories = self::normalizeCategories($work['categories'] ?? ($work['category'] ?? null), $kind);
+        $context['categories'] = $categories;
+        $context['category'] = $categories;
+        $context['work']['categories'] = $categories;
+        $context['work']['category'] = $categories;
+
         foreach ($ctx as $key => $value) {
             if ($key === 'work') {
                 continue;
@@ -556,6 +608,9 @@ class Worktype
             if ($key === 'fields' && is_array($value)) {
                 $context['fields'] = $value;
                 $context['work']['fields'] = $value;
+                continue;
+            }
+            if ($key === 'categories' || $key === 'category') {
                 continue;
             }
             if (is_bool($value)) {

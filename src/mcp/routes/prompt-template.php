@@ -686,6 +686,23 @@ function mcpPromptTrimText(string $text, int $maxLength = 240): string
     return substr($normalized, 0, max(0, $maxLength - 3)) . '...';
 }
 
+function mcpPromptNormalizeStringList(array|string|null $value): array
+{
+    $items = is_array($value)
+        ? $value
+        : (is_string($value) && trim($value) !== '' ? preg_split('/\r?\n|,/', $value) : []);
+    $result = [];
+    foreach ($items ?: [] as $item) {
+        $normalized = strtolower(trim((string) $item));
+        if ($normalized === '' || in_array($normalized, $result, true)) {
+            continue;
+        }
+        $result[] = $normalized;
+    }
+
+    return $result;
+}
+
 function mcpPromptCompactRef(array $ref): array
 {
     $compact = [];
@@ -739,6 +756,14 @@ function mcpPromptCompactConfig(array $config): array
 
             if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
                 $summary['work'][$key] = $value;
+                continue;
+            }
+
+            if ($key === 'categories' || $key === 'category') {
+                $categories = mcpPromptNormalizeStringList($value);
+                if ($categories !== []) {
+                    $summary['work']['categories'] = $categories;
+                }
                 continue;
             }
 
@@ -846,6 +871,7 @@ function mcpPromptSystemPrompt(): string
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
         'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+        'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
         'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
         'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
         'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
@@ -903,6 +929,132 @@ function mcpPromptOpenAiMessages(string $systemPrompt, string $userPrompt, ?arra
     return $messages;
 }
 
+function mcpPromptProviderResult(string $template, string $model, bool $reasoningOnly = false, ?string $error = null): array
+{
+    return [
+        'template' => $template,
+        'model' => $model,
+        'reasoningOnly' => $reasoningOnly,
+        'error' => $error,
+    ];
+}
+
+function mcpPromptGenerateOpenAi(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image): array
+{
+    $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'OPENAI_API_KEY') ?? '');
+    if ($key === '') {
+        return mcpPromptProviderResult('', $model, false, 'OpenAI API key not set.');
+    }
+
+    $usedModel = $model !== '' ? $model : 'gpt-4o-mini';
+    $payload = [
+        'model' => $usedModel,
+        'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image),
+        'temperature' => 0.4,
+    ];
+    $response = mcpPromptHttpPost('https://api.openai.com/v1/chat/completions', [
+        'Authorization: Bearer ' . $key,
+    ], $payload);
+    if (!$response['ok']) {
+        return mcpPromptProviderResult('', $usedModel, false, mcpPromptFormatHttpError('OpenAI', $response));
+    }
+
+    $decoded = json_decode($response['body'], true);
+    $template = is_array($decoded) ? (string) ($decoded['choices'][0]['message']['content'] ?? '') : '';
+
+    return mcpPromptProviderResult($template, $usedModel);
+}
+
+function mcpPromptGenerateGemini(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image): array
+{
+    $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'GEMINI_API_KEY') ?? '');
+    if ($key === '') {
+        return mcpPromptProviderResult('', $model, false, 'Gemini API key not set.');
+    }
+
+    $usedModel = $model !== '' ? $model : 'gemini-1.5-flash';
+    $promptText = $systemPrompt . "\n\n" . $userPrompt;
+    $payload = [
+        'contents' => [
+            [
+                'parts' => [
+                    ['text' => $promptText],
+                    ...($image ? [[
+                        'inline_data' => [
+                            'mime_type' => $image['mimeType'],
+                            'data' => $image['base64'],
+                        ],
+                    ]] : []),
+                ],
+            ],
+        ],
+    ];
+    $url = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', rawurlencode($usedModel), $key);
+    $response = mcpPromptHttpPost($url, [], $payload);
+    if (!$response['ok']) {
+        return mcpPromptProviderResult('', $usedModel, false, mcpPromptFormatHttpError('Gemini', $response));
+    }
+
+    $decoded = json_decode($response['body'], true);
+    $template = is_array($decoded) ? (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '') : '';
+
+    return mcpPromptProviderResult($template, $usedModel);
+}
+
+function mcpPromptGenerateLocal(
+    string $model,
+    string $endpoint,
+    string $prompt,
+    string $systemPrompt,
+    string $userPrompt,
+    ?array $image,
+    array $history,
+    array $config
+): array {
+    $usedEndpoint = $endpoint !== '' ? $endpoint : 'http://127.0.0.1:1234/v1/chat/completions';
+    $usedModel = $model !== '' ? $model : 'gemma4';
+    if (mcpPromptIsOpenAiCompatibleEndpoint($usedEndpoint)) {
+        $payload = [
+            'model' => $usedModel,
+            'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image, $history),
+            'temperature' => 0.4,
+        ];
+    } else {
+        $payload = [
+            'prompt' => $prompt,
+            'history' => $history,
+            'config' => $config,
+            'instruction' => $systemPrompt,
+            'image' => $image,
+        ];
+    }
+
+    $response = mcpPromptHttpPost($usedEndpoint, [], $payload);
+    if (!$response['ok']) {
+        return mcpPromptProviderResult('', $usedModel, false, mcpPromptFormatHttpError('Local endpoint', $response));
+    }
+
+    $template = '';
+    $reasoningOnly = false;
+    $decoded = json_decode($response['body'], true);
+    if (is_array($decoded)) {
+        $message = $decoded['choices'][0]['message'] ?? null;
+        if (is_array($message) && array_key_exists('content', $message)) {
+            $template = (string) $message['content'];
+            $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
+            $reasoningOnly = trim($template) === '' && $reasoningContent !== '';
+        } elseif (isset($decoded['template'])) {
+            $template = (string) $decoded['template'];
+        } elseif (isset($decoded['content'])) {
+            $template = (string) $decoded['content'];
+        }
+    } else {
+        $template = trim((string) $response['body']);
+    }
+
+    return mcpPromptProviderResult($template, $usedModel, $reasoningOnly);
+}
+
 function handlePromptTemplate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
@@ -950,105 +1102,21 @@ function handlePromptTemplate(array $opts): array
     }
 
     $env = mcpPromptLoadEnv($rootDir);
-    $template = '';
-    $usedModel = $model;
-    $modelReturnedReasoningOnly = false;
-
     if ($provider === 'openai') {
-        $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'OPENAI_API_KEY') ?? '');
-        if ($key === '') {
-            return mcpPromptError('OpenAI API key not set.');
-        }
-        if ($usedModel === '') {
-            $usedModel = 'gpt-4o-mini';
-        }
-        $payload = [
-            'model' => $usedModel,
-            'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image),
-            'temperature' => 0.4,
-        ];
-        $response = mcpPromptHttpPost('https://api.openai.com/v1/chat/completions', [
-            'Authorization: Bearer ' . $key,
-        ], $payload);
-        if (!$response['ok']) {
-            return mcpPromptError(mcpPromptFormatHttpError('OpenAI', $response));
-        }
-        $decoded = json_decode($response['body'], true);
-        $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
+        $generation = mcpPromptGenerateOpenAi($env, $model, $apiKey, $systemPrompt, $userPrompt, $image);
     } elseif ($provider === 'gemini') {
-        $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'GEMINI_API_KEY') ?? '');
-        if ($key === '') {
-            return mcpPromptError('Gemini API key not set.');
-        }
-        if ($usedModel === '') {
-            $usedModel = 'gemini-1.5-flash';
-        }
-        $promptText = $systemPrompt . "\n\n" . $userPrompt;
-        $payload = [
-            'contents' => [
-                [
-                    'parts' => [
-                        ['text' => $promptText],
-                        ...($image ? [[
-                            'inline_data' => [
-                                'mime_type' => $image['mimeType'],
-                                'data' => $image['base64'],
-                            ],
-                        ]] : []),
-                    ],
-                ],
-            ],
-        ];
-        $url = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', rawurlencode($usedModel), $key);
-        $response = mcpPromptHttpPost($url, [], $payload);
-        if (!$response['ok']) {
-            return mcpPromptError(mcpPromptFormatHttpError('Gemini', $response));
-        }
-        $decoded = json_decode($response['body'], true);
-        $template = (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        $generation = mcpPromptGenerateGemini($env, $model, $apiKey, $systemPrompt, $userPrompt, $image);
     } else {
-        if ($endpoint === '') {
-            $endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
-        }
-        if ($usedModel === '') {
-            $usedModel = 'gemma4';
-        }
-        if (mcpPromptIsOpenAiCompatibleEndpoint($endpoint)) {
-            $payload = [
-                'model' => $usedModel,
-                'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image, $history),
-                'temperature' => 0.4,
-            ];
-        } else {
-            $payload = [
-                'prompt' => $prompt,
-                'history' => $history,
-                'config' => $config,
-                'instruction' => $systemPrompt,
-                'image' => $image,
-            ];
-        }
-        $response = mcpPromptHttpPost($endpoint, [], $payload);
-        if (!$response['ok']) {
-            return mcpPromptError(mcpPromptFormatHttpError('Local endpoint', $response));
-        }
-        $decoded = json_decode($response['body'], true);
-        if (is_array($decoded)) {
-            $message = $decoded['choices'][0]['message'] ?? null;
-            if (is_array($message) && array_key_exists('content', $message)) {
-                $template = (string) $message['content'];
-                $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
-                $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
-            } elseif (isset($decoded['template'])) {
-                $template = (string) $decoded['template'];
-            } elseif (isset($decoded['content'])) {
-                $template = (string) $decoded['content'];
-            }
-        } elseif ($template === '') {
-            $template = trim((string) $response['body']);
-        }
+        $generation = mcpPromptGenerateLocal($model, $endpoint, $prompt, $systemPrompt, $userPrompt, $image, $history, $config);
     }
 
+    if (($generation['error'] ?? null) !== null) {
+        return mcpPromptError((string) $generation['error']);
+    }
+
+    $template = (string) ($generation['template'] ?? '');
+    $usedModel = (string) ($generation['model'] ?? $model);
+    $modelReturnedReasoningOnly = (bool) ($generation['reasoningOnly'] ?? false);
     $parsedResult = mcpParsePromptModelResult($template);
     if (isset($parsedResult['css']) && is_string($parsedResult['css'])) {
         $cssErrors = mcpPromptValidateScopedCss($parsedResult['css']);

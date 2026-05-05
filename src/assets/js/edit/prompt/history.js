@@ -197,6 +197,8 @@ export function filterAllowedWork(work, config) {
         'type',
         'layout',
         'model',
+        'categories',
+        'category',
     ]);
     const filtered = {};
     Object.entries(work).forEach(([key, value]) => {
