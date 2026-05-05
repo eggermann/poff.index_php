@@ -1,47 +1,43 @@
-<div class="poff-default-layout__work-shell grid gap-4 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-2xl">
-    <header class="poff-default-layout__work-head grid gap-1.5">
-        <h2 class="poff-default-layout__work-title m-0 text-2xl font-semibold leading-tight text-slate-50">{{title}}</h2>
+<article class="poff-default-layout__work">
+    <header class="poff-default-layout__work-head">
+        <p class="poff-default-layout__eyebrow">{{kind}}</p>
+        <h2 class="poff-default-layout__work-title">{{title}}</h2>
         {{#if description}}
-            <p class="poff-default-layout__work-description m-0 text-sm text-slate-400">{{description}}</p>
-        {{else}}
-            <p class="poff-default-layout__work-description m-0 text-xs uppercase tracking-wider text-slate-400">{{kind}}</p>
+            <p class="poff-default-layout__work-description">{{description}}</p>
         {{/if}}
     </header>
 
-    <div class="poff-default-layout__work-body rounded-2xl border border-slate-700/60 bg-slate-950/60 p-3">
+    <div class="poff-default-layout__work-body">
         {{#if isImage}}
-            <img class="mx-auto block max-h-screen max-w-full object-contain" src="{{srcUrl}}" alt="{{title}}">
+            <img class="poff-default-layout__media" src="{{srcUrl}}" alt="{{title}}">
         {{/if}}
         {{#if isVideo}}
-            <video class="mx-auto block max-h-screen max-w-full" controls {{#if work.autoplay}}autoplay{{/if}} {{#if work.loop}}loop{{/if}} {{#if work.muted}}muted{{/if}} {{#if work.poster}}poster="{{work.poster}}"{{/if}}>
+            <video class="poff-default-layout__media" controls {{#if work.autoplay}}autoplay{{/if}} {{#if work.loop}}loop{{/if}} {{#if work.muted}}muted{{/if}} {{#if work.poster}}poster="{{work.poster}}"{{/if}}>
                 <source src="{{srcUrl}}">
                 Your browser does not support the video tag.
             </video>
         {{/if}}
         {{#if isAudio}}
-            <audio class="w-full" controls {{#if work.autoplay}}autoplay{{/if}}>
+            <audio class="poff-default-layout__audio" controls {{#if work.autoplay}}autoplay{{/if}}>
                 <source src="{{srcUrl}}">
                 Your browser does not support the audio element.
             </audio>
         {{/if}}
         {{#if isPdf}}
-            <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{srcUrl}}" title="{{title}}"></iframe>
+            <iframe class="poff-default-layout__frame" src="{{srcUrl}}" title="{{title}}"></iframe>
         {{/if}}
         {{#if isText}}
             {{#if showInlineTextPreview}}
-                <pre class="min-h-screen w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-slate-950 p-4 text-sm text-slate-100">{{textContent}}</pre>
+                <pre class="poff-default-layout__text-preview">{{textContent}}</pre>
             {{else}}
-                <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{srcUrl}}" title="{{title}}"></iframe>
+                <iframe class="poff-default-layout__frame" src="{{srcUrl}}" title="{{title}}"></iframe>
             {{/if}}
         {{/if}}
         {{#if isLink}}
-            <div class="message">
-                <div class="mb-3">External link</div>
-                <a href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a>
-            </div>
+            <p class="poff-default-layout__link-line"><a class="poff-default-layout__link" href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a></p>
         {{/if}}
         {{#if isOther}}
-            <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{srcUrl}}" title="{{title}}"></iframe>
+            <iframe class="poff-default-layout__frame" src="{{srcUrl}}" title="{{title}}"></iframe>
         {{/if}}
     </div>
-</div>
+</article>

@@ -396,8 +396,20 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       }
     }
     if (hashPath) {
+      let resolvedIsFile;
+      if (typeof window.POFF_RESOLVE_HASH_PATH === "function") {
+        const resolvedHash = window.POFF_RESOLVE_HASH_PATH(hashPath);
+        if (resolvedHash && typeof resolvedHash === "object") {
+          hashPath = resolvedHash.path || hashPath;
+          if (typeof resolvedHash.isFile === "boolean") {
+            resolvedIsFile = resolvedHash.isFile;
+          }
+        } else {
+          hashPath = resolvedHash;
+        }
+      }
       const hashMatchesFileParam = filePath !== "" && hashPath === filePath;
-      const isFileHint = hashMatchesFileParam ? true : void 0;
+      const isFileHint = typeof resolvedIsFile === "boolean" ? resolvedIsFile : hashMatchesFileParam ? true : void 0;
       return getSelectionFromPath(hashPath, { isFile: isFileHint });
     }
     if (filePath) {
@@ -565,8 +577,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   }
   var legacyWorkSystemPrompt = [
     "You are a Handlebars (HBS) template generator for this single-page CMS.",
-    "Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.",
-    "Return only the template (no Markdown, no fences).",
+    'Return strict JSON with a required "template" string and optional "work" field.',
     "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
     "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
     "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
@@ -575,12 +586,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
     "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
     "Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.",
-    "Tailwind first. Use utility classes for the common layout and visual structure.",
-    "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
-    "Do not embed global CSS, and do not use inline style attributes.",
-    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
-    "Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
-    "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
+    "Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.",
+    'Do not return "css" or "js" for work prompts. Work prompts update only the inner HBS partial; layout prompts own wrapper CSS and JS.',
+    "Do not put <style> tags inside template and do not use inline style attributes."
   ].join("\n");
   var defaultFileSystemPrompt = [
     legacyWorkSystemPrompt,
@@ -593,7 +601,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
     "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.",
     'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
-    "Return only the inner partial content that will be rendered inside the existing layout wrapper."
+    'The JSON "template" must contain only the inner file partial content rendered inside the existing layout wrapper.'
   ].join("\n");
   var defaultFolderSystemPrompt = [
     legacyWorkSystemPrompt,
@@ -609,7 +617,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
     "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.",
     'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
-    "Return only the inner folder partial content that will be rendered inside the existing layout wrapper."
+    'The JSON "template" must contain only the inner folder partial content rendered inside the existing layout wrapper.'
   ].join("\n");
   var defaultLayoutSystemPrompt = [
     "You are a Handlebars (HBS) layout generator for this single-page CMS.",
@@ -623,12 +631,11 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.",
     'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
     "Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.",
-    "Tailwind first. Put standard layout styling in class attributes.",
-    "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
-    "Do not embed global CSS, and do not use inline style attributes.",
     "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
-    "Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
+    "Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.",
+    'Put all wrapper-specific styling in the JSON "css" field as plain CSS that works without a build step.',
+    "Scope CSS under a unique root class used by the returned wrapper. Do not define global selectors like body, a, img, h1 unless nested under that root class.",
+    "Do not put <style> tags inside template and do not use inline style attributes.",
     "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
     "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
     "When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.",
@@ -637,20 +644,13 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
     "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
     "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
-    "Avoid CSS variable theme systems unless explicitly requested; prefer direct Tailwind utility classes.",
     "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
     "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
     "If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.",
     "Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.",
     "Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
-    "Tailwind first. Use utility classes for the common layout and visual structure.",
-    "Use scoped CSS only for exceptions that are awkward or unreadable as utilities.",
-    "Do not embed global CSS, and do not use inline style attributes.",
-    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Use static Tailwind utilities from the built app.css vocabulary: flex/grid, spacing, borders, rounded, shadows, slate/white/blue/emerald/red/amber/yellow/green/cyan/pink colors, responsive md/lg/xl variants. Avoid dynamic class names built from Handlebars values because runtime templates cannot trigger a rebuild.",
-    "Use examples like text-red-500, bg-red-500, border-red-500, hover:bg-red-600 for red accents; if a requested utility is not in this vocabulary, use small scoped CSS instead of inventing a new utility class. Avoid arbitrary-value utilities like text-[13px], grid-cols-[...], [background:...], and [&_img]:... unless there is no regular utility that works.",
-    "If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled."
+    'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.'
   ].join("\n");
   var defaultPromptSettings = {
     provider: "local",
@@ -2045,6 +2045,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (openEl) {
       openEl.addEventListener("click", () => applyState(false));
     }
+    if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
+      document.addEventListener("keydown", (event) => {
+        if (!event || event.key !== "Escape") {
+          return;
+        }
+        applyState(true);
+      });
+    }
     return {
       readState,
       writeState,
@@ -2096,6 +2104,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }) {
     var _a, _b;
     const layoutState = getLayoutState(currentConfig || {});
+    if (!(selection2 == null ? void 0 : selection2.isLayout)) {
+      return {
+        layoutPayload: {
+          sectionTemplate: templateText
+        },
+        layoutState,
+        resolvedLayoutName: resolveLayoutName(nextLayoutValue, drawerForm, currentConfig)
+      };
+    }
     const resolvedLayoutName = resolveLayoutName(nextLayoutValue, drawerForm, currentConfig);
     const layoutPayload = {
       name: resolvedLayoutName,
@@ -2112,10 +2129,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     if (responseModel) {
       layoutPayload.model = responseModel;
-    }
-    if (!(selection2 == null ? void 0 : selection2.isLayout)) {
-      layoutPayload.sectionTemplate = templateText;
-      return { layoutPayload, layoutState, resolvedLayoutName };
     }
     const attachSiblingSectionTemplates = () => {
       if (responseWorkTemplate !== null) {
@@ -2710,8 +2723,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           if (nextDescription !== null) extra.push("description");
           if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(", ")}`);
           if (nextLayoutValue) extra.push("layout");
-          if (nextCss !== null) extra.push("css");
-          if (nextJs !== null) extra.push("js");
+          if (isLayoutTarget && nextCss !== null) extra.push("css");
+          if (isLayoutTarget && nextJs !== null) extra.push("js");
           const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? "layout " : ""}HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
           renderSummary(summaryText);
           clearAttachment();
@@ -4553,6 +4566,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
     }
     async function saveConfig(payload, statusEl) {
+      var _a, _b;
       try {
         setStatusMessage(statusEl, "Saving...");
         const data = await requestEditConfig("save", payload);
@@ -4568,7 +4582,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setStatusMessage(statusEl, "Config saved.", true);
         window.dispatchEvent(new CustomEvent("poff:content-updated", {
           detail: {
-            path: (payload == null ? void 0 : payload.path) || "",
+            path: data.routePath || (payload == null ? void 0 : payload.path) || "",
+            slug: data.routeSlug || ((_a = data.config) == null ? void 0 : _a.slug) || "",
+            routePath: data.routePath || (payload == null ? void 0 : payload.path) || "",
+            routeSlug: data.routeSlug || ((_b = data.config) == null ? void 0 : _b.slug) || "",
             target: editTarget,
             subjectTarget: data.subjectTarget || editTarget
           }
@@ -4892,6 +4909,132 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let previewClickBound = false;
     let previewDisabled = false;
     let lastPreviewKey = "";
+    const slugToPathAliases = /* @__PURE__ */ new Map();
+    const pathToSlugAliases = /* @__PURE__ */ new Map();
+    function normalizeHashPath(value = "") {
+      return String(value || "").replace(/\\/g, "/").replace(/^#\/?/, "").replace(/^\/+|\/+$/g, "");
+    }
+    function normalizeHashAlias(value = "") {
+      return normalizeHashPath(value).toLowerCase();
+    }
+    function routeResolution(path = "", isFile = inferFilePath(path)) {
+      return {
+        path,
+        isFile
+      };
+    }
+    function rememberSlugPathAlias(detail = {}) {
+      const path = normalizeHashPath((detail == null ? void 0 : detail.routePath) || (detail == null ? void 0 : detail.path) || (detail == null ? void 0 : detail.relativePath) || "");
+      const slug = normalizeHashPath((detail == null ? void 0 : detail.routeSlug) || (detail == null ? void 0 : detail.slug) || "");
+      if (!path || !slug || slug.includes("/")) {
+        return;
+      }
+      slugToPathAliases.set(normalizeHashAlias(slug), path);
+      pathToSlugAliases.set(normalizeHashAlias(path), slug);
+    }
+    function findNavLinkByAttribute(attributeName, value = "") {
+      if (!navList || !value) {
+        return null;
+      }
+      const normalizedValue = normalizeHashAlias(value);
+      for (const link of navList.querySelectorAll(`[${attributeName}]`)) {
+        if (normalizeHashAlias(link.getAttribute(attributeName) || "") === normalizedValue) {
+          return link;
+        }
+      }
+      return null;
+    }
+    function navTargetPath(link) {
+      if (!link) {
+        return "";
+      }
+      return link.getAttribute("data-layout-path") || link.getAttribute("data-path") || link.getAttribute("data-src") || "";
+    }
+    function navTargetIsFile(link, path = "") {
+      if (!link) {
+        return inferFilePath(path);
+      }
+      if (link.hasAttribute("data-layout-path")) {
+        return false;
+      }
+      if (link.hasAttribute("data-file") || link.hasAttribute("data-src")) {
+        return true;
+      }
+      const href = link.getAttribute("href") || "";
+      if (href.startsWith("?path=")) {
+        return false;
+      }
+      return inferFilePath(path);
+    }
+    function resolveHashPath(path = "") {
+      const normalizedPath = normalizeHashPath(path);
+      const aliasPath = slugToPathAliases.get(normalizeHashAlias(normalizedPath));
+      if (aliasPath) {
+        return routeResolution(aliasPath);
+      }
+      if (!normalizedPath.includes("/")) {
+        const link = findNavLinkByAttribute("data-slug", normalizedPath);
+        const targetPath = navTargetPath(link);
+        if (targetPath) {
+          rememberSlugPathAlias({
+            path: targetPath,
+            slug: normalizedPath
+          });
+          return routeResolution(targetPath, navTargetIsFile(link, targetPath));
+        }
+      }
+      return routeResolution(normalizedPath);
+    }
+    async function resolveHashPathAsync(path = "") {
+      const resolved = resolveHashPath(path);
+      const normalizedPath = normalizeHashPath(path);
+      if (!normalizedPath || normalizedPath.includes("/") || normalizedPath === ".layout" || normalizedPath.endsWith("/.layout") || inferFilePath(normalizedPath) || resolved.path !== normalizedPath) {
+        return resolved;
+      }
+      try {
+        const response = await fetch(`?ajax=resolve&slug=${encodeURIComponent(normalizedPath)}`, {
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json"
+          }
+        });
+        if (!response.ok) {
+          return resolved;
+        }
+        const data = await response.json();
+        if (!(data == null ? void 0 : data.resolved) || !data.path) {
+          return resolved;
+        }
+        rememberSlugPathAlias({
+          path: data.path,
+          slug: data.slug || normalizedPath
+        });
+        return routeResolution(data.path, typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder");
+      } catch (err) {
+        return resolved;
+      }
+    }
+    function displayHashPath(path = "") {
+      const normalizedPath = normalizeHashPath(path);
+      if (!normalizedPath || normalizedPath.includes("/.layout") || normalizedPath === ".layout") {
+        return normalizedPath;
+      }
+      const aliasSlug = pathToSlugAliases.get(normalizeHashAlias(normalizedPath));
+      if (aliasSlug) {
+        return aliasSlug;
+      }
+      const link = findNavLinkByAttribute("data-path", normalizedPath);
+      const slug = (link == null ? void 0 : link.getAttribute("data-slug")) || "";
+      if (slug && !slug.includes("/")) {
+        rememberSlugPathAlias({
+          path: normalizedPath,
+          slug
+        });
+        return slug;
+      }
+      return normalizedPath;
+    }
+    window.POFF_RESOLVE_HASH_PATH = resolveHashPath;
     function previewStateFromUrl(url) {
       try {
         const parsed = new URL(url, window.location.href);
@@ -5139,7 +5282,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
     }
     function writeHashPath(path = "") {
-      const nextHash = path ? `#/${path.replace(/^\/+/, "")}` : "";
+      const hashPath = displayHashPath(path);
+      const nextHash = hashPath ? `#/${hashPath.replace(/^\/+/, "")}` : "";
       if (window.location.hash === nextHash) {
         return;
       }
@@ -5166,7 +5310,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setActiveFileLink(fileName);
     }
     function navigateToPath(path = "", options = {}) {
-      const selection2 = getSelectionFromPath(path, { isFile: options == null ? void 0 : options.isFile });
+      const resolved = resolveHashPath(path);
+      const selection2 = getSelectionFromPath(resolved.path, {
+        isFile: typeof (options == null ? void 0 : options.isFile) === "boolean" ? options.isFile : resolved.isFile
+      });
       navigateToSelection(selection2, options);
     }
     function navigateToSelection(selectionInput, options = {}) {
@@ -5390,12 +5537,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         renderFolderMeta();
       }
     }
-    function syncFromLocation(options = {}) {
+    async function syncFromLocation(options = {}) {
       var _a;
       const { forceRefresh = false } = options;
       const hashPath = readHashPath();
       if (hashPath || window.location.hash) {
-        navigateToSelection(getSelectionFromPath(hashPath), {
+        const resolved = await resolveHashPathAsync(hashPath);
+        navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
           updateHash: false,
           forceRefresh
         });
@@ -5464,7 +5612,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       },
       loadCurrentFolderInIframe,
       syncFromLocation,
-      refreshCurrentLocation
+      refreshCurrentLocation,
+      rememberSlugPathAlias,
+      writeHashPath
     };
   }
 
@@ -5560,7 +5710,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     initEditMode: editController.initEditMode
   });
   var sidebarController = bindSidebarToggle(elements);
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     if (sidebarController) {
       sidebarController.syncSidebarState(true);
     }
@@ -5570,13 +5720,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       navigation.loadCurrentFolderInIframe();
       requestAnimationFrame(() => scrollToPreview());
     } else if (window.location.hash && window.location.hash.length > 1) {
-      navigation.syncFromLocation();
+      await navigation.syncFromLocation();
     } else {
       navigation.loadCurrentFolderInIframe();
     }
     editController.initEditMode();
   });
-  window.addEventListener("hashchange", () => {
+  window.addEventListener("hashchange", async () => {
     if (isPreviewHashActive()) {
       scrollToPreview();
       if (editRequested) {
@@ -5585,14 +5735,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return;
     }
     if (!navigation.consumeHashSync()) {
-      navigation.syncFromLocation();
+      await navigation.syncFromLocation();
     }
     if (editRequested) {
       editController.initEditMode();
     }
   });
-  window.addEventListener("poff:content-updated", () => {
-    navigation.refreshCurrentLocation();
+  window.addEventListener("poff:content-updated", async (event) => {
+    var _a, _b;
+    navigation.rememberSlugPathAlias(event.detail || {});
+    const nextPath = ((_a = event.detail) == null ? void 0 : _a.routePath) || ((_b = event.detail) == null ? void 0 : _b.path) || "";
+    if (nextPath) {
+      navigation.writeHashPath(nextPath);
+    }
+    await navigation.refreshCurrentLocation();
     if (editRequested) {
       editController.initEditMode();
     }

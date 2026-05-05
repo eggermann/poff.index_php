@@ -3,6 +3,9 @@
  * Simple MCP endpoint for exposing the current file tree and config state.
  * - Creates or updates poff.config.toon on first contact.
  * - Exposes JSON routes under /index.php?mcp=1[&route=...]
+ *
+ * MCP is an adapter layer for tools/agents. Core layout inheritance and
+ * rendering live in PoffConfig, Worktype, and viewer/render.
  */
 
 declare(strict_types=1);
@@ -17,44 +20,40 @@ require_once __DIR__ . '/routes/edit-config.php';
 require_once __DIR__ . '/routes/prompt-template.php';
 require_once __DIR__ . '/routes/style.php';
 
-$rootDir = getcwd();
-$configPath = $rootDir . DIRECTORY_SEPARATOR . 'poff.config.toon';
+$runtime = mcpRuntimeContext();
+$rootDir = $runtime['rootDir'];
+$configPath = $runtime['configPath'];
 $route = mcpQueryString('route', 'info') ?? 'info';
 $prompt = mcpQueryString('prompt', '') ?? '';
-$targetFile = mcpQueryString('file', '') ?? '';
-$stylePrompt = mcpQueryString('style', '') ?? '';
+$targetFile = mcpRouteFile();
+$stylePrompt = mcpRouteStyle();
 
 header('Content-Type: application/json');
 
 $tree = mcpBuildFileTree($rootDir, $rootDir);
 $configState = mcpEnsureConfig($configPath, $tree);
 
-$mcpUrl = rtrim($_SERVER['SCRIPT_NAME'] ?? '/index.php', '/') . '#mcp';
+$mcpUrl = $runtime['mcpUrl'];
 
 switch ($route) {
     case 'workprompt':
-        mcpJsonResponse(handleWorkPrompt([
-            'rootDir' => $rootDir,
-            'file' => $targetFile,
-            'style' => $stylePrompt,
-        ]));
+        mcpJsonResponse(handleWorkPrompt(mcpWorkPromptArgs($rootDir, $targetFile, $stylePrompt)));
     case 'create':
-        mcpJsonResponse(handleCreate([
-            'rootDir' => $rootDir,
-            'dest' => mcpQueryString('dest', '') ?? '',
+        mcpJsonResponse(handleCreate(mcpCreateArgs($rootDir, [
+            'dest' => mcpRouteDest(),
             'path' => mcpQueryString('path', null),
             'url' => mcpQueryString('url', null),
-            'poffDir' => getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null,
-        ]));
+            'poffDir' => $runtime['poffDir'],
+        ])));
     case 'edit-config':
         mcpJsonResponse(handleEditConfig([
             'rootDir' => $rootDir,
-            'path' => mcpQueryString('path', '') ?? '',
+            'path' => mcpRoutePath(),
         ]));
     case 'prompt-template':
         mcpJsonResponse(handlePromptTemplate([
             'rootDir' => $rootDir,
-            'path' => mcpQueryString('path', '') ?? '',
+            'path' => mcpRoutePath(),
         ]));
     case 'style':
         $response = handleStyleRoute($prompt, $mcpUrl, $configPath);

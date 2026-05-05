@@ -1,6 +1,69 @@
 <?php
 declare(strict_types=1);
 
+function mcpPoffDirOverride(): ?string
+{
+    $poffBase = getenv('POFF_BASE');
+    if (!is_string($poffBase) || trim($poffBase) === '') {
+        return null;
+    }
+
+    return rtrim($poffBase, '/\\');
+}
+
+function mcpRuntimeContext(): array
+{
+    $rootDir = getcwd();
+    $scriptName = rtrim($_SERVER['SCRIPT_NAME'] ?? '/index.php', '/');
+
+    return [
+        'rootDir' => $rootDir,
+        'configPath' => $rootDir . DIRECTORY_SEPARATOR . 'poff.config.toon',
+        'poffDir' => mcpPoffDirOverride(),
+        'mcpUrl' => $scriptName . '#mcp',
+    ];
+}
+
+function mcpRoutePath(): string
+{
+    return mcpQueryString('path', '') ?? '';
+}
+
+function mcpRouteFile(): string
+{
+    return mcpQueryString('file', '') ?? '';
+}
+
+function mcpRouteStyle(): string
+{
+    return mcpQueryString('style', '') ?? '';
+}
+
+function mcpRouteDest(): string
+{
+    return mcpQueryString('dest', '') ?? '';
+}
+
+function mcpWorkPromptArgs(string $rootDir, string $file, string $style): array
+{
+    return [
+        'rootDir' => $rootDir,
+        'file' => $file,
+        'style' => $style,
+    ];
+}
+
+function mcpCreateArgs(string $rootDir, array $input): array
+{
+    return [
+        'rootDir' => $rootDir,
+        'dest' => $input['dest'] ?? '',
+        'path' => $input['path'] ?? null,
+        'url' => $input['url'] ?? null,
+        'poffDir' => $input['poffDir'] ?? mcpPoffDirOverride(),
+    ];
+}
+
 function mcpBuildFileTree(string $dir, string $base): array
 {
     $items = [];

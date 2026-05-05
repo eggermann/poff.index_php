@@ -15,7 +15,10 @@ require_once __DIR__ . '/routes/create.php';
 use PhpMcp\Server\Server;
 use PhpMcp\Server\Transports\StreamableHttpServerTransport;
 
-$rootDir = getcwd();
+// MCP is an adapter layer for tools/agents. Core layout inheritance and
+// rendering live in PoffConfig, Worktype, and viewer/render.
+$runtime = mcpRuntimeContext();
+$rootDir = $runtime['rootDir'];
 
 $server = Server::make()
     ->withServerInfo('poff-mcp', '1.0.0')
@@ -24,25 +27,14 @@ $server = Server::make()
             $parts = explode('|', $input, 2);
             $file = trim($parts[0] ?? '');
             $style = trim($parts[1] ?? '');
-            return handleWorkPrompt([
-                'rootDir' => $rootDir,
-                'file' => $file,
-                'style' => $style,
-            ]);
+            return handleWorkPrompt(mcpWorkPromptArgs($rootDir, $file, $style));
         },
         name: 'workprompt',
         description: 'Generate/override LightnCandy HBS work.layout model/template for a file. Input: "path|style prompt".'
     )
     ->withTool(
         function (array $args) use ($rootDir) {
-            $poffDirOverride = getenv('POFF_BASE') ? rtrim(getenv('POFF_BASE'), '/\\') : null;
-            return handleCreate([
-                'rootDir' => $rootDir,
-                'dest' => $args['dest'] ?? '',
-                'path' => $args['path'] ?? null,
-                'url' => $args['url'] ?? null,
-                'poffDir' => $poffDirOverride,
-            ]);
+            return handleCreate(mcpCreateArgs($rootDir, $args));
         },
         name: 'create',
         description: 'Create entry under /poff. Required: dest (relative inside /poff). Optional: path (copy) or url (download).',

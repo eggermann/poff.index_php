@@ -25,6 +25,7 @@ function mcpSanitizeRelPath(string $path): string
 
 function mcp_sanitize_relpath(string $path): string
 {
+    // Internal compatibility wrapper for older MCP helper callers.
     return mcpSanitizeRelPath($path);
 }
 
@@ -57,6 +58,7 @@ function mcpCopyRecursive(string $src, string $dst): void
 
 function mcp_copy_recursive(string $src, string $dst): void
 {
+    // Internal compatibility wrapper for older MCP helper callers.
     mcpCopyRecursive($src, $dst);
 }
 
@@ -106,6 +108,7 @@ function mcpUrlHostIsPrivate(string $host): bool
 
 function mcp_url_host_is_private(string $host): bool
 {
+    // Internal compatibility wrapper for older MCP helper callers.
     return mcpUrlHostIsPrivate($host);
 }
 

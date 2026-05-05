@@ -67,6 +67,6 @@ function handleWorkPrompt(array $opts): array
         'partials' => $partials,
         'config' => $fileConfig,
         'configPath' => $configPath,
-        'instruction' => 'Use the filesystem-layout HBS template and partials as a base. The section includes works for folders and work for files. The bundled poff-layout remains available as a fallback. Save updates into the item layout filesystem as source templates in .layout and .works. Tailwind first for structure with static utilities from the built app.css vocabulary; runtime templates cannot trigger a rebuild. Use scoped style.css only for exceptions that are awkward or unreadable as utilities. script.js is for behavior only. Build is for the deployment artifact, not for authoring.',
+        'instruction' => 'Use the filesystem-layout HBS template and partials as a base. The section includes works for folders and work for files. The bundled poff-layout remains available as a fallback. Save updates into the item layout filesystem as source templates in .layout and .works. Use semantic HTML and stable readable class names. Put styling in scoped style.css under a unique root class, without global selectors, inline style attributes, or Tailwind utility classes. script.js is for behavior only; guard DOM readiness, avoid network calls, and degrade gracefully.',
     ];
 }

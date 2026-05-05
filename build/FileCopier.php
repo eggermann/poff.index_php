@@ -41,6 +41,24 @@ class FileCopier {
         }
     }
 
+    public static function copyDirectoryToAllDirectories(string $sourceDir, string $targetDir, string $targetSubdir = ''): void {
+        $projectRoot = rtrim($targetDir, '/\\');
+
+        if (!is_dir($sourceDir)) {
+            throw new Exception("Source directory not found: $sourceDir");
+        }
+
+        $dirs = array_merge([$projectRoot], self::findAllDirectories($projectRoot));
+        foreach ($dirs as $dir) {
+            $destinationDir = $dir;
+            if ($targetSubdir !== '') {
+                $destinationDir .= DIRECTORY_SEPARATOR . trim($targetSubdir, '/\\');
+            }
+
+            self::copyDirectory($sourceDir, $destinationDir);
+        }
+    }
+
     public static function mirrorDirectory(string $sourceDir, string $targetDir): void {
         if (!is_dir($sourceDir)) {
             throw new Exception("Source directory not found: $sourceDir");
