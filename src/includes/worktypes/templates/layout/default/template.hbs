@@ -1,177 +1,36 @@
-<div class="poff-default-layout poff-default-layout--{{kind}} grid min-h-screen grid-cols-1 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-200 lg:h-screen lg:grid-cols-12">
-    <aside class="poff-default-layout__sidebar overflow-y-auto border-r border-slate-800 bg-gradient-to-b from-slate-950 to-slate-900 px-4 pb-6 pt-24 shadow-2xl lg:col-span-3">
-        <nav class="poff-default-layout__nav grid gap-2" aria-label="Current work navigation">
-            {{#if parentPageLink}}
-                <a class="poff-default-layout__nav-link poff-default-layout__nav-link--up flex items-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2.5 text-sm text-emerald-300 transition hover:-translate-y-0.5 hover:border-blue-400" href="{{parentPageLink}}">
-                    <span class="poff-default-layout__nav-icon inline-block w-5 text-center">↑</span>
-                    <span class="poff-default-layout__nav-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Go Up</span>
-                </a>
+<div class="poff-default-layout poff-default-layout--{{kind}}">
+    <header class="poff-default-layout__header">
+        <div class="poff-default-layout__header-art">
+            <img
+                class="poff-default-layout__profile"
+                src="{{layout.baseHref}}/eggman_profile-image.jpg"
+                alt="Eggman profile"
+            >
+        </div>
+        <div class="poff-default-layout__header-copy">
+            <h1 class="poff-default-layout__title">{{title}}</h1>
+            {{#if categories}}
+                <div class="poff-default-layout__categories" aria-label="Categories">
+                    {{#each categories}}
+                        <span class="poff-default-layout__category-pill">{{this}}</span>
+                    {{/each}}
+                </div>
             {{/if}}
-
-            {{#if showDirectoryPageLink}}
-                <a class="poff-default-layout__nav-link {{#if isFolder}}poff-default-layout__nav-link--current bg-gradient-to-r from-blue-500 to-blue-600 border-transparent text-white font-semibold{{else}}border-slate-700/80 bg-slate-900/70 hover:-translate-y-0.5 hover:border-blue-400{{/if}} flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition" href="{{directoryPageLink}}">
-                    <span class="poff-default-layout__nav-icon inline-block w-5 text-center">./</span>
-                    <span class="poff-default-layout__nav-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{name}}</span>
-                </a>
+            {{#if description}}
+                <p class="poff-default-layout__description">{{description}}</p>
             {{/if}}
+        </div>
+    </header>
 
-            {{#if isFolder}}
-                {{#each items}}
-                    <a class="poff-default-layout__nav-link flex items-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 transition hover:-translate-y-0.5 hover:border-blue-400" href="{{pageLink}}">
-                        <span class="poff-default-layout__nav-icon inline-block w-5 text-center">{{#if isFolder}}▣{{else}}◧{{/if}}</span>
-                        <span class="poff-default-layout__nav-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{name}}</span>
-                    </a>
-                {{/each}}
-            {{else}}
-                <a class="poff-default-layout__nav-link poff-default-layout__nav-link--current flex items-center gap-2.5 rounded-xl border border-transparent bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-2.5 text-sm font-semibold text-white" href="{{pageLink}}">
-                    <span class="poff-default-layout__nav-icon inline-block w-5 text-center">◧</span>
-                    <span class="poff-default-layout__nav-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{name}}</span>
-                </a>
-            {{/if}}
-        </nav>
-    </aside>
+    <main class="poff-default-layout__main">
+        {{#if isFolder}}
+            {{> works}}
+        {{else}}
+            {{> work}}
+        {{/if}}
+    </main>
 
-    <div class="poff-default-layout__stage flex min-h-0 flex-col bg-gradient-to-b from-slate-900 to-slate-950 lg:col-span-9">
-        <header class="poff-default-layout__header sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/90 bg-slate-950/80 px-6 py-4 backdrop-blur">
-            <div class="poff-default-layout__brand flex items-center gap-3">
-                <div class="poff-default-layout__brand-icon grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-lg">◉</div>
-                <div class="poff-default-layout__brand-copy grid">
-                    <strong class="text-base leading-none">CVA System</strong>
-                    <span class="text-xs uppercase tracking-wider text-slate-400">Career Vector Alignment</span>
-                </div>
-            </div>
-            <div class="poff-default-layout__header-meta flex flex-wrap items-center justify-end gap-2">
-                <div class="poff-default-layout__meta-block grid gap-0.5 rounded-lg border border-slate-700/80 bg-slate-900/70 px-2.5 py-1.5">
-                    <span class="poff-default-layout__meta-label text-xs uppercase tracking-wider text-slate-400">Source</span>
-                    <span class="poff-default-layout__meta-value text-xs">{{#if isFolder}}Folder{{else}}File{{/if}} • {{name}}</span>
-                </div>
-                <div class="poff-default-layout__meta-block grid gap-0.5 rounded-lg border border-slate-700/80 bg-slate-900/70 px-2.5 py-1.5">
-                    <span class="poff-default-layout__meta-label text-xs uppercase tracking-wider text-slate-400">Last Sync</span>
-                    <span class="poff-default-layout__meta-value text-xs" data-layout-last-sync>now</span>
-                </div>
-                <button class="poff-default-layout__action poff-default-layout__action--sync rounded-lg border border-slate-600 bg-slate-900/90 px-3 py-2 text-xs text-blue-100 transition hover:border-blue-400" type="button" data-layout-sync>Sync</button>
-                <button class="poff-default-layout__action rounded-lg border border-slate-600 bg-slate-900/90 px-3 py-2 text-xs text-blue-100 transition hover:border-blue-400" type="button" data-layout-toggle>Focus View</button>
-                <span class="poff-default-layout__health rounded-full border border-indigo-400/50 bg-indigo-500/20 px-2.5 py-1 text-xs font-bold text-indigo-200" data-layout-health>On Track</span>
-            </div>
-        </header>
-
-        <main class="poff-default-layout__main grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 md:p-6">
-            <section class="poff-default-layout__grid grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <section class="poff-default-layout__primary grid gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-2xl xl:col-span-2">
-                    <header class="poff-default-layout__section-head grid gap-1.5">
-                        <h1 class="poff-default-layout__title m-0 text-3xl leading-tight md:text-4xl">{{title}}</h1>
-                        <p class="poff-default-layout__subtitle m-0 text-xs uppercase tracking-wider text-slate-400">Strategic Alignment Space</p>
-                    </header>
-
-                    <div class="poff-default-layout__content-shell min-h-96 rounded-2xl border-2 border-red-500 bg-slate-950/70 p-3.5">
-                        {{#if isFolder}}
-                            {{> works}}
-                        {{else}}
-                            {{> work}}
-                        {{/if}}
-                    </div>
-
-                    <div class="poff-default-layout__stats grid grid-cols-2 gap-3 lg:grid-cols-4">
-                        <article class="poff-default-layout__stat-card rounded-xl border border-slate-700/80 bg-slate-900/80 p-3">
-                            <span class="poff-default-layout__stat-label block text-xs uppercase tracking-wider text-slate-400">Scope</span>
-                            <strong class="poff-default-layout__stat-value text-sm">{{#if isFolder}}Folder{{else}}File{{/if}}</strong>
-                        </article>
-                        <article class="poff-default-layout__stat-card rounded-xl border border-slate-700/80 bg-slate-900/80 p-3">
-                            <span class="poff-default-layout__stat-label block text-xs uppercase tracking-wider text-slate-400">Visible</span>
-                            <strong class="poff-default-layout__stat-value text-sm">{{#if isFolder}}{{itemCount}}{{else}}1{{/if}}</strong>
-                        </article>
-                        <article class="poff-default-layout__stat-card rounded-xl border border-slate-700/80 bg-slate-900/80 p-3">
-                            <span class="poff-default-layout__stat-label block text-xs uppercase tracking-wider text-slate-400">Total Assets</span>
-                            <strong class="poff-default-layout__stat-value text-sm">{{#if isFolder}}{{#if allItemCount}}{{allItemCount}}{{else}}{{itemCount}}{{/if}}{{else}}1{{/if}}</strong>
-                        </article>
-                        <article class="poff-default-layout__stat-card rounded-xl border border-slate-700/80 bg-slate-900/80 p-3">
-                            <span class="poff-default-layout__stat-label block text-xs uppercase tracking-wider text-slate-400">Status</span>
-                            <strong class="poff-default-layout__stat-value text-sm" data-layout-status>{{#if isFolder}}Indexed{{else}}Ready{{/if}}</strong>
-                        </article>
-                    </div>
-                </section>
-
-                <aside class="poff-default-layout__timeline rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-2xl">
-                    <h2 class="poff-default-layout__timeline-title mb-3 text-lg font-semibold">Process Timeline</h2>
-                    <ul class="poff-default-layout__timeline-list grid gap-3">
-                        {{#if isFolder}}
-                            {{#if hasItems}}
-                                {{#each items}}
-                                    <li class="poff-default-layout__timeline-item flex gap-3 rounded-xl border border-slate-700/60 bg-slate-900/60 p-3">
-                                        <span class="poff-default-layout__timeline-dot mt-1.5 h-2.5 w-2.5 rounded-full bg-cyan-400"></span>
-                                        <div class="poff-default-layout__timeline-copy grid gap-0.5">
-                                            <span class="poff-default-layout__timeline-kind text-xs uppercase tracking-wider text-slate-400">{{#if isFolder}}Folder{{else}}File{{/if}}</span>
-                                            <a href="{{pageLink}}" class="poff-default-layout__timeline-link text-sm text-slate-100 underline-offset-2 hover:underline">{{name}}</a>
-                                            <small class="text-xs text-slate-400">{{path}}</small>
-                                        </div>
-                                    </li>
-                                {{/each}}
-                            {{else}}
-                                <li class="poff-default-layout__timeline-item flex gap-3 rounded-xl border border-slate-700/60 bg-slate-900/60 p-3">
-                                    <span class="poff-default-layout__timeline-dot mt-1.5 h-2.5 w-2.5 rounded-full bg-cyan-400"></span>
-                                    <div class="poff-default-layout__timeline-copy grid gap-0.5">
-                                        <span class="poff-default-layout__timeline-kind text-xs uppercase tracking-wider text-slate-400">Info</span>
-                                        <span class="poff-default-layout__timeline-link text-sm text-slate-100">No entries available.</span>
-                                        <small class="text-xs text-slate-400">Folder is currently empty.</small>
-                                    </div>
-                                </li>
-                            {{/if}}
-                        {{else}}
-                            <li class="poff-default-layout__timeline-item flex gap-3 rounded-xl border border-slate-700/60 bg-slate-900/60 p-3">
-                                <span class="poff-default-layout__timeline-dot mt-1.5 h-2.5 w-2.5 rounded-full bg-cyan-400"></span>
-                                <div class="poff-default-layout__timeline-copy grid gap-0.5">
-                                    <span class="poff-default-layout__timeline-kind text-xs uppercase tracking-wider text-slate-400">Type</span>
-                                    <span class="poff-default-layout__timeline-link text-sm text-slate-100">{{kind}}</span>
-                                    <small class="text-xs text-slate-400">{{path}}</small>
-                                </div>
-                            </li>
-                            <li class="poff-default-layout__timeline-item flex gap-3 rounded-xl border border-slate-700/60 bg-slate-900/60 p-3">
-                                <span class="poff-default-layout__timeline-dot mt-1.5 h-2.5 w-2.5 rounded-full bg-cyan-400"></span>
-                                <div class="poff-default-layout__timeline-copy grid gap-0.5">
-                                    <span class="poff-default-layout__timeline-kind text-xs uppercase tracking-wider text-slate-400">Name</span>
-                                    <span class="poff-default-layout__timeline-link text-sm text-slate-100">{{name}}</span>
-                                    <small class="text-xs text-slate-400">{{title}}</small>
-                                </div>
-                            </li>
-                        {{/if}}
-                    </ul>
-                </aside>
-            </section>
-
-            <section class="poff-default-layout__drivers rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-2xl">
-                <h2 class="mb-3 text-lg font-semibold">Strategic & Personal Drivers</h2>
-                <div class="poff-default-layout__driver-grid grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {{#if isFolder}}
-                        {{#each items}}
-                            <article class="poff-default-layout__driver-card rounded-xl border border-slate-700/70 bg-slate-900/70 p-3">
-                                <span class="poff-default-layout__driver-kind text-xs uppercase tracking-wider text-slate-400">{{#if isFolder}}Structure{{else}}Asset{{/if}}</span>
-                                <h3 class="mt-1 text-base font-semibold">{{name}}</h3>
-                                <p class="text-sm text-slate-300">{{path}}</p>
-                            </article>
-                        {{/each}}
-                    {{else}}
-                        <article class="poff-default-layout__driver-card rounded-xl border border-slate-700/70 bg-slate-900/70 p-3">
-                            <span class="poff-default-layout__driver-kind text-xs uppercase tracking-wider text-slate-400">Scope</span>
-                            <h3 class="mt-1 text-base font-semibold">{{title}}</h3>
-                            <p class="text-sm text-slate-300">{{description}}</p>
-                        </article>
-                        <article class="poff-default-layout__driver-card rounded-xl border border-slate-700/70 bg-slate-900/70 p-3">
-                            <span class="poff-default-layout__driver-kind text-xs uppercase tracking-wider text-slate-400">Type</span>
-                            <h3 class="mt-1 text-base font-semibold">{{kind}}</h3>
-                            <p class="text-sm text-slate-300">{{path}}</p>
-                        </article>
-                        <article class="poff-default-layout__driver-card rounded-xl border border-slate-700/70 bg-slate-900/70 p-3">
-                            <span class="poff-default-layout__driver-kind text-xs uppercase tracking-wider text-slate-400">Context</span>
-                            <h3 class="mt-1 text-base font-semibold">{{name}}</h3>
-                            <p class="text-sm text-slate-300">{{#if description}}{{description}}{{else}}Ready for focused review.{{/if}}</p>
-                        </article>
-                    {{/if}}
-                </div>
-            </section>
-        </main>
-
-        <footer class="poff-default-layout__footer border-t border-slate-800/90 bg-slate-950/70 px-6 py-3 text-sm text-slate-300">
-            <span>{{#if isFolder}}Directory{{else}}File{{/if}}: {{name}}</span>
-        </footer>
-    </div>
+    <footer class="poff-default-layout__footer">
+        <span>Copyright eggman</span>
+    </footer>
 </div>

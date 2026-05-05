@@ -1,1 +1,170 @@
-/* Tailwind-first layout: keep native CSS empty to reduce bundled style payload. */
+.poff-default-layout {
+    --poff-shell-bg:
+        radial-gradient(circle at top right, rgba(73, 114, 255, 0.18), transparent 24rem),
+        linear-gradient(180deg, #0c1220 0%, #111827 100%);
+    --poff-shell-color: #e5e7eb;
+    --poff-shell-header-border: rgba(255, 255, 255, 0.08);
+    --poff-shell-footer-border: rgba(255, 255, 255, 0.08);
+    --poff-shell-eyebrow-color: #8fb3ff;
+    --poff-shell-title-color: #f8fafc;
+    --poff-shell-description-color: rgba(226, 232, 240, 0.86);
+    --poff-shell-footer-color: rgba(226, 232, 240, 0.7);
+    --poff-shell-card-bg: rgba(9, 15, 28, 0.72);
+    --poff-shell-card-border: rgba(255, 255, 255, 0.08);
+    --poff-shell-profile-bg: rgba(255, 255, 255, 0.06);
+    --poff-shell-profile-border: rgba(255, 255, 255, 0.14);
+    --poff-shell-main-padding: 1.5rem 1.75rem 2rem;
+    --poff-work-max-height: calc(100dvh - 11.5rem);
+    min-height: 100dvh;
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background: var(--poff-shell-bg);
+    color: var(--poff-shell-color);
+}
+
+.poff-default-layout__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.5rem 1.75rem 1.25rem;
+    border-bottom: 1px solid var(--poff-shell-header-border);
+}
+
+.poff-default-layout__header-copy {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 44rem;
+}
+
+.poff-default-layout__eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--poff-shell-eyebrow-color);
+}
+
+.poff-default-layout__title {
+    margin: 0;
+    font-size: clamp(2rem, 3vw, 3.4rem);
+    line-height: 0.95;
+    color: var(--poff-shell-title-color);
+}
+
+.poff-default-layout__description {
+    margin: 0;
+    max-width: 38rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--poff-shell-description-color);
+}
+
+.poff-default-layout__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.poff-default-layout__category-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.6rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid rgba(143, 179, 255, 0.32);
+    background: rgba(143, 179, 255, 0.12);
+    color: var(--poff-shell-title-color);
+    font-size: 0.74rem;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.poff-default-layout__header-art {
+    flex-shrink: 0;
+}
+
+.poff-default-layout__profile {
+    width: 3.5rem;
+    height: 3.5rem;
+    object-fit: cover;
+    border-radius: 999px;
+    border: 1px solid var(--poff-shell-profile-border);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    background: var(--poff-shell-profile-bg);
+}
+
+.poff-default-layout__main {
+    padding: var(--poff-shell-main-padding);
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.poff-default-layout__main > * {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.poff-default-layout__main img,
+.poff-default-layout__main video,
+.poff-default-layout__main iframe,
+.poff-default-layout__main canvas,
+.poff-default-layout__main svg {
+    display: block;
+    max-width: 100%;
+    max-height: var(--poff-work-max-height);
+    margin-inline: auto;
+}
+
+.poff-default-layout__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 1rem 1.75rem 1.5rem;
+    border-top: 1px solid var(--poff-shell-footer-border);
+    color: var(--poff-shell-footer-color);
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.poff-default-layout .folder-view {
+    gap: 1.5rem;
+}
+
+.poff-default-layout .folder-view-summary {
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.poff-default-layout .folder-view-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.poff-default-layout .folder-view-card {
+    border: 1px solid var(--poff-shell-card-border);
+    background: var(--poff-shell-card-bg);
+}
+
+@media (max-width: 720px) {
+    .poff-default-layout__header {
+        padding: 1.2rem 1.1rem 1rem;
+        flex-direction: column-reverse;
+        align-items: flex-start;
+    }
+
+    .poff-default-layout__main {
+        --poff-shell-main-padding: 1rem 1.1rem 1.5rem;
+    }
+
+    .poff-default-layout__footer {
+        justify-content: flex-start;
+        padding: 1rem 1.1rem 1.2rem;
+    }
+}
