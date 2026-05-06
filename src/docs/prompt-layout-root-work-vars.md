@@ -82,3 +82,4 @@ Example prompt-context JSON:
 - The edit layout panel calls this out in the layout summary
 - The prompt context panel highlights `root` and `work`
 - The prompt system message tells the model to treat `root.*` and `work.*` separately
+- The gray disabled-preview block in the layout view repeats the root/work split and points back to this guide

@@ -451,7 +451,7 @@ body, html {
 }
 
 .content-frame.content-frame-layout-target[data-disabled=true] .poff-default-layout__main::after {
-  content: "Prompt edits layout wrapper only.\awork.hbs / works.hbs stays inherited.";
+  content: "Prompt edits layout wrapper only.\aroot.title is the outer shell title.\awork.title is the inner item title.\aSee src/docs/prompt-layout-root-work-vars.md.";
   display: block;
   margin-top: 12px;
   padding: 18px 16px 14px;
