@@ -17,6 +17,7 @@ function renderLayoutModeSummary({ subjectLabel, displayMode, wrapperSourceLabel
                 <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
                 <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                 <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
+                <div class="edit-layout-summary-line">Prompt context separates <code>root.title</code> for the layout shell from <code>work.title</code> for the nested item.</div>
             </div>
             <div class="edit-inline-actions edit-layout-header-actions">
                 <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>

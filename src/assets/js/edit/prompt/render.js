@@ -237,12 +237,17 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
     const tree = Array.isArray(config?.tree) ? config.tree : [];
     const folderBasePath = (selection?.isFile ? path.split('/').slice(0, -1).join('/') : path).replace(/^\/+|\/+$/g, '');
     const ellipsis = '\u2026';
-    const workFields = extractWorkFields(work);
+    const workConfig = (config && typeof config === 'object' && config.work && typeof config.work === 'object') ? config.work : {};
+    const rootTitle = String(config?.title || name || '').trim();
+    const rootDescription = String(config?.description || '').trim();
+    const rootFolderName = String(config?.folderName || name || '').trim();
+    const rootSlug = String(config?.slug || '').trim();
+    const workFields = extractWorkFields(workConfig);
     const workWithCategories = {
-        ...work,
-        categories: normalizeWorkCategories(work),
+        ...workConfig,
+        categories: normalizeWorkCategories(workConfig),
     };
-    const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
+    const workPreview = Object.entries(workConfig || {}).slice(0, 6).map(([key, value]) => {
         if (key === 'fields' && Array.isArray(value)) {
             const summary = summarizeWorkFields(value);
             return summary ? `fields: ${summary}` : `fields: ${value.length} item(s)`;
@@ -297,6 +302,7 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         layoutPreset,
         layoutSharedName,
         name,
+        title: rootTitle,
         pageLink: viewUrl,
         viewUrl,
         templateTarget,
@@ -306,6 +312,28 @@ export function buildPromptContext({ getActiveSelection, getConfig }) {
         inheritedLayoutDirectory,
         layoutAssetsPreview,
         editorDraft,
+        root: {
+            title: rootTitle,
+            name: rootFolderName,
+            folderName: rootFolderName,
+            path,
+            slug: rootSlug,
+            description: rootDescription,
+            type: selection?.isFile ? 'file' : 'folder',
+            sectionPartial: isLayout ? 'layout' : (isFile ? 'work' : 'works'),
+        },
+        work: {
+            title: String(workConfig?.title || name || rootTitle || '').trim(),
+            name: String(workConfig?.name || name || '').trim(),
+            path,
+            slug: String(workConfig?.slug || rootSlug || '').trim(),
+            description: String(workConfig?.description || rootDescription || '').trim(),
+            type: String(workConfig?.type || (selection?.isFile ? 'file' : 'folder') || '').trim(),
+            kind: String(workConfig?.kind || (selection?.isFile ? 'file' : 'folder') || '').trim(),
+            categories: normalizeWorkCategories(workConfig),
+            fields: workFields,
+            layout: workWithCategories.layout ?? null,
+        },
         workData: workWithCategories,
         workFields,
         workFieldsPreview,
@@ -351,8 +379,8 @@ export function renderPromptContext(contextEl, context) {
         }
         return `<code class="prompt-context-code">${escapeHtml(String(value))}</code>`;
     };
-    const renderRow = (label, value) => `
-        <div class="prompt-context-item">
+    const renderRow = (label, value, className = '') => `
+        <div class="prompt-context-item${className ? ` ${className}` : ''}">
             <div class="prompt-context-key">${escapeHtml(label)}</div>
             <div class="prompt-context-value">${renderValue(value)}</div>
         </div>
@@ -388,7 +416,10 @@ export function renderPromptContext(contextEl, context) {
     const inheritedLayoutDirectory = context?.inheritedLayoutDirectory || '';
     const layoutAssetsPreview = context?.layoutAssetsPreview || '';
     const editorDraft = (context?.editorDraft && typeof context.editorDraft === 'object') ? context.editorDraft : null;
-    const workData = (context?.workData && typeof context.workData === 'object') ? context.workData : {};
+    const rootData = (context?.root && typeof context.root === 'object') ? context.root : {};
+    const workData = (context?.work && typeof context.work === 'object')
+        ? context.work
+        : ((context?.workData && typeof context.workData === 'object') ? context.workData : {});
     const workFields = Array.isArray(context?.workFields) ? context.workFields : [];
     const workFieldsPreview = context?.workFieldsPreview || '';
     const refPreview = context?.refPreview || '';
@@ -397,12 +428,15 @@ export function renderPromptContext(contextEl, context) {
     const layoutAssetItems = layoutAssetsPreview ? layoutAssetsPreview.split(' | ').filter(Boolean) : [];
     contextEl.innerHTML = `
         <div class="prompt-context-grid">
+            ${Object.keys(rootData).length ? renderRow('root', rootData, 'prompt-context-item--accent') : ''}
+            ${Object.keys(workData).length ? renderRow('work', workData, 'prompt-context-item--accent') : ''}
             ${context?.isLayout ? renderRow('virtualPath', virtualPath) : ''}
             ${context?.isLayout && layoutPreset ? renderRow('layoutPreset', layoutPreset) : ''}
             ${context?.isLayout && layoutSharedName ? renderRow('layoutSharedName', layoutSharedName) : ''}
             ${renderRow('pageLink', pageLink)}
             ${renderRow('path', path)}
             ${renderRow('name', name)}
+            ${context?.title ? renderRow('title', context.title) : ''}
             ${renderRow('viewUrl', viewUrl)}
             ${templateTarget ? renderRow('templateTarget', templateTarget) : ''}
             ${layoutTemplateTarget ? renderRow('layoutTemplateTarget', layoutTemplateTarget) : ''}

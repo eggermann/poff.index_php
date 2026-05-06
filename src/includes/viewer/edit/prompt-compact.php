@@ -203,6 +203,32 @@ function cmsPromptCompactContext(array $context): array
         }
         $current['outerWrapper'] = $outerWrapper;
     }
+    if (is_array($current['root'] ?? null)) {
+        $root = [];
+        foreach (['title', 'name', 'folderName', 'path', 'slug', 'description', 'type'] as $key) {
+            if (!array_key_exists($key, $current['root'])) {
+                continue;
+            }
+            $value = $current['root'][$key];
+            $root[$key] = is_string($value)
+                ? cmsPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['root'] = $root;
+    }
+    if (is_array($current['work'] ?? null)) {
+        $work = [];
+        foreach (['title', 'name', 'path', 'slug', 'description', 'type', 'kind'] as $key) {
+            if (!array_key_exists($key, $current['work'])) {
+                continue;
+            }
+            $value = $current['work'][$key];
+            $work[$key] = is_string($value)
+                ? cmsPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['work'] = $work;
+    }
     if (is_array($current['workFields'] ?? null)) {
         $workFields = [];
         foreach (array_slice($current['workFields'], 0, 12) as $field) {

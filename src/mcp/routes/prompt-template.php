@@ -607,16 +607,66 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     $layoutValue = is_array($config['work'] ?? null) && is_array($config['work']['layout'] ?? null)
         ? $config['work']['layout']
         : [];
+    $rootTitle = trim((string) ($config['title'] ?? $currentName));
+    if ($rootTitle === '') {
+        $rootTitle = $currentName;
+    }
+    $rootFolderName = trim((string) ($config['folderName'] ?? $currentName));
+    if ($rootFolderName === '') {
+        $rootFolderName = $currentName;
+    }
+    $rootSlug = trim((string) ($config['slug'] ?? ''));
+    if ($rootSlug === '') {
+        $rootSlug = PoffConfig::slugify($rootFolderName);
+    }
+    $rootDescription = trim((string) ($config['description'] ?? ''));
+    $workSource = is_array($config['work'] ?? null) ? $config['work'] : [];
+    $workTitle = trim((string) ($workSource['title'] ?? $currentName));
+    if ($workTitle === '') {
+        $workTitle = $currentName;
+    }
+    $workName = trim((string) ($workSource['name'] ?? $currentName));
+    if ($workName === '') {
+        $workName = $currentName;
+    }
+    $workSlug = trim((string) ($workSource['slug'] ?? ''));
+    if ($workSlug === '') {
+        $workSlug = $rootSlug;
+    }
+    $workDescription = trim((string) ($workSource['description'] ?? $rootDescription));
+    $workType = trim((string) ($workSource['type'] ?? 'folder'));
+    if ($workType === '') {
+        $workType = 'folder';
+    }
 
     $context = [
         'current' => array_merge([
             'targetType' => 'folder',
             'sectionPartial' => 'works',
+            'title' => $rootTitle,
             'name' => $currentName,
             'path' => $normalizedPath,
             'templateTarget' => mcpPromptTemplateTarget($normalizedPath),
             'layoutTemplateTarget' => mcpPromptLayoutTemplateTarget($normalizedPath),
             'outerWrapper' => mcpPromptOuterWrapperReference($layoutValue),
+            'root' => [
+                'title' => $rootTitle,
+                'name' => $rootFolderName,
+                'folderName' => $rootFolderName,
+                'path' => $normalizedPath,
+                'slug' => $rootSlug,
+                'description' => $rootDescription,
+                'type' => 'folder',
+            ],
+            'work' => [
+                'title' => $workTitle,
+                'name' => $workName,
+                'path' => $normalizedPath,
+                'slug' => $workSlug,
+                'description' => $workDescription,
+                'type' => $workType,
+                'kind' => $workType,
+            ],
         ], mcpPromptUrlAliases($currentPageLink, $currentAssetUrl)),
         'items' => [],
         'allItems' => [],
@@ -814,6 +864,32 @@ function mcpPromptCompactContext(array $context): array
         }
         $current['outerWrapper'] = $outerWrapper;
     }
+    if (is_array($current['root'] ?? null)) {
+        $root = [];
+        foreach (['title', 'name', 'folderName', 'path', 'slug', 'description', 'type'] as $key) {
+            if (!array_key_exists($key, $current['root'])) {
+                continue;
+            }
+            $value = $current['root'][$key];
+            $root[$key] = is_string($value)
+                ? mcpPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['root'] = $root;
+    }
+    if (is_array($current['work'] ?? null)) {
+        $work = [];
+        foreach (['title', 'name', 'path', 'slug', 'description', 'type', 'kind'] as $key) {
+            if (!array_key_exists($key, $current['work'])) {
+                continue;
+            }
+            $value = $current['work'][$key];
+            $work[$key] = is_string($value)
+                ? mcpPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['work'] = $work;
+    }
 
     $items = array_values(array_filter(array_map(
         static fn(array $ref): array => mcpPromptCompactRef($ref),
@@ -868,6 +944,8 @@ function mcpPromptSystemPrompt(): string
         'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
         'Return only the JSON object (no Markdown, no fences).',
         'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+        'Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.',
+        'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
         'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',

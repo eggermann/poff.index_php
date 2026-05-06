@@ -16,6 +16,8 @@ export const legacyWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
     'Return strict JSON with a required "template" string and optional "work" field.',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
+    'Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.',
+    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
     'When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.',
     'Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.',
@@ -67,6 +69,8 @@ export const defaultLayoutSystemPrompt = [
     'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
     'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
     'Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, sectionTemplate, css, and js after filesystem, inheritance, and preset resolution.',
+    'Use current.root.title for the outer wrapper title and current.work.title for the nested item title. Keep shell vars and work vars separate when naming or copying content.',
+    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     'When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.',
     'The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.',
     'Keep the wrapped content chain active and preserve the data flow from the current item context all the way down to the inner partial. Use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.',
@@ -93,6 +97,8 @@ export const defaultLayoutSystemPrompt = [
     'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
     'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
     'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
+    'Use current.root.title for the folder shell title and current.work.title for the inner item title when the folder prompt needs both levels.',
+    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',
 ].join('\n');
 

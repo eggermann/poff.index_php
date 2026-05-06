@@ -96,6 +96,37 @@ function cmsBuildPromptContext(
     $currentLayoutTarget = trim($activeLayoutDirectory, "/\\") . '/template.hbs';
     $layoutBasePath = $activeLayoutDirectory;
     $layoutSectionBasePath = trim((string) ($layoutValue['sectionDirectory'] ?? $layoutBasePath), "/\\");
+    $rootTitle = trim((string) ($config['title'] ?? $currentName));
+    if ($rootTitle === '') {
+        $rootTitle = $currentName;
+    }
+    $rootFolderName = trim((string) ($config['folderName'] ?? $currentName));
+    if ($rootFolderName === '') {
+        $rootFolderName = $currentName;
+    }
+    $rootSlug = trim((string) ($config['slug'] ?? ''));
+    if ($rootSlug === '') {
+        $rootSlug = PoffConfig::slugify($rootFolderName);
+    }
+    $rootDescription = trim((string) ($config['description'] ?? ''));
+    $workSource = is_array($config['work'] ?? null) ? $config['work'] : [];
+    $workTitle = trim((string) ($workSource['title'] ?? $currentName));
+    if ($workTitle === '') {
+        $workTitle = $currentName;
+    }
+    $workName = trim((string) ($workSource['name'] ?? $currentName));
+    if ($workName === '') {
+        $workName = $currentName;
+    }
+    $workSlug = trim((string) ($workSource['slug'] ?? ''));
+    if ($workSlug === '') {
+        $workSlug = $rootSlug;
+    }
+    $workDescription = trim((string) ($workSource['description'] ?? $rootDescription));
+    $workType = trim((string) ($workSource['type'] ?? ($currentIsFile ? 'file' : 'folder')));
+    if ($workType === '') {
+        $workType = $currentIsFile ? 'file' : 'folder';
+    }
     $layoutAssets = [];
     foreach (($layoutValue['assets'] ?? []) as $asset) {
         if (!is_array($asset) || !isset($asset['path'])) {
@@ -117,6 +148,7 @@ function cmsBuildPromptContext(
             'targetType' => $isLayoutTarget ? 'layout' : $subjectType,
             'subjectType' => $subjectType,
             'layoutPreset' => $normalizedLayoutPreset,
+            'title' => $rootTitle,
             'sectionPartial' => $currentSection,
             'name' => $currentName,
             'path' => $currentPath,
@@ -139,6 +171,24 @@ function cmsBuildPromptContext(
             'layoutSectionBaseHref' => cmsPromptEncodeRelativePath($layoutSectionBasePath),
             'layoutAssets' => $layoutAssets,
             'outerWrapper' => cmsPromptOuterWrapperReference($layoutValue, $currentSection),
+            'root' => [
+                'title' => $rootTitle,
+                'name' => $rootFolderName,
+                'folderName' => $rootFolderName,
+                'path' => $currentPath,
+                'slug' => $rootSlug,
+                'description' => $rootDescription,
+                'type' => $currentIsFile ? 'file' : 'folder',
+            ],
+            'work' => [
+                'title' => $workTitle,
+                'name' => $workName,
+                'path' => $currentPath,
+                'slug' => $workSlug,
+                'description' => $workDescription,
+                'type' => $workType,
+                'kind' => $workType,
+            ],
         ],
         'items' => [],
         'allItems' => [],

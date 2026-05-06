@@ -946,6 +946,12 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.file.current).toEqual(expect.objectContaining({
       subjectType: 'file',
       sectionTemplateTarget: '.works/viewer-file.txt.layout/work.hbs',
+      root: expect.objectContaining({
+        title: 'Viewer File',
+      }),
+      work: expect.objectContaining({
+        title: 'viewer-file.txt',
+      }),
       outerWrapper: expect.objectContaining({
         sectionPartial: 'work',
       }),
@@ -956,6 +962,12 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.folder.current).toEqual(expect.objectContaining({
       subjectType: 'folder',
       sectionTemplateTarget: 'viewer-folder/.layout/works.hbs',
+      root: expect.objectContaining({
+        title: 'Folder Preview',
+      }),
+      work: expect.objectContaining({
+        title: 'viewer-folder',
+      }),
       outerWrapper: expect.objectContaining({
         sectionPartial: 'works',
       }),

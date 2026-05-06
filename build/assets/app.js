@@ -567,10 +567,13 @@
     "You are a Handlebars (HBS) template generator for this single-page CMS.",
     'Return strict JSON with a required "template" string and optional "work" field.',
     "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
+    "Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.",
+    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
     "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
     "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
     "Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
+    "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
     "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
     "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
     "Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.",
@@ -596,6 +599,7 @@
     "Save target is works.hbs for the current folder inside the active item layout folder.",
     "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
+    "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
     "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
     "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
     "Use folder tree data and resolved refs when relevant instead of inventing paths.",
@@ -613,6 +617,8 @@
     'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
     'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
     "Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, sectionTemplate, css, and js after filesystem, inheritance, and preset resolution.",
+    "Use current.root.title for the outer wrapper title and current.work.title for the nested item title. Keep shell vars and work vars separate when naming or copying content.",
+    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     "When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.",
     "The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.",
     "Keep the wrapped content chain active and preserve the data flow from the current item context all the way down to the inner partial. Use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.",
@@ -629,6 +635,7 @@
     "When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.",
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
     "Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.",
+    "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
     "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
     "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
@@ -638,6 +645,8 @@
     "Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.",
     "Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
+    "Use current.root.title for the folder shell title and current.work.title for the inner item title when the folder prompt needs both levels.",
+    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.'
   ].join("\n");
   var defaultPromptSettings = {
@@ -895,7 +904,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       ...Object.keys(baseWork),
       "type",
       "layout",
-      "model"
+      "model",
+      "categories",
+      "category"
     ]);
     const filtered = {};
     Object.entries(work).forEach(([key, value]) => {
@@ -944,7 +955,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/work-fields.js
-  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType"]);
+  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType", "categories", "category"]);
   var SUPPORTED_WORK_FIELD_TYPES = /* @__PURE__ */ new Set(["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"]);
   var SCHEMA_NUMBER_KEYS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "step"];
   var WORK_FIELD_SCHEMA_PROFILES = {
@@ -1271,6 +1282,47 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return folderBasePath ? `${folderBasePath}/${fallbackName}` : fallbackName;
   }
+  function getDefaultWorkCategories(type = "") {
+    const normalizedType = String(type || "").trim().toLowerCase();
+    if (normalizedType === "image") {
+      return ["image", "media", "visual"];
+    }
+    if (normalizedType === "video") {
+      return ["video", "media", "motion"];
+    }
+    if (normalizedType === "audio") {
+      return ["audio", "media", "sound"];
+    }
+    if (normalizedType === "pdf") {
+      return ["pdf", "document"];
+    }
+    if (normalizedType === "text") {
+      return ["text", "document"];
+    }
+    if (normalizedType === "link") {
+      return ["link", "reference"];
+    }
+    if (normalizedType === "folder") {
+      return ["folder", "collection"];
+    }
+    return ["other"];
+  }
+  function normalizeWorkCategories(work = {}) {
+    var _a, _b;
+    const rawValue = Array.isArray(work == null ? void 0 : work.categories) ? work.categories : Array.isArray(work == null ? void 0 : work.category) ? work.category : (_b = (_a = work == null ? void 0 : work.categories) != null ? _a : work == null ? void 0 : work.category) != null ? _b : [];
+    const sourceValues = Array.isArray(rawValue) ? rawValue : String(rawValue || "").trim() ? String(rawValue).split(/\r?\n|,/) : [];
+    const categories = [];
+    const append = (value) => {
+      const normalized = String(value || "").trim().toLowerCase();
+      if (!normalized || categories.includes(normalized)) {
+        return;
+      }
+      categories.push(normalized);
+    };
+    getDefaultWorkCategories(work == null ? void 0 : work.type).forEach(append);
+    sourceValues.forEach(append);
+    return categories;
+  }
   function renderPromptHistory(container, history, streamState, options = {}) {
     if (!container) {
       return;
@@ -1332,7 +1384,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     body.innerHTML = escapeHtml(safeContent);
   }
   function buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig }) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const selection2 = typeof getActiveSelection2 === "function" ? getActiveSelection2() : { path: "", isFile: false };
     const config = typeof getConfig === "function" ? getConfig() || {} : {};
     const isLayout = !!(selection2 == null ? void 0 : selection2.isLayout);
@@ -1372,8 +1424,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const tree = Array.isArray(config == null ? void 0 : config.tree) ? config.tree : [];
     const folderBasePath = ((selection2 == null ? void 0 : selection2.isFile) ? path.split("/").slice(0, -1).join("/") : path).replace(/^\/+|\/+$/g, "");
     const ellipsis = "\u2026";
-    const workFields = extractWorkFields(work);
-    const workPreview = Object.entries(work || {}).slice(0, 6).map(([key, value]) => {
+    const workConfig = config && typeof config === "object" && config.work && typeof config.work === "object" ? config.work : {};
+    const rootTitle = String((config == null ? void 0 : config.title) || name || "").trim();
+    const rootDescription = String((config == null ? void 0 : config.description) || "").trim();
+    const rootFolderName = String((config == null ? void 0 : config.folderName) || name || "").trim();
+    const rootSlug = String((config == null ? void 0 : config.slug) || "").trim();
+    const workFields = extractWorkFields(workConfig);
+    const workWithCategories = {
+      ...workConfig,
+      categories: normalizeWorkCategories(workConfig)
+    };
+    const workPreview = Object.entries(workConfig || {}).slice(0, 6).map(([key, value]) => {
       if (key === "fields" && Array.isArray(value)) {
         const summary = summarizeWorkFields(value);
         return summary ? `fields: ${summary}` : `fields: ${value.length} item(s)`;
@@ -1422,6 +1483,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       layoutPreset,
       layoutSharedName,
       name,
+      title: rootTitle,
       pageLink: viewUrl,
       viewUrl,
       templateTarget,
@@ -1431,7 +1493,29 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       inheritedLayoutDirectory,
       layoutAssetsPreview,
       editorDraft,
-      workData: work,
+      root: {
+        title: rootTitle,
+        name: rootFolderName,
+        folderName: rootFolderName,
+        path,
+        slug: rootSlug,
+        description: rootDescription,
+        type: (selection2 == null ? void 0 : selection2.isFile) ? "file" : "folder",
+        sectionPartial: isLayout ? "layout" : isFile ? "work" : "works"
+      },
+      work: {
+        title: String((workConfig == null ? void 0 : workConfig.title) || name || rootTitle || "").trim(),
+        name: String((workConfig == null ? void 0 : workConfig.name) || name || "").trim(),
+        path,
+        slug: String((workConfig == null ? void 0 : workConfig.slug) || rootSlug || "").trim(),
+        description: String((workConfig == null ? void 0 : workConfig.description) || rootDescription || "").trim(),
+        type: String((workConfig == null ? void 0 : workConfig.type) || ((selection2 == null ? void 0 : selection2.isFile) ? "file" : "folder") || "").trim(),
+        kind: String((workConfig == null ? void 0 : workConfig.kind) || ((selection2 == null ? void 0 : selection2.isFile) ? "file" : "folder") || "").trim(),
+        categories: normalizeWorkCategories(workConfig),
+        fields: workFields,
+        layout: (_d = workWithCategories.layout) != null ? _d : null
+      },
+      workData: workWithCategories,
       workFields,
       workFieldsPreview,
       workPreview,
@@ -1475,8 +1559,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return `<code class="prompt-context-code">${escapeHtml(String(value))}</code>`;
     };
-    const renderRow = (label, value) => `
-        <div class="prompt-context-item">
+    const renderRow = (label, value, className = "") => `
+        <div class="prompt-context-item${className ? ` ${className}` : ""}">
             <div class="prompt-context-key">${escapeHtml(label)}</div>
             <div class="prompt-context-value">${renderValue(value)}</div>
         </div>
@@ -1511,7 +1595,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const inheritedLayoutDirectory = (context == null ? void 0 : context.inheritedLayoutDirectory) || "";
     const layoutAssetsPreview = (context == null ? void 0 : context.layoutAssetsPreview) || "";
     const editorDraft = (context == null ? void 0 : context.editorDraft) && typeof context.editorDraft === "object" ? context.editorDraft : null;
-    const workData = (context == null ? void 0 : context.workData) && typeof context.workData === "object" ? context.workData : {};
+    const rootData = (context == null ? void 0 : context.root) && typeof context.root === "object" ? context.root : {};
+    const workData = (context == null ? void 0 : context.work) && typeof context.work === "object" ? context.work : (context == null ? void 0 : context.workData) && typeof context.workData === "object" ? context.workData : {};
     const workFields = Array.isArray(context == null ? void 0 : context.workFields) ? context.workFields : [];
     const workFieldsPreview = (context == null ? void 0 : context.workFieldsPreview) || "";
     const refPreview = (context == null ? void 0 : context.refPreview) || "";
@@ -1520,12 +1605,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const layoutAssetItems = layoutAssetsPreview ? layoutAssetsPreview.split(" | ").filter(Boolean) : [];
     contextEl.innerHTML = `
         <div class="prompt-context-grid">
+            ${Object.keys(rootData).length ? renderRow("root", rootData, "prompt-context-item--accent") : ""}
+            ${Object.keys(workData).length ? renderRow("work", workData, "prompt-context-item--accent") : ""}
             ${(context == null ? void 0 : context.isLayout) ? renderRow("virtualPath", virtualPath) : ""}
             ${(context == null ? void 0 : context.isLayout) && layoutPreset ? renderRow("layoutPreset", layoutPreset) : ""}
             ${(context == null ? void 0 : context.isLayout) && layoutSharedName ? renderRow("layoutSharedName", layoutSharedName) : ""}
             ${renderRow("pageLink", pageLink)}
             ${renderRow("path", path)}
             ${renderRow("name", name)}
+            ${(context == null ? void 0 : context.title) ? renderRow("title", context.title) : ""}
             ${renderRow("viewUrl", viewUrl)}
             ${templateTarget ? renderRow("templateTarget", templateTarget) : ""}
             ${layoutTemplateTarget ? renderRow("layoutTemplateTarget", layoutTemplateTarget) : ""}
@@ -2936,11 +3024,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const systemPrompt = mode === "layout" ? settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt : mode === "folder" ? settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt : settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt;
     const promptTargetCopy = mode === "layout" ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : mode === "folder" ? "Prompt edits the wrapped works.hbs partial for the current folder." : "Prompt edits the wrapped work.hbs partial for the current file.";
     const footerCopy = mode === "layout" ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || "work.hbs")}</code>.` : mode === "folder" ? "Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders." : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.";
-    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : mode === "folder" ? "<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>" : "<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>";
+    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>root.*</code> is the shell-level layout data and <code>work.*</code> is the inner item data. Use <code>root.title</code> for the wrapper title and <code>work.title</code> for the item title.</div><div><code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : mode === "folder" ? "<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>" : "<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>";
     const editableCopy = mode === "layout" ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.&lt;name&gt;</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.&lt;name&gt;</strong>';
-    const placeholderCopy = mode === "layout" ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+    const placeholderCopy = mode === "layout" ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{root.title}}, {{root.folderName}}, {{work.title}}, {{work.name}}, {{linkUrl}}, {{slug}}</div>
                         <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
+                        <div>Example context JSON: <code>{"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}</code></div>
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : mode === "folder" ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
                         <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                         <div>{{> work}}, {{work.key}}, layout.*</div>`;
@@ -3537,6 +3626,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
                 <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
                 <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
+                <div class="edit-layout-summary-line">Prompt context separates <code>root.title</code> for the layout shell from <code>work.title</code> for the nested item.</div>
             </div>
             <div class="edit-inline-actions edit-layout-header-actions">
                 <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>

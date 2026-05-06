@@ -371,6 +371,11 @@
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.9);
 }
+.prompt-context-item--accent {
+    border-color: #93c5fd;
+    background: linear-gradient(180deg, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.96));
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.08);
+}
 .prompt-context-key {
     font-weight: 700;
     color: #0f172a;
