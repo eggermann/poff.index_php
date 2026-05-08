@@ -31,11 +31,16 @@ class PoffConfig
         }
     }
 
-    private static function defaultWork(string $kind, ?string $mime = null): array
+    private static function defaultWork(string $kind, ?string $mime = null, ?string $fileName = null): array
     {
-        $work = Worktype::definition($kind, $mime);
+        $templateKey = Worktype::suggestedWorktypeKey($kind, $mime, $fileName);
+        $work = Worktype::definition($templateKey, $mime);
         $section = $kind === 'folder' ? 'works' : 'work';
         $work['layout'] = Worktype::normalizeLayout($work['layout'] ?? null, $section);
+        if (!isset($work['template']) || trim((string) $work['template']) === '') {
+            $work['template'] = $templateKey;
+        }
+        $work['type'] = $work['type'] ?? $kind;
 
         return $work;
     }
@@ -140,7 +145,7 @@ class PoffConfig
         $base['hash'] = $hash;
         $base['updatedAt'] = $now;
         $base['id'] = self::generateId();
-        $base['work'] = self::defaultWork($kind, $mime);
+        $base['work'] = self::defaultWork($kind, $mime, $fileName);
 
         return $base;
     }
@@ -348,7 +353,7 @@ class PoffConfig
         }
 
         $data = $defaults;
-        $workDefault = self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null);
+        $workDefault = self::defaultWork($data['kind'] ?? 'other', $data['mimeType'] ?? null, $fileName);
         $existingWork = [];
         $forceWrite = false;
         if (is_array($existing)) {

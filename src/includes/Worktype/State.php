@@ -13,4 +13,5 @@ trait WorktypeStateTrait
     private static bool $bundleLoaded = false;
     private static array $fileDefinitions = [];
     private static array $fileTemplates = [];
+    private static array $worktypeCatalog = [];
 }

@@ -9,11 +9,23 @@ function renderFileViewer(string $relativePath, string $fullPath): void
 
     $type = detectFileType($fullPath);
     $mimeType = MediaType::detectMimeType($fullPath, basename($fullPath));
-    $workDefaults = Worktype::definition($type, $mimeType);
     $workData = (isset($fileConfig['work']) && is_array($fileConfig['work'])) ? $fileConfig['work'] : [];
+    $workTemplateKey = trim((string) ($workData['template'] ?? ''));
+    $workDefinitionKey = $workTemplateKey !== '' ? $workTemplateKey : $type;
+    $workDefaults = Worktype::definition($workDefinitionKey, $mimeType);
     $work = array_merge($workDefaults, $workData);
+    if ($workTemplateKey === '' && isset($workDefaults['template']) && is_string($workDefaults['template'])) {
+        $work['template'] = $workDefaults['template'];
+    }
+    $work['type'] = $work['type'] ?? $type;
     if (class_exists('PoffConfig')) {
         $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, true, 'work');
+    }
+    if ($workTemplateKey !== '') {
+        $sectionTemplate = Worktype::template($workTemplateKey);
+        if (is_string($sectionTemplate) && trim($sectionTemplate) !== '') {
+            $work['layout']['sectionTemplate'] = $sectionTemplate;
+        }
     }
 
     $linkUrl = null;

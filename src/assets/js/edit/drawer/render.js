@@ -1,5 +1,50 @@
 import { escapeHtml } from '../../core/utils.js';
 
+function groupWorktypeChoices(choices = []) {
+    return Array.isArray(choices)
+        ? choices.reduce((groups, choice) => {
+            const group = String(choice?.kind || 'other').trim() || 'other';
+            if (!groups[group]) {
+                groups[group] = [];
+            }
+            groups[group].push(choice);
+            return groups;
+        }, {})
+        : {};
+}
+
+function renderWorktypeSelect(config = {}) {
+    const catalog = config?.workTemplateCatalog && typeof config.workTemplateCatalog === 'object'
+        ? config.workTemplateCatalog
+        : null;
+    const choices = Array.isArray(catalog?.choices) ? catalog.choices : [];
+    const selectedValue = String(config?.work?.template || catalog?.selected || config?.work?.type || '').trim();
+    const groups = groupWorktypeChoices(choices);
+    const groupEntries = Object.entries(groups);
+    if (!groupEntries.length) {
+        return `<input class="form-input" id="edit-work-type" type="text" name="work_template" value="${escapeHtml(selectedValue)}">`;
+    }
+
+    return `
+        <select class="form-select" id="edit-work-type" name="work_template">
+            ${groupEntries.map(([group, groupChoices]) => `
+                <optgroup label="${escapeHtml(group)}">
+                    ${groupChoices.map((choice) => `
+                        <option value="${escapeHtml(choice.value || '')}" data-kind="${escapeHtml(choice.kind || group)}" ${String(choice.value || '') === selectedValue ? 'selected' : ''}>
+                            ${escapeHtml(choice.label || choice.value || group)}
+                        </option>
+                    `).join('')}
+                </optgroup>
+            `).join('')}
+        </select>
+        <div class="small-note">
+            ${catalog?.detectedMime
+                ? `Detected ${escapeHtml(catalog.detectedMime)}${catalog.detectedExtension ? ` · .${escapeHtml(catalog.detectedExtension)}` : ''} · showing ${escapeHtml(catalog.detectedKind || 'current')} templates`
+                : 'Template is picked from the available registry.'}
+        </div>
+    `;
+}
+
 export function renderDrawerTreeHtml(config, status) {
     if (status?.target === 'file') {
         return '';
@@ -41,10 +86,10 @@ export function renderEditDrawerMarkup({ config, status, treeHtml }) {
             </div>
             <div class="edit-grid edit-grid-cols">
                 <div>
-                    <label class="edit-label" for="edit-work-type">Work Type</label>
-                    <input class="form-input" id="edit-work-type" type="text" name="work_type" value="${escapeHtml((config?.work || {}).type || '')}">
+                    <label class="edit-label" for="edit-work-type">Work Template</label>
+                    ${renderWorktypeSelect(config)}
                 </div>
-                <div class="small-note">Use <strong>Change layout</strong> for layout source, inheritance, and wrapper/work template editing.</div>
+                <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
             ${status?.target !== 'file' ? `
             <div>

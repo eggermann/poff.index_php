@@ -213,6 +213,9 @@ function cmsParsePromptModelResult(string $raw, bool $isLayoutTarget = false): a
     if (isset($decoded['work']) && is_array($decoded['work'])) {
         $result['work'] = $decoded['work'];
     }
+    if (isset($decoded['treeVisible']) && is_array($decoded['treeVisible'])) {
+        $result['treeVisible'] = array_values(array_filter($decoded['treeVisible'], static fn(mixed $value): bool => is_scalar($value)));
+    }
 
     return $result;
 }

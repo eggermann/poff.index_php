@@ -65,7 +65,9 @@ function cmsBuildPromptContext(
     ?string $targetFile = null,
     bool $isLayoutTarget = false,
     string $layoutPreset = '',
-    array $editorDraft = []
+    array $editorDraft = [],
+    array $parentPrompt = [],
+    array $folderViewData = []
 ): array {
     $normalizedPath = trim($relativePath, "/\\");
     $currentName = $subjectType === 'file'
@@ -178,7 +180,7 @@ function cmsBuildPromptContext(
                 'path' => $currentPath,
                 'slug' => $rootSlug,
                 'description' => $rootDescription,
-                'type' => $currentIsFile ? 'file' : 'folder',
+                'type' => 'folder',
             ],
             'work' => [
                 'title' => $workTitle,
@@ -201,7 +203,38 @@ function cmsBuildPromptContext(
         'allTexts' => [],
         'allLinks' => [],
         'allOther' => [],
+        'siblingWorks' => [],
+        'siblingImages' => [],
+        'siblingVideos' => [],
+        'siblingAudio' => [],
+        'siblingPdfs' => [],
+        'siblingTexts' => [],
+        'siblingLinks' => [],
+        'siblingFolders' => [],
+        'siblingOther' => [],
     ];
+    cmsApplyParentPromptContext($context, $parentPrompt, $currentPath);
+    if ($subjectType === 'folder' && is_array($folderViewData['tree'] ?? null)) {
+        $context['current']['tree'] = $folderViewData['tree'];
+        $context['current']['workTree'] = $folderViewData['workTree'] ?? null;
+        foreach (['allItems', 'allFiles', 'allFolders', 'allImages', 'allVideos', 'allAudio', 'allPdfs', 'allTexts', 'allLinks', 'allOther'] as $key) {
+            if (array_key_exists($key, $folderViewData) && is_array($folderViewData[$key])) {
+                $context['current'][$key] = $folderViewData[$key];
+                $context[$key] = $folderViewData[$key];
+            }
+        }
+        $context['items'] = $folderViewData['tree'];
+        $context['allItems'] = $folderViewData['allItems'] ?? [];
+        $context['allFiles'] = $folderViewData['allFiles'] ?? [];
+        $context['allFolders'] = $folderViewData['allFolders'] ?? [];
+        $context['allImages'] = $folderViewData['allImages'] ?? [];
+        $context['allVideos'] = $folderViewData['allVideos'] ?? [];
+        $context['allAudio'] = $folderViewData['allAudio'] ?? [];
+        $context['allPdfs'] = $folderViewData['allPdfs'] ?? [];
+        $context['allTexts'] = $folderViewData['allTexts'] ?? [];
+        $context['allLinks'] = $folderViewData['allLinks'] ?? [];
+        $context['allOther'] = $folderViewData['allOther'] ?? [];
+    }
     if (is_array($config['work']['fields'] ?? null) && $config['work']['fields'] !== []) {
         $context['current']['workFields'] = array_values(array_filter($config['work']['fields'], static fn($field): bool => is_array($field)));
     }
@@ -218,6 +251,10 @@ function cmsBuildPromptContext(
     }
 
     if ($subjectType !== 'folder') {
+        return $context;
+    }
+
+    if (is_array($folderViewData['tree'] ?? null) && $folderViewData['tree'] !== []) {
         return $context;
     }
 
@@ -264,4 +301,106 @@ function cmsBuildPromptContext(
     }
 
     return $context;
+}
+
+function cmsPromptParentWork(array $parentConfig, string $parentRelativePath): array
+{
+    $parentPath = trim(str_replace('\\', '/', $parentRelativePath), '/');
+    $parentName = trim((string) ($parentConfig['folderName'] ?? basename($parentPath)));
+    if ($parentName === '') {
+        $parentName = $parentPath !== '' ? basename($parentPath) : 'root';
+    }
+    $parentTitle = trim((string) ($parentConfig['title'] ?? $parentName));
+    if ($parentTitle === '') {
+        $parentTitle = $parentName;
+    }
+    $parentDescription = trim((string) ($parentConfig['description'] ?? ''));
+    $parentWork = is_array($parentConfig['work'] ?? null) ? $parentConfig['work'] : [];
+    $parentType = trim((string) ($parentWork['type'] ?? 'folder'));
+    if ($parentType === '') {
+        $parentType = 'folder';
+    }
+    $parentPageLink = cmsPromptViewerUrl($parentPath, false);
+    $parentAssetUrl = cmsPromptAssetUrl($parentPath, false);
+
+    return [
+        'title' => $parentTitle,
+        'name' => $parentName,
+        'folderName' => $parentName,
+        'path' => $parentPath,
+        'slug' => (string) ($parentConfig['slug'] ?? PoffConfig::slugify($parentName)),
+        'description' => $parentDescription,
+        'type' => $parentType,
+        'kind' => $parentType,
+        'pageLink' => $parentPageLink,
+        'pageUrl' => $parentPageLink,
+        'workUrl' => $parentPageLink,
+        'viewUrl' => $parentPageLink,
+        'viewerHref' => $parentPageLink,
+        'assetUrl' => $parentAssetUrl,
+        'assetLink' => $parentAssetUrl,
+        'rawHref' => $parentAssetUrl,
+        'srcUrl' => $parentAssetUrl,
+        'sourceUrl' => $parentAssetUrl,
+    ];
+}
+
+function cmsApplyParentPromptContext(array &$context, array $parentPrompt, string $currentPath): void
+{
+    $parentConfig = is_array($parentPrompt['config'] ?? null) ? $parentPrompt['config'] : [];
+    if ($parentConfig === []) {
+        return;
+    }
+
+    $parentRelativePath = trim(str_replace('\\', '/', (string) ($parentPrompt['relativePath'] ?? '')), '/');
+    $context['current']['parentWork'] = cmsPromptParentWork($parentConfig, $parentRelativePath);
+
+    $currentNormalized = trim(str_replace('\\', '/', $currentPath), '/');
+    $currentName = basename($currentNormalized);
+    $tree = is_array($parentConfig['tree'] ?? null) ? $parentConfig['tree'] : [];
+    foreach ($tree as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $ref = cmsBuildPromptRef($parentRelativePath, $item);
+        if ($ref === null) {
+            continue;
+        }
+
+        $refPath = trim(str_replace('\\', '/', (string) ($ref['path'] ?? '')), '/');
+        $refName = trim((string) ($ref['name'] ?? ''));
+        if ($refPath === $currentNormalized || ($refName !== '' && $refName === $currentName)) {
+            continue;
+        }
+
+        $context['siblingWorks'][] = $ref;
+        if ($ref['isFolder']) {
+            $context['siblingFolders'][] = $ref;
+            continue;
+        }
+
+        switch ($ref['kind']) {
+            case 'image':
+                $context['siblingImages'][] = $ref;
+                break;
+            case 'video':
+                $context['siblingVideos'][] = $ref;
+                break;
+            case 'audio':
+                $context['siblingAudio'][] = $ref;
+                break;
+            case 'pdf':
+                $context['siblingPdfs'][] = $ref;
+                break;
+            case 'text':
+                $context['siblingTexts'][] = $ref;
+                break;
+            case 'link':
+                $context['siblingLinks'][] = $ref;
+                break;
+            default:
+                $context['siblingOther'][] = $ref;
+                break;
+        }
+    }
 }

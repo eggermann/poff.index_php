@@ -348,12 +348,19 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onSubmit: async ({ elements, statusEl, treeVisible }) => {
                 const selection = getActiveSelection();
+                const templateField = elements.work_template || elements.work_type;
+                const selectedTemplateOption = templateField?.selectedOptions && templateField.selectedOptions[0]
+                    ? templateField.selectedOptions[0]
+                    : null;
+                const selectedTemplate = (templateField?.value || '').trim();
+                const selectedKind = (selectedTemplateOption?.dataset?.kind || selectedTemplate || '').trim();
                 const payload = {
                     path: getEditTargetPath(selection),
                     link: (elements.link?.value || '').trim(),
                     url: (elements.url?.value || '').trim(),
                     work: {
-                        type: (elements.work_type?.value || '').trim(),
+                        type: selectedKind,
+                        template: selectedTemplate,
                     },
                 };
                 if (status?.target !== 'file') {

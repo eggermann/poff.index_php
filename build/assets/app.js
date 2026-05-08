@@ -572,8 +572,12 @@
     "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
     "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
     "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
-    "Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.",
+    "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.",
+    "Use work.type for the base family and work.template for the exact template variant key. If the item is a movie or similar autoplay candidate, prefer a matching video variant when one exists.",
     "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
+    "Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.",
+    'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
+    'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
     "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
     "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
     "Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.",
@@ -1222,7 +1226,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return ["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"];
   }
 
-  // src/assets/js/edit/prompt/render.js
+  // src/assets/js/edit/prompt/normalize/link.js
   function isExternalPromptLink(value = "") {
     const trimmed = String(value || "").trim();
     if (!trimmed) {
@@ -1282,6 +1286,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return folderBasePath ? `${folderBasePath}/${fallbackName}` : fallbackName;
   }
+
+  // src/assets/js/edit/prompt/normalize/categories.js
   function getDefaultWorkCategories(type = "") {
     const normalizedType = String(type || "").trim().toLowerCase();
     if (normalizedType === "image") {
@@ -1323,66 +1329,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     sourceValues.forEach(append);
     return categories;
   }
-  function renderPromptHistory(container, history, streamState, options = {}) {
-    if (!container) {
-      return;
-    }
-    const { forceScroll = false } = options;
-    const stickToBottom = container.scrollHeight - container.clientHeight - container.scrollTop < 24;
-    const historyStats = summarizeSerializedHistory(history);
-    if (!history || !history.length) {
-      container.innerHTML = '<div class="small-note">History payload: 0 messages, 0 chars.</div><div class="small-note">No messages yet.</div>';
-      return;
-    }
-    container.innerHTML = history.map((msg) => {
-      const role = (msg.role || "user").toLowerCase();
-      const isStreaming = streamState && streamState.index === msg._index;
-      const content = isStreaming ? streamState.text : msg.content;
-      const safeContent = content || "";
-      const snapshot = (msg == null ? void 0 : msg.templateSnapshot) && typeof msg.templateSnapshot === "object" ? msg.templateSnapshot : null;
-      const snapshotParts = [];
-      if (snapshot) {
-        if (typeof snapshot.targetType === "string" && snapshot.targetType) {
-          snapshotParts.push(`target: ${snapshot.targetType}`);
-        }
-        if (typeof snapshot.templateLength === "number" && snapshot.templateLength > 0) {
-          snapshotParts.push(`template: ${snapshot.templateLength} chars`);
-        }
-        if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
-          snapshotParts.push(`fields: ${snapshot.workFieldNames.join(", ")}`);
-        }
-        if (typeof snapshot.cssLength === "number" && snapshot.cssLength > 0) {
-          snapshotParts.push(`css: ${snapshot.cssLength}`);
-        }
-        if (typeof snapshot.jsLength === "number" && snapshot.jsLength > 0) {
-          snapshotParts.push(`js: ${snapshot.jsLength}`);
-        }
-      }
-      return `
-            <div class="prompt-message prompt-message-${role}">
-                <span class="prompt-message-role">${escapeHtml(role)}:</span>
-                <span class="prompt-message-content">${escapeHtml(safeContent)}${isStreaming ? '<span class="stream-cursor"></span>' : ""}</span>
-                ${snapshotParts.length ? `<div class="small-note prompt-message-meta">${escapeHtml(snapshotParts.join(" | "))}</div>` : ""}
-            </div>
-        `;
-    }).join("");
-    container.innerHTML = `<div class="small-note">History payload: ${historyStats.count} messages, ${historyStats.chars} chars.</div>${container.innerHTML}`;
-    if (forceScroll || stickToBottom) {
-      container.scrollTop = container.scrollHeight;
-    }
-  }
-  function renderPromptSummary(summaryEl, content) {
-    if (!summaryEl) {
-      return;
-    }
-    const safeContent = content || "Waiting for response...";
-    const body = summaryEl.querySelector(".prompt-summary-body");
-    if (!body) {
-      summaryEl.innerHTML = `<div class="prompt-summary-title">Template summary</div><div class="prompt-summary-body">${escapeHtml(safeContent)}</div>`;
-      return;
-    }
-    body.innerHTML = escapeHtml(safeContent);
-  }
+
+  // src/assets/js/edit/prompt/build/context.js
   function buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig }) {
     var _a, _b, _c, _d;
     const selection2 = typeof getActiveSelection2 === "function" ? getActiveSelection2() : { path: "", isFile: false };
@@ -1522,65 +1470,69 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       refPreview
     };
   }
-  function renderPromptContext(contextEl, context) {
-    if (!contextEl) {
-      return;
+
+  // src/assets/js/edit/prompt/render/context.js
+  function renderValue(value = "", depth = 0) {
+    if (value === null || value === void 0 || value === "") {
+      return '<code class="prompt-context-code">-</code>';
     }
-    const renderValue = (value = "", depth = 0) => {
-      if (value === null || value === void 0 || value === "") {
-        return '<code class="prompt-context-code">-</code>';
+    if (Array.isArray(value)) {
+      const filtered = value.filter((item) => item !== null && item !== void 0 && item !== "");
+      if (!filtered.length) {
+        return '<code class="prompt-context-code">[]</code>';
       }
-      if (Array.isArray(value)) {
-        const filtered = value.filter((item) => item !== null && item !== void 0 && item !== "");
-        if (!filtered.length) {
-          return '<code class="prompt-context-code">[]</code>';
-        }
-        return `
-                <div class="prompt-context-list prompt-context-list--nested">
-                    ${filtered.map((item) => `<div class="prompt-context-list-item">${renderValue(item, depth + 1)}</div>`).join("")}
-                </div>
-            `;
+      return `
+            <div class="prompt-context-list prompt-context-list--nested">
+                ${filtered.map((item) => `<div class="prompt-context-list-item">${renderValue(item, depth + 1)}</div>`).join("")}
+            </div>
+        `;
+    }
+    if (typeof value === "object") {
+      const entries = Object.entries(value).filter(([, entryValue]) => entryValue !== void 0);
+      if (!entries.length) {
+        return '<code class="prompt-context-code">{}</code>';
       }
-      if (typeof value === "object") {
-        const entries = Object.entries(value).filter(([, entryValue]) => entryValue !== void 0);
-        if (!entries.length) {
-          return '<code class="prompt-context-code">{}</code>';
-        }
-        return `
-                <div class="prompt-context-object${depth > 0 ? " prompt-context-object--nested" : ""}">
-                    ${entries.map(([entryKey, entryValue]) => `
-                        <div class="prompt-context-object-row">
-                            <div class="prompt-context-object-key">${escapeHtml(entryKey)}</div>
-                            <div class="prompt-context-object-value">${renderValue(entryValue, depth + 1)}</div>
-                        </div>
-                    `).join("")}
-                </div>
-            `;
-      }
-      return `<code class="prompt-context-code">${escapeHtml(String(value))}</code>`;
-    };
-    const renderRow = (label, value, className = "") => `
+      return `
+            <div class="prompt-context-object${depth > 0 ? " prompt-context-object--nested" : ""}">
+                ${entries.map(([entryKey, entryValue]) => `
+                    <div class="prompt-context-object-row">
+                        <div class="prompt-context-object-key">${escapeHtml(entryKey)}</div>
+                        <div class="prompt-context-object-value">${renderValue(entryValue, depth + 1)}</div>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
+    return `<code class="prompt-context-code">${escapeHtml(String(value))}</code>`;
+  }
+  function renderRow(label, value, className = "") {
+    return `
         <div class="prompt-context-item${className ? ` ${className}` : ""}">
             <div class="prompt-context-key">${escapeHtml(label)}</div>
             <div class="prompt-context-value">${renderValue(value)}</div>
         </div>
     `;
-    const renderList = (label, values = []) => {
-      const filtered = Array.isArray(values) ? values.filter(Boolean) : [];
-      if (!filtered.length) {
-        return "";
-      }
-      return `
-            <div class="prompt-context-item">
-                <div class="prompt-context-key">${escapeHtml(label)}</div>
-                <div class="prompt-context-value">
-                    <div class="prompt-context-list">
-                        ${filtered.map((value) => `<div class="prompt-context-list-item">${renderValue(value)}</div>`).join("")}
-                    </div>
+  }
+  function renderList(label, values = []) {
+    const filtered = Array.isArray(values) ? values.filter(Boolean) : [];
+    if (!filtered.length) {
+      return "";
+    }
+    return `
+        <div class="prompt-context-item">
+            <div class="prompt-context-key">${escapeHtml(label)}</div>
+            <div class="prompt-context-value">
+                <div class="prompt-context-list">
+                    ${filtered.map((value) => `<div class="prompt-context-list-item">${renderValue(value)}</div>`).join("")}
                 </div>
             </div>
-        `;
-    };
+        </div>
+    `;
+  }
+  function renderPromptContext(contextEl, context) {
+    if (!contextEl) {
+      return;
+    }
     const path = (context == null ? void 0 : context.path) || "";
     const virtualPath = (context == null ? void 0 : context.virtualPath) || "";
     const layoutPreset = (context == null ? void 0 : context.layoutPreset) || "";
@@ -1628,6 +1580,68 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         ${workFieldsPreview ? renderRow("work.fields", workFields) : ""}
         ${Object.keys(workData).length ? renderRow("work.*", workData) : ""}
     `;
+  }
+
+  // src/assets/js/edit/prompt/render/history.js
+  function renderPromptHistory(container, history, streamState, options = {}) {
+    if (!container) {
+      return;
+    }
+    const { forceScroll = false } = options;
+    const stickToBottom = container.scrollHeight - container.clientHeight - container.scrollTop < 24;
+    const historyStats = summarizeSerializedHistory(history);
+    if (!history || !history.length) {
+      container.innerHTML = '<div class="small-note">History payload: 0 messages, 0 chars.</div><div class="small-note">No messages yet.</div>';
+      return;
+    }
+    container.innerHTML = history.map((msg) => {
+      const role = (msg.role || "user").toLowerCase();
+      const isStreaming = streamState && streamState.index === msg._index;
+      const content = isStreaming ? streamState.text : msg.content;
+      const safeContent = content || "";
+      const snapshot = (msg == null ? void 0 : msg.templateSnapshot) && typeof msg.templateSnapshot === "object" ? msg.templateSnapshot : null;
+      const snapshotParts = [];
+      if (snapshot) {
+        if (typeof snapshot.targetType === "string" && snapshot.targetType) {
+          snapshotParts.push(`target: ${snapshot.targetType}`);
+        }
+        if (typeof snapshot.templateLength === "number" && snapshot.templateLength > 0) {
+          snapshotParts.push(`template: ${snapshot.templateLength} chars`);
+        }
+        if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
+          snapshotParts.push(`fields: ${snapshot.workFieldNames.join(", ")}`);
+        }
+        if (typeof snapshot.cssLength === "number" && snapshot.cssLength > 0) {
+          snapshotParts.push(`css: ${snapshot.cssLength}`);
+        }
+        if (typeof snapshot.jsLength === "number" && snapshot.jsLength > 0) {
+          snapshotParts.push(`js: ${snapshot.jsLength}`);
+        }
+      }
+      return `
+            <div class="prompt-message prompt-message-${role}">
+                <span class="prompt-message-role">${escapeHtml(role)}:</span>
+                <span class="prompt-message-content">${escapeHtml(safeContent)}${isStreaming ? '<span class="stream-cursor"></span>' : ""}</span>
+                ${snapshotParts.length ? `<div class="small-note prompt-message-meta">${escapeHtml(snapshotParts.join(" | "))}</div>` : ""}
+            </div>
+        `;
+    }).join("");
+    container.innerHTML = `<div class="small-note">History payload: ${historyStats.count} messages, ${historyStats.chars} chars.</div>${container.innerHTML}`;
+    if (forceScroll || stickToBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+  function renderPromptSummary(summaryEl, content) {
+    if (!summaryEl) {
+      return;
+    }
+    const safeContent = content || "Waiting for response...";
+    const body = summaryEl.querySelector(".prompt-summary-body");
+    if (!body) {
+      summaryEl.innerHTML = `<div class="prompt-summary-title">Template summary</div><div class="prompt-summary-body">${escapeHtml(safeContent)}</div>`;
+      return;
+    }
+    body.innerHTML = escapeHtml(safeContent);
   }
 
   // src/assets/js/edit/prompt/stream.js
@@ -2754,10 +2768,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             if (layoutNameField && !layoutNameField.value.trim()) {
               layoutNameField.value = "poff-layout";
             }
-            if (nextWork && typeof nextWork.type === "string") {
+            if (nextWork && (typeof nextWork.template === "string" || typeof nextWork.type === "string")) {
               const workTypeField = drawerForm.querySelector("#edit-work-type");
               if (workTypeField) {
-                workTypeField.value = nextWork.type;
+                workTypeField.value = nextWork.template || nextWork.type;
               }
             }
           }
@@ -2788,6 +2802,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           if (persistedWork && Object.keys(persistedWork).length) {
             savePayload.work = persistedWork;
+          }
+          if (Array.isArray(response == null ? void 0 : response.treeVisible)) {
+            savePayload.treeVisible = response.treeVisible;
           }
           await saveConfig(savePayload, statusEl);
           renderContext();
@@ -2909,6 +2926,43 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/drawer/render.js
+  function groupWorktypeChoices(choices = []) {
+    return Array.isArray(choices) ? choices.reduce((groups, choice) => {
+      const group = String((choice == null ? void 0 : choice.kind) || "other").trim() || "other";
+      if (!groups[group]) {
+        groups[group] = [];
+      }
+      groups[group].push(choice);
+      return groups;
+    }, {}) : {};
+  }
+  function renderWorktypeSelect(config = {}) {
+    var _a, _b;
+    const catalog = (config == null ? void 0 : config.workTemplateCatalog) && typeof config.workTemplateCatalog === "object" ? config.workTemplateCatalog : null;
+    const choices = Array.isArray(catalog == null ? void 0 : catalog.choices) ? catalog.choices : [];
+    const selectedValue = String(((_a = config == null ? void 0 : config.work) == null ? void 0 : _a.template) || (catalog == null ? void 0 : catalog.selected) || ((_b = config == null ? void 0 : config.work) == null ? void 0 : _b.type) || "").trim();
+    const groups = groupWorktypeChoices(choices);
+    const groupEntries = Object.entries(groups);
+    if (!groupEntries.length) {
+      return `<input class="form-input" id="edit-work-type" type="text" name="work_template" value="${escapeHtml(selectedValue)}">`;
+    }
+    return `
+        <select class="form-select" id="edit-work-type" name="work_template">
+            ${groupEntries.map(([group, groupChoices]) => `
+                <optgroup label="${escapeHtml(group)}">
+                    ${groupChoices.map((choice) => `
+                        <option value="${escapeHtml(choice.value || "")}" data-kind="${escapeHtml(choice.kind || group)}" ${String(choice.value || "") === selectedValue ? "selected" : ""}>
+                            ${escapeHtml(choice.label || choice.value || group)}
+                        </option>
+                    `).join("")}
+                </optgroup>
+            `).join("")}
+        </select>
+        <div class="small-note">
+            ${(catalog == null ? void 0 : catalog.detectedMime) ? `Detected ${escapeHtml(catalog.detectedMime)}${catalog.detectedExtension ? ` \xB7 .${escapeHtml(catalog.detectedExtension)}` : ""} \xB7 showing ${escapeHtml(catalog.detectedKind || "current")} templates` : "Template is picked from the available registry."}
+        </div>
+    `;
+  }
   function renderDrawerTreeHtml(config, status) {
     if ((status == null ? void 0 : status.target) === "file") {
       return "";
@@ -2947,10 +3001,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             </div>
             <div class="edit-grid edit-grid-cols">
                 <div>
-                    <label class="edit-label" for="edit-work-type">Work Type</label>
-                    <input class="form-input" id="edit-work-type" type="text" name="work_type" value="${escapeHtml(((config == null ? void 0 : config.work) || {}).type || "")}">
+                    <label class="edit-label" for="edit-work-type">Work Template</label>
+                    ${renderWorktypeSelect(config)}
                 </div>
-                <div class="small-note">Use <strong>Change layout</strong> for layout source, inheritance, and wrapper/work template editing.</div>
+                <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
             ${(status == null ? void 0 : status.target) !== "file" ? `
             <div>
@@ -3031,8 +3085,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
                         <div>Example context JSON: <code>{"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}</code></div>
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : mode === "folder" ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
-                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> work}}, {{work.key}}, layout.*</div>`;
+                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>
+                        <div>Parent/sibling prompt refs: current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks. Sibling refs are same-folder only.</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>`;
     const inputPlaceholder = mode === "layout" ? "Describe the layout you want..." : mode === "folder" ? "Describe the folder component you want..." : "Describe the file component you want...";
     const provider = settings.provider === "openai" ? "openai" : settings.provider === "gemini" ? "gemini" : "local";
     return `
@@ -4914,12 +4969,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onSubmit: async ({ elements: elements3, statusEl, treeVisible }) => {
           var _a, _b, _c;
           const selection2 = getActiveSelection();
+          const templateField = elements3.work_template || elements3.work_type;
+          const selectedTemplateOption = (templateField == null ? void 0 : templateField.selectedOptions) && templateField.selectedOptions[0] ? templateField.selectedOptions[0] : null;
+          const selectedTemplate = ((templateField == null ? void 0 : templateField.value) || "").trim();
+          const selectedKind = (((_a = selectedTemplateOption == null ? void 0 : selectedTemplateOption.dataset) == null ? void 0 : _a.kind) || selectedTemplate || "").trim();
           const payload = {
             path: getEditTargetPath(selection2),
-            link: (((_a = elements3.link) == null ? void 0 : _a.value) || "").trim(),
-            url: (((_b = elements3.url) == null ? void 0 : _b.value) || "").trim(),
+            link: (((_b = elements3.link) == null ? void 0 : _b.value) || "").trim(),
+            url: (((_c = elements3.url) == null ? void 0 : _c.value) || "").trim(),
             work: {
-              type: (((_c = elements3.work_type) == null ? void 0 : _c.value) || "").trim()
+              type: selectedKind,
+              template: selectedTemplate
             }
           };
           if ((status == null ? void 0 : status.target) !== "file") {

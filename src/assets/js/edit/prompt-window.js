@@ -38,9 +38,10 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>`
         : mode === 'folder'
             ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
-                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>`
+                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>
+                        <div>Parent/sibling prompt refs: current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks. Sibling refs are same-folder only.</div>`
             : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> work}}, {{work.key}}, layout.*</div>`;
+                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>`;
     const inputPlaceholder = mode === 'layout'
         ? 'Describe the layout you want...'
         : mode === 'folder'

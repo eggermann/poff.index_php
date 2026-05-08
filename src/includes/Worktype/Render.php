@@ -15,6 +15,14 @@ trait WorktypeRenderTrait
         $layout = self::normalizeLayout(is_array($work) ? ($work['layout'] ?? null) : null, $kind === 'folder' ? 'works' : 'work');
         $resolvedWork = is_array($work) ? $work : [];
         $resolvedWork['layout'] = $layout;
+        $workTemplateKey = trim((string) ($resolvedWork['template'] ?? ''));
+        if ($workTemplateKey !== '' && trim((string) ($layout['sectionTemplate'] ?? '')) === '') {
+            $template = self::template($workTemplateKey);
+            if (is_string($template) && trim($template) !== '') {
+                $layout['sectionTemplate'] = $template;
+                $resolvedWork['layout'] = $layout;
+            }
+        }
         $rendered = self::renderTemplate($kind, $ctx, $resolvedWork, $layout);
         if ($rendered !== null) {
             return $rendered;

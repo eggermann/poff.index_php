@@ -165,6 +165,138 @@ trait WorktypeDefinitionsTrait
         return $base;
     }
 
+    public static function availableKinds(): array
+    {
+        self::loadBundle();
+        $keys = array_keys(self::$bundleDefinitions + self::$fileDefinitions + self::$embedded);
+        $keys = array_values(array_unique(array_filter(array_map(static fn (mixed $value): string => strtolower(trim((string) $value)), $keys), static fn (string $value): bool => $value !== '')));
+        sort($keys, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $keys;
+    }
+
+    public static function suggestedWorktypeKey(string $kind, ?string $mime = null, ?string $fileName = null): string
+    {
+        $subjectType = strtolower(trim($kind)) === 'folder' ? 'folder' : 'file';
+        $catalog = self::worktypeCatalog($mime, $fileName, null, $subjectType);
+        return (string) ($catalog['selected'] ?? $kind);
+    }
+
+    /**
+     * Build a selector catalog for work templates.
+     *
+     * @return array<string,mixed>
+     */
+    public static function worktypeCatalog(?string $mime = null, ?string $fileName = null, ?string $selected = null, ?string $subjectType = null): array
+    {
+        self::loadBundle();
+
+        $selected = strtolower(trim((string) $selected));
+        $subjectType = strtolower(trim((string) $subjectType));
+        $detectedKind = $fileName !== null && $fileName !== ''
+            ? strtolower((string) (class_exists('MediaType') ? MediaType::classifyExtension($fileName) : 'other'))
+            : '';
+        $mime = strtolower(trim((string) $mime));
+        $extension = $fileName !== null ? strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) : '';
+        $choices = [];
+
+        foreach (self::availableKinds() as $key) {
+            $definition = self::definition($key, $mime !== '' ? $mime : null);
+            $choiceKind = strtolower(trim((string) ($definition['type'] ?? $key)));
+            $choiceLabel = self::worktypeLabel($key, $definition);
+            $choiceMimes = self::normalizeChoiceList($definition['mimes'] ?? $definition['mimeTypes'] ?? null);
+            $choiceExtensions = self::normalizeChoiceList($definition['extensions'] ?? $definition['suffixes'] ?? null);
+
+            if ($subjectType === 'folder' && $choiceKind !== 'folder') {
+                continue;
+            }
+            if ($subjectType === 'file' && $choiceKind === 'folder') {
+                continue;
+            }
+
+            $score = 0;
+
+            if ($selected !== '' && $selected === $key) {
+                $score += 1000;
+            }
+            if ($choiceKind !== '' && $detectedKind !== '' && $choiceKind === $detectedKind) {
+                $score += 300;
+            }
+            if ($mime !== '' && in_array($mime, $choiceMimes, true)) {
+                $score += 600;
+            }
+            if ($extension !== '' && in_array($extension, $choiceExtensions, true)) {
+                $score += 500;
+            }
+            if (($definition['preferred'] ?? false) === true) {
+                $score += 50;
+            }
+            if ($key === $choiceKind) {
+                $score += 25;
+            }
+
+            $choices[] = [
+                'value' => $key,
+                'label' => $choiceLabel,
+                'kind' => $choiceKind ?: $key,
+                'description' => trim((string) ($definition['description'] ?? '')),
+                'mimes' => $choiceMimes,
+                'extensions' => $choiceExtensions,
+                'score' => $score,
+            ];
+        }
+
+        usort($choices, static function (array $left, array $right): int {
+            $scoreCompare = ($right['score'] ?? 0) <=> ($left['score'] ?? 0);
+            if ($scoreCompare !== 0) {
+                return $scoreCompare;
+            }
+
+            $kindCompare = strcasecmp((string) ($left['kind'] ?? ''), (string) ($right['kind'] ?? ''));
+            if ($kindCompare !== 0) {
+                return $kindCompare;
+            }
+
+            return strcasecmp((string) ($left['label'] ?? $left['value'] ?? ''), (string) ($right['label'] ?? $right['value'] ?? ''));
+        });
+
+        if ($subjectType === 'file' && $detectedKind !== '') {
+            $focusedChoices = array_values(array_filter($choices, static function (array $choice) use ($detectedKind): bool {
+                return (string) ($choice['kind'] ?? '') === $detectedKind;
+            }));
+            if ($focusedChoices !== []) {
+                $choices = $focusedChoices;
+            }
+        }
+
+        $selectedValue = '';
+        if ($selected !== '') {
+            foreach ($choices as $choice) {
+                if ((string) ($choice['value'] ?? '') === $selected) {
+                    $selectedValue = $selected;
+                    break;
+                }
+            }
+        }
+        if ($selectedValue === '' && isset($choices[0]['value'])) {
+            $selectedValue = (string) $choices[0]['value'];
+        }
+
+        foreach ($choices as &$choice) {
+            $choice['selected'] = (string) ($choice['value'] ?? '') === $selectedValue;
+            unset($choice['score']);
+        }
+        unset($choice);
+
+        return [
+            'detectedKind' => $detectedKind,
+            'detectedMime' => $mime,
+            'detectedExtension' => $extension,
+            'selected' => $selectedValue,
+            'choices' => $choices,
+        ];
+    }
+
     public static function setEmbedded(array $map): void
     {
         self::$embedded = $map;
@@ -276,5 +408,40 @@ trait WorktypeDefinitionsTrait
             'filesystem', self::FILESYSTEM_LAYOUT_NAME => self::FILESYSTEM_LAYOUT_NAME,
             default => $candidate,
         };
+    }
+
+    private static function normalizeChoiceList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            if (is_string($value) && trim($value) !== '') {
+                $value = preg_split('/\r?\n|,/', $value) ?: [];
+            } else {
+                $value = [];
+            }
+        }
+
+        $choices = [];
+        foreach ($value as $candidate) {
+            if (!is_scalar($candidate)) {
+                continue;
+            }
+            $normalized = strtolower(trim((string) $candidate));
+            if ($normalized === '' || in_array($normalized, $choices, true)) {
+                continue;
+            }
+            $choices[] = $normalized;
+        }
+
+        return $choices;
+    }
+
+    private static function worktypeLabel(string $key, array $definition): string
+    {
+        $label = trim((string) ($definition['label'] ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+
+        return ucwords(str_replace(['-', '_'], ' ', $key));
     }
 }

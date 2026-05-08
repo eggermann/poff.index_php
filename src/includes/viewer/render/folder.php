@@ -7,11 +7,22 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         $folderConfig = PoffConfig::ensure($fullPath);
     }
 
-    $workDefaults = Worktype::definition('folder');
     $workData = (isset($folderConfig['work']) && is_array($folderConfig['work'])) ? $folderConfig['work'] : [];
+    $workTemplateKey = trim((string) ($workData['template'] ?? 'folder'));
+    $workDefaults = Worktype::definition($workTemplateKey !== '' ? $workTemplateKey : 'folder');
     $work = array_merge($workDefaults, $workData);
+    if (!isset($work['template']) || trim((string) $work['template']) === '') {
+        $work['template'] = $workTemplateKey !== '' ? $workTemplateKey : 'folder';
+    }
+    $work['type'] = $work['type'] ?? 'folder';
     if (class_exists('PoffConfig')) {
         $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, false, 'works');
+    }
+    if ($workTemplateKey !== '') {
+        $sectionTemplate = Worktype::template($workTemplateKey);
+        if (is_string($sectionTemplate) && trim($sectionTemplate) !== '') {
+            $work['layout']['sectionTemplate'] = $sectionTemplate;
+        }
     }
 
     $rawName = $folderConfig['folderName'] ?? basename($fullPath);

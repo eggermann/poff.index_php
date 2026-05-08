@@ -8,6 +8,7 @@ require_once __DIR__ . '/edit/prompt-parse.php';
 require_once __DIR__ . '/edit/prompt-refs.php';
 require_once __DIR__ . '/edit/prompt-context.php';
 require_once __DIR__ . '/edit/prompt-compact.php';
+require_once __DIR__ . '/render/data.php';
 require_once __DIR__ . '/edit/upload.php';
 require_once __DIR__ . '/edit/delete.php';
 require_once __DIR__ . '/edit/reset.php';
@@ -42,6 +43,127 @@ function cmsUploadLimits(): array
         'uploadMaxBytes' => cmsIniBytes($uploadMax),
         'maxFileUploads' => (int) ini_get('max_file_uploads'),
     ];
+}
+
+function cmsWorktypeCatalogForConfig(array $config, string $subjectType, ?string $targetFile = null): array
+{
+    if (!class_exists('Worktype')) {
+        return [];
+    }
+
+    $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
+    $selected = trim((string) ($work['template'] ?? ''));
+    $mime = $subjectType === 'file'
+        ? trim((string) ($config['mimeType'] ?? ''))
+        : '';
+    $fileName = $subjectType === 'file' ? trim((string) ($targetFile ?? '')) : null;
+
+    return Worktype::worktypeCatalog($mime !== '' ? $mime : null, $fileName, $selected !== '' ? $selected : null, $subjectType);
+}
+
+function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, ?string $targetFile = null): array
+{
+    $config['workTemplateCatalog'] = cmsWorktypeCatalogForConfig($config, $subjectType, $targetFile);
+    return $config;
+}
+
+function cmsPromptParentConfig(string $rootDir, string $subjectRelativePath, string $subjectType, string $targetDir): array
+{
+    $normalizedPath = trim(str_replace('\\', '/', $subjectRelativePath), '/');
+    if ($normalizedPath === '') {
+        return [];
+    }
+
+    $parentRelativePath = dirname($normalizedPath);
+    if ($parentRelativePath === '.' || $parentRelativePath === DIRECTORY_SEPARATOR) {
+        $parentRelativePath = '';
+    }
+
+    $parentDir = $subjectType === 'file'
+        ? $targetDir
+        : dirname($targetDir);
+    $rootReal = realpath($rootDir);
+    $parentReal = realpath($parentDir);
+    if ($rootReal === false || $parentReal === false || !str_starts_with($parentReal, $rootReal)) {
+        return [];
+    }
+
+    $configPath = PoffConfig::configPath($parentReal);
+    if (!is_file($configPath)) {
+        return [];
+    }
+
+    $parentConfig = json_decode((string) file_get_contents($configPath), true);
+    if (!is_array($parentConfig)) {
+        return [];
+    }
+
+    return [
+        'relativePath' => $parentRelativePath,
+        'config' => $parentConfig,
+    ];
+}
+
+function cmsPromptFolderViewData(string $relativePath, string $fullPath, array $config, array $rootMeta): array
+{
+    if (!is_dir($fullPath)) {
+        return [];
+    }
+
+    return buildFolderViewerData($relativePath, $fullPath, $config, $rootMeta);
+}
+
+function cmsApplyParentTreeVisible(string $rootDir, string $subjectRelativePath, string $subjectType, string $targetDir, mixed $treeVisible): void
+{
+    if (!is_array($treeVisible)) {
+        return;
+    }
+
+    $parentPrompt = cmsPromptParentConfig($rootDir, $subjectRelativePath, $subjectType, $targetDir);
+    $parentConfig = is_array($parentPrompt['config'] ?? null) ? $parentPrompt['config'] : [];
+    if ($parentConfig === [] || !is_array($parentConfig['tree'] ?? null)) {
+        return;
+    }
+
+    $visibleKeys = [];
+    foreach ($treeVisible as $key) {
+        if (is_scalar($key)) {
+            $visibleKeys[trim((string) $key, "/\\")] = true;
+        }
+    }
+
+    $changed = false;
+    foreach ($parentConfig['tree'] as &$item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $key = trim((string) ($item['path'] ?? $item['name'] ?? ''), "/\\");
+        $name = trim((string) ($item['name'] ?? ''), "/\\");
+        if ($key === '' && $name === '') {
+            continue;
+        }
+        $parentRelativePath = trim(str_replace('\\', '/', (string) ($parentPrompt['relativePath'] ?? '')), '/');
+        $fullKey = trim($parentRelativePath . '/' . $key, '/');
+        $nextVisible = isset($visibleKeys[$key])
+            || isset($visibleKeys[$fullKey])
+            || ($name !== '' && isset($visibleKeys[$name]));
+        if (!array_key_exists('visible', $item) || (bool) $item['visible'] !== $nextVisible) {
+            $item['visible'] = $nextVisible;
+            $changed = true;
+        }
+    }
+    unset($item);
+
+    if (!$changed) {
+        return;
+    }
+
+    $parentDir = $subjectType === 'file'
+        ? $targetDir
+        : dirname($targetDir);
+    $parentConfig['treeHash'] = hash('sha256', json_encode($parentConfig['tree'] ?? []));
+    $parentConfig['updatedAt'] = date('c');
+    file_put_contents(PoffConfig::configPath($parentDir), json_encode($parentConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }
 
 function cmsSyncParentTreeItemMeta(string $rootDir, string $subjectRelativePath, string $subjectType, array $config): void
@@ -183,6 +305,7 @@ function cmsHandleEditAction(): void
     }
 
     if ($action === 'config') {
+        $config = cmsAnnotateConfigWorktypeCatalog($config, $subjectType, $targetFile);
         cmsJsonResponse([
             'allowed' => true,
             'target' => $isLayoutTarget ? 'layout' : $subjectType,
@@ -671,12 +794,16 @@ function cmsHandleEditAction(): void
         }
         file_put_contents($configPath, $encoded);
         cmsSyncParentTreeItemMeta($rootDir, $subjectRelativePath, $subjectType, $config);
+        if ($subjectType === 'file' && (array_key_exists('treeVisible', $data) || array_key_exists('tree_visible', $data))) {
+            cmsApplyParentTreeVisible($rootDir, $subjectRelativePath, $subjectType, $targetDir, $data['treeVisible'] ?? $data['tree_visible'] ?? null);
+        }
 
         $responseConfig = PoffConfig::hydrateConfigLayout(
             $config,
             $targetDir,
             $subjectType === 'file' ? (string) $targetFile : null
         );
+        $responseConfig = cmsAnnotateConfigWorktypeCatalog($responseConfig, $subjectType, $targetFile);
 
         cmsJsonResponse([
             'allowed' => true,
@@ -721,7 +848,30 @@ function cmsHandleEditAction(): void
             ]);
         }
 
-        $promptContext = cmsBuildPromptContext($subjectRelativePath, $subjectType, $config, $targetFile, $promptIsLayoutTarget, $layoutPreset, $editorDraft);
+        $folderViewData = $subjectType === 'folder'
+            ? cmsPromptFolderViewData(
+                $subjectRelativePath,
+                $targetDir,
+                $config,
+                [
+                    'name' => (string) ($config['folderName'] ?? basename($subjectRelativePath)),
+                    'title' => (string) ($config['title'] ?? $config['folderName'] ?? basename($subjectRelativePath)),
+                    'slug' => (string) ($config['slug'] ?? PoffConfig::slugify((string) ($config['folderName'] ?? basename($subjectRelativePath)))),
+                ]
+            )
+            : [];
+
+        $promptContext = cmsBuildPromptContext(
+            $subjectRelativePath,
+            $subjectType,
+            $config,
+            $targetFile,
+            $promptIsLayoutTarget,
+            $layoutPreset,
+            $editorDraft,
+            cmsPromptParentConfig($rootDir, $subjectRelativePath, $subjectType, $targetDir),
+            $folderViewData
+        );
         if ($promptIsLayoutTarget && is_array($config['work']['layout'] ?? null)) {
             $promptContext['current']['activeLayout'] = [
                 'name' => (string) ($config['work']['layout']['name'] ?? ''),
@@ -757,6 +907,7 @@ function cmsHandleEditAction(): void
                 'Response format: return strict JSON.',
                 'Required key: "template" with only the current inner partial HBS string.',
                 'Optional key: "work" for work.* updates when the user explicitly requests them.',
+                'Optional key: "treeVisible" as an array of same-folder parent tree item names/paths to keep visible when the user asks to hide used sibling works.',
                 'Do not return code fences, the outer layout wrapper, a full HTML page shell, nav chrome, or footer.',
                 'Use Prompt context JSON current.templateTarget / current.sectionTemplateTarget to understand the exact save target.',
                 'Treat layout metadata as reference only; the answer must be inner partial content for the existing wrapper.',
@@ -769,8 +920,12 @@ function cmsHandleEditAction(): void
             'Return strict JSON with a required "template" string and optional "work" field.',
             'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
             'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
-            'Use config/title/description, layout name/template, and work type when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+            'Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.',
+            'Use work.type for the base family and work.template for the exact template variant key. If the item is a movie or similar autoplay candidate, prefer a matching video variant when one exists.',
             'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+            'Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.',
+            'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
+            'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
             'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
             'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
             'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
@@ -1113,7 +1268,7 @@ function cmsHandleEditAction(): void
             'template' => $templateText,
             'systemPrompt' => $systemPrompt,
         ];
-        foreach (['title', 'description', 'work', 'css', 'js'] as $key) {
+        foreach (['title', 'description', 'work', 'css', 'js', 'treeVisible'] as $key) {
             if (array_key_exists($key, $parsedResult)) {
                 $responsePayload[$key] = $parsedResult[$key];
             }

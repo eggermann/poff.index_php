@@ -559,10 +559,10 @@ export function bindPromptWindow({
                     if (layoutNameField && !layoutNameField.value.trim()) {
                         layoutNameField.value = 'poff-layout';
                     }
-                    if (nextWork && typeof nextWork.type === 'string') {
+                    if (nextWork && (typeof nextWork.template === 'string' || typeof nextWork.type === 'string')) {
                         const workTypeField = drawerForm.querySelector('#edit-work-type');
                         if (workTypeField) {
-                            workTypeField.value = nextWork.type;
+                            workTypeField.value = nextWork.template || nextWork.type;
                         }
                     }
                 }
@@ -595,6 +595,9 @@ export function bindPromptWindow({
                 }
                 if (persistedWork && Object.keys(persistedWork).length) {
                     savePayload.work = persistedWork;
+                }
+                if (Array.isArray(response?.treeVisible)) {
+                    savePayload.treeVisible = response.treeVisible;
                 }
                 await saveConfig(savePayload, statusEl);
                 renderContext();
