@@ -47,6 +47,29 @@ function cmsPromptCompactRef(array $ref): array
     return $compact;
 }
 
+function cmsPromptCompactTreeItems(array $items, int $maxDepth = 3, int $maxChildren = 12): array
+{
+    $compactItems = [];
+    foreach (array_slice($items, 0, $maxChildren) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $compact = cmsPromptCompactRef($item);
+        if (array_key_exists('childCount', $item) && is_scalar($item['childCount'])) {
+            $compact['childCount'] = (int) $item['childCount'];
+        }
+
+        if ($maxDepth > 0 && is_array($item['children'] ?? null) && $item['children'] !== []) {
+            $compact['children'] = cmsPromptCompactTreeItems($item['children'], $maxDepth - 1, $maxChildren);
+        }
+
+        $compactItems[] = $compact;
+    }
+
+    return $compactItems;
+}
+
 function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource = false): array
 {
     $summary = [];
@@ -229,6 +252,29 @@ function cmsPromptCompactContext(array $context): array
         }
         $current['work'] = $work;
     }
+    if (is_array($current['parentWork'] ?? null)) {
+        $parentWork = [];
+        foreach (['title', 'name', 'folderName', 'path', 'slug', 'description', 'type', 'kind', 'pageLink', 'srcUrl'] as $key) {
+            if (!array_key_exists($key, $current['parentWork'])) {
+                continue;
+            }
+            $value = $current['parentWork'][$key];
+            $parentWork[$key] = is_string($value)
+                ? cmsPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['parentWork'] = $parentWork;
+    }
+    if (is_array($current['tree'] ?? null)) {
+        $current['tree'] = cmsPromptCompactTreeItems($current['tree']);
+    }
+    if (is_array($current['workTree'] ?? null)) {
+        $current['workTree']['children'] = cmsPromptCompactTreeItems(
+            is_array($current['workTree']['children'] ?? null) ? $current['workTree']['children'] : [],
+            3,
+            12
+        );
+    }
     if (is_array($current['workFields'] ?? null)) {
         $workFields = [];
         foreach (array_slice($current['workFields'], 0, 12) as $field) {
@@ -259,15 +305,33 @@ function cmsPromptCompactContext(array $context): array
         'current' => $current,
     ];
 
+    $siblingWorks = array_values(array_filter(array_map(
+        static fn(array $ref): array => cmsPromptCompactRef($ref),
+        array_slice(is_array($context['siblingWorks'] ?? null) ? $context['siblingWorks'] : [], 0, 24)
+    )));
+    if ($siblingWorks !== []) {
+        $compact['siblingWorks'] = $siblingWorks;
+        $compact['siblingCounts'] = [
+            'items' => count(is_array($context['siblingWorks'] ?? null) ? $context['siblingWorks'] : []),
+            'folders' => count(is_array($context['siblingFolders'] ?? null) ? $context['siblingFolders'] : []),
+            'images' => count(is_array($context['siblingImages'] ?? null) ? $context['siblingImages'] : []),
+            'videos' => count(is_array($context['siblingVideos'] ?? null) ? $context['siblingVideos'] : []),
+            'audio' => count(is_array($context['siblingAudio'] ?? null) ? $context['siblingAudio'] : []),
+            'pdfs' => count(is_array($context['siblingPdfs'] ?? null) ? $context['siblingPdfs'] : []),
+            'texts' => count(is_array($context['siblingTexts'] ?? null) ? $context['siblingTexts'] : []),
+            'links' => count(is_array($context['siblingLinks'] ?? null) ? $context['siblingLinks'] : []),
+            'other' => count(is_array($context['siblingOther'] ?? null) ? $context['siblingOther'] : []),
+        ];
+    }
+
     $subjectType = strtolower(trim((string) ($current['subjectType'] ?? '')));
     if ($subjectType !== 'folder') {
         return $compact;
     }
 
-    $items = array_values(array_filter(array_map(
-        static fn(array $ref): array => cmsPromptCompactRef($ref),
-        array_slice(is_array($context['items'] ?? null) ? $context['items'] : [], 0, 24)
-    )));
+    $items = is_array($context['items'] ?? null)
+        ? cmsPromptCompactTreeItems($context['items'])
+        : [];
 
     $compact['counts'] = [
         'items' => count(is_array($context['items'] ?? null) ? $context['items'] : []),

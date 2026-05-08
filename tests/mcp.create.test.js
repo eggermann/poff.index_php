@@ -956,9 +956,20 @@ describe('MCP create route helper (CLI)', () => {
         sectionPartial: 'work',
       }),
     }));
-    expect(result.file.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
+    expect(result.file.current.outerWrapper.template).toContain('poff-default-layout__main');
     expect(result.file.counts).toBeUndefined();
     expect(result.file.items).toBeUndefined();
+    expect(result.file.current.parentWork).toEqual(expect.objectContaining({
+      title: 'poff-tests',
+      path: '',
+    }));
+    expect(result.file.siblingWorks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'viewer-folder',
+        kind: 'folder',
+      }),
+    ]));
+    expect(result.file.siblingWorks.map((item) => item.name)).not.toContain('viewer-file.txt');
     expect(result.folder.current).toEqual(expect.objectContaining({
       subjectType: 'folder',
       sectionTemplateTarget: 'viewer-folder/.layout/works.hbs',
@@ -972,12 +983,38 @@ describe('MCP create route helper (CLI)', () => {
         sectionPartial: 'works',
       }),
     }));
-    expect(result.folder.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
+    expect(result.folder.current.outerWrapper.template).toContain('poff-default-layout__main');
+    expect(result.folder.current.parentWork).toEqual(expect.objectContaining({
+      title: 'poff-tests',
+      path: '',
+    }));
+    expect(result.folder.siblingWorks.map((item) => item.name)).not.toContain('viewer-folder');
     expect(result.folder.counts).toEqual(expect.objectContaining({
       items: expect.any(Number),
       files: expect.any(Number),
     }));
     expect(Array.isArray(result.folder.items)).toBe(true);
+    expect(Array.isArray(result.folder.current.tree)).toBe(true);
+    expect(result.folder.current.tree).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'nested-child',
+        type: 'folder',
+        children: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'nested-video.mp4',
+            type: 'file',
+          }),
+        ]),
+      }),
+    ]));
+    expect(result.folder.current.workTree).toEqual(expect.objectContaining({
+      children: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'nested-child',
+          type: 'folder',
+        }),
+      ]),
+    }));
   });
 
   test('includes custom work fields in prompt compact output', async () => {
@@ -1398,6 +1435,68 @@ describe('Worktype HBS renderer', () => {
       engine: 'lightncandy',
       section: 'work',
     });
+  });
+
+  test('suggests the autoplay video template for quicktime files', async () => {
+    const output = await runWorktype('catalog', 'video', {
+      mime: 'video/quicktime',
+      fileName: 'sample.mov',
+      subjectType: 'file',
+    });
+    const catalog = JSON.parse(output);
+
+    expect(catalog.selected).toBe('video-autoplay');
+    expect(catalog.choices.map((choice) => choice.value)).toContain('video-autoplay');
+    expect(catalog.choices.map((choice) => choice.kind)).toEqual(expect.arrayContaining(['video']));
+    expect(catalog.choices.every((choice) => choice.kind === 'video')).toBe(true);
+  });
+
+  test('limits folder templates to folder worktypes', async () => {
+    const output = await runWorktype('catalog', 'folder', {
+      subjectType: 'folder',
+    });
+    const catalog = JSON.parse(output);
+
+    expect(catalog.selected).toBe('folder');
+    expect(catalog.choices).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: 'folder', kind: 'folder' }),
+    ]));
+    expect(catalog.choices.map((choice) => choice.kind).every((kind) => kind === 'folder')).toBe(true);
+  });
+
+  test('renders a selected work template variant as the active section partial', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
+    const output = await runWorktype('render', 'video', {
+      ctx: {
+        path: 'movies/sample.mov',
+        name: 'sample.mov',
+        title: 'Sample Movie',
+        description: '',
+        descriptionHtml: '',
+        linkUrl: '',
+        slug: 'sample-movie',
+        mimeType: 'video/quicktime',
+        work: {
+          type: 'video',
+          template: 'video-autoplay',
+          autoplay: true,
+          muted: true,
+          layout: {
+            name: 'poff-layout',
+            engine: 'lightncandy',
+            section: 'work',
+          },
+        },
+      },
+    });
+
+    if (!lightnCandyInstalled) {
+      expect(output).toBe('<iframe src="movies/sample.mov" title="sample.mov"></iframe>');
+      return;
+    }
+
+    expect(output).toContain('<video class="mx-auto block max-h-screen max-w-full" autoplay muted playsinline controls');
+    expect(output).toContain('src="movies/sample.mov"');
   });
 
   test('hydrates folder layout metadata from the .layout filesystem', async () => {

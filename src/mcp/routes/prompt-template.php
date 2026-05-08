@@ -4,6 +4,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/viewer/link-targets.php';
 require_once __DIR__ . '/../../includes/edit-mode.php';
 require_once __DIR__ . '/../../includes/prompt-template-sanitize.php';
+require_once __DIR__ . '/../../includes/viewer/utils.php';
+require_once __DIR__ . '/../../includes/viewer/render/data.php';
 require_once __DIR__ . '/../helpers.php';
 
 const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 300;
@@ -210,6 +212,9 @@ function mcpParsePromptModelResult(string $raw): array
     }
     if (isset($decoded['work']) && is_array($decoded['work'])) {
         $result['work'] = $decoded['work'];
+    }
+    if (isset($decoded['treeVisible']) && is_array($decoded['treeVisible'])) {
+        $result['treeVisible'] = array_values(array_filter($decoded['treeVisible'], static fn(mixed $value): bool => is_scalar($value)));
     }
     if (array_key_exists('css', $decoded) || array_key_exists('style', $decoded)) {
         $result['css'] = (string) ($decoded['css'] ?? $decoded['style'] ?? '');
@@ -598,7 +603,7 @@ function mcpBuildPromptRef(string $basePath, array $item): ?array
     return $result;
 }
 
-function mcpBuildPromptContext(string $relativePath, array $config): array
+function mcpBuildPromptContext(string $relativePath, array $config, array $folderViewData = []): array
 {
     $normalizedPath = trim($relativePath, "/\\");
     $currentName = (string) ($config['folderName'] ?? basename($normalizedPath));
@@ -680,6 +685,27 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
         'allLinks' => [],
         'allOther' => [],
     ];
+    if (is_array($folderViewData['tree'] ?? null)) {
+        $context['current']['tree'] = $folderViewData['tree'];
+        $context['current']['workTree'] = $folderViewData['workTree'] ?? null;
+        foreach (['allItems', 'allFiles', 'allFolders', 'allImages', 'allVideos', 'allAudio', 'allPdfs', 'allTexts', 'allLinks', 'allOther'] as $key) {
+            if (array_key_exists($key, $folderViewData) && is_array($folderViewData[$key])) {
+                $context['current'][$key] = $folderViewData[$key];
+                $context[$key] = $folderViewData[$key];
+            }
+        }
+        $context['items'] = $folderViewData['tree'];
+        $context['allItems'] = $folderViewData['allItems'] ?? [];
+        $context['allFiles'] = $folderViewData['allFiles'] ?? [];
+        $context['allFolders'] = $folderViewData['allFolders'] ?? [];
+        $context['allImages'] = $folderViewData['allImages'] ?? [];
+        $context['allVideos'] = $folderViewData['allVideos'] ?? [];
+        $context['allAudio'] = $folderViewData['allAudio'] ?? [];
+        $context['allPdfs'] = $folderViewData['allPdfs'] ?? [];
+        $context['allTexts'] = $folderViewData['allTexts'] ?? [];
+        $context['allLinks'] = $folderViewData['allLinks'] ?? [];
+        $context['allOther'] = $folderViewData['allOther'] ?? [];
+    }
 
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
     foreach ($tree as $item) {
@@ -726,6 +752,15 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     return $context;
 }
 
+function mcpPromptFolderViewData(string $relativePath, string $fullPath, array $config, array $rootMeta): array
+{
+    if (!is_dir($fullPath)) {
+        return [];
+    }
+
+    return buildFolderViewerData($relativePath, $fullPath, $config, $rootMeta);
+}
+
 function mcpPromptTrimText(string $text, int $maxLength = 240): string
 {
     $normalized = preg_replace('/\s+/', ' ', trim($text)) ?? trim($text);
@@ -765,6 +800,29 @@ function mcpPromptCompactRef(array $ref): array
     }
 
     return $compact;
+}
+
+function mcpPromptCompactTreeItems(array $items, int $maxDepth = 3, int $maxChildren = 12): array
+{
+    $compactItems = [];
+    foreach (array_slice($items, 0, $maxChildren) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $compact = mcpPromptCompactRef($item);
+        if (array_key_exists('childCount', $item) && is_scalar($item['childCount'])) {
+            $compact['childCount'] = (int) $item['childCount'];
+        }
+
+        if ($maxDepth > 0 && is_array($item['children'] ?? null) && $item['children'] !== []) {
+            $compact['children'] = mcpPromptCompactTreeItems($item['children'], $maxDepth - 1, $maxChildren);
+        }
+
+        $compactItems[] = $compact;
+    }
+
+    return $compactItems;
 }
 
 function mcpPromptCompactConfig(array $config): array
@@ -890,11 +948,20 @@ function mcpPromptCompactContext(array $context): array
         }
         $current['work'] = $work;
     }
+    if (is_array($current['tree'] ?? null)) {
+        $current['tree'] = mcpPromptCompactTreeItems($current['tree']);
+    }
+    if (is_array($current['workTree'] ?? null)) {
+        $current['workTree']['children'] = mcpPromptCompactTreeItems(
+            is_array($current['workTree']['children'] ?? null) ? $current['workTree']['children'] : [],
+            3,
+            12
+        );
+    }
 
-    $items = array_values(array_filter(array_map(
-        static fn(array $ref): array => mcpPromptCompactRef($ref),
-        array_slice(is_array($context['items'] ?? null) ? $context['items'] : [], 0, 24)
-    )));
+    $items = is_array($context['items'] ?? null)
+        ? mcpPromptCompactTreeItems($context['items'])
+        : [];
 
     $counts = [
         'items' => count(is_array($context['items'] ?? null) ? $context['items'] : []),
@@ -940,6 +1007,7 @@ function mcpPromptSystemPrompt(): string
     return implode("\n", [
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
         'Return strict JSON with a required "template" string and optional "css", "js", and "work" fields.',
+        'Optional key "treeVisible" may list same-folder parent tree item names/paths to keep visible when the user asks to hide used sibling works.',
         'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
         'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
         'Return only the JSON object (no Markdown, no fences).',
@@ -948,8 +1016,12 @@ function mcpPromptSystemPrompt(): string
         'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
-        'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
+        'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.',
+        'Use work.type for the base family and work.template for the exact template variant key. If the item is a movie or similar autoplay candidate, prefer a matching video variant when one exists.',
         'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+        'Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.',
+        'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
+        'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
         'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
         'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
         'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
@@ -1171,7 +1243,17 @@ function handlePromptTemplate(array $opts): array
     $config = PoffConfig::ensure($targetDir);
     $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $systemPrompt = mcpPromptSystemPrompt();
-    $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config));
+    $folderViewData = mcpPromptFolderViewData(
+        (string) $path,
+        $targetDir,
+        $config,
+        [
+            'name' => (string) ($config['folderName'] ?? basename((string) $path)),
+            'title' => (string) ($config['title'] ?? $config['folderName'] ?? basename((string) $path)),
+            'slug' => (string) ($config['slug'] ?? PoffConfig::slugify((string) ($config['folderName'] ?? basename((string) $path)))),
+        ]
+    );
+    $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config, $folderViewData));
     $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $historyText = mcpPromptHistoryText($history);
     $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $historyText . "USER: " . $prompt;
@@ -1219,7 +1301,7 @@ function handlePromptTemplate(array $opts): array
         'model' => $usedModel,
         'template' => $templateText,
     ];
-    foreach (['title', 'description', 'work', 'css', 'js'] as $key) {
+    foreach (['title', 'description', 'work', 'css', 'js', 'treeVisible'] as $key) {
         if (array_key_exists($key, $parsedResult)) {
             $response[$key] = $parsedResult[$key];
         }
