@@ -48,6 +48,11 @@ export function buildTemplateHistorySnapshot({
         snapshot.description = trimHistoryText(nextDescription, 220);
     }
     if (nextWork && typeof nextWork === 'object') {
+        try {
+            snapshot.workSnapshot = JSON.parse(JSON.stringify(nextWork));
+        } catch {
+            snapshot.workSnapshot = { ...nextWork };
+        }
         const keys = Object.keys(nextWork).filter((key) => key !== 'layout').slice(0, 6);
         if (keys.length) {
             snapshot.workKeys = keys;

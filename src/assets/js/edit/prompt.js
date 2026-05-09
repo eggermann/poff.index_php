@@ -162,12 +162,15 @@ export function bindPromptWindow({
         if (!templateText) {
             return false;
         }
+        const restoredWork = snapshot.workSnapshot && typeof snapshot.workSnapshot === 'object'
+            ? snapshot.workSnapshot
+            : {};
 
         updatePromptEditorFields({
             templateText,
             nextTitle: typeof snapshot.title === 'string' ? snapshot.title : null,
             nextDescription: typeof snapshot.description === 'string' ? snapshot.description : null,
-            nextWork: {},
+            nextWork: restoredWork,
             isLayoutTarget,
             nextCss: typeof snapshot.css === 'string' ? snapshot.css : null,
             nextJs: typeof snapshot.js === 'string' ? snapshot.js : null,

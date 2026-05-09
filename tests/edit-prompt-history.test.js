@@ -92,6 +92,10 @@ describe('prompt history helpers', () => {
       title: 'Card view',
       description: 'Compact card layout',
       layoutName: 'poff-layout',
+      workSnapshot: expect.objectContaining({
+        layout: 'poff-layout',
+        featured: true,
+      }),
       workKeys: ['featured'],
     }));
   });
