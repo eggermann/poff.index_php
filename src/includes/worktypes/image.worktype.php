@@ -6,5 +6,9 @@ return [
         'background' => '#000',
         'caption' => '',
     ],
+    'mimes' => [
+        'image/*',
+        'image/.*',
+    ],
     'template' => (string) file_get_contents(__DIR__ . '/templates/image.hbs'),
 ];

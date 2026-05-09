@@ -4,5 +4,9 @@ return [
         'type' => 'audio',
         'autoplay' => false,
     ],
+    'mimes' => [
+        'audio/*',
+        'audio/.*',
+    ],
     'template' => (string) file_get_contents(__DIR__ . '/templates/audio.hbs'),
 ];

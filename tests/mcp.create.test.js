@@ -1528,6 +1528,41 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('accepts wildcard MIME template map keys for video files', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-template-map-wildcard-'));
+    try {
+      const parentDir = path.join(tempRoot, 'parent');
+      fs.mkdirSync(parentDir, { recursive: true });
+      fs.writeFileSync(path.join(parentDir, 'poff.config.json'), JSON.stringify({
+        folderName: 'parent',
+        title: 'Parent',
+        slug: 'parent',
+        description: '',
+        work: {
+          type: 'folder',
+          templateMap: {
+            'video/.*': 'image',
+          },
+        },
+        tree: [],
+      }, null, 2));
+      fs.writeFileSync(path.join(parentDir, 'sample.mov'), 'fake video');
+
+      const resolvedWildcard = JSON.parse(await runLayoutFilesystem('resolve-work-template', parentDir, '', {
+        kind: 'video',
+        mime: 'video/quicktime',
+        fileName: 'sample.mov',
+        work: {
+          type: 'video',
+        },
+      }));
+      expect(resolvedWildcard.template).toBe('image');
+      expect(resolvedWildcard.autoplay).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('limits folder templates to folder worktypes', async () => {
     const output = await runWorktype('catalog', 'folder', {
       subjectType: 'folder',

@@ -101,6 +101,31 @@ trait WorktypeDefinitionsTrait
         return $map;
     }
 
+    private static function mimeMatchesPattern(string $mime, string $pattern): bool
+    {
+        $normalizedMime = strtolower(trim($mime));
+        $normalizedPattern = strtolower(trim($pattern));
+        if ($normalizedMime === '' || $normalizedPattern === '') {
+            return false;
+        }
+
+        if ($normalizedMime === $normalizedPattern) {
+            return true;
+        }
+
+        if (str_ends_with($normalizedPattern, '/*')) {
+            $prefix = substr($normalizedPattern, 0, -2);
+            return $prefix !== '' && str_starts_with($normalizedMime, $prefix . '/');
+        }
+
+        if (str_ends_with($normalizedPattern, '/.*')) {
+            $prefix = substr($normalizedPattern, 0, -3);
+            return $prefix !== '' && str_starts_with($normalizedMime, $prefix . '/');
+        }
+
+        return false;
+    }
+
     private static function templateMapCandidates(string $kind, ?string $mime = null, ?string $fileName = null): array
     {
         $candidates = [];
@@ -109,7 +134,9 @@ trait WorktypeDefinitionsTrait
             $candidates[] = $normalizedMime;
             $mimeMajor = strtok($normalizedMime, '/');
             if (is_string($mimeMajor) && trim($mimeMajor) !== '') {
-                $candidates[] = strtolower(trim($mimeMajor)) . '/*';
+                $major = strtolower(trim($mimeMajor));
+                $candidates[] = $major . '/*';
+                $candidates[] = $major . '/.*';
             }
         }
 
@@ -138,6 +165,20 @@ trait WorktypeDefinitionsTrait
             $normalizedTemplate = self::normalizeTemplateKey((string) $templateMap[$candidate]);
             if ($normalizedTemplate !== '') {
                 return $normalizedTemplate;
+            }
+        }
+
+        $normalizedMime = strtolower(trim((string) $mime));
+        if ($normalizedMime !== '') {
+            foreach ($templateMap as $candidate => $template) {
+                if (!is_string($candidate) || !self::mimeMatchesPattern($normalizedMime, (string) $candidate)) {
+                    continue;
+                }
+
+                $normalizedTemplate = self::normalizeTemplateKey((string) $template);
+                if ($normalizedTemplate !== '') {
+                    return $normalizedTemplate;
+                }
             }
         }
 
@@ -386,6 +427,49 @@ trait WorktypeDefinitionsTrait
                 'extensions' => $choiceExtensions,
                 'score' => $score,
             ];
+        }
+
+        if ($mime !== '') {
+            $mimeMatches = array_values(array_filter($choices, static function (array $choice) use ($mime): bool {
+                $choiceMimes = is_array($choice['mimes'] ?? null) ? $choice['mimes'] : [];
+                if ($choiceMimes === []) {
+                    return false;
+                }
+
+                foreach ($choiceMimes as $choiceMime) {
+                    if (is_string($choiceMime) && self::mimeMatchesPattern($mime, $choiceMime)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }));
+
+            if ($mimeMatches !== []) {
+                if ($selected !== '') {
+                    $selectedChoice = null;
+                    foreach ($choices as $choice) {
+                        if ((string) ($choice['value'] ?? '') === $selected) {
+                            $selectedChoice = $choice;
+                            break;
+                        }
+                    }
+                    if ($selectedChoice !== null) {
+                        $alreadyPresent = false;
+                        foreach ($mimeMatches as $choice) {
+                            if ((string) ($choice['value'] ?? '') === $selected) {
+                                $alreadyPresent = true;
+                                break;
+                            }
+                        }
+                        if (!$alreadyPresent) {
+                            array_unshift($mimeMatches, $selectedChoice);
+                        }
+                    }
+                }
+
+                $choices = $mimeMatches;
+            }
         }
 
         usort($choices, static function (array $left, array $right): int {
