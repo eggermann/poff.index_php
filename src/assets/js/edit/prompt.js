@@ -153,7 +153,7 @@ export function bindPromptWindow({
         return true;
     };
 
-    const restoreHistorySnapshot = (snapshot) => {
+    const restoreHistorySnapshot = async (snapshot) => {
         if (!snapshot || typeof snapshot !== 'object') {
             return false;
         }
@@ -173,7 +173,30 @@ export function bindPromptWindow({
             nextJs: typeof snapshot.js === 'string' ? snapshot.js : null,
         });
         renderContext();
+        const selection = currentSelection({ path: activePath, previewPath: activePath, previewIsFile: false, isLayout: isLayoutTarget });
+        const currentConfig = getConfig ? (getConfig() || {}) : {};
+        const { layoutPayload } = buildPromptLayoutPayload({
+            selection,
+            currentConfig,
+            drawerForm,
+            templateText,
+            nextCss: typeof snapshot.css === 'string' ? snapshot.css : null,
+            nextJs: typeof snapshot.js === 'string' ? snapshot.js : null,
+            layoutPreset: isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset(),
+        });
+        const savePayload = {
+            path: activePath,
+            layout: layoutPayload,
+        };
+        if (typeof snapshot.title === 'string' && snapshot.title.trim() !== '') {
+            savePayload.title = snapshot.title.trim();
+        }
+        if (typeof snapshot.description === 'string' && snapshot.description.trim() !== '') {
+            savePayload.description = snapshot.description.trim();
+        }
+        await saveConfig(savePayload, statusEl);
         renderSummary(`Restored ${isLayoutTarget ? 'layout' : 'template'} from assistant stage.`);
+        reloadViewer();
         focusPromptTemplateField(isLayoutTarget);
         setPromptStatus('Restored template from assistant stage.', true);
         return true;
@@ -823,7 +846,7 @@ export function bindPromptWindow({
             }
             event.preventDefault();
             event.stopPropagation();
-            restoreHistorySnapshot(historyEntry.templateSnapshot);
+            void restoreHistorySnapshot(historyEntry.templateSnapshot);
         });
     }
 }
