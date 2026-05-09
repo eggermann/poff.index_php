@@ -28,6 +28,41 @@ module.exports = {
   return module.exports;
 }
 
+function loadPromptHistoryRenderer() {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/render/history.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*;\r?\n/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    escapeHtml: (value) => String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;'),
+    summarizeSerializedHistory: (history) => ({
+      count: Array.isArray(history) ? history.length : 0,
+      chars: Array.isArray(history) ? history.reduce((total, item) => total + String(item?.content || '').length, 0) : 0,
+    }),
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  renderPromptHistory,
+};
+`, context);
+
+  return module.exports;
+}
+
 describe('prompt history helpers', () => {
   const {
     buildTemplateHistorySnapshot,
@@ -106,5 +141,33 @@ describe('prompt history helpers', () => {
 
     expect(summary.count).toBe(2);
     expect(summary.chars).toBeGreaterThan(7);
+  });
+});
+
+describe('prompt history renderer', () => {
+  const { renderPromptHistory } = loadPromptHistoryRenderer();
+
+  test('shows a reset action for assistant snapshots', () => {
+    const container = {
+      innerHTML: '',
+      scrollHeight: 0,
+      clientHeight: 0,
+      scrollTop: 0,
+    };
+
+    renderPromptHistory(container, [
+      {
+        role: 'assistant',
+        content: 'ready',
+        _index: 3,
+        templateSnapshot: {
+          targetType: 'partial',
+          template: '<section>ready</section>',
+        },
+      },
+    ], null);
+
+    expect(container.innerHTML).toContain('data-history-reset-index="3"');
+    expect(container.innerHTML).toContain('>reset<');
   });
 });

@@ -19,6 +19,7 @@ export function renderPromptHistory(container, history, streamState, options = {
         const safeContent = content || '';
         const snapshot = msg?.templateSnapshot && typeof msg.templateSnapshot === 'object' ? msg.templateSnapshot : null;
         const snapshotParts = [];
+        const canReset = role === 'assistant' && !!snapshot;
         if (snapshot) {
             if (typeof snapshot.targetType === 'string' && snapshot.targetType) {
                 snapshotParts.push(`target: ${snapshot.targetType}`);
@@ -36,11 +37,17 @@ export function renderPromptHistory(container, history, streamState, options = {
                 snapshotParts.push(`js: ${snapshot.jsLength}`);
             }
         }
+        const snapshotMeta = snapshotParts.length
+            ? `<span>${escapeHtml(snapshotParts.join(' | '))}</span>`
+            : '';
+        const snapshotAction = canReset
+            ? `<button type="button" class="btn btn-secondary prompt-message-reset" data-history-reset-index="${msg._index}" title="Reset template to this stage">reset</button>`
+            : '';
         return `
             <div class="prompt-message prompt-message-${role}">
                 <span class="prompt-message-role">${escapeHtml(role)}:</span>
                 <span class="prompt-message-content">${escapeHtml(safeContent)}${isStreaming ? '<span class="stream-cursor"></span>' : ''}</span>
-                ${snapshotParts.length ? `<div class="small-note prompt-message-meta">${escapeHtml(snapshotParts.join(' | '))}</div>` : ''}
+                ${(snapshotMeta || snapshotAction) ? `<div class="small-note prompt-message-meta" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">${snapshotMeta}${snapshotAction}</div>` : ''}
             </div>
         `;
     }).join('');

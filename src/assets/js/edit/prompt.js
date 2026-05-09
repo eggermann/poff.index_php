@@ -65,6 +65,7 @@ export function bindPromptWindow({
     const promptInputEl = root.querySelector('#prompt-input');
     const promptSendEl = root.querySelector('#prompt-send');
     const promptAttachEl = root.querySelector('#prompt-attach');
+    const promptInsertNameEl = root.querySelector('#prompt-insert-name');
     const promptClearEl = root.querySelector('#prompt-clear');
     const promptImageInputEl = root.querySelector('#prompt-image-input');
     const promptAttachmentPreviewEl = root.querySelector('#promptAttachmentPreview');
@@ -109,6 +110,73 @@ export function bindPromptWindow({
             : (typeof selection?.path === 'string' ? selection.path : '');
 
         return imageContextPattern.test(selectionPath);
+    };
+
+    const currentSelectionName = () => {
+        const selection = currentSelection(null);
+        const selectionPath = typeof selection?.previewPath === 'string' && selection.previewPath.trim() !== ''
+            ? selection.previewPath
+            : (typeof selection?.path === 'string' ? selection.path : '');
+        const normalizedPath = String(selectionPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        if (!normalizedPath) {
+            return '';
+        }
+        const parts = normalizedPath.split('/').filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : '';
+    };
+
+    const insertPromptText = async (text) => {
+        if (!promptInputEl || !text) {
+            return false;
+        }
+        const start = typeof promptInputEl.selectionStart === 'number' ? promptInputEl.selectionStart : promptInputEl.value.length;
+        const end = typeof promptInputEl.selectionEnd === 'number' ? promptInputEl.selectionEnd : promptInputEl.value.length;
+        const before = promptInputEl.value.slice(0, start);
+        const after = promptInputEl.value.slice(end);
+        const separator = before && !/\s$/.test(before) ? ' ' : '';
+        const nextValue = `${before}${separator}${text}${after}`;
+        promptInputEl.value = nextValue;
+        const caret = (before + separator + text).length;
+        if (typeof promptInputEl.setSelectionRange === 'function') {
+            promptInputEl.setSelectionRange(caret, caret);
+        }
+        promptInputEl.focus({ preventScroll: true });
+        renderSummary(`Inserted ${text} into the prompt.`);
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            }
+            setPromptStatus(`Inserted and copied: ${text}`, true);
+        } catch {
+            setPromptStatus(`Inserted: ${text}`);
+        }
+        return true;
+    };
+
+    const restoreHistorySnapshot = (snapshot) => {
+        if (!snapshot || typeof snapshot !== 'object') {
+            return false;
+        }
+        const isLayoutTarget = snapshot.targetType === 'layout';
+        const templateText = typeof snapshot.template === 'string' ? snapshot.template : '';
+        if (!templateText) {
+            return false;
+        }
+
+        updatePromptEditorFields({
+            templateText,
+            nextTitle: typeof snapshot.title === 'string' ? snapshot.title : null,
+            nextDescription: typeof snapshot.description === 'string' ? snapshot.description : null,
+            nextWork: {},
+            isLayoutTarget,
+            nextCss: typeof snapshot.css === 'string' ? snapshot.css : null,
+            nextJs: typeof snapshot.js === 'string' ? snapshot.js : null,
+        });
+        renderContext();
+        renderSummary(`Restored ${isLayoutTarget ? 'layout' : 'template'} from assistant stage.`);
+        focusPromptTemplateField(isLayoutTarget);
+        setPromptStatus('Restored template from assistant stage.', true);
+        return true;
     };
 
     const setHistory = (nextHistory) => {
@@ -267,6 +335,7 @@ export function bindPromptWindow({
         promptSendEl,
         promptInputEl,
         promptAttachEl,
+        promptInsertNameEl,
         promptImageInputEl,
         promptAttachmentRemoveEl,
         layoutPresetEl: document.getElementById('edit-layout-preset'),
@@ -637,6 +706,14 @@ export function bindPromptWindow({
             }
         },
         onAttachImage: attachImageFile,
+        onInsertName: async () => {
+            const name = currentSelectionName();
+            if (!name) {
+                setPromptStatus('No file name selected.');
+                return;
+            }
+            await insertPromptText(name);
+        },
         onRemoveImage: () => {
             clearAttachment();
             setPromptStatus('Image removed.');
@@ -725,4 +802,28 @@ export function bindPromptWindow({
             renderTemplatePreview();
         }
     });
+
+    if (promptMessagesEl) {
+        promptMessagesEl.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            const button = target.closest('[data-history-reset-index]');
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+            const index = Number.parseInt(button.dataset.historyResetIndex || '', 10);
+            if (!Number.isInteger(index)) {
+                return;
+            }
+            const historyEntry = promptHistory.find((item) => item && item._index === index);
+            if (!historyEntry || !historyEntry.templateSnapshot) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            restoreHistorySnapshot(historyEntry.templateSnapshot);
+        });
+    }
 }

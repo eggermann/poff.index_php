@@ -1,4 +1,5 @@
 export function updatePromptEditorFields({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget, nextCss = null, nextJs = null }) {
+    const workUpdates = nextWork && typeof nextWork === 'object' ? nextWork : null;
     const templateSelectors = isLayoutTarget
         ? ['#edit-layout-primary-template']
         : ['#edit-content-template'];
@@ -27,10 +28,10 @@ export function updatePromptEditorFields({ templateText, nextTitle, nextDescript
         });
     }
 
-    if (nextWork && typeof nextWork.type === 'string') {
+    if (workUpdates && typeof workUpdates.type === 'string') {
         document.querySelectorAll('#edit-work-type').forEach((field) => {
             if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
-                field.value = nextWork.type;
+                field.value = workUpdates.type;
             }
         });
     }
@@ -39,10 +40,10 @@ export function updatePromptEditorFields({ templateText, nextTitle, nextDescript
             return;
         }
         const key = String(field.dataset.workConfigKey || '').trim();
-        if (!key || !Object.prototype.hasOwnProperty.call(nextWork, key)) {
+        if (!key || !workUpdates || !Object.prototype.hasOwnProperty.call(workUpdates, key)) {
             return;
         }
-        const value = nextWork[key];
+        const value = workUpdates[key];
         if (field instanceof HTMLInputElement && field.type === 'checkbox') {
             field.checked = !!value;
             return;
