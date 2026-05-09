@@ -5,16 +5,7 @@
  * with lightweight folder metadata and a first-level tree listing.
  */
 
-require_once __DIR__ . '/project-root.php';
-require_once __DIR__ . '/PoffConfig/layout-helpers.php';
-require_once __DIR__ . '/PoffConfig/core-helpers.php';
-require_once __DIR__ . '/PoffConfig/layout-files.php';
-require_once __DIR__ . '/PoffConfig/layout-view.php';
-require_once __DIR__ . '/PoffConfig/layout-collections.php';
-require_once __DIR__ . '/PoffConfig/layout-persistence.php';
-require_once __DIR__ . '/PoffConfig/prompt-helpers.php';
-require_once __DIR__ . '/prompt-template-sanitize.php';
-require_once __DIR__ . '/viewer/link-targets.php';
+require_once __DIR__ . '/PoffConfig/bootstrap.php';
 
 class PoffConfig
 {

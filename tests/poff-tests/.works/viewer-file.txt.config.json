@@ -6,12 +6,12 @@
     "kind": "text",
     "path": "viewer-file.txt",
     "size": 11,
-    "modifiedAt": "2026-05-09T20:59:23+00:00",
+    "modifiedAt": "2026-05-09T21:16:20+00:00",
     "visible": true,
     "mimeType": "text/plain",
-    "hash": "ab1933f1c7ed7fdc3b37ae11669f18d5d42c2b818d4b7f1cd2c31e8bc53a91bf",
-    "updatedAt": "2026-05-09T20:59:29+00:00",
-    "id": "poff_cd0ad144795907e8",
+    "hash": "36eee70443e2ed886dae853e731f9ead06c07f8959a34580d90ba5263e1ab9ba",
+    "updatedAt": "2026-05-09T21:16:24+00:00",
+    "id": "poff_05ccc8468821046d",
     "work": {
         "type": "text",
         "syntax": "text/plain",
@@ -33,13 +33,13 @@
                     "name": "thumbnail.txt",
                     "path": "thumbnail.txt",
                     "size": 10,
-                    "updatedAt": "2026-05-09T20:59:23+00:00"
+                    "updatedAt": "2026-05-09T21:16:20+00:00"
                 },
                 {
                     "name": "work.hbs",
                     "path": "work.hbs",
                     "size": 150,
-                    "updatedAt": "2026-05-09T20:59:28+00:00"
+                    "updatedAt": "2026-05-09T21:16:23+00:00"
                 }
             ],
             "files": {
