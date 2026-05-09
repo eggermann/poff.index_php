@@ -148,8 +148,17 @@ export function inferWorkChangesFromPrompt(prompt, config) {
     }
 
     const nextWork = {};
-    Object.entries(work).forEach(([key, value]) => {
-        if (typeof value !== 'boolean') {
+    const booleanKeys = new Set([
+        ...Object.entries(work)
+            .filter(([, value]) => typeof value === 'boolean')
+            .map(([key]) => key),
+        'autoplay',
+        'loop',
+        'muted',
+    ]);
+    booleanKeys.forEach((key) => {
+        const value = work[key];
+        if (typeof value !== 'boolean' && !['autoplay', 'loop', 'muted'].includes(key)) {
             return;
         }
         const compactKey = compactValue(key);
@@ -199,6 +208,10 @@ export function filterAllowedWork(work, config) {
         'model',
         'categories',
         'category',
+        'autoplay',
+        'loop',
+        'muted',
+        'poster',
     ]);
     const filtered = {};
     Object.entries(work).forEach(([key, value]) => {

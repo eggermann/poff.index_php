@@ -34,6 +34,27 @@ export function updatePromptEditorFields({ templateText, nextTitle, nextDescript
             }
         });
     }
+    document.querySelectorAll('[data-work-config-field]').forEach((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+            return;
+        }
+        const key = String(field.dataset.workConfigKey || '').trim();
+        if (!key || !Object.prototype.hasOwnProperty.call(nextWork, key)) {
+            return;
+        }
+        const value = nextWork[key];
+        if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+            field.checked = !!value;
+            return;
+        }
+        if (field.dataset.workConfigKind === 'json') {
+            field.value = value === null || value === undefined
+                ? ''
+                : (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+            return;
+        }
+        field.value = value === null || value === undefined ? '' : String(value);
+    });
 
     if (isLayoutTarget && nextCss !== null) {
         document.querySelectorAll('#edit-layout-primary-css').forEach((field) => {

@@ -2250,6 +2250,53 @@ describe('Worktype HBS renderer', () => {
     fs.unlinkSync(path.join(nestedRuntimeDir, 'edit.not-allow'));
   });
 
+  test('exposes worktype-specific config fields in the default work definitions', async () => {
+    const videoDef = JSON.parse(await runWorktype('definition', 'video'));
+    const imageDef = JSON.parse(await runWorktype('definition', 'image'));
+
+    expect(videoDef).toMatchObject({
+      type: 'video',
+      autoplay: false,
+      loop: false,
+      muted: false,
+      poster: null,
+    });
+    expect(imageDef).toMatchObject({
+      type: 'image',
+      fit: 'contain',
+      background: '#000',
+      caption: '',
+    });
+  });
+
+  test('persists worktype-specific config fields from edit save', async () => {
+    const tempDir = path.join(POFF_DIR, `work-config-save-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'clip.mp4'), 'video');
+
+    try {
+      const result = await runViewerSave(tempDir, 'clip.mp4', {
+        work: {
+          type: 'video',
+          autoplay: true,
+          loop: true,
+          muted: false,
+          poster: 'poster.png',
+        },
+      });
+
+      expect(result.saved).toBe(true);
+      expect(result.config.work.type).toBe('video');
+      expect(result.config.work.autoplay).toBe(true);
+      expect(result.config.work.loop).toBe(true);
+      expect(result.config.work.muted).toBe(false);
+      expect(result.config.work.poster).toBe('poster.png');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('injects the wrapped work partial when a filesystem file wrapper forgets to include it', async () => {
     await runLayoutFilesystem('persist-file', POFF_DIR, VIEWER_FILE_NAME, {
       name: 'filesystem-layout',
