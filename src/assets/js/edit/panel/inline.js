@@ -14,7 +14,6 @@ import { layoutOverlayState, syncPromptDock } from './shared.js';
 import { bindUploadDialog, renderUploadSectionHtml } from './upload.js';
 import { renderEditLayoutPanel } from './layout.js';
 
-const MEDIA_WORK_TYPE_OPTIONS = ['video', 'image', 'audio', 'pdf', 'text', 'link', 'folder', 'other'];
 const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind']);
 
 function readRowText(row, selector) {
@@ -93,14 +92,21 @@ function renderSchemaGroup(field, keys, html) {
     return visible ? html : '';
 }
 
-function renderMediaTypeOptions(selectedValue = '') {
+function renderMediaTypeOptions(selectedValue = '', catalog = null) {
     const normalizedSelected = String(selectedValue || '').trim();
-    const options = MEDIA_WORK_TYPE_OPTIONS.slice();
+    const choices = Array.isArray(catalog?.choices) ? catalog.choices : [];
+    const options = choices.length
+        ? choices.map((choice) => String(choice?.value || '').trim()).filter(Boolean)
+        : ['video', 'image', 'audio', 'pdf', 'text', 'link', 'folder', 'other'];
+
     if (normalizedSelected && !options.includes(normalizedSelected)) {
         options.unshift(normalizedSelected);
     }
 
-    return options.map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('');
+    return options
+        .filter((option, index) => option && options.indexOf(option) === index)
+        .map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? ' selected' : ''}>${escapeHtml(option)}</option>`)
+        .join('');
 }
 
 function readMediaConfigFromForm(form, currentWork = {}) {
@@ -179,9 +185,13 @@ function renderWorkValueControl(key, value) {
 function renderWorkConfigFieldsSection(config = {}) {
     const work = (config?.work && typeof config.work === 'object') ? config.work : {};
     const workType = String(work.type || '').trim();
+    const catalog = config?.workTemplateCatalog && typeof config.workTemplateCatalog === 'object'
+        ? config.workTemplateCatalog
+        : null;
     const fieldNames = new Set(extractWorkFields(work).map((field) => field.name));
     const dynamicKeys = Object.keys(work).filter((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) && key !== 'type' && !fieldNames.has(key));
     const workTypeSummary = dynamicKeys.length ? dynamicKeys.join(', ') : 'No additional work fields yet.';
+    const selectedValue = String(work.template || catalog?.selected || workType || '').trim();
     return `
         <div class="edit-work-fields edit-work-media">
             <div class="edit-work-fields-header">
@@ -194,9 +204,11 @@ function renderWorkConfigFieldsSection(config = {}) {
                 <div>
                     <label class="edit-label" for="edit-work-type">Work type</label>
                     <select class="form-select" id="edit-work-type" name="work_type">
-                        ${renderMediaTypeOptions(workType || 'video')}
+                        ${renderMediaTypeOptions(selectedValue || 'video', catalog)}
                     </select>
-                    <div class="small-note">Base family for the current item.</div>
+                    <div class="small-note">${catalog?.detectedMime
+            ? `Detected ${escapeHtml(catalog.detectedMime)}${catalog.detectedExtension ? ` · .${escapeHtml(catalog.detectedExtension)}` : ''} · showing ${escapeHtml(catalog.detectedKind || 'current')} templates`
+            : 'Base family for the current item.'}</div>
                 </div>
                 <div>
                     <div class="edit-label">Current work fields</div>
