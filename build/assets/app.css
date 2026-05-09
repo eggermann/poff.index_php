@@ -842,6 +842,25 @@ body, html {
   gap: 14px;
 }
 
+.edit-panel .edit-work-config-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.edit-panel .edit-work-config-field {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.edit-panel .edit-work-config-field .edit-label {
+  margin-bottom: 0;
+}
+
 .edit-drawer .edit-fieldset {
   display: grid;
   gap: 10px;

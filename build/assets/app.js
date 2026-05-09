@@ -573,7 +573,7 @@
     "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
     "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
     "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.",
-    "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items. If the item is a movie or similar autoplay candidate, prefer video plus work.autoplay=true instead of a separate video-autoplay template key.",
+    "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items. When a worktype exposes fields such as autoplay, loop, muted, poster, fit, background, or caption, set those as config values on work instead of hardcoding them into the template unless the user explicitly asks for one-off markup.",
     "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
     "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
     "Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.",
@@ -869,8 +869,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return null;
     }
     const nextWork = {};
-    Object.entries(work).forEach(([key, value]) => {
-      if (typeof value !== "boolean") {
+    const booleanKeys = /* @__PURE__ */ new Set([
+      ...Object.entries(work).filter(([, value]) => typeof value === "boolean").map(([key]) => key),
+      "autoplay",
+      "loop",
+      "muted"
+    ]);
+    booleanKeys.forEach((key) => {
+      const value = work[key];
+      if (typeof value !== "boolean" && !["autoplay", "loop", "muted"].includes(key)) {
         return;
       }
       const compactKey = compactValue(key);
@@ -913,7 +920,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       "layout",
       "model",
       "categories",
-      "category"
+      "category",
+      "autoplay",
+      "loop",
+      "muted",
+      "poster"
     ]);
     const filtered = {};
     Object.entries(work).forEach(([key, value]) => {
@@ -1719,6 +1730,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       });
     }
+    document.querySelectorAll("[data-work-config-field]").forEach((field) => {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+        return;
+      }
+      const key = String(field.dataset.workConfigKey || "").trim();
+      if (!key || !Object.prototype.hasOwnProperty.call(nextWork, key)) {
+        return;
+      }
+      const value = nextWork[key];
+      if (field instanceof HTMLInputElement && field.type === "checkbox") {
+        field.checked = !!value;
+        return;
+      }
+      if (field.dataset.workConfigKind === "json") {
+        field.value = value === null || value === void 0 ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
+        return;
+      }
+      field.value = value === null || value === void 0 ? "" : String(value);
+    });
     if (isLayoutTarget && nextCss !== null) {
       document.querySelectorAll("#edit-layout-primary-css").forEach((field) => {
         if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
@@ -3017,7 +3047,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             `;
     }).join("") : '<div class="edit-tree-item">No items found.</div>';
   }
-  function renderEditDrawerMarkup({ config, status, treeHtml }) {
+  function renderDrawerTreeBulkToggle(treeItems = [], status) {
+    if ((status == null ? void 0 : status.target) === "file" || !Array.isArray(treeItems) || treeItems.length === 0) {
+      return "";
+    }
+    const visibleCount = treeItems.reduce((count, item) => count + ((item == null ? void 0 : item.visible) !== false ? 1 : 0), 0);
+    return `
+        <div class="edit-tree-bulk">
+            <label class="edit-tree-item edit-tree-item-bulk">
+                <input type="checkbox" id="editTreeVisibleAll" data-tree-visible-all ${visibleCount > 0 ? "checked" : ""}>
+                <span>Select all visible items <span class="opacity-60">(${visibleCount}/${treeItems.length})</span></span>
+            </label>
+        </div>
+    `;
+  }
+  function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
     var _a;
     return `
         <div class="drawer-header">
@@ -3059,6 +3103,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             ${(status == null ? void 0 : status.target) !== "file" ? `
             <div>
                 <label class="edit-label">Visible items</label>
+                ${renderDrawerTreeBulkToggle(treeItems, status)}
                 <div class="edit-tree">${treeHtml}</div>
             </div>
             ` : ""}
@@ -3077,6 +3122,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     const drawerStatus = editDrawer.querySelector("#editDrawerStatus");
     const drawerForm = editDrawer.querySelector("#editDrawerForm");
+    const treeBulkToggle = editDrawer.querySelector("#editTreeVisibleAll");
+    const treeVisibleInputs = () => Array.from(editDrawer.querySelectorAll('input[name="tree_visible"]'));
+    const syncTreeBulkToggle = () => {
+      if (!treeBulkToggle) {
+        return;
+      }
+      const inputs = treeVisibleInputs();
+      const checkedCount = inputs.filter((input) => input.checked).length;
+      treeBulkToggle.checked = inputs.length > 0 && checkedCount === inputs.length;
+      treeBulkToggle.indeterminate = checkedCount > 0 && checkedCount < inputs.length;
+    };
+    if (treeBulkToggle) {
+      treeBulkToggle.addEventListener("change", () => {
+        const inputs = treeVisibleInputs();
+        inputs.forEach((input) => {
+          input.checked = treeBulkToggle.checked;
+        });
+        syncTreeBulkToggle();
+      });
+      treeVisibleInputs().forEach((input) => {
+        input.addEventListener("change", syncTreeBulkToggle);
+      });
+      syncTreeBulkToggle();
+    }
     if (drawerForm && drawerStatus && typeof onSubmit === "function") {
       drawerForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -3114,7 +3183,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return { drawerForm: null, drawerStatus: null };
     }
     const treeHtml = renderDrawerTreeHtml(config, status);
-    editDrawer.innerHTML = renderEditDrawerMarkup({ config, status, treeHtml });
+    editDrawer.innerHTML = renderEditDrawerMarkup({ config, status, treeHtml, treeItems: (config == null ? void 0 : config.tree) || [] });
     return bindEditDrawerInteractions({
       editDrawer,
       status,
@@ -4104,6 +4173,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/panel/inline.js
+  var MEDIA_WORK_TYPE_OPTIONS = ["video", "image", "audio", "pdf", "text", "link", "folder", "other"];
+  var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind"]);
   function readRowText(row, selector) {
     const field = row.querySelector(selector);
     return field && typeof field.value === "string" ? field.value : "";
@@ -4168,6 +4239,126 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   function renderSchemaGroup(field, keys, html) {
     const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
     return visible ? html : "";
+  }
+  function renderMediaTypeOptions(selectedValue = "") {
+    const normalizedSelected = String(selectedValue || "").trim();
+    const options = MEDIA_WORK_TYPE_OPTIONS.slice();
+    if (normalizedSelected && !options.includes(normalizedSelected)) {
+      options.unshift(normalizedSelected);
+    }
+    return options.map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
+  }
+  function readMediaConfigFromForm(form, currentWork = {}) {
+    var _a;
+    const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
+    const typeField = (_a = form == null ? void 0 : form.elements) == null ? void 0 : _a.work_type;
+    if (typeField && typeof typeField.value === "string") {
+      const type = typeField.value.trim();
+      if (type) {
+        nextWork.type = type;
+      }
+    }
+    const configFields = (form == null ? void 0 : form.querySelectorAll("[data-work-config-field]")) || [];
+    configFields.forEach((field) => {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+        return;
+      }
+      const key = String(field.dataset.workConfigKey || "").trim();
+      if (!key) {
+        return;
+      }
+      const kind = String(field.dataset.workConfigKind || "text").trim();
+      const isNullable = field.dataset.workConfigNullable === "true";
+      if (field instanceof HTMLInputElement && field.type === "checkbox") {
+        nextWork[key] = !!field.checked;
+        return;
+      }
+      const rawValue = field.value;
+      if (kind === "number") {
+        nextWork[key] = rawValue === "" ? null : Number(rawValue);
+        return;
+      }
+      if (kind === "json") {
+        const trimmed2 = String(rawValue || "").trim();
+        if (trimmed2 === "") {
+          nextWork[key] = null;
+          return;
+        }
+        try {
+          nextWork[key] = JSON.parse(trimmed2);
+        } catch (e) {
+          nextWork[key] = trimmed2;
+        }
+        return;
+      }
+      const trimmed = String(rawValue || "").trim();
+      if (isNullable && trimmed === "") {
+        nextWork[key] = null;
+        return;
+      }
+      nextWork[key] = rawValue;
+    });
+    return nextWork;
+  }
+  function renderWorkValueControl(key, value) {
+    const normalizedKey = String(key || "").trim();
+    const inputId = `edit-work-config-${normalizedKey}`;
+    if (typeof value === "boolean") {
+      return `
+            <label class="edit-work-field-value-toggle">
+                <input class="edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="checkbox" type="checkbox"${value ? " checked" : ""}>
+            </label>
+        `;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="number" type="number" step="any" value="${escapeHtml(String(value))}" placeholder="Value">`;
+    }
+    if (Array.isArray(value) || value && typeof value === "object") {
+      const serialized = JSON.stringify(value, null, 2);
+      return `<textarea class="form-textarea edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="json" rows="3" placeholder="JSON value">${escapeHtml(serialized)}</textarea>`;
+    }
+    const isNullable = normalizedKey === "poster";
+    return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="text"${isNullable ? ' data-work-config-nullable="true"' : ""} type="text" value="${escapeHtml(value === null || value === void 0 ? "" : String(value))}" placeholder="Value">`;
+  }
+  function renderWorkConfigFieldsSection(config = {}) {
+    const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
+    const workType = String(work.type || "").trim();
+    const fieldNames = new Set(extractWorkFields(work).map((field) => field.name));
+    const dynamicKeys = Object.keys(work).filter((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) && key !== "type" && !fieldNames.has(key));
+    const workTypeSummary = dynamicKeys.length ? dynamicKeys.join(", ") : "No additional work fields yet.";
+    return `
+        <div class="edit-work-fields edit-work-media">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Work settings</div>
+                    <div class="small-note">Derived from the current work config. Each worktype exposes its own fields here.</div>
+                </div>
+            </div>
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-work-type">Work type</label>
+                    <select class="form-select" id="edit-work-type" name="work_type">
+                        ${renderMediaTypeOptions(workType || "video")}
+                    </select>
+                    <div class="small-note">Base family for the current item.</div>
+                </div>
+                <div>
+                    <div class="edit-label">Current work fields</div>
+                    <div class="small-note">${escapeHtml(workTypeSummary)}</div>
+                </div>
+            </div>
+            ${dynamicKeys.length ? `
+            <div class="edit-work-config-grid">
+                ${dynamicKeys.map((key) => `
+                    <div class="edit-work-config-field">
+                        <label class="edit-label" for="edit-work-config-${escapeHtml(key)}">work.${escapeHtml(key)}</label>
+                        ${renderWorkValueControl(key, work[key])}
+                    </div>
+                `).join("")}
+            </div>
+            ` : ""}
+        </div>
+    `;
   }
   function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
     if (!fields.length) {
@@ -4425,6 +4616,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onTitleInput,
     onDescriptionInput,
     onWorkFieldsInput,
+    onMediaInput,
     onSubmit,
     onToggleDrawer,
     onOpenLayoutPage,
@@ -4506,6 +4698,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <label class="edit-label" for="edit-description">Description</label>
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
             </div>
+            ${(status == null ? void 0 : status.target) === "file" || (config == null ? void 0 : config.work) && typeof config.work === "object" && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === "type") ? renderWorkConfigFieldsSection(config) : ""}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -4559,6 +4752,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const addWorkFieldButton = editPanel.querySelector("#editWorkFieldAdd");
     const promptRoot = editPanel.querySelector("#promptLayer");
     syncPromptDock(promptRoot);
+    const syncMediaState = () => {
+      if (typeof onMediaInput !== "function" || !form) {
+        return;
+      }
+      onMediaInput(readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}));
+    };
     if (titleInput && typeof onTitleInput === "function") {
       titleInput.addEventListener("input", () => {
         onTitleInput(titleInput.value);
@@ -4574,12 +4773,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         workFieldEditor.addWorkField();
       });
     }
+    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type").forEach((input) => {
+      if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
+        return;
+      }
+      input.addEventListener("input", syncMediaState);
+      input.addEventListener("change", syncMediaState);
+    });
     if (form && typeof onSubmit === "function") {
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         workFieldEditor.syncWorkFieldsFromDom();
         onSubmit({
           elements: form.elements,
+          form,
           statusEl
         });
       });
@@ -4699,6 +4906,57 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/controller.js
+  function readMediaConfigFromElements(elements2, form, currentWork = {}) {
+    const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
+    const typeField = elements2.work_type;
+    if (typeField && typeof typeField.value === "string") {
+      const type = typeField.value.trim();
+      if (type) {
+        nextWork.type = type;
+      }
+    }
+    const configFields = (form == null ? void 0 : form.querySelectorAll("[data-work-config-field]")) || [];
+    configFields.forEach((field) => {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+        return;
+      }
+      const key = String(field.dataset.workConfigKey || "").trim();
+      if (!key) {
+        return;
+      }
+      const kind = String(field.dataset.workConfigKind || "text").trim();
+      const isNullable = field.dataset.workConfigNullable === "true";
+      if (field instanceof HTMLInputElement && field.type === "checkbox") {
+        nextWork[key] = !!field.checked;
+        return;
+      }
+      const rawValue = field.value;
+      if (kind === "number") {
+        nextWork[key] = rawValue === "" ? null : Number(rawValue);
+        return;
+      }
+      if (kind === "json") {
+        const trimmed2 = String(rawValue || "").trim();
+        if (trimmed2 === "") {
+          nextWork[key] = null;
+          return;
+        }
+        try {
+          nextWork[key] = JSON.parse(trimmed2);
+        } catch (e) {
+          nextWork[key] = trimmed2;
+        }
+        return;
+      }
+      const trimmed = String(rawValue || "").trim();
+      if (isNullable && trimmed === "") {
+        nextWork[key] = null;
+        return;
+      }
+      nextWork[key] = rawValue;
+    });
+    return nextWork;
+  }
   function createEditController({ elements: elements2, context, editRequested: editRequested2 }) {
     const { editPanel, editDrawer, editToggle } = elements2;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, "currentPoffConfig") ? context.currentPoffConfig : null;
@@ -4851,16 +5109,26 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             renderFolderMeta();
           }
         },
+        onMediaInput: (mediaState) => {
+          if (!editConfig || !mediaState || typeof mediaState !== "object") {
+            return;
+          }
+          const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
+          editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
+        },
         onSubmit: async ({ elements: elements3, statusEl }) => {
           var _a, _b;
           const selection2 = getActiveSelection();
+          const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
+          const form = (elements3 == null ? void 0 : elements3.form) || null;
+          const mediaWork = readMediaConfigFromElements(elements3, form, currentWork);
           const payload = {
             path: getEditTargetPath(selection2),
             title: (((_a = elements3.title) == null ? void 0 : _a.value) || "").trim(),
             description: (((_b = elements3.description) == null ? void 0 : _b.value) || "").trim()
           };
           if ((editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object") {
-            payload.work = materializeWorkFields(editConfig.work);
+            payload.work = materializeWorkFields(mediaWork);
           }
           await saveConfig(payload, statusEl);
         },
