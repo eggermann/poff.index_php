@@ -13,7 +13,9 @@
     --poff-shell-card-border: rgba(255, 255, 255, 0.08);
     --poff-shell-profile-bg: rgba(255, 255, 255, 0.06);
     --poff-shell-profile-border: rgba(255, 255, 255, 0.14);
-    --poff-shell-main-padding: 1.5rem 1.75rem 2rem;
+    --poff-shell-main-padding-block-start: 1.5rem;
+    --poff-shell-main-padding-inline: 1.75rem;
+    --poff-shell-main-padding-block-end: 2rem;
     --poff-work-max-height: calc(100dvh - 11.5rem);
     min-height: 100dvh;
     height: 100dvh;
@@ -97,7 +99,11 @@
 }
 
 .poff-default-layout__main {
-    padding: var(--poff-shell-main-padding);
+    box-sizing: border-box;
+    padding:
+        var(--poff-shell-main-padding-block-start)
+        var(--poff-shell-main-padding-inline)
+        var(--poff-shell-main-padding-block-end);
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
@@ -160,7 +166,9 @@
     }
 
     .poff-default-layout__main {
-        --poff-shell-main-padding: 1rem 1.1rem 1.5rem;
+        --poff-shell-main-padding-block-start: 1rem;
+        --poff-shell-main-padding-inline: 1.1rem;
+        --poff-shell-main-padding-block-end: 1.5rem;
     }
 
     .poff-default-layout__footer {

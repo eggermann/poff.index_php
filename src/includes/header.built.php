@@ -396,7 +396,8 @@ body, html {
 }
 
 .content-frame > .viewer .poff-default-layout__main {
-  padding-inline-end: calc(var(--poff-shell-main-padding) + var(--prompt-dock-reserve));
+  box-sizing: border-box;
+  padding-inline-end: calc(var(--poff-shell-main-padding-inline) + var(--prompt-dock-reserve));
   transition: padding-inline-end 0.18s ease;
 }
 
