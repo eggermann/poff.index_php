@@ -3,6 +3,7 @@
 // $baseDir, $currentRelativePath, $currentAbsolutePath, $currentScript, $folderPoffConfig.
 
 $editQuery = (isset($_GET['edit']) && $_GET['edit'] === 'true') ? '&edit=true' : '';
+$editMode = isset($_GET['edit']) && $_GET['edit'] === 'true';
 $navFolder = $currentRelativePath;
 
 if (!function_exists('cmsNavSlug')) {
@@ -81,7 +82,8 @@ $tree = $folderPoffConfig['tree'] ?? null;
 
 if (is_array($tree)) {
     foreach ($tree as $item) {
-        if (isset($item['visible']) && $item['visible'] === false) {
+        $isHidden = isset($item['visible']) && $item['visible'] === false;
+        if ($isHidden && !$editMode) {
             continue;
         }
         $itemName = $item['name'] ?? '';
@@ -94,9 +96,9 @@ if (is_array($tree)) {
         $linkUrl = ($itemType === 'folder') ? null : extractLinkFileUrl($fullPath);
 
         if ($itemType === 'folder') {
-            $directories[] = cmsNavEntry($itemName, $relativePath, 'folder', $folderIcon, $item, null, $editQuery);
+            $directories[] = cmsNavEntry($itemName, $relativePath, 'folder', $folderIcon, $item, null, $editQuery) + ['hidden' => $isHidden];
         } else {
-            $files[] = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $linkUrl ?? $relativePath, $editQuery);
+            $files[] = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $linkUrl ?? $relativePath, $editQuery) + ['hidden' => $isHidden];
         }
     }
 } else {
@@ -141,7 +143,14 @@ usort($directories, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 usort($files, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
 foreach ($directories as $dir) {
-    echo '<li><a class="nav-link" href="' . htmlspecialchars($dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '">' . $dir['icon'] . htmlspecialchars($dir['name']) . '</a></li>';
+    $isHidden = !empty($dir['hidden']);
+    $hiddenAttrs = $isHidden
+        ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
+        : '';
+    $hiddenBadge = $isHidden
+        ? '<span style="margin-left:auto;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">hidden</span>'
+        : '';
+    echo '<li><a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '"' . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($dir['name']) . $hiddenBadge . '</a></li>';
 }
 
 if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
@@ -160,5 +169,12 @@ if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
 }
 
 foreach ($files as $file) {
-    echo '<li><a class="nav-link" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '">' . $file['icon'] . htmlspecialchars($file['name']) . '</a></li>';
+    $isHidden = !empty($file['hidden']);
+    $hiddenAttrs = $isHidden
+        ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
+        : '';
+    $hiddenBadge = $isHidden
+        ? '<span style="margin-left:auto;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">hidden</span>'
+        : '';
+    echo '<li><a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '"' . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($file['name']) . $hiddenBadge . '</a></li>';
 }

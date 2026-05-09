@@ -23,7 +23,7 @@ export function renderEditDrawer({
     }
 
     const treeHtml = renderDrawerTreeHtml(config, status);
-    editDrawer.innerHTML = renderEditDrawerMarkup({ config, status, treeHtml });
+    editDrawer.innerHTML = renderEditDrawerMarkup({ config, status, treeHtml, treeItems: config?.tree || [] });
 
     return bindEditDrawerInteractions({
         editDrawer,

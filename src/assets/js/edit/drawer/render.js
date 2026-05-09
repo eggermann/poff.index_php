@@ -110,7 +110,23 @@ export function renderDrawerTreeHtml(config, status) {
         : '<div class="edit-tree-item">No items found.</div>';
 }
 
-export function renderEditDrawerMarkup({ config, status, treeHtml }) {
+function renderDrawerTreeBulkToggle(treeItems = [], status) {
+    if (status?.target === 'file' || !Array.isArray(treeItems) || treeItems.length === 0) {
+        return '';
+    }
+
+    const visibleCount = treeItems.reduce((count, item) => count + (item?.visible !== false ? 1 : 0), 0);
+    return `
+        <div class="edit-tree-bulk">
+            <label class="edit-tree-item edit-tree-item-bulk">
+                <input type="checkbox" id="editTreeVisibleAll" data-tree-visible-all ${visibleCount > 0 ? 'checked' : ''}>
+                <span>Select all visible items <span class="opacity-60">(${visibleCount}/${treeItems.length})</span></span>
+            </label>
+        </div>
+    `;
+}
+
+export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
     return `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -151,6 +167,7 @@ export function renderEditDrawerMarkup({ config, status, treeHtml }) {
             ${status?.target !== 'file' ? `
             <div>
                 <label class="edit-label">Visible items</label>
+                ${renderDrawerTreeBulkToggle(treeItems, status)}
                 <div class="edit-tree">${treeHtml}</div>
             </div>
             ` : ''}
