@@ -1,1 +1,1 @@
-window.__defaultFsLayout = true;
+window.__editedDefaultFsLayout = true;

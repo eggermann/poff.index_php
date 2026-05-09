@@ -84,7 +84,3 @@ export function getActiveSelection() {
     }
     return getSelectionFromPath(folderPath);
 }
-
-export function getActivePath() {
-    return getActiveSelection().path;
-}

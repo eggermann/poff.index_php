@@ -87,7 +87,6 @@
 .edit-status-success{--un-text-opacity:1;color:rgb(21 128 61 / var(--un-text-opacity));}
 .nav-link-up{--un-text-opacity:1;color:rgb(16 185 129 / var(--un-text-opacity));font-weight:500;}
 /* layer: default */
-.\!visible{visibility:visible !important;}
 .visible{visibility:visible;}
 .absolute{position:absolute;}
 .relative{position:relative;}
@@ -841,6 +840,47 @@ body, html {
 .edit-panel .edit-work-fields-list {
   display: grid;
   gap: 14px;
+}
+
+.edit-drawer .edit-fieldset {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fbfdff 0%, #eef6ff 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 12px 30px rgba(15, 23, 42, 0.03);
+}
+
+.edit-drawer .edit-fieldset-title {
+  font-weight: 700;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.edit-drawer .edit-template-map-list {
+  display: grid;
+  gap: 12px;
+}
+
+.edit-drawer .edit-template-map-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.edit-drawer .edit-template-map-row .edit-label {
+  margin-bottom: 0;
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.edit-drawer .edit-template-map-row .small-note {
+  margin-top: 0;
 }
 
 .edit-panel .edit-work-field-row {

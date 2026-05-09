@@ -31,14 +31,137 @@ class PoffConfig
         }
     }
 
+    private static function normalizeTemplateMap(mixed $value): array
+    {
+        return class_exists('Worktype') ? Worktype::normalizeTemplateMap($value) : [];
+    }
+
+    public static function trimTemplateMapOverrides(array $templateMap, array $inheritedMap): array
+    {
+        $normalizedTemplateMap = self::normalizeTemplateMap($templateMap);
+        $normalizedInheritedMap = self::normalizeTemplateMap($inheritedMap);
+
+        if ($normalizedTemplateMap === []) {
+            return [];
+        }
+
+        foreach ($normalizedTemplateMap as $mime => $template) {
+            if (isset($normalizedInheritedMap[$mime]) && $normalizedInheritedMap[$mime] === $template) {
+                unset($normalizedTemplateMap[$mime]);
+            }
+        }
+
+        return self::normalizeTemplateMap($normalizedTemplateMap);
+    }
+
+    private static function resolveConfigTemplateMap(array $config): array
+    {
+        $work = isset($config['work']) && is_array($config['work']) ? $config['work'] : [];
+        return self::normalizeTemplateMap($work['templateMap'] ?? null);
+    }
+
+    public static function resolveInheritedTemplateMap(string $dir): array
+    {
+        $normalizedDir = realpath($dir);
+        if ($normalizedDir === false) {
+            $normalizedDir = rtrim($dir, DIRECTORY_SEPARATOR);
+        }
+
+        $directories = [];
+        $cursor = $normalizedDir;
+        while ($cursor !== '' && $cursor !== DIRECTORY_SEPARATOR) {
+            $directories[] = $cursor;
+            $parent = dirname($cursor);
+            if ($parent === $cursor) {
+                break;
+            }
+            $cursor = $parent;
+        }
+
+        $map = [];
+        foreach (array_reverse($directories) as $directory) {
+            $configPath = self::configPath($directory);
+            if (!is_file($configPath)) {
+                continue;
+            }
+
+            $decoded = json_decode((string) file_get_contents($configPath), true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            $map = array_replace($map, self::resolveConfigTemplateMap($decoded));
+        }
+
+        return self::normalizeTemplateMap($map);
+    }
+
+    public static function resolveEffectiveTemplateMap(string $dir, mixed $localTemplateMap = null): array
+    {
+        $map = self::resolveInheritedTemplateMap($dir);
+        $local = self::normalizeTemplateMap($localTemplateMap);
+        if ($local !== []) {
+            $map = array_replace($map, $local);
+        }
+
+        return self::normalizeTemplateMap($map);
+    }
+
+    public static function resolveWorkTemplateState(string $dir, array $work, string $kind, ?string $mime = null, ?string $fileName = null): array
+    {
+        $normalizedKind = strtolower(trim($kind));
+        if ($normalizedKind === '') {
+            $normalizedKind = 'other';
+        }
+
+        $explicitTemplate = '';
+        if (array_key_exists('template', $work) && is_string($work['template'])) {
+            $explicitTemplate = Worktype::normalizeTemplateKey($work['template']);
+        }
+
+        $effectiveTemplateMap = self::resolveEffectiveTemplateMap($dir, $work['templateMap'] ?? null);
+        $suggested = Worktype::resolveTemplateSelection($normalizedKind, $mime, $fileName, $effectiveTemplateMap);
+
+        if ($explicitTemplate !== '') {
+            $suggested['template'] = $explicitTemplate;
+            $suggested['source'] = 'explicit';
+        }
+
+        if ($suggested['template'] === 'video' && Worktype::shouldAutoplayByDefault('video', $normalizedKind, $mime, $fileName)) {
+            $suggested['autoplay'] = true;
+        }
+
+        $resolvedWork = $work;
+        $resolvedWork['templateMap'] = $effectiveTemplateMap;
+        $resolvedWork['template'] = $suggested['template'];
+        if (!array_key_exists('type', $resolvedWork) || trim((string) $resolvedWork['type']) === '') {
+            $resolvedWork['type'] = $normalizedKind;
+        }
+        if ($suggested['autoplay'] === true) {
+            $resolvedWork['autoplay'] = true;
+        }
+
+        return [
+            'work' => $resolvedWork,
+            'template' => $suggested['template'],
+            'source' => $suggested['source'],
+            'templateMap' => $effectiveTemplateMap,
+            'autoplay' => $suggested['autoplay'] ?? false,
+        ];
+    }
+
     private static function defaultWork(string $kind, ?string $mime = null, ?string $fileName = null): array
     {
-        $templateKey = Worktype::suggestedWorktypeKey($kind, $mime, $fileName);
+        $selection = Worktype::resolveTemplateSelection($kind, $mime, $fileName);
+        $templateKey = (string) ($selection['template'] ?? Worktype::suggestedWorktypeKey($kind, $mime, $fileName));
         $work = Worktype::definition($templateKey, $mime);
         $section = $kind === 'folder' ? 'works' : 'work';
         $work['layout'] = Worktype::normalizeLayout($work['layout'] ?? null, $section);
         if (!isset($work['template']) || trim((string) $work['template']) === '') {
             $work['template'] = $templateKey;
+        }
+        if (($selection['autoplay'] ?? false) === true) {
+            $work['autoplay'] = true;
         }
         $work['type'] = $work['type'] ?? $kind;
 
@@ -456,7 +579,8 @@ class PoffConfig
             }
         }
         if ($isSharedPreset) {
-            return $normalized;
+            $normalized['storage'] = 'shared';
+            return self::serializeLayout($normalized, $section);
         }
         $layoutDir = $fileName === null
             ? self::folderLayoutDir($dir)

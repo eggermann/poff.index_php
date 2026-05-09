@@ -33,6 +33,31 @@ function cmsPromptNormalizeStringList(array|string|null $value): array
     return $result;
 }
 
+function cmsPromptCompactTemplateMap(array|string|null $value, int $maxEntries = 12): array
+{
+    if (!class_exists('Worktype')) {
+        return [];
+    }
+
+    $map = Worktype::normalizeTemplateMap($value);
+    if ($map === []) {
+        return [];
+    }
+
+    $entries = [];
+    foreach (array_slice($map, 0, $maxEntries, true) as $mime => $template) {
+        $entries[] = [
+            'mime' => $mime,
+            'template' => $template,
+        ];
+    }
+
+    return [
+        'count' => count($map),
+        'entries' => $entries,
+    ];
+}
+
 function cmsPromptCompactRef(array $ref): array
 {
     $compact = [];
@@ -153,6 +178,14 @@ function cmsPromptCompactConfig(array $config, bool $includeResolvedLayoutSource
                 continue;
             }
 
+            if ($key === 'templateMap' && is_array($value)) {
+                $templateMap = cmsPromptCompactTemplateMap($value);
+                if ($templateMap !== []) {
+                    $summary['work']['templateMap'] = $templateMap;
+                }
+                continue;
+            }
+
             if (is_string($value)) {
                 $summary['work'][$key] = cmsPromptTrimText($value, 180);
             }
@@ -249,6 +282,9 @@ function cmsPromptCompactContext(array $context): array
             $work[$key] = is_string($value)
                 ? cmsPromptTrimText($value, 220)
                 : $value;
+        }
+        if (is_array($current['work']['templateMap'] ?? null)) {
+            $work['templateMap'] = cmsPromptCompactTemplateMap($current['work']['templateMap']);
         }
         $current['work'] = $work;
     }

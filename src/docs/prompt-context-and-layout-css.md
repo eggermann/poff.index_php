@@ -17,7 +17,10 @@ The visible `Prompt context` panel on the right side is rendered in the browser.
 
 Main file:
 
-- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/build/context.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render/context.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render/history.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render/summary.js`
 
 Relevant functions:
 

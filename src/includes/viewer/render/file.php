@@ -14,18 +14,18 @@ function renderFileViewer(string $relativePath, string $fullPath): void
     $workDefinitionKey = $workTemplateKey !== '' ? $workTemplateKey : $type;
     $workDefaults = Worktype::definition($workDefinitionKey, $mimeType);
     $work = array_merge($workDefaults, $workData);
-    if ($workTemplateKey === '' && isset($workDefaults['template']) && is_string($workDefaults['template'])) {
+    if (class_exists('PoffConfig')) {
+        $resolvedWorkState = PoffConfig::resolveWorkTemplateState(dirname($fullPath), $work, $type, $mimeType, basename($fullPath));
+        if (is_array($resolvedWorkState['work'] ?? null)) {
+            $work = $resolvedWorkState['work'];
+        }
+    }
+    if ((!isset($work['template']) || trim((string) $work['template']) === '') && isset($workDefaults['template']) && is_string($workDefaults['template'])) {
         $work['template'] = $workDefaults['template'];
     }
     $work['type'] = $work['type'] ?? $type;
     if (class_exists('PoffConfig')) {
         $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, true, 'work');
-    }
-    if ($workTemplateKey !== '') {
-        $sectionTemplate = Worktype::template($workTemplateKey);
-        if (is_string($sectionTemplate) && trim($sectionTemplate) !== '') {
-            $work['layout']['sectionTemplate'] = $sectionTemplate;
-        }
     }
 
     $linkUrl = null;

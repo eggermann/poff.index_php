@@ -573,8 +573,9 @@
     "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
     "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
     "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.",
-    "Use work.type for the base family and work.template for the exact template variant key. If the item is a movie or similar autoplay candidate, prefer a matching video variant when one exists.",
+    "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items. If the item is a movie or similar autoplay candidate, prefer video plus work.autoplay=true instead of a separate video-autoplay template key.",
     "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
+    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
     "Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.",
     'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
     'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
@@ -604,6 +605,7 @@
     "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
     "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
     "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
+    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
     "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
     "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
     "Use folder tree data and resolved refs when relevant instead of inventing paths.",
@@ -640,6 +642,7 @@
     "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
     "Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.",
     "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
+    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
     "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
     "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
     "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
@@ -921,45 +924,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return filtered;
   }
 
-  // src/assets/js/edit/prompt/draft.js
-  function readFieldValue(root, selector) {
-    if (!root || typeof root.querySelector !== "function") {
-      return null;
-    }
-    const field = root.querySelector(selector);
-    if (!field || typeof field.value !== "string") {
-      return null;
-    }
-    return field.value;
-  }
-  function readPromptEditorDraft(selection2 = {}, root = document) {
-    const isLayout = !!(selection2 == null ? void 0 : selection2.isLayout);
-    const template = readFieldValue(root, isLayout ? "#edit-layout-primary-template" : "#edit-content-template");
-    if (template === null) {
-      return null;
-    }
-    const draft = {
-      template
-    };
-    if (isLayout) {
-      const sectionTemplate = readFieldValue(root, "#edit-content-template");
-      const css = readFieldValue(root, "#edit-layout-primary-css");
-      const js = readFieldValue(root, "#edit-layout-primary-js");
-      if (sectionTemplate !== null) {
-        draft.sectionTemplate = sectionTemplate;
-      }
-      if (css !== null) {
-        draft.css = css;
-      }
-      if (js !== null) {
-        draft.js = js;
-      }
-    }
-    return draft;
-  }
-
   // src/assets/js/edit/work-fields.js
-  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType", "categories", "category"]);
+  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType", "categories", "category", "templateMap"]);
   var SUPPORTED_WORK_FIELD_TYPES = /* @__PURE__ */ new Set(["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"]);
   var SCHEMA_NUMBER_KEYS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "step"];
   var WORK_FIELD_SCHEMA_PROFILES = {
@@ -1226,7 +1192,44 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return ["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"];
   }
 
-  // src/assets/js/edit/prompt/normalize/link.js
+  // src/assets/js/edit/prompt/draft.js
+  function readFieldValue(root, selector) {
+    if (!root || typeof root.querySelector !== "function") {
+      return null;
+    }
+    const field = root.querySelector(selector);
+    if (!field || typeof field.value !== "string") {
+      return null;
+    }
+    return field.value;
+  }
+  function readPromptEditorDraft(selection2 = {}, root = document) {
+    const isLayout = !!(selection2 == null ? void 0 : selection2.isLayout);
+    const template = readFieldValue(root, isLayout ? "#edit-layout-primary-template" : "#edit-content-template");
+    if (template === null) {
+      return null;
+    }
+    const draft = {
+      template
+    };
+    if (isLayout) {
+      const sectionTemplate = readFieldValue(root, "#edit-content-template");
+      const css = readFieldValue(root, "#edit-layout-primary-css");
+      const js = readFieldValue(root, "#edit-layout-primary-js");
+      if (sectionTemplate !== null) {
+        draft.sectionTemplate = sectionTemplate;
+      }
+      if (css !== null) {
+        draft.css = css;
+      }
+      if (js !== null) {
+        draft.js = js;
+      }
+    }
+    return draft;
+  }
+
+  // src/assets/js/edit/prompt/build/context.js
   function isExternalPromptLink(value = "") {
     const trimmed = String(value || "").trim();
     if (!trimmed) {
@@ -1286,8 +1289,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return folderBasePath ? `${folderBasePath}/${fallbackName}` : fallbackName;
   }
-
-  // src/assets/js/edit/prompt/normalize/categories.js
   function getDefaultWorkCategories(type = "") {
     const normalizedType = String(type || "").trim().toLowerCase();
     if (normalizedType === "image") {
@@ -1329,8 +1330,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     sourceValues.forEach(append);
     return categories;
   }
-
-  // src/assets/js/edit/prompt/build/context.js
   function buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig }) {
     var _a, _b, _c, _d;
     const selection2 = typeof getActiveSelection2 === "function" ? getActiveSelection2() : { path: "", isFile: false };
@@ -1401,7 +1400,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return `${key}: null`;
       }
       const str = String(value);
-      return `${key}: ${str.length > 28 ? str.slice(0, 25) + ellipsis : str}`;
+      return `${key}: ${str.length > 28 ? `${str.slice(0, 25)}${ellipsis}` : str}`;
     }).join(", ");
     const workFieldsPreview = summarizeWorkFields(workFields);
     const refPreview = tree.slice(0, 4).map((item) => {
@@ -1631,6 +1630,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       container.scrollTop = container.scrollHeight;
     }
   }
+
+  // src/assets/js/edit/prompt/render/summary.js
   function renderPromptSummary(summaryEl, content) {
     if (!summaryEl) {
       return;
@@ -2936,30 +2937,65 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return groups;
     }, {}) : {};
   }
+  function renderGroupedSelectOptions(choices = [], selectedValue = "", includeInherit = false) {
+    const groups = groupWorktypeChoices(choices);
+    const groupEntries = Object.entries(groups);
+    if (!groupEntries.length) {
+      return includeInherit ? `<option value="" ${selectedValue === "" ? "selected" : ""}>Inherit default</option>` : "";
+    }
+    const inheritOption = includeInherit ? `<option value="" ${selectedValue === "" ? "selected" : ""}>Inherit default</option>` : "";
+    return `
+        ${inheritOption}
+        ${groupEntries.map(([group, groupChoices]) => `
+            <optgroup label="${escapeHtml(group)}">
+                ${groupChoices.map((choice) => `
+                    <option value="${escapeHtml(choice.value || "")}" data-kind="${escapeHtml(choice.kind || group)}" ${String(choice.value || "") === selectedValue ? "selected" : ""}>
+                        ${escapeHtml(choice.label || choice.value || group)}
+                    </option>
+                `).join("")}
+            </optgroup>
+        `).join("")}
+    `;
+  }
   function renderWorktypeSelect(config = {}) {
     var _a, _b;
     const catalog = (config == null ? void 0 : config.workTemplateCatalog) && typeof config.workTemplateCatalog === "object" ? config.workTemplateCatalog : null;
     const choices = Array.isArray(catalog == null ? void 0 : catalog.choices) ? catalog.choices : [];
     const selectedValue = String(((_a = config == null ? void 0 : config.work) == null ? void 0 : _a.template) || (catalog == null ? void 0 : catalog.selected) || ((_b = config == null ? void 0 : config.work) == null ? void 0 : _b.type) || "").trim();
-    const groups = groupWorktypeChoices(choices);
-    const groupEntries = Object.entries(groups);
-    if (!groupEntries.length) {
+    if (!choices.length) {
       return `<input class="form-input" id="edit-work-type" type="text" name="work_template" value="${escapeHtml(selectedValue)}">`;
     }
     return `
         <select class="form-select" id="edit-work-type" name="work_template">
-            ${groupEntries.map(([group, groupChoices]) => `
-                <optgroup label="${escapeHtml(group)}">
-                    ${groupChoices.map((choice) => `
-                        <option value="${escapeHtml(choice.value || "")}" data-kind="${escapeHtml(choice.kind || group)}" ${String(choice.value || "") === selectedValue ? "selected" : ""}>
-                            ${escapeHtml(choice.label || choice.value || group)}
-                        </option>
-                    `).join("")}
-                </optgroup>
-            `).join("")}
+            ${renderGroupedSelectOptions(choices, selectedValue, false)}
         </select>
         <div class="small-note">
             ${(catalog == null ? void 0 : catalog.detectedMime) ? `Detected ${escapeHtml(catalog.detectedMime)}${catalog.detectedExtension ? ` \xB7 .${escapeHtml(catalog.detectedExtension)}` : ""} \xB7 showing ${escapeHtml(catalog.detectedKind || "current")} templates` : "Template is picked from the available registry."}
+        </div>
+    `;
+  }
+  function renderTemplateMapSelect(row = {}) {
+    const catalog = (row == null ? void 0 : row.catalog) && typeof row.catalog === "object" ? row.catalog : null;
+    const choices = Array.isArray(catalog == null ? void 0 : catalog.choices) ? catalog.choices : [];
+    const selectedValue = String((row == null ? void 0 : row.selected) || "").trim();
+    const mime = String((row == null ? void 0 : row.mime) || "").trim();
+    const safeMimeId = mime.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "mime";
+    return `
+        <label class="edit-label" for="template-map-${escapeHtml(safeMimeId)}">
+            ${escapeHtml(mime || "mime")}
+        </label>
+        <select
+            class="form-select edit-template-map-select"
+            id="template-map-${escapeHtml(safeMimeId)}"
+            name="work_template_map[${escapeHtml(mime)}]"
+            data-template-map-mime="${escapeHtml(mime)}"
+            data-template-map-selected="${escapeHtml(selectedValue)}"
+        >
+            ${renderGroupedSelectOptions(choices, selectedValue, true)}
+        </select>
+        <div class="small-note">
+            ${escapeHtml((row == null ? void 0 : row.kind) || "other")} \xB7 ${escapeHtml((row == null ? void 0 : row.count) ? `${row.count} item${row.count === 1 ? "" : "s"}` : "no items")}
+            ${(row == null ? void 0 : row.sampleName) ? `\xB7 ${escapeHtml(row.sampleName)}` : ""}
         </div>
     `;
   }
@@ -2982,6 +3018,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }).join("") : '<div class="edit-tree-item">No items found.</div>';
   }
   function renderEditDrawerMarkup({ config, status, treeHtml }) {
+    var _a;
     return `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -3006,6 +3043,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
                 <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
+            ${Array.isArray((_a = config == null ? void 0 : config.workTemplateMapCatalog) == null ? void 0 : _a.rows) && config.workTemplateMapCatalog.rows.length ? `
+            <div class="edit-fieldset">
+                <div class="edit-fieldset-title">Template defaults by MIME</div>
+                <div class="small-note">Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.</div>
+                <div class="edit-template-map-list">
+                    ${config.workTemplateMapCatalog.rows.map((row) => `
+                        <div class="edit-template-map-row">
+                            ${renderTemplateMapSelect(row)}
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+            ` : ""}
             ${(status == null ? void 0 : status.target) !== "file" ? `
             <div>
                 <label class="edit-label">Visible items</label>
@@ -3033,6 +3083,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const treeVisible = (status == null ? void 0 : status.target) !== "file" ? Array.from(editDrawer.querySelectorAll('input[name="tree_visible"]:checked')).map((input) => input.value) : [];
         onSubmit({
           elements: drawerForm.elements,
+          drawerForm,
           statusEl: drawerStatus,
           treeVisible
         });
@@ -3086,8 +3137,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         <div>Example context JSON: <code>{"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}</code></div>
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : mode === "folder" ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
                         <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>
+                        <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>
                         <div>Parent/sibling prompt refs: current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks. Sibling refs are same-folder only.</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>`;
+                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>
+                        <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>`;
     const inputPlaceholder = mode === "layout" ? "Describe the layout you want..." : mode === "folder" ? "Describe the folder component you want..." : "Describe the file component you want...";
     const provider = settings.provider === "openai" ? "openai" : settings.provider === "gemini" ? "gemini" : "local";
     return `
@@ -4966,13 +5019,28 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           drawerOpen = false;
           syncDrawerVisibility();
         },
-        onSubmit: async ({ elements: elements3, statusEl, treeVisible }) => {
+        onSubmit: async ({ elements: elements3, drawerForm, statusEl, treeVisible }) => {
           var _a, _b, _c;
           const selection2 = getActiveSelection();
           const templateField = elements3.work_template || elements3.work_type;
           const selectedTemplateOption = (templateField == null ? void 0 : templateField.selectedOptions) && templateField.selectedOptions[0] ? templateField.selectedOptions[0] : null;
           const selectedTemplate = ((templateField == null ? void 0 : templateField.value) || "").trim();
           const selectedKind = (((_a = selectedTemplateOption == null ? void 0 : selectedTemplateOption.dataset) == null ? void 0 : _a.kind) || selectedTemplate || "").trim();
+          const templateMap = {};
+          if (drawerForm) {
+            drawerForm.querySelectorAll("select[data-template-map-mime]").forEach((select) => {
+              const mime = String(select.dataset.templateMapMime || "").trim();
+              if (!mime) {
+                return;
+              }
+              const selectedValue = String(select.value || "").trim();
+              const baselineValue = String(select.dataset.templateMapSelected || "").trim();
+              if (selectedValue === baselineValue) {
+                return;
+              }
+              templateMap[mime] = selectedValue;
+            });
+          }
           const payload = {
             path: getEditTargetPath(selection2),
             link: (((_b = elements3.link) == null ? void 0 : _b.value) || "").trim(),
@@ -4982,6 +5050,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               template: selectedTemplate
             }
           };
+          if (Object.keys(templateMap).length > 0) {
+            payload.work.templateMap = templateMap;
+          }
           if ((status == null ? void 0 : status.target) !== "file") {
             payload.treeVisible = treeVisible;
           }

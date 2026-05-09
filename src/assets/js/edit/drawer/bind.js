@@ -15,6 +15,7 @@ export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubm
                 : [];
             onSubmit({
                 elements: drawerForm.elements,
+                drawerForm,
                 statusEl: drawerStatus,
                 treeVisible,
             });

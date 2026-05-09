@@ -49,6 +49,148 @@ trait WorktypeDefinitionsTrait
         return $categories;
     }
 
+    public static function isKnownWorktypeKey(string $key): bool
+    {
+        $normalized = strtolower(trim($key));
+        if ($normalized === '') {
+            return false;
+        }
+
+        return in_array($normalized, self::availableKinds(), true);
+    }
+
+    public static function normalizeTemplateKey(?string $value): string
+    {
+        $candidate = strtolower(trim((string) $value));
+        return self::isKnownWorktypeKey($candidate) ? $candidate : '';
+    }
+
+    public static function normalizeTemplateMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($value as $mime => $template) {
+            if (!is_scalar($mime)) {
+                continue;
+            }
+
+            $normalizedMime = strtolower(trim((string) $mime));
+            if ($normalizedMime === '') {
+                continue;
+            }
+
+            if (is_array($template)) {
+                $template = $template['template'] ?? $template['value'] ?? $template['kind'] ?? '';
+            }
+
+            $normalizedTemplate = self::normalizeTemplateKey(is_scalar($template) ? (string) $template : '');
+            if ($normalizedTemplate === '') {
+                continue;
+            }
+
+            $map[$normalizedMime] = $normalizedTemplate;
+        }
+
+        if ($map !== []) {
+            ksort($map, SORT_NATURAL | SORT_FLAG_CASE);
+        }
+
+        return $map;
+    }
+
+    private static function templateMapCandidates(string $kind, ?string $mime = null, ?string $fileName = null): array
+    {
+        $candidates = [];
+        $normalizedMime = strtolower(trim((string) $mime));
+        if ($normalizedMime !== '') {
+            $candidates[] = $normalizedMime;
+            $mimeMajor = strtok($normalizedMime, '/');
+            if (is_string($mimeMajor) && trim($mimeMajor) !== '') {
+                $candidates[] = strtolower(trim($mimeMajor)) . '/*';
+            }
+        }
+
+        $normalizedKind = strtolower(trim($kind));
+        if ($normalizedKind !== '') {
+            $candidates[] = $normalizedKind;
+        }
+
+        if ($fileName !== null && trim($fileName) !== '') {
+            $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            if ($extension !== '') {
+                $candidates[] = $extension;
+            }
+        }
+
+        return array_values(array_unique(array_filter($candidates, static fn(string $candidate): bool => $candidate !== '')));
+    }
+
+    private static function lookupTemplateMap(array $templateMap, string $kind, ?string $mime = null, ?string $fileName = null): string
+    {
+        foreach (self::templateMapCandidates($kind, $mime, $fileName) as $candidate) {
+            if (!array_key_exists($candidate, $templateMap)) {
+                continue;
+            }
+
+            $normalizedTemplate = self::normalizeTemplateKey((string) $templateMap[$candidate]);
+            if ($normalizedTemplate !== '') {
+                return $normalizedTemplate;
+            }
+        }
+
+        return '';
+    }
+
+    public static function shouldAutoplayByDefault(string $template, string $kind, ?string $mime = null, ?string $fileName = null): bool
+    {
+        if ($template !== 'video') {
+            return false;
+        }
+
+        $normalizedMime = strtolower(trim((string) $mime));
+        if ($normalizedMime === 'video/quicktime') {
+            return true;
+        }
+
+        if ($fileName !== null && strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) === 'mov') {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function resolveTemplateSelection(string $kind, ?string $mime = null, ?string $fileName = null, mixed $templateMap = null): array
+    {
+        $normalizedKind = strtolower(trim($kind));
+        if ($normalizedKind === '') {
+            $normalizedKind = 'other';
+        }
+
+        $normalizedMap = self::normalizeTemplateMap($templateMap);
+        $selected = self::lookupTemplateMap($normalizedMap, $normalizedKind, $mime, $fileName);
+        $source = $selected !== '' ? 'templateMap' : 'suggested';
+        if ($selected === '') {
+            $selected = self::suggestedWorktypeKey($normalizedKind, $mime, $fileName);
+        }
+
+        if (!self::isKnownWorktypeKey($selected)) {
+            $selected = self::isKnownWorktypeKey($normalizedKind) ? $normalizedKind : 'other';
+        }
+
+        return [
+            'kind' => $normalizedKind,
+            'template' => $selected,
+            'source' => $source,
+            'mime' => is_string($mime) ? trim($mime) : null,
+            'fileName' => is_string($fileName) ? trim($fileName) : null,
+            'templateMap' => $normalizedMap,
+            'autoplay' => self::shouldAutoplayByDefault($selected, $normalizedKind, $mime, $fileName),
+        ];
+    }
+
     public static function normalizeLayout(mixed $value, string $section = 'work'): array
     {
         $layout = [

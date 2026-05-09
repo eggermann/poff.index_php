@@ -346,7 +346,7 @@ export function createEditController({ elements, context, editRequested }) {
                 drawerOpen = false;
                 syncDrawerVisibility();
             },
-            onSubmit: async ({ elements, statusEl, treeVisible }) => {
+            onSubmit: async ({ elements, drawerForm, statusEl, treeVisible }) => {
                 const selection = getActiveSelection();
                 const templateField = elements.work_template || elements.work_type;
                 const selectedTemplateOption = templateField?.selectedOptions && templateField.selectedOptions[0]
@@ -354,6 +354,21 @@ export function createEditController({ elements, context, editRequested }) {
                     : null;
                 const selectedTemplate = (templateField?.value || '').trim();
                 const selectedKind = (selectedTemplateOption?.dataset?.kind || selectedTemplate || '').trim();
+                const templateMap = {};
+                if (drawerForm) {
+                    drawerForm.querySelectorAll('select[data-template-map-mime]').forEach((select) => {
+                        const mime = String(select.dataset.templateMapMime || '').trim();
+                        if (!mime) {
+                            return;
+                        }
+                        const selectedValue = String(select.value || '').trim();
+                        const baselineValue = String(select.dataset.templateMapSelected || '').trim();
+                        if (selectedValue === baselineValue) {
+                            return;
+                        }
+                        templateMap[mime] = selectedValue;
+                    });
+                }
                 const payload = {
                     path: getEditTargetPath(selection),
                     link: (elements.link?.value || '').trim(),
@@ -363,6 +378,9 @@ export function createEditController({ elements, context, editRequested }) {
                         template: selectedTemplate,
                     },
                 };
+                if (Object.keys(templateMap).length > 0) {
+                    payload.work.templateMap = templateMap;
+                }
                 if (status?.target !== 'file') {
                     payload.treeVisible = treeVisible;
                 }

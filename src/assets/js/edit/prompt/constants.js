@@ -22,8 +22,9 @@ export const legacyWorkSystemPrompt = [
     'When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.',
     'Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.',
     'Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.',
-    'Use work.type for the base family and work.template for the exact template variant key. If the item is a movie or similar autoplay candidate, prefer a matching video variant when one exists.',
+    'Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items. If the item is a movie or similar autoplay candidate, prefer video plus work.autoplay=true instead of a separate video-autoplay template key.',
     'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+    'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
     'Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.',
     'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
     'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
@@ -55,6 +56,7 @@ export const defaultFolderSystemPrompt = [
     'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
     'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
     'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+    'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
     'Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
     'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
     'Use folder tree data and resolved refs when relevant instead of inventing paths.',
@@ -92,6 +94,7 @@ export const defaultLayoutSystemPrompt = [
     'current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.',
     'Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.',
     'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+    'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
     'For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.',
     'Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.',
     'Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.',
@@ -105,8 +108,6 @@ export const defaultLayoutSystemPrompt = [
     'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
     'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',
 ].join('\n');
-
-export const defaultSystemPrompt = defaultFileSystemPrompt;
 export const defaultPromptSettings = {
     provider: 'local',
     model: getDefaultModelForProvider('local'),

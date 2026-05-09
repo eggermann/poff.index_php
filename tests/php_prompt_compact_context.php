@@ -33,6 +33,10 @@ $fileConfig['work']['fields'] = [
     ],
 ];
 $fileConfig['work']['text1'] = 'Prominent section copy';
+$fileConfig['work']['templateMap'] = [
+    'video/quicktime' => 'video',
+    'image/jpeg' => 'image',
+];
 $rootConfig = [
     'folderName' => 'poff-tests',
     'title' => 'poff-tests',
@@ -68,6 +72,9 @@ $folderConfig['work']['fields'] = [
     ],
 ];
 $folderConfig['work']['text1'] = 'Folder prominent copy';
+$folderConfig['work']['templateMap'] = [
+    'video/quicktime' => 'video',
+];
 $folderViewData = buildFolderViewerData('viewer-folder', $root . DIRECTORY_SEPARATOR . 'viewer-folder', $folderConfig, [
     'name' => 'viewer-folder',
     'title' => 'Folder Preview',

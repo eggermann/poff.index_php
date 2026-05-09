@@ -39,9 +39,11 @@ export function renderPromptWindow(settings = {}, options = {}) {
         : mode === 'folder'
             ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
                         <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>
+                        <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>
                         <div>Parent/sibling prompt refs: current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks. Sibling refs are same-folder only.</div>`
             : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>`;
+                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>
+                        <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>`;
     const inputPlaceholder = mode === 'layout'
         ? 'Describe the layout you want...'
         : mode === 'folder'

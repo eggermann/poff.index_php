@@ -1,1 +1,9 @@
-<div class="file-custom">{{title}}|{{#each layout.assets}}<span class="asset">{{href}}</span>{{/each}}</div>
+<div class="broken-file-wrapper"><header>{{title}}</header><main><p>Wrapper only</p></main><main class="poff-default-layout__main">
+    {{#if isFolder}}
+        {{> works}}
+    {{else}}
+        {{> work}}
+    {{/if}}
+</main>
+
+</div>

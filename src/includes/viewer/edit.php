@@ -45,25 +45,103 @@ function cmsUploadLimits(): array
     ];
 }
 
-function cmsWorktypeCatalogForConfig(array $config, string $subjectType, ?string $targetFile = null): array
+function cmsWorktypeCatalogForConfig(array $config, string $subjectType, string $targetDir, ?string $targetFile = null): array
 {
     if (!class_exists('Worktype')) {
         return [];
     }
 
     $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
-    $selected = trim((string) ($work['template'] ?? ''));
     $mime = $subjectType === 'file'
         ? trim((string) ($config['mimeType'] ?? ''))
         : '';
     $fileName = $subjectType === 'file' ? trim((string) ($targetFile ?? '')) : null;
+    $resolved = class_exists('PoffConfig')
+        ? PoffConfig::resolveWorkTemplateState($targetDir, $work, $subjectType === 'folder' ? 'folder' : (string) ($config['kind'] ?? $subjectType), $mime !== '' ? $mime : null, $fileName)
+        : [];
+    $selected = trim((string) ($resolved['template'] ?? $work['template'] ?? ''));
+    $catalog = Worktype::worktypeCatalog($mime !== '' ? $mime : null, $fileName, $selected !== '' ? $selected : null, $subjectType);
 
-    return Worktype::worktypeCatalog($mime !== '' ? $mime : null, $fileName, $selected !== '' ? $selected : null, $subjectType);
+    return $catalog;
 }
 
-function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, ?string $targetFile = null): array
+function cmsWorktypeMapCatalogForConfig(array $config, string $subjectType, string $targetDir, ?string $targetFile = null, array $folderViewData = []): array
 {
-    $config['workTemplateCatalog'] = cmsWorktypeCatalogForConfig($config, $subjectType, $targetFile);
+    if ($subjectType !== 'folder') {
+        return [];
+    }
+
+    $items = is_array($folderViewData['allFiles'] ?? null) ? $folderViewData['allFiles'] : [];
+    $groups = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $mime = strtolower(trim((string) ($item['mimeType'] ?? '')));
+        if ($mime === '') {
+            continue;
+        }
+        $kind = strtolower(trim((string) ($item['kind'] ?? 'other')));
+        if (!isset($groups[$mime])) {
+            $groups[$mime] = [
+                'mime' => $mime,
+                'kind' => $kind === '' ? 'other' : $kind,
+                'count' => 0,
+                'sampleName' => '',
+            ];
+        }
+        $groups[$mime]['count']++;
+        if ($groups[$mime]['sampleName'] === '' && is_string($item['name'] ?? null)) {
+            $groups[$mime]['sampleName'] = (string) $item['name'];
+        }
+    }
+
+    if ($groups === []) {
+        return ['rows' => [], 'count' => 0];
+    }
+
+    $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
+    $effectiveTemplateMap = class_exists('PoffConfig')
+        ? PoffConfig::resolveEffectiveTemplateMap($targetDir, $work['templateMap'] ?? null)
+        : Worktype::normalizeTemplateMap($work['templateMap'] ?? null);
+
+    $rows = [];
+    foreach ($groups as $group) {
+        $mime = (string) ($group['mime'] ?? '');
+        $kind = (string) ($group['kind'] ?? 'other');
+        $sampleName = (string) ($group['sampleName'] ?? '');
+        $selectedState = Worktype::resolveTemplateSelection($kind, $mime, $sampleName !== '' ? $sampleName : null, $effectiveTemplateMap);
+        $catalog = Worktype::worktypeCatalog($mime, $sampleName !== '' ? $sampleName : null, (string) ($selectedState['template'] ?? ''), 'file');
+        $rows[] = [
+            'mime' => $mime,
+            'kind' => $kind,
+            'label' => ucfirst($kind) . ' · ' . $mime,
+            'count' => (int) ($group['count'] ?? 0),
+            'sampleName' => $sampleName,
+            'selected' => (string) ($selectedState['template'] ?? ''),
+            'catalog' => $catalog,
+        ];
+    }
+
+    usort($rows, static function (array $left, array $right): int {
+        $kindCompare = strcasecmp((string) ($left['kind'] ?? ''), (string) ($right['kind'] ?? ''));
+        if ($kindCompare !== 0) {
+            return $kindCompare;
+        }
+
+        return strcasecmp((string) ($left['mime'] ?? ''), (string) ($right['mime'] ?? ''));
+    });
+
+    return [
+        'rows' => $rows,
+        'count' => count($rows),
+    ];
+}
+
+function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, string $targetDir, ?string $targetFile = null, array $folderViewData = []): array
+{
+    $config['workTemplateCatalog'] = cmsWorktypeCatalogForConfig($config, $subjectType, $targetDir, $targetFile);
+    $config['workTemplateMapCatalog'] = cmsWorktypeMapCatalogForConfig($config, $subjectType, $targetDir, $targetFile, $folderViewData);
     return $config;
 }
 
@@ -303,9 +381,21 @@ function cmsHandleEditAction(): void
     } else {
         $config = PoffConfig::ensure($targetDir);
     }
+    $folderViewData = $subjectType === 'folder'
+        ? cmsPromptFolderViewData(
+            $subjectRelativePath,
+            $targetDir,
+            $config,
+            [
+                'name' => (string) ($config['folderName'] ?? basename($subjectRelativePath)),
+                'title' => (string) ($config['title'] ?? $config['folderName'] ?? basename($subjectRelativePath)),
+                'slug' => (string) ($config['slug'] ?? PoffConfig::slugify((string) ($config['folderName'] ?? basename($subjectRelativePath)))),
+            ]
+        )
+        : [];
 
     if ($action === 'config') {
-        $config = cmsAnnotateConfigWorktypeCatalog($config, $subjectType, $targetFile);
+        $config = cmsAnnotateConfigWorktypeCatalog($config, $subjectType, $targetDir, $targetFile, $folderViewData);
         cmsJsonResponse([
             'allowed' => true,
             'target' => $isLayoutTarget ? 'layout' : $subjectType,
@@ -477,9 +567,14 @@ function cmsHandleEditAction(): void
         }
 
         $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
+        $templateMapUpdate = null;
         if (isset($data['work']) && is_array($data['work'])) {
             foreach ($data['work'] as $key => $value) {
                 if ($key === 'type') {
+                    continue;
+                }
+                if ($key === 'templateMap') {
+                    $templateMapUpdate = $value;
                     continue;
                 }
                 $work[$key] = $value;
@@ -496,6 +591,50 @@ function cmsHandleEditAction(): void
         }
         if ($hasWorkType && $workType !== '') {
             $work['type'] = $workType;
+        }
+
+        $inheritedTemplateMap = PoffConfig::resolveInheritedTemplateMap($targetDir);
+        if ($templateMapUpdate !== null) {
+            $nextTemplateMap = is_array($work['templateMap'] ?? null) ? $work['templateMap'] : [];
+            if (is_array($templateMapUpdate)) {
+                foreach ($templateMapUpdate as $mime => $template) {
+                    if (!is_scalar($mime)) {
+                        continue;
+                    }
+                    $normalizedMime = strtolower(trim((string) $mime));
+                    if ($normalizedMime === '') {
+                        continue;
+                    }
+                    if (!is_scalar($template) || trim((string) $template) === '') {
+                        unset($nextTemplateMap[$normalizedMime]);
+                        continue;
+                    }
+
+                    $normalizedTemplate = Worktype::normalizeTemplateKey((string) $template);
+                    if ($normalizedTemplate === '') {
+                        unset($nextTemplateMap[$normalizedMime]);
+                        continue;
+                    }
+
+                    $nextTemplateMap[$normalizedMime] = $normalizedTemplate;
+                }
+            }
+
+            $nextTemplateMap = PoffConfig::trimTemplateMapOverrides($nextTemplateMap, $inheritedTemplateMap);
+            if ($nextTemplateMap !== []) {
+                $work['templateMap'] = $nextTemplateMap;
+            } else {
+                unset($work['templateMap']);
+            }
+        }
+
+        if (array_key_exists('templateMap', $work) && is_array($work['templateMap'])) {
+            $currentTemplateMap = PoffConfig::trimTemplateMapOverrides($work['templateMap'], $inheritedTemplateMap);
+            if ($currentTemplateMap !== []) {
+                $work['templateMap'] = $currentTemplateMap;
+            } else {
+                unset($work['templateMap']);
+            }
         }
 
         $layoutPayload = isset($data['layout']) && is_array($data['layout']) ? $data['layout'] : null;
@@ -803,7 +942,7 @@ function cmsHandleEditAction(): void
             $targetDir,
             $subjectType === 'file' ? (string) $targetFile : null
         );
-        $responseConfig = cmsAnnotateConfigWorktypeCatalog($responseConfig, $subjectType, $targetFile);
+        $responseConfig = cmsAnnotateConfigWorktypeCatalog($responseConfig, $subjectType, $targetDir, $targetFile, $subjectType === 'folder' ? ($folderViewData ?? []) : []);
 
         cmsJsonResponse([
             'allowed' => true,
@@ -861,10 +1000,18 @@ function cmsHandleEditAction(): void
             )
             : [];
 
+        $promptConfig = $config;
+        if (is_array($promptConfig['work'] ?? null)) {
+            $promptConfig['work']['templateMap'] = PoffConfig::resolveEffectiveTemplateMap(
+                $targetDir,
+                $promptConfig['work']['templateMap'] ?? null
+            );
+        }
+
         $promptContext = cmsBuildPromptContext(
             $subjectRelativePath,
             $subjectType,
-            $config,
+            $promptConfig,
             $targetFile,
             $promptIsLayoutTarget,
             $layoutPreset,
@@ -872,24 +1019,24 @@ function cmsHandleEditAction(): void
             cmsPromptParentConfig($rootDir, $subjectRelativePath, $subjectType, $targetDir),
             $folderViewData
         );
-        if ($promptIsLayoutTarget && is_array($config['work']['layout'] ?? null)) {
+        if ($promptIsLayoutTarget && is_array($promptConfig['work']['layout'] ?? null)) {
             $promptContext['current']['activeLayout'] = [
-                'name' => (string) ($config['work']['layout']['name'] ?? ''),
-                'mode' => (string) ($config['work']['layout']['mode'] ?? ''),
-                'storage' => (string) ($config['work']['layout']['storage'] ?? ''),
-                'source' => (string) ($config['work']['layout']['source'] ?? ''),
-                'directory' => (string) ($config['work']['layout']['directory'] ?? ''),
-                'inheritedDirectory' => (string) ($config['work']['layout']['inheritedDirectory'] ?? ''),
-                'sectionDirectory' => (string) ($config['work']['layout']['sectionDirectory'] ?? ''),
-                'sharedName' => (string) ($config['work']['layout']['sharedName'] ?? ''),
-                'template' => (string) ($config['work']['layout']['template'] ?? ''),
-                'sectionTemplate' => (string) ($config['work']['layout']['sectionTemplate'] ?? ''),
-                'css' => (string) ($config['work']['layout']['css'] ?? ($config['work']['layout']['style'] ?? '')),
-                'js' => (string) ($config['work']['layout']['js'] ?? ($config['work']['layout']['script'] ?? '')),
+                'name' => (string) ($promptConfig['work']['layout']['name'] ?? ''),
+                'mode' => (string) ($promptConfig['work']['layout']['mode'] ?? ''),
+                'storage' => (string) ($promptConfig['work']['layout']['storage'] ?? ''),
+                'source' => (string) ($promptConfig['work']['layout']['source'] ?? ''),
+                'directory' => (string) ($promptConfig['work']['layout']['directory'] ?? ''),
+                'inheritedDirectory' => (string) ($promptConfig['work']['layout']['inheritedDirectory'] ?? ''),
+                'sectionDirectory' => (string) ($promptConfig['work']['layout']['sectionDirectory'] ?? ''),
+                'sharedName' => (string) ($promptConfig['work']['layout']['sharedName'] ?? ''),
+                'template' => (string) ($promptConfig['work']['layout']['template'] ?? ''),
+                'sectionTemplate' => (string) ($promptConfig['work']['layout']['sectionTemplate'] ?? ''),
+                'css' => (string) ($promptConfig['work']['layout']['css'] ?? ($promptConfig['work']['layout']['style'] ?? '')),
+                'js' => (string) ($promptConfig['work']['layout']['js'] ?? ($promptConfig['work']['layout']['script'] ?? '')),
             ];
         }
         $promptContextJson = json_encode(cmsPromptCompactContext($promptContext), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $configJson = json_encode(cmsPromptCompactConfig($config, $promptIsLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $configJson = json_encode(cmsPromptCompactConfig($promptConfig, $promptIsLayoutTarget), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $responseFormatInstruction = implode("\n", $promptIsLayoutTarget
             ? [
                 'Response format: return strict JSON.',
@@ -921,8 +1068,9 @@ function cmsHandleEditAction(): void
             'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
             'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
             'Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.',
-            'Use work.type for the base family and work.template for the exact template variant key. If the item is a movie or similar autoplay candidate, prefer a matching video variant when one exists.',
+            'Use work.type for the base family and work.template for the exact template override. Use work.templateMap as inherited MIME => template defaults for child items. If the item is a movie or similar autoplay candidate, prefer video plus work.autoplay=true instead of a separate video-autoplay template key.',
             'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+            'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
             'Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.',
             'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
             'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
@@ -991,6 +1139,7 @@ function cmsHandleEditAction(): void
                 'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
                 'Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
                 'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
+                'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
                 'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
                 'Prompt context JSON includes resolved refs for the current item and current folder contents. Use those refs directly instead of inventing paths.',
                 'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',

@@ -238,6 +238,9 @@ function cmsBuildPromptContext(
     if (is_array($config['work']['fields'] ?? null) && $config['work']['fields'] !== []) {
         $context['current']['workFields'] = array_values(array_filter($config['work']['fields'], static fn($field): bool => is_array($field)));
     }
+    if (is_array($config['work']['templateMap'] ?? null)) {
+        $context['current']['work']['templateMap'] = $config['work']['templateMap'];
+    }
 
     $draftSummary = [];
     foreach (['template', 'sectionTemplate', 'css', 'js'] as $key) {

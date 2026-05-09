@@ -13,34 +13,78 @@ function groupWorktypeChoices(choices = []) {
         : {};
 }
 
+function renderGroupedSelectOptions(choices = [], selectedValue = '', includeInherit = false) {
+    const groups = groupWorktypeChoices(choices);
+    const groupEntries = Object.entries(groups);
+    if (!groupEntries.length) {
+        return includeInherit ? `<option value="" ${selectedValue === '' ? 'selected' : ''}>Inherit default</option>` : '';
+    }
+
+    const inheritOption = includeInherit
+        ? `<option value="" ${selectedValue === '' ? 'selected' : ''}>Inherit default</option>`
+        : '';
+
+    return `
+        ${inheritOption}
+        ${groupEntries.map(([group, groupChoices]) => `
+            <optgroup label="${escapeHtml(group)}">
+                ${groupChoices.map((choice) => `
+                    <option value="${escapeHtml(choice.value || '')}" data-kind="${escapeHtml(choice.kind || group)}" ${String(choice.value || '') === selectedValue ? 'selected' : ''}>
+                        ${escapeHtml(choice.label || choice.value || group)}
+                    </option>
+                `).join('')}
+            </optgroup>
+        `).join('')}
+    `;
+}
+
 function renderWorktypeSelect(config = {}) {
     const catalog = config?.workTemplateCatalog && typeof config.workTemplateCatalog === 'object'
         ? config.workTemplateCatalog
         : null;
     const choices = Array.isArray(catalog?.choices) ? catalog.choices : [];
     const selectedValue = String(config?.work?.template || catalog?.selected || config?.work?.type || '').trim();
-    const groups = groupWorktypeChoices(choices);
-    const groupEntries = Object.entries(groups);
-    if (!groupEntries.length) {
+    if (!choices.length) {
         return `<input class="form-input" id="edit-work-type" type="text" name="work_template" value="${escapeHtml(selectedValue)}">`;
     }
 
     return `
         <select class="form-select" id="edit-work-type" name="work_template">
-            ${groupEntries.map(([group, groupChoices]) => `
-                <optgroup label="${escapeHtml(group)}">
-                    ${groupChoices.map((choice) => `
-                        <option value="${escapeHtml(choice.value || '')}" data-kind="${escapeHtml(choice.kind || group)}" ${String(choice.value || '') === selectedValue ? 'selected' : ''}>
-                            ${escapeHtml(choice.label || choice.value || group)}
-                        </option>
-                    `).join('')}
-                </optgroup>
-            `).join('')}
+            ${renderGroupedSelectOptions(choices, selectedValue, false)}
         </select>
         <div class="small-note">
             ${catalog?.detectedMime
                 ? `Detected ${escapeHtml(catalog.detectedMime)}${catalog.detectedExtension ? ` · .${escapeHtml(catalog.detectedExtension)}` : ''} · showing ${escapeHtml(catalog.detectedKind || 'current')} templates`
                 : 'Template is picked from the available registry.'}
+        </div>
+    `;
+}
+
+function renderTemplateMapSelect(row = {}) {
+    const catalog = row?.catalog && typeof row.catalog === 'object' ? row.catalog : null;
+    const choices = Array.isArray(catalog?.choices) ? catalog.choices : [];
+    const selectedValue = String(row?.selected || '').trim();
+    const mime = String(row?.mime || '').trim();
+    const safeMimeId = mime
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'mime';
+    return `
+        <label class="edit-label" for="template-map-${escapeHtml(safeMimeId)}">
+            ${escapeHtml(mime || 'mime')}
+        </label>
+        <select
+            class="form-select edit-template-map-select"
+            id="template-map-${escapeHtml(safeMimeId)}"
+            name="work_template_map[${escapeHtml(mime)}]"
+            data-template-map-mime="${escapeHtml(mime)}"
+            data-template-map-selected="${escapeHtml(selectedValue)}"
+        >
+            ${renderGroupedSelectOptions(choices, selectedValue, true)}
+        </select>
+        <div class="small-note">
+            ${escapeHtml(row?.kind || 'other')} · ${escapeHtml(row?.count ? `${row.count} item${row.count === 1 ? '' : 's'}` : 'no items')}
+            ${row?.sampleName ? `· ${escapeHtml(row.sampleName)}` : ''}
         </div>
     `;
 }
@@ -91,6 +135,19 @@ export function renderEditDrawerMarkup({ config, status, treeHtml }) {
                 </div>
                 <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
+            ${Array.isArray(config?.workTemplateMapCatalog?.rows) && config.workTemplateMapCatalog.rows.length ? `
+            <div class="edit-fieldset">
+                <div class="edit-fieldset-title">Template defaults by MIME</div>
+                <div class="small-note">Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.</div>
+                <div class="edit-template-map-list">
+                    ${config.workTemplateMapCatalog.rows.map((row) => `
+                        <div class="edit-template-map-row">
+                            ${renderTemplateMapSelect(row)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
             ${status?.target !== 'file' ? `
             <div>
                 <label class="edit-label">Visible items</label>
