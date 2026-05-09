@@ -3,7 +3,10 @@ import { getDefaultSystemPromptForMode, getPromptMode, getPromptPlaceholderForMo
 import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt, defaultPromptSettings, getDefaultModelForProvider } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings, readStoredHistory, writeStoredHistory } from './prompt/storage.js';
 import { tagHistory, filterAllowedWork, inferWorkChangesFromPrompt, buildTemplateHistorySnapshot, serializeHistoryForRequest } from './prompt/history.js';
-import { buildPromptContext, renderPromptContext, renderPromptHistory, renderPromptSummary } from './prompt/render.js';
+import { buildPromptContext } from './prompt/build/context.js';
+import { renderPromptContext } from './prompt/render/context.js';
+import { renderPromptHistory } from './prompt/render/history.js';
+import { renderPromptSummary } from './prompt/render/summary.js';
 import { appendStreamingChunk, beginStreaming, createStreamState, finishStreaming, stopStreaming } from './prompt/stream.js';
 import { requestPromptTemplateStream } from '../api/edit.js';
 import { focusPromptTemplateField, syncWorkFieldEditors, updatePromptEditorFields } from './prompt/editor-fields.js';
