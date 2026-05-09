@@ -8,6 +8,58 @@ import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layo
 import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
 import { setStatusMessage } from './status.js';
 
+function readMediaConfigFromElements(elements, form, currentWork = {}) {
+    const nextWork = { ...(currentWork && typeof currentWork === 'object' ? currentWork : {}) };
+    const typeField = elements.work_type;
+    if (typeField && typeof typeField.value === 'string') {
+        const type = typeField.value.trim();
+        if (type) {
+            nextWork.type = type;
+        }
+    }
+    const configFields = form?.querySelectorAll('[data-work-config-field]') || [];
+    configFields.forEach((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+            return;
+        }
+        const key = String(field.dataset.workConfigKey || '').trim();
+        if (!key) {
+            return;
+        }
+        const kind = String(field.dataset.workConfigKind || 'text').trim();
+        const isNullable = field.dataset.workConfigNullable === 'true';
+        if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+            nextWork[key] = !!field.checked;
+            return;
+        }
+        const rawValue = field.value;
+        if (kind === 'number') {
+            nextWork[key] = rawValue === '' ? null : Number(rawValue);
+            return;
+        }
+        if (kind === 'json') {
+            const trimmed = String(rawValue || '').trim();
+            if (trimmed === '') {
+                nextWork[key] = null;
+                return;
+            }
+            try {
+                nextWork[key] = JSON.parse(trimmed);
+            } catch {
+                nextWork[key] = trimmed;
+            }
+            return;
+        }
+        const trimmed = String(rawValue || '').trim();
+        if (isNullable && trimmed === '') {
+            nextWork[key] = null;
+            return;
+        }
+        nextWork[key] = rawValue;
+    });
+    return nextWork;
+}
+
 export function createEditController({ elements, context, editRequested }) {
     const { editPanel, editDrawer, editToggle } = elements;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, 'currentPoffConfig')
@@ -173,15 +225,25 @@ export function createEditController({ elements, context, editRequested }) {
                     renderFolderMeta();
                 }
             },
+            onMediaInput: (mediaState) => {
+                if (!editConfig || !mediaState || typeof mediaState !== 'object') {
+                    return;
+                }
+                const currentWork = (editConfig.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
+            },
             onSubmit: async ({ elements, statusEl }) => {
                 const selection = getActiveSelection();
+                const currentWork = (editConfig?.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                const form = elements?.form || null;
+                const mediaWork = readMediaConfigFromElements(elements, form, currentWork);
                 const payload = {
                     path: getEditTargetPath(selection),
                     title: (elements.title?.value || '').trim(),
                     description: (elements.description?.value || '').trim(),
                 };
                 if (editConfig?.work && typeof editConfig.work === 'object') {
-                    payload.work = materializeWorkFields(editConfig.work);
+                    payload.work = materializeWorkFields(mediaWork);
                 }
                 await saveConfig(payload, statusEl);
             },

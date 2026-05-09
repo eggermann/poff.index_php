@@ -14,6 +14,9 @@ import { layoutOverlayState, syncPromptDock } from './shared.js';
 import { bindUploadDialog, renderUploadSectionHtml } from './upload.js';
 import { renderEditLayoutPanel } from './layout.js';
 
+const MEDIA_WORK_TYPE_OPTIONS = ['video', 'image', 'audio', 'pdf', 'text', 'link', 'folder', 'other'];
+const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind']);
+
 function readRowText(row, selector) {
     const field = row.querySelector(selector);
     return field && typeof field.value === 'string' ? field.value : '';
@@ -88,6 +91,130 @@ function renderSchemaControl(field, key, html) {
 function renderSchemaGroup(field, keys, html) {
     const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
     return visible ? html : '';
+}
+
+function renderMediaTypeOptions(selectedValue = '') {
+    const normalizedSelected = String(selectedValue || '').trim();
+    const options = MEDIA_WORK_TYPE_OPTIONS.slice();
+    if (normalizedSelected && !options.includes(normalizedSelected)) {
+        options.unshift(normalizedSelected);
+    }
+
+    return options.map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('');
+}
+
+function readMediaConfigFromForm(form, currentWork = {}) {
+    const nextWork = { ...(currentWork && typeof currentWork === 'object' ? currentWork : {}) };
+    const typeField = form?.elements?.work_type;
+    if (typeField && typeof typeField.value === 'string') {
+        const type = typeField.value.trim();
+        if (type) {
+            nextWork.type = type;
+        }
+    }
+    const configFields = form?.querySelectorAll('[data-work-config-field]') || [];
+    configFields.forEach((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+            return;
+        }
+        const key = String(field.dataset.workConfigKey || '').trim();
+        if (!key) {
+            return;
+        }
+        const kind = String(field.dataset.workConfigKind || 'text').trim();
+        const isNullable = field.dataset.workConfigNullable === 'true';
+        if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+            nextWork[key] = !!field.checked;
+            return;
+        }
+        const rawValue = field.value;
+        if (kind === 'number') {
+            nextWork[key] = rawValue === '' ? null : Number(rawValue);
+            return;
+        }
+        if (kind === 'json') {
+            const trimmed = String(rawValue || '').trim();
+            if (trimmed === '') {
+                nextWork[key] = null;
+                return;
+            }
+            try {
+                nextWork[key] = JSON.parse(trimmed);
+            } catch {
+                nextWork[key] = trimmed;
+            }
+            return;
+        }
+        const trimmed = String(rawValue || '').trim();
+        if (isNullable && trimmed === '') {
+            nextWork[key] = null;
+            return;
+        }
+        nextWork[key] = rawValue;
+    });
+    return nextWork;
+}
+
+function renderWorkValueControl(key, value) {
+    const normalizedKey = String(key || '').trim();
+    const inputId = `edit-work-config-${normalizedKey}`;
+    if (typeof value === 'boolean') {
+        return `
+            <label class="edit-work-field-value-toggle">
+                <input class="edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="checkbox" type="checkbox"${value ? ' checked' : ''}>
+            </label>
+        `;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="number" type="number" step="any" value="${escapeHtml(String(value))}" placeholder="Value">`;
+    }
+    if (Array.isArray(value) || (value && typeof value === 'object')) {
+        const serialized = JSON.stringify(value, null, 2);
+        return `<textarea class="form-textarea edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="json" rows="3" placeholder="JSON value">${escapeHtml(serialized)}</textarea>`;
+    }
+    const isNullable = normalizedKey === 'poster';
+    return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="text"${isNullable ? ' data-work-config-nullable="true"' : ''} type="text" value="${escapeHtml(value === null || value === undefined ? '' : String(value))}" placeholder="Value">`;
+}
+
+function renderWorkConfigFieldsSection(config = {}) {
+    const work = (config?.work && typeof config.work === 'object') ? config.work : {};
+    const workType = String(work.type || '').trim();
+    const fieldNames = new Set(extractWorkFields(work).map((field) => field.name));
+    const dynamicKeys = Object.keys(work).filter((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) && key !== 'type' && !fieldNames.has(key));
+    const workTypeSummary = dynamicKeys.length ? dynamicKeys.join(', ') : 'No additional work fields yet.';
+    return `
+        <div class="edit-work-fields edit-work-media">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Work settings</div>
+                    <div class="small-note">Derived from the current work config. Each worktype exposes its own fields here.</div>
+                </div>
+            </div>
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-work-type">Work type</label>
+                    <select class="form-select" id="edit-work-type" name="work_type">
+                        ${renderMediaTypeOptions(workType || 'video')}
+                    </select>
+                    <div class="small-note">Base family for the current item.</div>
+                </div>
+                <div>
+                    <div class="edit-label">Current work fields</div>
+                    <div class="small-note">${escapeHtml(workTypeSummary)}</div>
+                </div>
+            </div>
+            ${dynamicKeys.length ? `
+            <div class="edit-work-config-grid">
+                ${dynamicKeys.map((key) => `
+                    <div class="edit-work-config-field">
+                        <label class="edit-label" for="edit-work-config-${escapeHtml(key)}">work.${escapeHtml(key)}</label>
+                        ${renderWorkValueControl(key, work[key])}
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
+        </div>
+    `;
 }
 
 function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
@@ -359,6 +486,7 @@ export function renderEditPanel({
     onTitleInput,
     onDescriptionInput,
     onWorkFieldsInput,
+    onMediaInput,
     onSubmit,
     onToggleDrawer,
     onOpenLayoutPage,
@@ -443,6 +571,9 @@ export function renderEditPanel({
                 <label class="edit-label" for="edit-description">Description</label>
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || '')}</textarea>
             </div>
+            ${status?.target === 'file' || (config?.work && typeof config.work === 'object' && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === 'type'))
+                ? renderWorkConfigFieldsSection(config)
+                : ''}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -498,6 +629,13 @@ export function renderEditPanel({
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
 
+    const syncMediaState = () => {
+        if (typeof onMediaInput !== 'function' || !form) {
+            return;
+        }
+        onMediaInput(readMediaConfigFromForm(form, config?.work || {}));
+    };
+
     if (titleInput && typeof onTitleInput === 'function') {
         titleInput.addEventListener('input', () => {
             onTitleInput(titleInput.value);
@@ -513,12 +651,20 @@ export function renderEditPanel({
             workFieldEditor.addWorkField();
         });
     }
+    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type').forEach((input) => {
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
+            return;
+        }
+        input.addEventListener('input', syncMediaState);
+        input.addEventListener('change', syncMediaState);
+    });
     if (form && typeof onSubmit === 'function') {
         form.addEventListener('submit', (event) => {
             event.preventDefault();
             workFieldEditor.syncWorkFieldsFromDom();
             onSubmit({
                 elements: form.elements,
+                form,
                 statusEl,
             });
         });
