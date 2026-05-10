@@ -2258,6 +2258,76 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('uses a child folder .layout over an inherited parent .layout and persists the full layout set', async () => {
+    const tempDir = path.join(POFF_DIR, `nested-folder-layout-${Date.now()}`);
+    const parentDir = path.join(tempDir, 'parent');
+    const childDir = path.join(parentDir, 'child');
+    const childRelativePath = path.relative(POFF_DIR, childDir).replace(/\\/g, '/');
+    const parentLayoutRelativePath = path.relative(ROOT, path.join(parentDir, '.layout')).replace(/\\/g, '/');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(parentDir, '.layout'), { recursive: true });
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(parentDir, 'parent.txt'), 'parent');
+    fs.writeFileSync(path.join(childDir, 'child.txt'), 'child');
+    fs.writeFileSync(
+      path.join(parentDir, '.layout', 'template.hbs'),
+      '<div class="parent-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+    );
+    fs.writeFileSync(path.join(parentDir, '.layout', 'style.css'), '.parent-layout{color:#f55;}');
+    fs.writeFileSync(path.join(parentDir, '.layout', 'script.js'), 'window.__parentLayout = true;');
+    fs.writeFileSync(
+      path.join(parentDir, '.layout', 'works.hbs'),
+      '<section class="parent-works">{{#each items}}<span class="parent-item">{{name}}</span>{{/each}}</section>',
+    );
+
+    try {
+      const payload = {
+        name: 'child-layout',
+        engine: 'lightncandy',
+        section: 'works',
+        preset: 'actual',
+        template: '<div class="child-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+        css: '.child-layout{color:#5f5;}',
+        js: 'window.__childLayout = true;',
+        worksTemplate: '<section class="child-works">{{#each items}}<span class="child-item">{{name}}</span>{{/each}}</section>',
+        workTemplate: '<article class="child-work">{{name}}</article>',
+      };
+
+      const output = await runLayoutFilesystem('persist-folder', childDir, '', payload);
+      const persisted = JSON.parse(output);
+      expect(persisted).toMatchObject({
+        name: 'child-layout',
+        section: 'works',
+        engine: 'lightncandy',
+        preset: 'actual',
+      });
+
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'template.hbs'), 'utf8')).toContain('child-layout');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'style.css'), 'utf8')).toContain('.child-layout');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'script.js'), 'utf8')).toContain('__childLayout');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'works.hbs'), 'utf8')).toContain('child-works');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'work.hbs'), 'utf8')).toContain('child-work');
+      expect(fs.readFileSync(path.join(parentDir, '.layout', 'template.hbs'), 'utf8')).toContain('parent-layout');
+
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', childDir));
+      expect(ensured.work.layout.directory).toBe('.layout');
+      expect(ensured.work.layout.inheritedDirectory).toBe(parentLayoutRelativePath);
+      expect(ensured.work.layout.template).toContain('child-layout');
+      expect(ensured.work.layout.css).toContain('.child-layout');
+      expect(ensured.work.layout.js).toContain('__childLayout');
+      expect(ensured.work.layout.sectionTemplate).toContain('child-works');
+
+      const rendered = await runViewer(childRelativePath);
+      expect(rendered).toContain('<div class="child-layout">');
+      expect(rendered).toContain('<section class="child-works">');
+      expect(rendered).toContain('<span class="child-item">child.txt</span>');
+      expect(rendered).not.toContain('parent-layout');
+      expect(rendered).not.toContain('parent-works');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('renders the viewer shell stylesheet inline in the generated page', async () => {
     const output = await runViewer(VIEWER_FILE_NAME);
 
