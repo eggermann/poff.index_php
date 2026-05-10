@@ -34,7 +34,6 @@ export const defaultFolderSystemPrompt = [
 
 export const defaultLayoutSystemPrompt = [
     'You are a Handlebars (HBS) layout generator for this single-page CMS.',
-    'Transform the user description into an updated outer layout wrapper rendered by LightnCandy.',
     ...sharedWorkPrompt.layoutLines,
 ].join('\n');
 export const defaultPromptSettings = {

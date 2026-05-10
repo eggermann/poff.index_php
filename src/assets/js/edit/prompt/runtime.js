@@ -2,7 +2,7 @@ import { getLayoutState } from '../../core/utils.js';
 import { getDefaultSystemPromptForMode, getPromptMode, getPromptPlaceholderForMode, getSystemPromptSettingKeyForMode } from './mode.js';
 import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt } from './constants.js';
 import { readStoredHistory, writeStoredHistory } from './storage.js';
-import { tagHistory } from './history.js';
+import { cleanPersistedHistory, tagHistory } from './history.js';
 import { buildPromptContext } from './build/context.js';
 import { renderPromptContext } from './render/context.js';
 import { renderPromptHistory } from './render/history.js';
@@ -135,17 +135,21 @@ export function createPromptRuntime({
         const scope = getHistoryScope(selection);
         const config = getConfig ? (getConfig() || {}) : {};
         if (config && Object.prototype.hasOwnProperty.call(config, 'promptHistory')) {
-            return Array.isArray(config.promptHistory) ? config.promptHistory : [];
+            return cleanPersistedHistory(config.promptHistory);
         }
-        return readStoredHistory(scope.path, scope.mode);
+        return cleanPersistedHistory(readStoredHistory(scope.path, scope.mode));
     };
 
-    const writeHistoryForSelection = (history, selection = null) => {
+    const writeHistoryForSelection = (history, selection = null, options = {}) => {
         const scope = getHistoryScope(selection);
-        writeStoredHistory(scope.path, history, scope.mode);
-        void requestEditConfig('save', {
+        if (options.persistRemote === false) {
+            return Promise.resolve(null);
+        }
+        const persistedHistory = cleanPersistedHistory(history);
+        writeStoredHistory(scope.path, persistedHistory, scope.mode);
+        return requestEditConfig('save', {
             path: scope.path,
-            promptHistory: Array.isArray(history) ? history.slice(-12) : [],
+            promptHistory: persistedHistory,
         });
     };
 

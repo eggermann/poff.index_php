@@ -188,7 +188,7 @@ export function createPromptWindowWorkflows({
             setHistory([...state.promptHistory, { role: 'user', content: userPrompt }].slice(-12));
             setHistory([...state.promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
             pendingAssistantIndex = state.promptHistory.length - 1;
-            writeHistoryForSelection(state.promptHistory, selection);
+            writeHistoryForSelection(state.promptHistory, selection, { persistRemote: false });
             renderHistory({ forceScroll: true });
             renderContext();
             promptInputEl.value = '';
@@ -387,6 +387,7 @@ export function createPromptWindowWorkflows({
             if (Array.isArray(response?.treeVisible)) {
                 savePayload.treeVisible = response.treeVisible;
             }
+            savePayload.promptHistory = state.promptHistory.slice(-12);
             await saveConfig(savePayload, statusEl);
             renderContext();
             const providerLabel = response.provider || payload.provider;

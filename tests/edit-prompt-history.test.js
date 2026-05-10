@@ -20,6 +20,8 @@ function loadPromptHistoryHelpers() {
   vm.runInContext(`${source}
 module.exports = {
   buildTemplateHistorySnapshot,
+  cleanPersistedHistory,
+  isPendingAssistantHistory,
   serializeHistoryForRequest,
   summarizeSerializedHistory,
 };
@@ -66,6 +68,8 @@ module.exports = {
 describe('prompt history helpers', () => {
   const {
     buildTemplateHistorySnapshot,
+    cleanPersistedHistory,
+    isPendingAssistantHistory,
     serializeHistoryForRequest,
     summarizeSerializedHistory,
   } = loadPromptHistoryHelpers();
@@ -162,6 +166,29 @@ describe('prompt history helpers', () => {
 
     expect(summary.count).toBe(2);
     expect(summary.chars).toBeGreaterThan(7);
+  });
+
+  test('drops transient pending assistant entries from persisted history', () => {
+    const pending = { role: 'assistant', content: 'Generating answer...' };
+    const final = {
+      role: 'assistant',
+      content: '<section>done</section>',
+      templateSnapshot: {
+        targetType: 'partial',
+        template: '<section>done</section>',
+      },
+    };
+
+    expect(isPendingAssistantHistory(pending)).toBe(true);
+    expect(isPendingAssistantHistory(final)).toBe(false);
+    expect(cleanPersistedHistory([
+      { role: 'user', content: 'Make it red.' },
+      pending,
+      final,
+    ])).toEqual([
+      { role: 'user', content: 'Make it red.' },
+      final,
+    ]);
   });
 });
 

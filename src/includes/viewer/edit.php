@@ -1077,7 +1077,6 @@ function cmsHandleEditAction(): void
         $defaultSystemPrompt = implode("\n", $promptIsLayoutTarget
             ? [
                 'You are a Handlebars (HBS) layout generator for this single-page CMS.',
-                'Transform the user description into an updated outer layout wrapper rendered through LightnCandy.',
                 'Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, sectionTemplate, css, and js after filesystem, inheritance, and preset resolution.',
                 'When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.',
                 'The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.',
@@ -1156,15 +1155,25 @@ function cmsHandleEditAction(): void
             if ($usedModel === '') {
                 $usedModel = 'gpt-4o-mini';
             }
+            $messages = [['role' => 'system', 'content' => $systemPrompt]];
+            foreach ($history as $message) {
+                if (!is_array($message)) {
+                    continue;
+                }
+                $role = strtolower(trim((string) ($message['role'] ?? 'user')));
+                $content = trim((string) ($message['content'] ?? ''));
+                if ($content === '' || !in_array($role, ['system', 'user', 'assistant'], true)) {
+                    continue;
+                }
+                $messages[] = ['role' => $role, 'content' => $content];
+            }
+            $messages[] = ['role' => 'user', 'content' => $image ? [
+                ['type' => 'text', 'text' => $userPrompt],
+                ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+            ] : $userPrompt];
             $payload = [
                 'model' => $usedModel,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $image ? [
-                        ['type' => 'text', 'text' => $userPrompt],
-                        ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
-                    ] : $userPrompt],
-                ],
+                'messages' => $messages,
                 'temperature' => 0.4,
             ];
             if ($streamRequested) {

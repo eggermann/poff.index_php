@@ -397,6 +397,54 @@ module.exports = {
   return module.exports;
 }
 
+function loadPromptApiHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/api/edit.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export async function /g, 'async function ')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const fetchState = {
+    impl: async () => {
+      throw new Error('fetch should be mocked in test');
+    },
+  };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    AbortController: global.AbortController,
+    TextDecoder: global.TextDecoder,
+    URL: global.URL,
+    window: {
+      location: {
+        pathname: '/dominikeggermann.com/',
+        origin: 'http://localhost:8888',
+      },
+    },
+    setTimeout,
+    clearTimeout,
+    fetch: (...args) => fetchState.impl(...args),
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  buildCmsUrl,
+  requestPromptTemplateStream,
+};
+`, context);
+
+  return {
+    ...module.exports,
+    setFetch(impl) {
+      fetchState.impl = impl;
+    },
+  };
+}
+
 function loadWorkFieldHelpers() {
   const filePath = path.join(ROOT, 'src/assets/js/edit/work-fields.js');
   const source = fs.readFileSync(filePath, 'utf8')
@@ -1352,6 +1400,49 @@ describe('MCP create route helper (CLI)', () => {
     expect(viewerResult.allowed).toBe(true);
     expect(viewerResult.error).toBe('Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.');
     expect(viewerResult.template).toBeUndefined();
+  });
+
+  test('recovers streamed JSON when the final SSE event is dropped', async () => {
+    const api = loadPromptApiHelpers();
+    const chunks = [
+      'data: {"choices":[{"delta":{"content":"{\\"template\\":\\""}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"<div class=card></div>\\"}"}}]}\n\n',
+    ];
+    api.setFetch(async () => ({
+      ok: true,
+      headers: {
+        get(name) {
+          return name && name.toLowerCase() === 'content-type'
+            ? 'text/event-stream; charset=utf-8'
+            : null;
+        },
+      },
+      body: {
+        getReader() {
+          let index = 0;
+          return {
+            async read() {
+              if (index >= chunks.length) {
+                return { done: true, value: undefined };
+              }
+              const value = new TextEncoder().encode(chunks[index++]);
+              return { done: false, value };
+            },
+          };
+        },
+      },
+      text: async () => '',
+    }));
+
+    const response = await api.requestPromptTemplateStream({
+      path: '',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    });
+
+    expect(response.allowed).toBe(true);
+    expect(response.template).toBe('<div class=card></div>');
+    expect(response.error).toBeUndefined();
   });
 });
 

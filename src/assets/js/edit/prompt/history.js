@@ -2,6 +2,18 @@ export function tagHistory(history) {
     return history.map((msg, idx) => ({ ...msg, _index: idx }));
 }
 
+export function isPendingAssistantHistory(item) {
+    return item?.role === 'assistant'
+        && String(item?.content || '').trim() === 'Generating answer...'
+        && !item?.templateSnapshot;
+}
+
+export function cleanPersistedHistory(history) {
+    return Array.isArray(history)
+        ? history.filter((item) => !isPendingAssistantHistory(item)).slice(-12)
+        : [];
+}
+
 function trimHistoryText(value, maxLength = 600) {
     const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
     if (!normalized) {

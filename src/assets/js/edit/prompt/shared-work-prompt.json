@@ -54,6 +54,7 @@
   "layoutLines": [
     "Return a JSON object with a required \"template\" string and optional \"css\" and \"js\" fields.",
     "Do not return work.hbs, works.hbs, sectionTemplate, or any inner partial content for layout prompts.",
+    "Transform the user description into an updated outer layout wrapper rendered by LightnCandy.",
     "Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, css, and js after filesystem, inheritance, and preset resolution.",
     "Use current.root.title for the outer wrapper title and current.work.title for the nested item title. Keep shell vars and work vars separate when naming or copying content.",
     "Example context JSON: {\"root\":{\"title\":\"dominikeggermann.com\"},\"work\":{\"title\":\"tests\"}}",
