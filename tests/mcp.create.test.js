@@ -1464,6 +1464,40 @@ describe('Worktype HBS renderer', () => {
     expect(layoutPayload).not.toHaveProperty('worksTemplate');
   });
 
+  test('persists prompt history in the shared config for other browsers', async () => {
+    const tempDir = path.join(POFF_DIR, `shared-prompt-history-${Date.now()}`);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    try {
+      const history = [
+        { role: 'user', content: 'set MAUAMAUAMAUAM' },
+        {
+          role: 'assistant',
+          content: '<div>ok</div>',
+          templateSnapshot: {
+            targetType: 'partial',
+            template: '<div>ok</div>',
+          },
+        },
+      ];
+
+      const saved = await runViewerSave(tempDir, '', {
+        promptHistory: history,
+      });
+
+      const storedConfig = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
+      expect(storedConfig.promptHistory).toHaveLength(2);
+      expect(storedConfig.promptHistory[0].content).toContain('MAUAMAUAMAUAM');
+      expect(storedConfig.promptHistory[1].templateSnapshot.template).toContain('<div>ok</div>');
+      expect(saved.config.promptHistory).toHaveLength(2);
+      expect(saved.config.promptHistory[0].content).toContain('MAUAMAUAMAUAM');
+      expect(saved.config.promptHistory[1].templateSnapshot.template).toContain('<div>ok</div>');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('normalizes and materializes custom work fields', () => {
     const {
       createDefaultWorkField,

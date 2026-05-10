@@ -565,6 +565,10 @@ function cmsHandleEditAction(): void
                 unset($config['url']);
             }
         }
+        if (array_key_exists('promptHistory', $data)) {
+            $promptHistory = is_array($data['promptHistory']) ? array_values($data['promptHistory']) : [];
+            $config['promptHistory'] = array_slice($promptHistory, -12);
+        }
 
         $work = (isset($config['work']) && is_array($config['work'])) ? $config['work'] : [];
         $templateMapUpdate = null;

@@ -8,7 +8,7 @@ import { renderPromptContext } from './prompt/render/context.js';
 import { renderPromptHistory } from './prompt/render/history.js';
 import { renderPromptSummary } from './prompt/render/summary.js';
 import { appendStreamingChunk, beginStreaming, createStreamState, finishStreaming, stopStreaming } from './prompt/stream.js';
-import { requestPromptTemplateStream } from '../api/edit.js';
+import { requestEditConfig, requestPromptTemplateStream } from '../api/edit.js';
 import { focusPromptTemplateField, syncWorkFieldEditors, updatePromptEditorFields } from './prompt/editor-fields.js';
 import { bindPromptActions } from './prompt/actions.js';
 import { debugPromptLog } from './prompt/log.js';
@@ -220,12 +220,20 @@ export function bindPromptWindow({
 
     const readHistoryForSelection = (selection = null) => {
         const scope = getHistoryScope(selection);
+        const config = getConfig ? (getConfig() || {}) : {};
+        if (config && Object.prototype.hasOwnProperty.call(config, 'promptHistory')) {
+            return Array.isArray(config.promptHistory) ? config.promptHistory : [];
+        }
         return readStoredHistory(scope.path, scope.mode);
     };
 
     const writeHistoryForSelection = (history, selection = null) => {
         const scope = getHistoryScope(selection);
         writeStoredHistory(scope.path, history, scope.mode);
+        void requestEditConfig('save', {
+            path: scope.path,
+            promptHistory: Array.isArray(history) ? history.slice(-12) : [],
+        });
     };
 
     const renderHistory = (options = {}) => {
