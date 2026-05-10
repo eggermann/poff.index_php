@@ -800,10 +800,10 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).toContain('Config JSON:');
     expect(captured.payload.messages[3].content).toContain('"title": "Folder Preview"');
     expect(captured.payload.messages[3].content).toContain('"outerWrapper"');
-    expect(captured.payload.messages[3].content).not.toContain('Previous draft.');
-    expect(captured.payload.messages[3].content).not.toContain('Make it smaller.');
     expect(captured.payload.messages[3].content).toContain('"source": "resolved active wrapper"');
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
+    expect(captured.payload.messages[3].content).not.toContain('Previous draft.');
+    expect(captured.payload.messages[3].content).not.toContain('Make it smaller.');
   });
 
   test('rejects prompt-template CSS with unsafe global styles', async () => {
@@ -1673,6 +1673,31 @@ describe('Worktype HBS renderer', () => {
       expect.objectContaining({ value: 'folder', kind: 'folder' }),
     ]));
     expect(catalog.choices.map((choice) => choice.kind).every((kind) => kind === 'folder')).toBe(true);
+  });
+
+  test('exposes the shared work category pool in the catalog', async () => {
+    const output = await runWorktype('catalog', 'image', {
+      subjectType: 'file',
+    });
+    const catalog = JSON.parse(output);
+
+    expect(catalog.categories).toEqual(expect.arrayContaining([
+      'image',
+      'media',
+      'visual',
+      'video',
+      'motion',
+      'audio',
+      'sound',
+      'pdf',
+      'document',
+      'text',
+      'link',
+      'reference',
+      'folder',
+      'collection',
+      'other',
+    ]));
   });
 
   test('renders a selected work template variant as the active section partial', async () => {

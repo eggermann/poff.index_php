@@ -358,6 +358,31 @@ trait WorktypeDefinitionsTrait
         return $keys;
     }
 
+    public static function availableCategories(): array
+    {
+        self::loadBundle();
+
+        $categories = [];
+        foreach (self::availableKinds() as $kind) {
+            foreach (self::defaultCategoriesForKind($kind) as $category) {
+                $normalized = strtolower(trim((string) $category));
+                if ($normalized === '' || in_array($normalized, $categories, true)) {
+                    continue;
+                }
+
+                $categories[] = $normalized;
+            }
+        }
+
+        if ($categories === []) {
+            $categories = ['other'];
+        }
+
+        sort($categories, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $categories;
+    }
+
     public static function suggestedWorktypeKey(string $kind, ?string $mime = null, ?string $fileName = null): string
     {
         $subjectType = strtolower(trim($kind)) === 'folder' ? 'folder' : 'file';
@@ -520,6 +545,7 @@ trait WorktypeDefinitionsTrait
             'detectedExtension' => $extension,
             'selected' => $selectedValue,
             'choices' => $choices,
+            'categories' => self::availableCategories(),
         ];
     }
 

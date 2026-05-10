@@ -10,6 +10,12 @@ import {
     normalizeWorkField,
     schemaFieldTypeOptions,
 } from '../work-fields.js';
+import {
+    bindWorkCategoryControls,
+    getWorkCategoryOptions,
+    normalizeWorkCategories,
+    renderWorkCategorySection,
+} from './categories.js';
 import { layoutOverlayState, syncPromptDock } from './shared.js';
 import { bindUploadDialog, renderUploadSectionHtml } from './upload.js';
 import { renderEditLayoutPanel } from './layout.js';
@@ -158,6 +164,9 @@ function readMediaConfigFromForm(form, currentWork = {}) {
         }
         nextWork[key] = rawValue;
     });
+    const categories = normalizeWorkCategories(nextWork.categories ?? nextWork.category ?? []);
+    nextWork.categories = categories;
+    nextWork.category = categories;
     return nextWork;
 }
 
@@ -188,6 +197,7 @@ function renderWorkConfigFieldsSection(config = {}) {
     const catalog = config?.workTemplateCatalog && typeof config.workTemplateCatalog === 'object'
         ? config.workTemplateCatalog
         : null;
+    const categoryOptions = getWorkCategoryOptions(catalog);
     const fieldNames = new Set(extractWorkFields(work).map((field) => field.name));
     const dynamicKeys = Object.keys(work).filter((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) && key !== 'type' && !fieldNames.has(key));
     const workTypeSummary = dynamicKeys.length ? dynamicKeys.join(', ') : 'No additional work fields yet.';
@@ -215,6 +225,9 @@ function renderWorkConfigFieldsSection(config = {}) {
                     <div class="small-note">${escapeHtml(workTypeSummary)}</div>
                 </div>
             </div>
+            ${categoryOptions.length || normalizeWorkCategories(work.categories ?? work.category ?? []).length
+                ? renderWorkCategorySection(config)
+                : ''}
             ${dynamicKeys.length ? `
             <div class="edit-work-config-grid">
                 ${dynamicKeys.map((key) => `
@@ -583,7 +596,7 @@ export function renderEditPanel({
                 <label class="edit-label" for="edit-description">Description</label>
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || '')}</textarea>
             </div>
-            ${status?.target === 'file' || (config?.work && typeof config.work === 'object' && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === 'type'))
+            ${status?.target === 'file' || status?.target === 'folder' || (config?.work && typeof config.work === 'object' && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === 'type'))
                 ? renderWorkConfigFieldsSection(config)
                 : ''}
             <div class="edit-work-fields">
@@ -669,6 +682,10 @@ export function renderEditPanel({
         }
         input.addEventListener('input', syncMediaState);
         input.addEventListener('change', syncMediaState);
+    });
+    bindWorkCategoryControls({
+        editPanel,
+        onMediaInput,
     });
     if (form && typeof onSubmit === 'function') {
         form.addEventListener('submit', (event) => {
