@@ -1004,25 +1004,17 @@ function mcpPromptHistoryText(array $history): string
 
 function mcpPromptSystemPrompt(): string
 {
-    return implode("\n", [
+    return implode("\n", array_merge([
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
-        'Return strict JSON with a required "template" string, optional "css" and "js" fields, and an optional "work" object for structured work config updates.',
+        cmsPromptSharedWorkPromptLead(),
         'Optional key "treeVisible" may list same-folder parent tree item names/paths to keep visible when the user asks to hide used sibling works.',
         'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
-        'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
         'Return only the JSON object (no Markdown, no fences).',
-        'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-        'Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.',
-        'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
+    ], cmsPromptSharedWorkSystemPromptLines(), [
         'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
         'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
         'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.',
         'Use work.type for the base family and work.template for the exact template override. Use work.templateMap as inherited MIME => template defaults for child items. If the item is a movie or similar autoplay candidate, prefer video plus work.autoplay=true instead of a separate video-autoplay template key.',
-        'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
-        'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
-        'Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.',
-        'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
-        'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
         'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
         'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
         'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
@@ -1034,12 +1026,10 @@ function mcpPromptSystemPrompt(): string
         'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
         'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
         'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
-        'Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.',
         'Put all template-specific styling in the JSON "css" field as plain CSS that works without a build step.',
         ...mcpPromptCssDesignRules(),
-        'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
         'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',
-    ]);
+    ]));
 }
 
 function mcpPromptError(string $message, bool $allowed = true): array

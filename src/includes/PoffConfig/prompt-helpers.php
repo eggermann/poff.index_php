@@ -185,3 +185,77 @@ trait PoffConfigPromptHelpers
         return null;
     }
 }
+
+if (!function_exists('cmsPromptSharedWorkPromptPath')) {
+    function cmsPromptSharedWorkPromptPath(): string
+    {
+        return dirname(__DIR__, 2) . '/assets/js/edit/prompt/shared-work-prompt.json';
+    }
+}
+
+if (!function_exists('cmsPromptSharedWorkPromptData')) {
+    function cmsPromptSharedWorkPromptData(): array
+    {
+        static $data = null;
+        if (is_array($data)) {
+            return $data;
+        }
+
+        $path = cmsPromptSharedWorkPromptPath();
+        if (!is_file($path)) {
+            return $data = [
+                'lead' => '',
+                'lines' => [],
+            ];
+        }
+
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (!is_array($decoded)) {
+            return $data = [
+                'lead' => '',
+                'lines' => [],
+            ];
+        }
+
+        return $data = [
+            'lead' => isset($decoded['lead']) && is_scalar($decoded['lead']) ? trim((string) $decoded['lead']) : '',
+            'lines' => array_values(array_filter(array_map(static function (mixed $line): string {
+                return is_scalar($line) ? trim((string) $line) : '';
+            }, is_array($decoded['lines'] ?? null) ? $decoded['lines'] : []), static fn(string $line): bool => $line !== '')),
+            'fileLines' => array_values(array_filter(array_map(static function (mixed $line): string {
+                return is_scalar($line) ? trim((string) $line) : '';
+            }, is_array($decoded['fileLines'] ?? null) ? $decoded['fileLines'] : []), static fn(string $line): bool => $line !== '')),
+            'folderLines' => array_values(array_filter(array_map(static function (mixed $line): string {
+                return is_scalar($line) ? trim((string) $line) : '';
+            }, is_array($decoded['folderLines'] ?? null) ? $decoded['folderLines'] : []), static fn(string $line): bool => $line !== '')),
+        ];
+    }
+}
+
+if (!function_exists('cmsPromptSharedWorkPromptLead')) {
+    function cmsPromptSharedWorkPromptLead(): string
+    {
+        return (string) (cmsPromptSharedWorkPromptData()['lead'] ?? '');
+    }
+}
+
+if (!function_exists('cmsPromptSharedWorkSystemPromptLines')) {
+    function cmsPromptSharedWorkSystemPromptLines(): array
+    {
+        return (array) (cmsPromptSharedWorkPromptData()['lines'] ?? []);
+    }
+}
+
+if (!function_exists('cmsPromptSharedFileSystemPromptLines')) {
+    function cmsPromptSharedFileSystemPromptLines(): array
+    {
+        return (array) (cmsPromptSharedWorkPromptData()['fileLines'] ?? []);
+    }
+}
+
+if (!function_exists('cmsPromptSharedFolderSystemPromptLines')) {
+    function cmsPromptSharedFolderSystemPromptLines(): array
+    {
+        return (array) (cmsPromptSharedWorkPromptData()['folderLines'] ?? []);
+    }
+}

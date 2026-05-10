@@ -1,3 +1,5 @@
+import sharedWorkPrompt from './shared-work-prompt.json';
+
 export const promptSettingsKey = 'poffEditPromptSettings';
 export const promptHistoryKey = 'poffEditPromptHistory';
 export const defaultLocalPromptEndpoint = 'http://127.0.0.1:1234/v1/chat/completions';
@@ -12,61 +14,22 @@ export function getDefaultModelForProvider(provider = 'local') {
     return 'gemma4';
 }
 
+export const sharedWorkSystemPromptLead = sharedWorkPrompt.lead;
+
 export const sharedWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
-    'Return strict JSON with a required "template" string and an optional "work" object for structured work config updates.',
-    'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-    'Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.',
-    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
-    'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
-    'When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.',
-    'Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.',
-    'Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants that match the current MIME. For example, video files should favor video templates or explicit MIME-bound overrides such as video/* or video/.*.',
-    'Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items, and only apply a mapped template when the item MIME matches the key or its family wildcard. When a worktype exposes fields such as autoplay, loop, muted, poster, fit, background, or caption, set those as config values on work instead of hardcoding them into the template unless the user explicitly asks for one-off markup.',
-    'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
-    'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item. MIME keys may be exact values like video/quicktime or family wildcards like video/* and video/.*.',
-    'Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.',
-    'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
-    'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
-    'Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.',
-    'Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.',
-    'Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.',
-    'Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.',
-    'Do not return "css" or "js" for work prompts. Work prompts update only the inner HBS partial; layout prompts own wrapper CSS and JS.',
-    'Do not put <style> tags inside template and do not use inline style attributes.',
+    sharedWorkSystemPromptLead,
+    ...sharedWorkPrompt.lines,
 ].join('\n');
 
 export const defaultFileSystemPrompt = [
     sharedWorkSystemPrompt,
-    'Save target is work.hbs for the current file inside the active item layout folder.',
-    'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-    'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
-    'Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.',
-    'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
-    'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
-    'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
-    'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.',
-    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
-    'The JSON "template" must contain only the inner file partial content rendered inside the existing layout wrapper.',
+    ...sharedWorkPrompt.fileLines,
 ].join('\n');
 
 export const defaultFolderSystemPrompt = [
     sharedWorkSystemPrompt,
-    'Save target is works.hbs for the current folder inside the active item layout folder.',
-    'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
-    'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
-    'Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.',
-    'Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.',
-    'Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
-    'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
-    'Use folder tree data and resolved refs when relevant instead of inventing paths.',
-    'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
-    'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
-    'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
-    'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
-    'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.',
-    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
-    'The JSON "template" must contain only the inner folder partial content rendered inside the existing layout wrapper.',
+    ...sharedWorkPrompt.folderLines,
 ].join('\n');
 
 export const defaultLayoutSystemPrompt = [
