@@ -800,6 +800,8 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).toContain('Config JSON:');
     expect(captured.payload.messages[3].content).toContain('"title": "Folder Preview"');
     expect(captured.payload.messages[3].content).toContain('"outerWrapper"');
+    expect(captured.payload.messages[3].content).not.toContain('Previous draft.');
+    expect(captured.payload.messages[3].content).not.toContain('Make it smaller.');
     expect(captured.payload.messages[3].content).toContain('"source": "resolved active wrapper"');
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
   });

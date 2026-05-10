@@ -270,6 +270,22 @@ export function bindPromptWindow({
         }
     };
 
+    const getCurrentTemplateText = () => {
+        const selection = currentSelection(null);
+        const templateField = getCurrentTemplateField();
+        const currentConfig = getConfig ? (getConfig() || {}) : {};
+        const layout = currentConfig?.work?.layout && typeof currentConfig.work.layout === 'object'
+            ? currentConfig.work.layout
+            : {};
+        const explicitTemplate = templateField && typeof templateField.value === 'string'
+            ? templateField.value
+            : '';
+        const fallbackTemplate = selection?.isLayout
+            ? ((typeof layout.template === 'string' && layout.template) || (typeof layout.phpTemplate === 'string' ? layout.phpTemplate : ''))
+            : ((typeof layout.sectionTemplate === 'string' && layout.sectionTemplate) || (typeof layout.defaultSectionTemplate === 'string' ? layout.defaultSectionTemplate : ''));
+        return explicitTemplate || fallbackTemplate || '';
+    };
+
     const renderContext = () => {
         const context = buildPromptContext({ getActiveSelection, getConfig });
         activePath = context.isLayout ? (context.virtualPath || context.path) : context.path;
@@ -513,7 +529,9 @@ export function bindPromptWindow({
                 promptInputEl.value = '';
                 setPromptStatus('Generating answer...');
                 renderSummary('Generating answer...');
-                const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
+                const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1), {
+                    initialTemplateText: getCurrentTemplateText(),
+                });
                 const systemPromptValue = (systemPromptEl?.value || '').trim();
                 const payload = {
                     path: activePath,

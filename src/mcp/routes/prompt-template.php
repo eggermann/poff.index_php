@@ -1090,7 +1090,7 @@ function mcpPromptProviderResult(string $template, string $model, bool $reasonin
     ];
 }
 
-function mcpPromptGenerateOpenAi(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image): array
+function mcpPromptGenerateOpenAi(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image, array $history = []): array
 {
     $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'OPENAI_API_KEY') ?? '');
     if ($key === '') {
@@ -1100,7 +1100,7 @@ function mcpPromptGenerateOpenAi(array $env, string $model, string $apiKey, stri
     $usedModel = $model !== '' ? $model : 'gpt-4o-mini';
     $payload = [
         'model' => $usedModel,
-        'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image),
+        'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image, $history),
         'temperature' => 0.4,
     ];
     $response = mcpPromptHttpPost('https://api.openai.com/v1/chat/completions', [
@@ -1116,7 +1116,7 @@ function mcpPromptGenerateOpenAi(array $env, string $model, string $apiKey, stri
     return mcpPromptProviderResult($template, $usedModel);
 }
 
-function mcpPromptGenerateGemini(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image): array
+function mcpPromptGenerateGemini(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image, array $history = []): array
 {
     $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'GEMINI_API_KEY') ?? '');
     if ($key === '') {
@@ -1124,7 +1124,13 @@ function mcpPromptGenerateGemini(array $env, string $model, string $apiKey, stri
     }
 
     $usedModel = $model !== '' ? $model : 'gemini-1.5-flash';
-    $promptText = $systemPrompt . "\n\n" . $userPrompt;
+    $historyText = mcpPromptHistoryText($history);
+    $promptParts = array_filter([
+        $systemPrompt,
+        $historyText,
+        $userPrompt,
+    ], static fn(string $part): bool => trim($part) !== '');
+    $promptText = implode("\n\n", $promptParts);
     $payload = [
         'contents' => [
             [
@@ -1256,17 +1262,16 @@ function handlePromptTemplate(array $opts): array
     );
     $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config, $folderViewData));
     $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $historyText = mcpPromptHistoryText($history);
-    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $historyText . "USER: " . $prompt;
+    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\nUSER: " . $prompt;
     if ($image) {
         $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
     }
 
     $env = mcpPromptLoadEnv($rootDir);
     if ($provider === 'openai') {
-        $generation = mcpPromptGenerateOpenAi($env, $model, $apiKey, $systemPrompt, $userPrompt, $image);
+        $generation = mcpPromptGenerateOpenAi($env, $model, $apiKey, $systemPrompt, $userPrompt, $image, $history);
     } elseif ($provider === 'gemini') {
-        $generation = mcpPromptGenerateGemini($env, $model, $apiKey, $systemPrompt, $userPrompt, $image);
+        $generation = mcpPromptGenerateGemini($env, $model, $apiKey, $systemPrompt, $userPrompt, $image, $history);
     } else {
         $generation = mcpPromptGenerateLocal($model, $endpoint, $prompt, $systemPrompt, $userPrompt, $image, $history, $config);
     }

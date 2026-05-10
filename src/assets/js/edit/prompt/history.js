@@ -76,9 +76,9 @@ export function buildTemplateHistorySnapshot({
     return snapshot;
 }
 
-export function serializeHistoryForRequest(history) {
+export function serializeHistoryForRequest(history, options = {}) {
     const list = Array.isArray(history) ? history : [];
-    return list.map((item) => {
+    const serialized = list.map((item) => {
         const role = item?.role || 'user';
         let content = String(item?.content || '');
         const snapshot = item?.templateSnapshot;
@@ -119,6 +119,21 @@ export function serializeHistoryForRequest(history) {
         }
         return { role, content };
     });
+
+    const seedTemplateText = typeof options?.initialTemplateText === 'string'
+        ? options.initialTemplateText
+        : '';
+    const seedRole = typeof options?.initialTemplateRole === 'string' && options.initialTemplateRole.trim() === 'system'
+        ? 'system'
+        : 'assistant';
+    if (seedTemplateText.trim() !== '' && !serialized.some((item) => item && item.role === 'assistant')) {
+        serialized.unshift({
+            role: seedRole,
+            content: seedTemplateText,
+        });
+    }
+
+    return serialized;
 }
 
 export function summarizeSerializedHistory(history) {

@@ -130,6 +130,23 @@ describe('prompt history helpers', () => {
     expect(serialized[1].content).toContain('Work keys updated: featured');
   });
 
+  test('seeds the first prompt request with the current template', () => {
+    const serialized = serializeHistoryForRequest([
+      { role: 'user', content: 'Make it tighter.' },
+    ], {
+      initialTemplateText: '<section class="card">{{title}}</section>',
+    });
+
+    expect(serialized[0]).toEqual({
+      role: 'assistant',
+      content: '<section class="card">{{title}}</section>',
+    });
+    expect(serialized[1]).toEqual({
+      role: 'user',
+      content: 'Make it tighter.',
+    });
+  });
+
   test('summarizes serialized history character totals', () => {
     const summary = summarizeSerializedHistory([
       { role: 'user', content: 'abc' },
