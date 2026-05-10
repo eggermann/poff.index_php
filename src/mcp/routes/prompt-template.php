@@ -1006,7 +1006,7 @@ function mcpPromptSystemPrompt(): string
 {
     return implode("\n", [
         'You are a Handlebars (HBS) template generator for this single-page CMS.',
-        'Return strict JSON with a required "template" string and optional "css", "js", and "work" fields.',
+        'Return strict JSON with a required "template" string, optional "css" and "js" fields, and an optional "work" object for structured work config updates.',
         'Optional key "treeVisible" may list same-folder parent tree item names/paths to keep visible when the user asks to hide used sibling works.',
         'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
         'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',

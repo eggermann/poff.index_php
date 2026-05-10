@@ -1068,7 +1068,7 @@ function cmsHandleEditAction(): void
             ]);
         $sharedWorkSystemPrompt = [
             'You are a Handlebars (HBS) template generator for this single-page CMS.',
-            'Return strict JSON with a required "template" string and optional "work" field.',
+            'Return strict JSON with a required "template" string and an optional "work" object for structured work config updates.',
             'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
             'Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.',
             'Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants that match the current MIME. For example, video files should favor video templates or explicit MIME-bound overrides such as video/* or video/.*.',

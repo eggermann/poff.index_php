@@ -14,7 +14,7 @@ export function getDefaultModelForProvider(provider = 'local') {
 
 export const sharedWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
-    'Return strict JSON with a required "template" string and optional "work" field.',
+    'Return strict JSON with a required "template" string and an optional "work" object for structured work config updates.',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
     'Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.',
     'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
