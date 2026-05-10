@@ -228,6 +228,9 @@ if (!function_exists('cmsPromptSharedWorkPromptData')) {
             'folderLines' => array_values(array_filter(array_map(static function (mixed $line): string {
                 return is_scalar($line) ? trim((string) $line) : '';
             }, is_array($decoded['folderLines'] ?? null) ? $decoded['folderLines'] : []), static fn(string $line): bool => $line !== '')),
+            'layoutLines' => array_values(array_filter(array_map(static function (mixed $line): string {
+                return is_scalar($line) ? trim((string) $line) : '';
+            }, is_array($decoded['layoutLines'] ?? null) ? $decoded['layoutLines'] : []), static fn(string $line): bool => $line !== '')),
         ];
     }
 }
@@ -257,5 +260,12 @@ if (!function_exists('cmsPromptSharedFolderSystemPromptLines')) {
     function cmsPromptSharedFolderSystemPromptLines(): array
     {
         return (array) (cmsPromptSharedWorkPromptData()['folderLines'] ?? []);
+    }
+}
+
+if (!function_exists('cmsPromptSharedLayoutSystemPromptLines')) {
+    function cmsPromptSharedLayoutSystemPromptLines(): array
+    {
+        return (array) (cmsPromptSharedWorkPromptData()['layoutLines'] ?? []);
     }
 }
