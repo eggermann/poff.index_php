@@ -12,7 +12,7 @@ export function getDefaultModelForProvider(provider = 'local') {
     return 'gemma4';
 }
 
-export const legacyWorkSystemPrompt = [
+export const sharedWorkSystemPrompt = [
     'You are a Handlebars (HBS) template generator for this single-page CMS.',
     'Return strict JSON with a required "template" string and optional "work" field.',
     'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
@@ -37,7 +37,7 @@ export const legacyWorkSystemPrompt = [
 ].join('\n');
 
 export const defaultFileSystemPrompt = [
-    legacyWorkSystemPrompt,
+    sharedWorkSystemPrompt,
     'Save target is work.hbs for the current file inside the active item layout folder.',
     'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
     'Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.',
@@ -51,7 +51,7 @@ export const defaultFileSystemPrompt = [
 ].join('\n');
 
 export const defaultFolderSystemPrompt = [
-    legacyWorkSystemPrompt,
+    sharedWorkSystemPrompt,
     'Save target is works.hbs for the current folder inside the active item layout folder.',
     'Template sources live in .layout and .works layout folders; keep the source files as the authoring target.',
     'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.',
