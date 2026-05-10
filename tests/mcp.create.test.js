@@ -176,6 +176,24 @@ function runLayoutFilesystem(action, dir, fileName = '', payload = null) {
   });
 }
 
+function runLayoutView(payload = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_layout_view.php'), JSON.stringify(payload)], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`layout view helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runUpload(targetDir, sourcePath, uploadName) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_upload_files.php'), targetDir, sourcePath, uploadName];
@@ -1720,6 +1738,49 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="poff-default-layout poff-default-layout--image">');
     expect(output).toContain('src="assets/photo.png" alt="Project Photo"');
     expect(output).toContain('Inline description');
+    expect(fs.readFileSync(path.join(ROOT, 'src/includes/worktypes/templates/layout/default/script.js'), 'utf8'))
+      .toContain('DOMContentLoaded');
+  });
+
+  test('falls back to the default layout script when a filesystem layout has no script.js', async () => {
+    const tempDir = path.join(POFF_DIR, 'missing-script-layout');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.works', `${fileName}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'fake image');
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.layout`, 'template.hbs'),
+      '<section class="custom-shell">{{> poff-layout}}</section>',
+    );
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.layout`, 'work.hbs'),
+      '<article class="custom-work">{{title}}</article>',
+    );
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.config.json`),
+      JSON.stringify({
+        title: 'Poster',
+        description: '',
+        work: {
+          type: 'image',
+          layout: {
+            mode: 'filesystem-file-layout',
+            name: 'filesystem-file-layout',
+            engine: 'lightncandy',
+            section: 'work',
+          },
+        },
+      }, null, 2),
+    );
+
+    try {
+      const output = await runViewer(fileName, tempDir);
+
+      expect(output).toContain('console.log(\'frogon\')');
+      expect(output).toContain('alert(\'test\')');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('allows a custom HBS layout template to include the default layout partial', async () => {
@@ -1887,6 +1948,8 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<div class="default-fs-layout">');
     expect(rendered).toContain('tests/poff-tests/.layout/style.css');
     expect(rendered).toContain('tests/poff-tests/.layout/script.js');
+    expect(rendered).toContain('console.log(\'frogon\')');
+    expect(rendered).toContain('alert(\'test\')');
     expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });

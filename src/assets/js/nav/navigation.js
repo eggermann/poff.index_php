@@ -661,17 +661,18 @@ export function initNavigation({
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const fragments = [];
+            const scripts = Array.from(doc.querySelectorAll('script'));
             doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
                 fragments.push(normalizePreviewStyleNode(node));
             });
             doc.body?.querySelectorAll('style').forEach((node) => {
                 node.textContent = scopePreviewStyleText(node.textContent || '');
             });
-            doc.querySelectorAll('script').forEach((node) => node.remove());
+            scripts.forEach((node) => node.remove());
             const bodyHtml = doc.body ? doc.body.innerHTML : html;
             contentFrame.innerHTML = `${fragments.join('')}${bodyHtml}`;
 
-            doc.querySelectorAll('script').forEach((oldScript) => {
+            scripts.forEach((oldScript) => {
                 const script = document.createElement('script');
                 for (const attribute of oldScript.attributes) {
                     script.setAttribute(attribute.name, attribute.value);

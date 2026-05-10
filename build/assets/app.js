@@ -572,10 +572,10 @@
     "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
     "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
     "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
-    "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.",
-    "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items. When a worktype exposes fields such as autoplay, loop, muted, poster, fit, background, or caption, set those as config values on work instead of hardcoding them into the template unless the user explicitly asks for one-off markup.",
+    "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants that match the current MIME. For example, video files should favor video templates or explicit MIME-bound overrides such as video/* or video/.*.",
+    "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items, and only apply a mapped template when the item MIME matches the key or its family wildcard. When a worktype exposes fields such as autoplay, loop, muted, poster, fit, background, or caption, set those as config values on work instead of hardcoding them into the template unless the user explicitly asks for one-off markup.",
     "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
-    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
+    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item. MIME keys may be exact values like video/quicktime or family wildcards like video/* and video/.*.",
     "Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.",
     'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
     'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
@@ -778,6 +778,11 @@
       snapshot.description = trimHistoryText(nextDescription, 220);
     }
     if (nextWork && typeof nextWork === "object") {
+      try {
+        snapshot.workSnapshot = JSON.parse(JSON.stringify(nextWork));
+      } catch (e) {
+        snapshot.workSnapshot = { ...nextWork };
+      }
       const keys = Object.keys(nextWork).filter((key) => key !== "layout").slice(0, 6);
       if (keys.length) {
         snapshot.workKeys = keys;
@@ -1611,6 +1616,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const safeContent = content || "";
       const snapshot = (msg == null ? void 0 : msg.templateSnapshot) && typeof msg.templateSnapshot === "object" ? msg.templateSnapshot : null;
       const snapshotParts = [];
+      const canReset = role === "assistant" && !!snapshot;
       if (snapshot) {
         if (typeof snapshot.targetType === "string" && snapshot.targetType) {
           snapshotParts.push(`target: ${snapshot.targetType}`);
@@ -1628,11 +1634,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           snapshotParts.push(`js: ${snapshot.jsLength}`);
         }
       }
+      const snapshotMeta = snapshotParts.length ? `<span>${escapeHtml(snapshotParts.join(" | "))}</span>` : "";
+      const snapshotAction = canReset ? `<button type="button" class="btn btn-secondary prompt-message-reset" data-history-reset-index="${msg._index}" title="Reset template to this stage">reset</button>` : "";
       return `
             <div class="prompt-message prompt-message-${role}">
                 <span class="prompt-message-role">${escapeHtml(role)}:</span>
                 <span class="prompt-message-content">${escapeHtml(safeContent)}${isStreaming ? '<span class="stream-cursor"></span>' : ""}</span>
-                ${snapshotParts.length ? `<div class="small-note prompt-message-meta">${escapeHtml(snapshotParts.join(" | "))}</div>` : ""}
+                ${snapshotMeta || snapshotAction ? `<div class="small-note prompt-message-meta" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">${snapshotMeta}${snapshotAction}</div>` : ""}
             </div>
         `;
     }).join("");
@@ -1701,6 +1709,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
 
   // src/assets/js/edit/prompt/editor-fields.js
   function updatePromptEditorFields({ templateText, nextTitle, nextDescription, nextWork, isLayoutTarget, nextCss = null, nextJs = null }) {
+    const workUpdates = nextWork && typeof nextWork === "object" ? nextWork : null;
     const templateSelectors = isLayoutTarget ? ["#edit-layout-primary-template"] : ["#edit-content-template"];
     templateSelectors.forEach((selector) => {
       document.querySelectorAll(selector).forEach((field) => {
@@ -1723,10 +1732,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       });
     }
-    if (nextWork && typeof nextWork.type === "string") {
+    if (workUpdates && typeof workUpdates.type === "string") {
       document.querySelectorAll("#edit-work-type").forEach((field) => {
         if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
-          field.value = nextWork.type;
+          field.value = workUpdates.type;
         }
       });
     }
@@ -1735,10 +1744,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       const key = String(field.dataset.workConfigKey || "").trim();
-      if (!key || !Object.prototype.hasOwnProperty.call(nextWork, key)) {
+      if (!key || !workUpdates || !Object.prototype.hasOwnProperty.call(workUpdates, key)) {
         return;
       }
-      const value = nextWork[key];
+      const value = workUpdates[key];
       if (field instanceof HTMLInputElement && field.type === "checkbox") {
         field.checked = !!value;
         return;
@@ -1852,6 +1861,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     promptSendEl,
     promptInputEl,
     promptAttachEl,
+    promptInsertNameEl,
     promptImageInputEl,
     promptAttachmentRemoveEl,
     layoutPresetEl,
@@ -1859,6 +1869,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onResetTemplate,
     onSendPrompt,
     onAttachImage,
+    onInsertName,
     onRemoveImage,
     onTemplateInput,
     onLayoutPresetChange
@@ -1897,6 +1908,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (typeof onAttachImage === "function") {
           void onAttachImage(file);
         }
+      });
+    }
+    if (promptInsertNameEl && typeof onInsertName === "function") {
+      promptInsertNameEl.addEventListener("click", () => {
+        void onInsertName();
       });
     }
     if (promptAttachEl && promptImageInputEl) {
@@ -2363,6 +2379,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const promptInputEl = root.querySelector("#prompt-input");
     const promptSendEl = root.querySelector("#prompt-send");
     const promptAttachEl = root.querySelector("#prompt-attach");
+    const promptInsertNameEl = root.querySelector("#prompt-insert-name");
     const promptClearEl = root.querySelector("#prompt-clear");
     const promptImageInputEl = root.querySelector("#prompt-image-input");
     const promptAttachmentPreviewEl = root.querySelector("#promptAttachmentPreview");
@@ -2404,6 +2421,92 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const selection2 = currentSelection(null);
       const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
       return imageContextPattern.test(selectionPath);
+    };
+    const currentSelectionName = () => {
+      const selection2 = currentSelection(null);
+      const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
+      const normalizedPath = String(selectionPath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+      if (!normalizedPath) {
+        return "";
+      }
+      const parts = normalizedPath.split("/").filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : "";
+    };
+    const insertPromptText = async (text) => {
+      var _a;
+      if (!promptInputEl || !text) {
+        return false;
+      }
+      const start = typeof promptInputEl.selectionStart === "number" ? promptInputEl.selectionStart : promptInputEl.value.length;
+      const end = typeof promptInputEl.selectionEnd === "number" ? promptInputEl.selectionEnd : promptInputEl.value.length;
+      const before = promptInputEl.value.slice(0, start);
+      const after = promptInputEl.value.slice(end);
+      const separator = before && !/\s$/.test(before) ? " " : "";
+      const nextValue = `${before}${separator}${text}${after}`;
+      promptInputEl.value = nextValue;
+      const caret = (before + separator + text).length;
+      if (typeof promptInputEl.setSelectionRange === "function") {
+        promptInputEl.setSelectionRange(caret, caret);
+      }
+      promptInputEl.focus({ preventScroll: true });
+      renderSummary(`Inserted ${text} into the prompt.`);
+      try {
+        if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
+          await navigator.clipboard.writeText(text);
+        }
+        setPromptStatus(`Inserted and copied: ${text}`, true);
+      } catch (e) {
+        setPromptStatus(`Inserted: ${text}`);
+      }
+      return true;
+    };
+    const restoreHistorySnapshot = async (snapshot) => {
+      if (!snapshot || typeof snapshot !== "object") {
+        return false;
+      }
+      const isLayoutTarget = snapshot.targetType === "layout";
+      const templateText = typeof snapshot.template === "string" ? snapshot.template : "";
+      if (!templateText) {
+        return false;
+      }
+      const restoredWork = snapshot.workSnapshot && typeof snapshot.workSnapshot === "object" ? snapshot.workSnapshot : {};
+      updatePromptEditorFields({
+        templateText,
+        nextTitle: typeof snapshot.title === "string" ? snapshot.title : null,
+        nextDescription: typeof snapshot.description === "string" ? snapshot.description : null,
+        nextWork: restoredWork,
+        isLayoutTarget,
+        nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
+        nextJs: typeof snapshot.js === "string" ? snapshot.js : null
+      });
+      renderContext();
+      const selection2 = currentSelection({ path: activePath, previewPath: activePath, previewIsFile: false, isLayout: isLayoutTarget });
+      const currentConfig = getConfig ? getConfig() || {} : {};
+      const { layoutPayload } = buildPromptLayoutPayload({
+        selection: selection2,
+        currentConfig,
+        drawerForm,
+        templateText,
+        nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
+        nextJs: typeof snapshot.js === "string" ? snapshot.js : null,
+        layoutPreset: isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset()
+      });
+      const savePayload = {
+        path: activePath,
+        layout: layoutPayload
+      };
+      if (typeof snapshot.title === "string" && snapshot.title.trim() !== "") {
+        savePayload.title = snapshot.title.trim();
+      }
+      if (typeof snapshot.description === "string" && snapshot.description.trim() !== "") {
+        savePayload.description = snapshot.description.trim();
+      }
+      await saveConfig(savePayload, statusEl);
+      renderSummary(`Restored ${isLayoutTarget ? "layout" : "template"} from assistant stage.`);
+      reloadViewer();
+      focusPromptTemplateField(isLayoutTarget);
+      setPromptStatus("Restored template from assistant stage.", true);
+      return true;
     };
     const setHistory = (nextHistory) => {
       const list = Array.isArray(nextHistory) ? nextHistory : [];
@@ -2540,6 +2643,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       promptSendEl,
       promptInputEl,
       promptAttachEl,
+      promptInsertNameEl,
       promptImageInputEl,
       promptAttachmentRemoveEl,
       layoutPresetEl: document.getElementById("edit-layout-preset"),
@@ -2872,6 +2976,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       },
       onAttachImage: attachImageFile,
+      onInsertName: async () => {
+        const name = currentSelectionName();
+        if (!name) {
+          setPromptStatus("No file name selected.");
+          return;
+        }
+        await insertPromptText(name);
+      },
       onRemoveImage: () => {
         clearAttachment();
         setPromptStatus("Image removed.");
@@ -2954,6 +3066,29 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         renderTemplatePreview();
       }
     });
+    if (promptMessagesEl) {
+      promptMessagesEl.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        const button = target.closest("[data-history-reset-index]");
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        const index = Number.parseInt(button.dataset.historyResetIndex || "", 10);
+        if (!Number.isInteger(index)) {
+          return;
+        }
+        const historyEntry = promptHistory.find((item) => item && item._index === index);
+        if (!historyEntry || !historyEntry.templateSnapshot) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        void restoreHistorySnapshot(historyEntry.templateSnapshot);
+      });
+    }
   }
 
   // src/assets/js/edit/drawer/render.js
@@ -3198,6 +3333,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const systemPrompt = mode === "layout" ? settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt : mode === "folder" ? settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt : settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt;
     const promptTargetCopy = mode === "layout" ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : mode === "folder" ? "Prompt edits the wrapped works.hbs partial for the current folder." : "Prompt edits the wrapped work.hbs partial for the current file.";
     const footerCopy = mode === "layout" ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || "work.hbs")}</code>.` : mode === "folder" ? "Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders." : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.";
+    const insertNameLabel = mode === "file" ? "Insert file name" : mode === "folder" ? "Insert item name" : "Insert layout name";
     const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>root.*</code> is the shell-level layout data and <code>work.*</code> is the inner item data. Use <code>root.title</code> for the wrapper title and <code>work.title</code> for the item title.</div><div><code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : mode === "folder" ? "<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>" : "<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>";
     const editableCopy = mode === "layout" ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.&lt;name&gt;</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.&lt;name&gt;</strong>';
     const placeholderCopy = mode === "layout" ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{root.title}}, {{root.folderName}}, {{work.title}}, {{work.name}}, {{linkUrl}}, {{slug}}</div>
@@ -3310,6 +3446,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <div class="prompt-actions-left">
                         <button class="btn" type="button" id="prompt-send">Send</button>
                         <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
+                        <button class="btn btn-secondary" type="button" id="prompt-insert-name">${escapeHtml(insertNameLabel)}</button>
                         <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
                     </div>
                     <label class="prompt-inline-toggle">
@@ -4173,7 +4310,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/panel/inline.js
-  var MEDIA_WORK_TYPE_OPTIONS = ["video", "image", "audio", "pdf", "text", "link", "folder", "other"];
   var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind"]);
   function readRowText(row, selector) {
     const field = row.querySelector(selector);
@@ -4240,13 +4376,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
     return visible ? html : "";
   }
-  function renderMediaTypeOptions(selectedValue = "") {
+  function renderMediaTypeOptions(selectedValue = "", catalog = null) {
     const normalizedSelected = String(selectedValue || "").trim();
-    const options = MEDIA_WORK_TYPE_OPTIONS.slice();
+    const choices = Array.isArray(catalog == null ? void 0 : catalog.choices) ? catalog.choices : [];
+    const options = choices.length ? choices.map((choice) => String((choice == null ? void 0 : choice.value) || "").trim()).filter(Boolean) : ["video", "image", "audio", "pdf", "text", "link", "folder", "other"];
     if (normalizedSelected && !options.includes(normalizedSelected)) {
       options.unshift(normalizedSelected);
     }
-    return options.map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
+    return options.filter((option, index) => option && options.indexOf(option) === index).map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
   }
   function readMediaConfigFromForm(form, currentWork = {}) {
     var _a;
@@ -4323,9 +4460,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   function renderWorkConfigFieldsSection(config = {}) {
     const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
     const workType = String(work.type || "").trim();
+    const catalog = (config == null ? void 0 : config.workTemplateCatalog) && typeof config.workTemplateCatalog === "object" ? config.workTemplateCatalog : null;
     const fieldNames = new Set(extractWorkFields(work).map((field) => field.name));
     const dynamicKeys = Object.keys(work).filter((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) && key !== "type" && !fieldNames.has(key));
     const workTypeSummary = dynamicKeys.length ? dynamicKeys.join(", ") : "No additional work fields yet.";
+    const selectedValue = String(work.template || (catalog == null ? void 0 : catalog.selected) || workType || "").trim();
     return `
         <div class="edit-work-fields edit-work-media">
             <div class="edit-work-fields-header">
@@ -4338,9 +4477,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div>
                     <label class="edit-label" for="edit-work-type">Work type</label>
                     <select class="form-select" id="edit-work-type" name="work_type">
-                        ${renderMediaTypeOptions(workType || "video")}
+                        ${renderMediaTypeOptions(selectedValue || "video", catalog)}
                     </select>
-                    <div class="small-note">Base family for the current item.</div>
+                    <div class="small-note">${(catalog == null ? void 0 : catalog.detectedMime) ? `Detected ${escapeHtml(catalog.detectedMime)}${catalog.detectedExtension ? ` \xB7 .${escapeHtml(catalog.detectedExtension)}` : ""} \xB7 showing ${escapeHtml(catalog.detectedKind || "current")} templates` : "Base family for the current item."}</div>
                 </div>
                 <div>
                     <div class="edit-label">Current work fields</div>
@@ -5964,16 +6103,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
         const fragments = [];
+        const scripts = Array.from(doc.querySelectorAll("script"));
         doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
           fragments.push(normalizePreviewStyleNode(node));
         });
         (_a = doc.body) == null ? void 0 : _a.querySelectorAll("style").forEach((node) => {
           node.textContent = scopePreviewStyleText(node.textContent || "");
         });
-        doc.querySelectorAll("script").forEach((node) => node.remove());
+        scripts.forEach((node) => node.remove());
         const bodyHtml = doc.body ? doc.body.innerHTML : html;
         contentFrame.innerHTML = `${fragments.join("")}${bodyHtml}`;
-        doc.querySelectorAll("script").forEach((oldScript) => {
+        scripts.forEach((oldScript) => {
           const script = document.createElement("script");
           for (const attribute of oldScript.attributes) {
             script.setAttribute(attribute.name, attribute.value);

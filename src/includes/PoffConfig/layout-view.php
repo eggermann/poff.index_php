@@ -34,6 +34,26 @@ trait PoffConfigLayoutViewHelpers
             ($defaultTemplateMarkup !== '' && $resolvedTemplate === $defaultTemplateMarkup)
             || ($filesystemTemplateMarkup !== '' && $resolvedTemplate === $filesystemTemplateMarkup)
         );
+        $layoutTemplateSource = trim((string) ($resolved['template'] ?? ''));
+        $usesDefaultBundlePartial = $layoutTemplateSource !== '' && preg_match('/\{\{>\s*(poff-layout|filesystem-layout)\s*\}\}/', $layoutTemplateSource) === 1;
+        $loadDefaultBundleAssets = $usesDefaultBundleTemplate || $usesDefaultBundlePartial;
+
+        if ($loadDefaultBundleAssets) {
+            if (!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') {
+                $bundleCss = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_STYLE_FILE);
+                if (is_string($bundleCss) && $bundleCss !== '') {
+                    $resolved['css'] = $bundleCss;
+                    $resolved['cssInlineOnly'] = true;
+                }
+            }
+            if (!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') {
+                $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
+                if (is_string($bundleJs) && $bundleJs !== '') {
+                    $resolved['js'] = $bundleJs;
+                    $resolved['jsInlineOnly'] = true;
+                }
+            }
+        }
 
         if (($resolved['storage'] ?? '') !== 'filesystem') {
             if (!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') {
@@ -104,10 +124,16 @@ trait PoffConfigLayoutViewHelpers
         $resolved['assetCount'] = count($assets);
 
         if (($resolved['storage'] ?? '') === 'filesystem') {
-            if (array_key_exists('css', $resolved) && trim((string) $resolved['css']) !== '') {
+            if (array_key_exists('js', $resolved) && trim((string) $resolved['js']) !== '') {
+                $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
+                if (is_string($bundleJs) && trim($bundleJs) !== '') {
+                    $resolved['jsInlineAfterHref'] = $bundleJs;
+                }
+            }
+            if (array_key_exists('css', $resolved) && trim((string) $resolved['css']) !== '' && empty($resolved['cssInlineOnly'])) {
                 $resolved['cssHref'] = self::encodeRelativePath($basePath . '/' . self::LAYOUT_STYLE_FILE);
             }
-            if (array_key_exists('js', $resolved) && trim((string) $resolved['js']) !== '') {
+            if (array_key_exists('js', $resolved) && trim((string) $resolved['js']) !== '' && empty($resolved['jsInlineOnly'])) {
                 $resolved['jsHref'] = self::encodeRelativePath($basePath . '/' . self::LAYOUT_SCRIPT_FILE);
             }
         }
@@ -240,6 +266,12 @@ trait PoffConfigLayoutViewHelpers
             $scriptPath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_SCRIPT_FILE;
             if (is_file($scriptPath)) {
                 $resolved['js'] = (string) file_get_contents($scriptPath);
+            }
+            if (array_key_exists('js', $resolved) && trim((string) $resolved['js']) !== '') {
+                $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
+                if (is_string($bundleJs) && trim($bundleJs) !== '') {
+                    $resolved['jsInlineAfterHref'] = $bundleJs;
+                }
             }
 
             [$assets, $files] = self::scanLayoutAssets($layoutDir);

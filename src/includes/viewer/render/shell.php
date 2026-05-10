@@ -13,6 +13,7 @@ function renderViewerShell(array $payload): void
     $layoutJsHref = trim((string) ($layout['jsHref'] ?? ''));
     $layoutCssInline = $layoutCssHref === '' ? trim((string) ($layout['css'] ?? '')) : '';
     $layoutJsInline = $layoutJsHref === '' ? trim((string) ($layout['js'] ?? '')) : '';
+    $layoutJsInlineAfterHref = trim((string) ($layout['jsInlineAfterHref'] ?? ''));
     $projectRootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir() : dirname(__DIR__, 4);
     $viewerShellCssPath = rtrim($projectRootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'build' . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'app.css';
     $viewerShellCss = is_file($viewerShellCssPath) ? trim((string) file_get_contents($viewerShellCssPath)) : '';
@@ -39,8 +40,12 @@ function renderViewerShell(array $payload): void
     </div>
 <?php if ($layoutJsHref !== ''): ?>
     <script src="<?= htmlspecialchars($layoutJsHref, ENT_QUOTES, 'UTF-8') ?>" defer></script>
-<?php elseif ($layoutJsInline !== ''): ?>
+<?php endif; ?>
+<?php if ($layoutJsHref === '' && $layoutJsInline !== ''): ?>
     <script><?= $layoutJsInline ?></script>
+<?php endif; ?>
+<?php if ($layoutJsInlineAfterHref !== ''): ?>
+    <script><?= $layoutJsInlineAfterHref ?></script>
 <?php endif; ?>
 </body>
 </html>
