@@ -66,7 +66,7 @@ if (!empty($navFolder)) {
     $upLink = '?path=' . urlencode($parentRelativePath) . $editQuery;
     $goUpCopy = htmlspecialchars($parentRelativePath !== '' ? $parentRelativePath : '..');
     echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-        . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars($upLink) . '"' . ($editMode ? cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..') : '') . '><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a>'
+        . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a>'
         . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..') . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
         . '</li>';
 }
@@ -80,7 +80,7 @@ $currentNavConfig = is_array($config ?? null) ? $config : [];
 $currentNavName = (string) ($currentNavConfig['folderName'] ?? basename($navFolder));
 $currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavName)));
 echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-    . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '"' . ($editMode ? cmsNavCopyPasteAttr($currentNavName) : '') . '>./ ' . htmlspecialchars($currentNavName) . '</a>'
+    . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
     . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($currentNavName) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
     . '</li>';
 
@@ -164,13 +164,16 @@ foreach ($directories as $dir) {
     $hiddenAttrs = $isHidden
         ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
         : '';
+    $rowStyle = $isHidden
+        ? 'display:flex;align-items:center;gap:.25rem;opacity:.48;filter:grayscale(1);'
+        : 'display:flex;align-items:center;gap:.25rem;';
     $hiddenBadge = $isHidden
         ? '<span style="margin-left:auto;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">hidden</span>'
         : '';
     $copyText = htmlspecialchars((string) ($dir['copyText'] ?? $dir['name']));
-    echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '"' . ($editMode ? cmsNavCopyPasteAttr((string) ($dir['copyText'] ?? $dir['name'])) : '') . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($dir['name']) . $hiddenBadge . '</a>'
-        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($dir['copyText'] ?? $dir['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
+    echo '<li style="' . $rowStyle . '">'
+        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '"' . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($dir['name']) . $hiddenBadge . '</a>'
+        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($dir['copyText'] ?? $dir['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:' . ($isHidden ? '.35' : '.6') . ';">Copy</button>' : '')
         . '</li>';
 }
 
@@ -179,7 +182,7 @@ if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
     $layoutHash = '#/' . str_replace('%2F', '/', rawurlencode($layoutVirtualPath));
     $layoutCopy = htmlspecialchars($layoutVirtualPath);
     echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-        . '<a class="nav-link nav-link-layout" style="flex:1;" href="' . htmlspecialchars($layoutHash) . '" data-layout-path="' . htmlspecialchars($layoutVirtualPath) . '"' . ($editMode ? cmsNavCopyPasteAttr($layoutVirtualPath) : '') . '>'
+        . '<a class="nav-link nav-link-layout" style="flex:1;" href="' . htmlspecialchars($layoutHash) . '" data-layout-path="' . htmlspecialchars($layoutVirtualPath) . '">'
         . '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zm2 1a.75.75 0 000 1.5h10a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h7a.75.75 0 000-1.5H5z" clip-rule="evenodd"/></svg>'
         . '.layout</a>'
         . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($layoutVirtualPath) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
@@ -188,8 +191,8 @@ if (isset($_GET['edit']) && $_GET['edit'] === 'true') {
     $htaccessFullPath = $navAbsolutePath . DIRECTORY_SEPARATOR . '.htaccess';
     if (is_file($htaccessFullPath)) {
         $htaccessCopy = htmlspecialchars($htaccessPath);
-        echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-            . '<a class="nav-link nav-link-htaccess" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($htaccessPath) . $editQuery) . '" data-path="' . htmlspecialchars($htaccessPath) . '" data-file=".htaccess"' . ($editMode ? cmsNavCopyPasteAttr($htaccessPath) : '') . '>'
+    echo '<li style="display:flex;align-items:center;gap:.25rem;">'
+            . '<a class="nav-link nav-link-htaccess" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($htaccessPath) . $editQuery) . '" data-path="' . htmlspecialchars($htaccessPath) . '" data-file=".htaccess">'
             . '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>'
             . '.htaccess</a>'
             . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($htaccessPath) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
@@ -202,13 +205,16 @@ foreach ($files as $file) {
     $hiddenAttrs = $isHidden
         ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
         : '';
+    $rowStyle = $isHidden
+        ? 'display:flex;align-items:center;gap:.25rem;opacity:.48;filter:grayscale(1);'
+        : 'display:flex;align-items:center;gap:.25rem;';
     $hiddenBadge = $isHidden
         ? '<span style="margin-left:auto;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">hidden</span>'
         : '';
     // Keep file rows copy-friendly without changing navigation behavior.
     $fileCopyText = htmlspecialchars((string) ($file['copyText'] ?? $file['name']));
-    echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '"' . ($editMode ? cmsNavCopyPasteAttr((string) ($file['copyText'] ?? $file['name'])) : '') . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($file['name']) . $hiddenBadge . '</a>'
-        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($file['copyText'] ?? $file['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
+    echo '<li style="' . $rowStyle . '">'
+        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '"' . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($file['name']) . $hiddenBadge . '</a>'
+        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($file['copyText'] ?? $file['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:' . ($isHidden ? '.35' : '.6') . ';">Copy</button>' : '')
         . '</li>';
 }

@@ -1,6 +1,5 @@
 (function () {
-    console.log('frogon');alert('test')
-    
+   
     const initDefaultLayout = () => {
         const root = document.querySelector('.poff-default-layout');
         if (!root) {

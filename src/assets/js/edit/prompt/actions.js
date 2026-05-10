@@ -4,6 +4,7 @@ export function bindPromptActions({
     promptSendEl,
     promptInputEl,
     promptAttachEl,
+    promptInsertNameEl,
     promptImageInputEl,
     promptAttachmentRemoveEl,
     layoutPresetEl,
@@ -11,6 +12,7 @@ export function bindPromptActions({
     onResetTemplate,
     onSendPrompt,
     onAttachImage,
+    onInsertName,
     onRemoveImage,
     onTemplateInput,
     onLayoutPresetChange,
@@ -60,6 +62,12 @@ export function bindPromptActions({
             if (typeof onAttachImage === 'function') {
                 void onAttachImage(file);
             }
+        });
+    }
+
+    if (promptInsertNameEl && typeof onInsertName === 'function') {
+        promptInsertNameEl.addEventListener('click', () => {
+            void onInsertName();
         });
     }
 

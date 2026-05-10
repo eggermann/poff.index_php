@@ -22,6 +22,11 @@ export function renderPromptWindow(settings = {}, options = {}) {
         : mode === 'folder'
             ? 'Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders.'
             : 'Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.';
+    const insertNameLabel = mode === 'file'
+        ? 'Insert file name'
+        : mode === 'folder'
+            ? 'Insert item name'
+            : 'Insert layout name';
     const contextCopy = mode === 'layout'
         ? `<div>Prompt edits the outer layout wrapper. <code>root.*</code> is the shell-level layout data and <code>work.*</code> is the inner item data. Use <code>root.title</code> for the wrapper title and <code>work.title</code> for the item title.</div><div><code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>`
         : mode === 'folder'
@@ -153,6 +158,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                     <div class="prompt-actions-left">
                         <button class="btn" type="button" id="prompt-send">Send</button>
                         <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
+                        <button class="btn btn-secondary" type="button" id="prompt-insert-name">${escapeHtml(insertNameLabel)}</button>
                         <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
                     </div>
                     <label class="prompt-inline-toggle">
