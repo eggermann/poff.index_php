@@ -61,15 +61,6 @@ export function buildPromptLayoutPayload({
         layoutPayload.model = responseModel;
     }
 
-    const attachSiblingSectionTemplates = () => {
-        if (responseWorkTemplate !== null) {
-            layoutPayload.workTemplate = responseWorkTemplate;
-        }
-        if (responseWorksTemplate !== null) {
-            layoutPayload.worksTemplate = responseWorksTemplate;
-        }
-    };
-
     const preset = (layoutPreset || layoutState.preset || 'actual').trim();
     layoutPayload.preset = preset;
     if (preset === 'shared') {
@@ -98,10 +89,6 @@ export function buildPromptLayoutPayload({
 
     if (shouldPersistToLocalWrapper) {
         layoutPayload.template = templateText;
-        if (responseSectionTemplate !== null) {
-            layoutPayload.sectionTemplate = responseSectionTemplate;
-        }
-        attachSiblingSectionTemplates();
         if (nextCss !== null) {
             layoutPayload.css = nextCss;
         }
@@ -111,10 +98,6 @@ export function buildPromptLayoutPayload({
     } else if (canEditResolvedFilesystemTarget) {
         layoutPayload.originalTarget = resolvedLayoutDirectory;
         layoutPayload.originalTemplate = templateText;
-        if (responseSectionTemplate !== null) {
-            layoutPayload.sectionTemplate = responseSectionTemplate;
-        }
-        attachSiblingSectionTemplates();
         if (nextCss !== null) {
             layoutPayload.originalCss = nextCss;
         }
@@ -124,10 +107,6 @@ export function buildPromptLayoutPayload({
     } else {
         layoutPayload.name = 'custom-layout';
         layoutPayload.template = templateText;
-        if (responseSectionTemplate !== null) {
-            layoutPayload.sectionTemplate = responseSectionTemplate;
-        }
-        attachSiblingSectionTemplates();
         if (nextCss !== null) {
             layoutPayload.css = nextCss;
         }

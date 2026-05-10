@@ -1419,6 +1419,51 @@ describe('Worktype HBS renderer', () => {
     expect(layoutPayload).not.toHaveProperty('model');
   });
 
+  test('keeps layout prompts focused on the outer wrapper only', () => {
+    const { buildPromptLayoutPayload } = loadPromptLayoutPayloadHelpers();
+
+    const { layoutPayload } = buildPromptLayoutPayload({
+      selection: {
+        isLayout: true,
+        previewIsFile: false,
+        layoutIsFile: false,
+        previewPath: '1er/.layout',
+      },
+      currentConfig: {
+        work: {
+          layout: {
+            name: 'filesystem-layout',
+            directory: '1er/.layout',
+            storage: 'filesystem',
+          },
+        },
+      },
+      drawerForm: {
+        elements: {
+          work_layout: { value: 'filesystem-layout' },
+        },
+      },
+      templateText: '<div class="layout-shell"></div>',
+      responseSectionTemplate: '<article class="should-not-be-saved"></article>',
+      responseWorkTemplate: '<span class="should-not-be-saved"></span>',
+      responseWorksTemplate: '<div class="should-not-be-saved"></div>',
+      nextCss: '.layout-shell{color:rebeccapurple;}',
+      nextJs: 'console.log("layout");',
+      responseModel: 'gpt-4o-mini',
+      layoutPreset: 'actual',
+    });
+
+    expect(layoutPayload).toMatchObject({
+      originalTemplate: '<div class="layout-shell"></div>',
+      originalCss: '.layout-shell{color:rebeccapurple;}',
+      originalJs: 'console.log("layout");',
+      originalTarget: '1er/.layout',
+    });
+    expect(layoutPayload).not.toHaveProperty('sectionTemplate');
+    expect(layoutPayload).not.toHaveProperty('workTemplate');
+    expect(layoutPayload).not.toHaveProperty('worksTemplate');
+  });
+
   test('normalizes and materializes custom work fields', () => {
     const {
       createDefaultWorkField,
@@ -1776,8 +1821,7 @@ describe('Worktype HBS renderer', () => {
     try {
       const output = await runViewer(fileName, tempDir);
 
-      expect(output).toContain('console.log(\'frogon\')');
-      expect(output).toContain('alert(\'test\')');
+      expect(output).toContain('const initDefaultLayout = () => {');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -1948,8 +1992,7 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<div class="default-fs-layout">');
     expect(rendered).toContain('tests/poff-tests/.layout/style.css');
     expect(rendered).toContain('tests/poff-tests/.layout/script.js');
-    expect(rendered).toContain('console.log(\'frogon\')');
-    expect(rendered).toContain('alert(\'test\')');
+    expect(rendered).toContain('const initDefaultLayout = () => {');
     expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });
@@ -2190,6 +2233,41 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="file-custom">');
     expect(output).toContain('Viewer File');
     expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
+  });
+
+  test('persists a prompt-generated file layout into the file page with template, CSS, and JS', async () => {
+    const tempDir = path.join(POFF_DIR, `prompt-file-layout-${Date.now()}`);
+    const fileName = 'clip.mp4';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.works', `${fileName}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'video');
+
+    try {
+      await runLayoutFilesystem('persist-file', tempDir, fileName, {
+        name: 'filesystem-layout',
+        engine: 'lightncandy',
+        section: 'work',
+        template: '<section class="prompt-file-layout"><h2>{{title}}</h2><div class="prompt-file-layout__body">{{> work}}</div></section>',
+        css: '.prompt-file-layout{border:1px solid #5f5;padding:1rem;}',
+        js: 'console.log(\'ok\');',
+        sectionTemplate: '<article class="prompt-file-work">{{name}}</article>',
+      });
+
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-file', tempDir, fileName));
+      expect(ensured.work.layout.directory).toBe(`.works/${fileName}.layout`);
+      expect(ensured.work.layout.template).toContain('prompt-file-layout');
+      expect(ensured.work.layout.css).toContain('.prompt-file-layout');
+      expect(ensured.work.layout.js).toContain("console.log('ok')");
+      expect(ensured.work.layout.sectionTemplate).toContain('prompt-file-work');
+
+      const output = await runViewer(fileName, tempDir);
+      expect(output).toContain('<section class="prompt-file-layout">');
+      expect(output).toContain('.works/clip.mp4.layout/style.css');
+      expect(output).toContain('.works/clip.mp4.layout/script.js');
+      expect(output).toContain('<article class="prompt-file-work">');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('renders built-in file layout assets from the containing folder .layout', async () => {
@@ -2489,7 +2567,7 @@ describe('Worktype HBS renderer', () => {
       preset: 'actual',
       template: '<div class="persisted-layout">Persisted</div>',
       css: '.persisted-layout{color:#fff;}',
-      js: 'window.__persistedLayout = true;',
+      js: 'console.log(\'ok\');',
       worksTemplate: '<div class="persisted-folder-inner">{{#each items}}<span>{{name}}</span>{{/each}}</div>',
       workTemplate: '<div class="persisted-file-inner">{{name}}</div>',
     };
@@ -2506,7 +2584,7 @@ describe('Worktype HBS renderer', () => {
     });
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('Persisted');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.persisted-layout');
-    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__persistedLayout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain("console.log('ok')");
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('persisted-folder-inner');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'work.hbs'), 'utf8')).toContain('persisted-file-inner');
     await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
@@ -2523,11 +2601,13 @@ describe('Worktype HBS renderer', () => {
     expect(ensuredConfig.work.layout.template).toContain('Persisted');
     expect(ensuredConfig.work.layout.storage).toBe('filesystem');
     expect(ensuredConfig.work.layout.preset).toBe('actual');
+    expect(ensuredConfig.work.layout.js).toContain("console.log('ok')");
 
     const ensuredFileOutput = await runLayoutFilesystem('ensure-file', PERSIST_LAYOUT_DIR, 'shared-file.txt');
     const ensuredFileConfig = JSON.parse(ensuredFileOutput);
     expect(ensuredFileConfig.work.layout.directory).toBe('tests/poff-tests/persist-layout/.layout');
     expect(ensuredFileConfig.work.layout.sectionTemplate).toContain('persisted-file-inner');
+    expect(await runViewer('persist-layout')).toContain('.layout/script.js');
   });
 
   test('keeps custom layout files when switching presets away from custom', async () => {
