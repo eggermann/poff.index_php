@@ -76,7 +76,7 @@ if ($navFolder !== '') {
     //root;
 }
 
-$currentNavConfig = is_array($config ?? null) ? $config : [];
+$currentNavConfig = is_array($folderPoffConfig ?? null) ? $folderPoffConfig : [];
 $currentNavName = (string) ($currentNavConfig['folderName'] ?? basename($navFolder));
 $currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavName)));
 echo '<li style="display:flex;align-items:center;gap:.25rem;">'
