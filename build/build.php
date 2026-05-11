@@ -178,48 +178,57 @@ try {
     $buildContent .= trim($poffConfigContent) . "\n\n";
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
-    $viewerUtils = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/utils.php');
-    $viewerEdit = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit.php');
-    $viewerEditPromptParse = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-parse.php');
-    $viewerEditPromptRefs = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-refs.php');
-    $viewerEditPromptContext = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-context.php');
-    $viewerEditPromptCompact = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/prompt-compact.php');
-    $viewerEditUpload = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/upload.php');
-    $viewerEditDelete = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/edit/delete.php');
-    $viewerRenderEntry = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/entry.php');
-    $viewerRenderFile = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/file.php');
-    $viewerRenderFolder = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/folder.php');
-    $viewerRenderData = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/data.php');
-    $viewerRenderShell = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/render/shell.php');
     $stripRequires = static function (string $content): string {
         return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
     };
-    $viewerUtils = $stripRequires($viewerUtils);
-    $viewerEdit = $stripRequires($viewerEdit);
-    $viewerEditPromptParse = $stripRequires($viewerEditPromptParse);
-    $viewerEditPromptRefs = $stripRequires($viewerEditPromptRefs);
-    $viewerEditPromptContext = $stripRequires($viewerEditPromptContext);
-    $viewerEditPromptCompact = $stripRequires($viewerEditPromptCompact);
-    $viewerEditUpload = $stripRequires($viewerEditUpload);
-    $viewerEditDelete = $stripRequires($viewerEditDelete);
-    $viewerRenderEntry = $stripRequires($viewerRenderEntry);
-    $viewerRenderFile = $stripRequires($viewerRenderFile);
-    $viewerRenderFolder = $stripRequires($viewerRenderFolder);
-    $viewerRenderData = $stripRequires($viewerRenderData);
-    $viewerRenderShell = $stripRequires($viewerRenderShell);
-    $buildContent .= trim($viewerUtils) . "\n\n";
-    $buildContent .= trim($viewerEdit) . "\n\n";
-    $buildContent .= trim($viewerEditPromptParse) . "\n\n";
-    $buildContent .= trim($viewerEditPromptRefs) . "\n\n";
-    $buildContent .= trim($viewerEditPromptContext) . "\n\n";
-    $buildContent .= trim($viewerEditPromptCompact) . "\n\n";
-    $buildContent .= trim($viewerEditUpload) . "\n\n";
-    $buildContent .= trim($viewerEditDelete) . "\n\n";
-    $buildContent .= trim($viewerRenderEntry) . "\n\n";
-    $buildContent .= trim($viewerRenderFile) . "\n\n";
-    $buildContent .= trim($viewerRenderFolder) . "\n\n";
-    $buildContent .= trim($viewerRenderData) . "\n\n";
-    $buildContent .= trim($viewerRenderShell) . "\n\n";
+    $viewerEditParts = [
+        '/includes/viewer/utils.php',
+        '/includes/viewer/edit/core/config.php',
+        '/includes/viewer/edit/core/parent.php',
+        '/includes/viewer/edit/core/transport.php',
+        '/includes/viewer/edit/prompt-parse/loose.php',
+        '/includes/viewer/edit/prompt-parse/model.php',
+        '/includes/viewer/edit/prompt-compact/base.php',
+        '/includes/viewer/edit/prompt-compact/config.php',
+        '/includes/viewer/edit/prompt-compact/context.php',
+        '/includes/viewer/edit/prompt-compact/history.php',
+        '/includes/viewer/edit/prompt-context/wrapper.php',
+        '/includes/viewer/edit/prompt-context/parent.php',
+        '/includes/viewer/edit/prompt/context-state.php',
+        '/includes/viewer/edit/prompt/context-build.php',
+        '/includes/viewer/edit/upload.php',
+        '/includes/viewer/edit/delete.php',
+        '/includes/viewer/edit/reset.php',
+        '/includes/viewer/edit/action/context.php',
+        '/includes/viewer/edit/action/config.php',
+        '/includes/viewer/edit/action/upload-action.php',
+        '/includes/viewer/edit/action/delete-action.php',
+        '/includes/viewer/edit/action/reset-action.php',
+        '/includes/viewer/edit/action/save/meta.php',
+        '/includes/viewer/edit/action/save/work.php',
+        '/includes/viewer/edit/action/save/layout-tree.php',
+        '/includes/viewer/edit/action/save/layout-original.php',
+        '/includes/viewer/edit/action/save/layout-section.php',
+        '/includes/viewer/edit/action/save/layout.php',
+        '/includes/viewer/edit/action/save/finalize.php',
+        '/includes/viewer/edit/action/save-action.php',
+        '/includes/viewer/edit/action/prompt/helpers.php',
+        '/includes/viewer/edit/action/prompt/openai.php',
+        '/includes/viewer/edit/action/prompt/gemini.php',
+        '/includes/viewer/edit/action/prompt/local.php',
+        '/includes/viewer/edit/action/prompt-action.php',
+        '/includes/viewer/edit/action/dispatch.php',
+        '/includes/viewer/render/entry.php',
+        '/includes/viewer/render/file.php',
+        '/includes/viewer/render/folder.php',
+        '/includes/viewer/render/data.php',
+        '/includes/viewer/render/shell.php',
+    ];
+    foreach ($viewerEditParts as $relativePath) {
+        $content = ComponentReader::readComponentFile($sourceDir . $relativePath);
+        $content = $stripRequires($content);
+        $buildContent .= trim($content) . "\n\n";
+    }
     $buildContent .= "cmsHandleEditAction();\n\n";
 
     // Add initialization code
