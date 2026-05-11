@@ -35,24 +35,27 @@ function loadEnv(rootDir) {
     return env;
 }
 
-function getEnvValue(env, key, fallback = '') {
-    const processValue = process.env[key];
-    if (typeof processValue === 'string' && processValue !== '') {
-        return processValue;
-    }
+function getEnvValue(env, keys, fallback = '') {
+    const keyList = Array.isArray(keys) ? keys : [keys];
+    for (const key of keyList) {
+        const processValue = process.env[key];
+        if (typeof processValue === 'string' && processValue !== '') {
+            return processValue;
+        }
 
-    const envValue = env[key];
-    if (typeof envValue === 'string' && envValue !== '') {
-        return envValue;
+        const envValue = env[key];
+        if (typeof envValue === 'string' && envValue !== '') {
+            return envValue;
+        }
     }
 
     return fallback;
 }
 
-function requireEnvValue(env, key) {
-    const value = getEnvValue(env, key);
+function requireEnvValue(env, keys, label) {
+    const value = getEnvValue(env, keys);
     if (!value) {
-        throw new Error(`Missing required deploy setting: ${key}`);
+        throw new Error(`Missing required deploy setting: ${label}`);
     }
     return value;
 }
@@ -61,11 +64,76 @@ function shellEscape(value) {
     return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
+function resolveDeployMode(env) {
+    const cliArgs = new Set(process.argv.slice(2));
+    if (cliArgs.has('--full')) {
+        return 'full';
+    }
+    if (cliArgs.has('--index-only')) {
+        return 'index';
+    }
+
+    const configuredMode = getEnvValue(env, ['DEPLOY_MODE', 'deployMode'], 'index').toLowerCase();
+    return configuredMode === 'full' ? 'full' : 'index';
+}
+
 function resolveSourcePath(env) {
-    const configuredPath = getEnvValue(env, 'DEPLOY_SOURCE_PATH', 'pages/dominikeggermann.com');
+    const configuredPath = getEnvValue(
+        env,
+        ['DEPLOY_SOURCE_PATH', 'SOURCE_PATH', 'sourcePath'],
+        'pages/dominikeggermann.com'
+    );
     return path.isAbsolute(configuredPath)
         ? configuredPath
         : path.resolve(projectRoot, configuredPath);
+}
+
+function resolveIndexFilePath(sourcePath) {
+    const stat = fs.statSync(sourcePath);
+    if (stat.isDirectory()) {
+        return path.join(sourcePath, 'index.php');
+    }
+    return sourcePath;
+}
+
+function resolveRemoteIndexPath(remotePath, localIndexPath) {
+    const normalizedRemotePath = remotePath.replace(/\\/g, '/');
+    if (normalizedRemotePath.endsWith('.php')) {
+        return normalizedRemotePath;
+    }
+    return path.posix.join(normalizedRemotePath, path.basename(localIndexPath));
+}
+
+async function getRemoteFileTimestamp(remoteFilePath) {
+    const cmd = `stat -c %Y ${shellEscape(remoteFilePath)} 2>/dev/null || stat -f %m ${shellEscape(remoteFilePath)} 2>/dev/null`;
+    const result = await ssh.execCommand(cmd);
+    const value = (result.stdout || '').trim();
+    if (!value) {
+        return null;
+    }
+
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function uploadIndexFile(localFilePath, remoteFilePath) {
+    if (!fs.existsSync(localFilePath) || !fs.statSync(localFilePath).isFile()) {
+        throw new Error(`Deploy index file not found: ${localFilePath}`);
+    }
+
+    const remoteDir = path.posix.dirname(remoteFilePath);
+    await ssh.execCommand(`mkdir -p ${shellEscape(remoteDir)}`);
+
+    const localTime = (fs.statSync(localFilePath).mtimeMs || 0) / 1000;
+    const remoteTime = await getRemoteFileTimestamp(remoteFilePath);
+
+    if (remoteTime && localTime <= remoteTime) {
+        console.log('Skipped (remote is newer or same): index.php');
+        return;
+    }
+
+    await ssh.putFile(localFilePath, remoteFilePath);
+    console.log('Uploaded:', remoteFilePath);
 }
 
 async function uploadDir(localDir, remoteDir, concurrency) {
@@ -162,14 +230,26 @@ async function uploadDir(localDir, remoteDir, concurrency) {
 
 async function main() {
     const env = loadEnv(projectRoot);
-    const host = requireEnvValue(env, 'DEPLOY_HOST');
-    const username = requireEnvValue(env, 'DEPLOY_USERNAME');
-    const remotePath = requireEnvValue(env, 'DEPLOY_REMOTE_PATH');
+    const deployMode = resolveDeployMode(env);
+    const host = requireEnvValue(env, ['DEPLOY_HOST', 'SSH_HOST', 'host'], 'DEPLOY_HOST / SSH_HOST / host');
+    const username = requireEnvValue(
+        env,
+        ['DEPLOY_USERNAME', 'SSH_USERNAME', 'SSH_USER', 'user'],
+        'DEPLOY_USERNAME / SSH_USERNAME / SSH_USER / user'
+    );
+    const remotePath = requireEnvValue(
+        env,
+        ['DEPLOY_REMOTE_PATH', 'SSH_REMOTE_PATH', 'DESTINATION_PATH', 'destinationPath'],
+        'DEPLOY_REMOTE_PATH / SSH_REMOTE_PATH / DESTINATION_PATH / destinationPath'
+    );
     const sourcePath = resolveSourcePath(env);
-    const concurrency = Number.parseInt(getEnvValue(env, 'DEPLOY_CONCURRENCY', '8'), 10) || 8;
-    const password = getEnvValue(env, 'DEPLOY_PASSWORD');
-    const privateKeyValue = getEnvValue(env, 'DEPLOY_PRIVATE_KEY');
-    const passphrase = getEnvValue(env, 'DEPLOY_PASSPHRASE');
+    const concurrency = Number.parseInt(
+        getEnvValue(env, ['DEPLOY_CONCURRENCY', 'SSH_CONCURRENCY', 'concurrency'], '8'),
+        10
+    ) || 8;
+    const password = getEnvValue(env, ['DEPLOY_PASSWORD', 'SSH_PASSWORD', 'password']);
+    const privateKeyValue = getEnvValue(env, ['DEPLOY_PRIVATE_KEY', 'SSH_PRIVATE_KEY', 'privateKey']);
+    const passphrase = getEnvValue(env, ['DEPLOY_PASSPHRASE', 'SSH_PASSPHRASE', 'passphrase']);
 
     if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isDirectory()) {
         throw new Error(`Deploy source directory not found: ${sourcePath}`);
@@ -196,11 +276,20 @@ async function main() {
     console.log('Connecting to server...');
     console.log(`Source: ${sourcePath}`);
     console.log(`Remote: ${remotePath}`);
+    console.log(`Mode: ${deployMode}`);
 
     try {
         await ssh.connect(connection);
-        console.log('Starting sync of newer files...');
-        await uploadDir(sourcePath, remotePath, concurrency);
+        if (deployMode === 'full') {
+            console.log('Starting sync of newer files...');
+            await uploadDir(sourcePath, remotePath, concurrency);
+            return;
+        }
+
+        const localIndexPath = resolveIndexFilePath(sourcePath);
+        const remoteIndexPath = resolveRemoteIndexPath(remotePath, localIndexPath);
+        console.log('Starting index-only deploy...');
+        await uploadIndexFile(localIndexPath, remoteIndexPath);
     } finally {
         ssh.dispose();
     }

@@ -227,6 +227,13 @@ npm run deploy
 
 `npm run deploy` uploads only built output from `pages/dominikeggermann.com` by default. It reads deploy settings from `.env` or process env.
 
+Default deploy mode is root `index.php` only.
+
+Full folder sync:
+```sh
+node scripts/deploy.js --full
+```
+
 Required `.env` keys:
 ```dotenv
 DEPLOY_HOST=example.com
@@ -249,4 +256,14 @@ Optional keys:
 ```dotenv
 DEPLOY_SOURCE_PATH=pages/dominikeggermann.com
 DEPLOY_CONCURRENCY=8
+DEPLOY_MODE=index
+```
+
+Legacy aliases also work if you want `.env` closer to old config naming:
+```dotenv
+host=example.com
+user=my-user
+password=my-password
+destinationPath=/var/www/virtual/my-user/dominikeggermann.com/
+sourcePath=pages/dominikeggermann.com
 ```
