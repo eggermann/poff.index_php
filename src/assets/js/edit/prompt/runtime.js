@@ -2,7 +2,7 @@ import { getLayoutState } from '../../core/utils.js';
 import { getDefaultSystemPromptForMode, getPromptMode, getPromptPlaceholderForMode, getSystemPromptSettingKeyForMode } from './mode.js';
 import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt } from './constants.js';
 import { readStoredHistory, writeStoredHistory } from './storage.js';
-import { cleanPersistedHistory, tagHistory } from './history.js';
+import { cleanPersistedHistory, shouldUsePersistedPromptHistory, tagHistory } from './history.js';
 import { buildPromptContext } from './build/context.js';
 import { renderPromptContext } from './render/context.js';
 import { renderPromptHistory } from './render/history.js';
@@ -135,6 +135,9 @@ export function createPromptRuntime({
         const scope = getHistoryScope(selection);
         const config = getConfig ? (getConfig() || {}) : {};
         if (config && Object.prototype.hasOwnProperty.call(config, 'promptHistory')) {
+            if (!shouldUsePersistedPromptHistory(config, scope.mode)) {
+                return [];
+            }
             return cleanPersistedHistory(config.promptHistory);
         }
         return cleanPersistedHistory(readStoredHistory(scope.path, scope.mode));
@@ -142,6 +145,7 @@ export function createPromptRuntime({
 
     const writeHistoryForSelection = (history, selection = null, options = {}) => {
         const scope = getHistoryScope(selection);
+        writeStoredHistory(scope.path, Array.isArray(history) ? history.slice(-12) : [], scope.mode);
         if (options.persistRemote === false) {
             return Promise.resolve(null);
         }

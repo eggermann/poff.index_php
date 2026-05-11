@@ -23,6 +23,7 @@ module.exports = {
   cleanPersistedHistory,
   isPendingAssistantHistory,
   serializeHistoryForRequest,
+  shouldUsePersistedPromptHistory,
   summarizeSerializedHistory,
 };
 `, context);
@@ -65,12 +66,38 @@ module.exports = {
   return module.exports;
 }
 
+function loadPromptWorkflowHelpers() {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/workflows.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*;\r?\n/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  buildPromptResetSavePayload,
+};
+`, context);
+
+  return module.exports;
+}
+
 describe('prompt history helpers', () => {
   const {
     buildTemplateHistorySnapshot,
     cleanPersistedHistory,
     isPendingAssistantHistory,
     serializeHistoryForRequest,
+    shouldUsePersistedPromptHistory,
     summarizeSerializedHistory,
   } = loadPromptHistoryHelpers();
 
@@ -190,6 +217,32 @@ describe('prompt history helpers', () => {
       final,
     ]);
   });
+
+  test('ignores stale work prompt history after template reset', () => {
+    expect(shouldUsePersistedPromptHistory({
+      work: {
+        layout: {
+          sectionTemplate: '',
+        },
+      },
+    }, 'file')).toBe(false);
+
+    expect(shouldUsePersistedPromptHistory({
+      work: {
+        layout: {
+          sectionTemplate: '',
+        },
+      },
+    }, 'layout')).toBe(true);
+
+    expect(shouldUsePersistedPromptHistory({
+      work: {
+        layout: {
+          sectionTemplate: '<article>{{title}}</article>',
+        },
+      },
+    }, 'file')).toBe(true);
+  });
 });
 
 describe('prompt history renderer', () => {
@@ -217,5 +270,21 @@ describe('prompt history renderer', () => {
 
     expect(container.innerHTML).toContain('data-history-reset-index="3"');
     expect(container.innerHTML).toContain('>reset<');
+  });
+});
+
+describe('prompt workflows', () => {
+  const { buildPromptResetSavePayload } = loadPromptWorkflowHelpers();
+
+  test('reset template save clears persisted prompt history', () => {
+    expect(buildPromptResetSavePayload('folder/file.jpg', {
+      sectionTemplate: '',
+    })).toEqual({
+      path: 'folder/file.jpg',
+      layout: {
+        sectionTemplate: '',
+      },
+      promptHistory: [],
+    });
   });
 });

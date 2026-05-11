@@ -8,6 +8,14 @@ import { materializeWorkFields } from '../work-fields.js';
 import { buildPromptLayoutPayload } from './layout-payload.js';
 import { appendStreamingChunk, beginStreaming, finishStreaming, stopStreaming } from './stream.js';
 
+export function buildPromptResetSavePayload(path, layoutPayload) {
+    return {
+        path,
+        layout: layoutPayload,
+        promptHistory: [],
+    };
+}
+
 export function createPromptWindowWorkflows({
     root,
     statusEl,
@@ -130,12 +138,9 @@ export function createPromptWindowWorkflows({
                 });
             }
 
-            await saveConfig({
-                path: state.activePath,
-                layout: layoutPayload,
-            }, statusEl);
-
-            state.promptHistory = [];
+            setHistory([]);
+            writeHistoryForSelection(state.promptHistory, selection, { persistRemote: false });
+            await saveConfig(buildPromptResetSavePayload(state.activePath, layoutPayload), statusEl);
             renderHistory();
             renderContext();
             renderSummary(`Reset ${isLayoutTarget ? 'layout wrapper' : 'wrapped partial'} to inherited/default template.`);

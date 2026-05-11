@@ -14,6 +14,16 @@ export function cleanPersistedHistory(history) {
         : [];
 }
 
+export function shouldUsePersistedPromptHistory(config, mode = 'folder') {
+    const layout = config?.work?.layout && typeof config.work.layout === 'object'
+        ? config.work.layout
+        : {};
+    if (mode !== 'layout' && typeof layout.sectionTemplate === 'string' && layout.sectionTemplate.trim() === '') {
+        return false;
+    }
+    return true;
+}
+
 function trimHistoryText(value, maxLength = 600) {
     const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
     if (!normalized) {
