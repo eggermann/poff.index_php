@@ -18,6 +18,7 @@ require_once __DIR__ . '/routes/workprompt.php';
 require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/edit-config.php';
 require_once __DIR__ . '/routes/prompt-template.php';
+require_once __DIR__ . '/routes/remote-content.php';
 require_once __DIR__ . '/routes/style.php';
 
 $runtime = mcpRuntimeContext();
@@ -54,6 +55,19 @@ switch ($route) {
         mcpJsonResponse(handlePromptTemplate([
             'rootDir' => $rootDir,
             'path' => mcpRoutePath(),
+        ]));
+    case 'export-content':
+        mcpJsonResponse(handleExportContent([
+            'rootDir' => $rootDir,
+            'path' => mcpRoutePath(),
+        ]));
+    case 'import-remote':
+        mcpJsonResponse(handleImportRemote([
+            'rootDir' => $rootDir,
+            'path' => mcpRoutePath(),
+            'url' => mcpQueryString('url', '') ?? '',
+            'sourceId' => mcpQueryString('sourceId', '') ?? '',
+            'replace' => in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true),
         ]));
     case 'style':
         $response = handleStyleRoute($prompt, $mcpUrl, $configPath);

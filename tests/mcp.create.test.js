@@ -28,6 +28,7 @@ const DELETE_FILE_DIR = path.join(POFF_DIR, 'delete-file-target');
 const DELETE_FOLDER_DIR = path.join(POFF_DIR, 'delete-folder-target');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
 const VIRTUAL_LINK_DIR = path.join(POFF_DIR, 'virtual-links');
+const REMOTE_IMPORT_DIR = path.join(POFF_DIR, 'remote-import-links');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -209,6 +210,34 @@ function runUpload(targetDir, sourcePath, uploadName) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`upload helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runRemoteContent(mode, baseDir, relativePath = '', payload = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      path.join(ROOT, 'tests/php_remote_content_routes.php'),
+      mode,
+      baseDir,
+      relativePath,
+      JSON.stringify(payload),
+    ];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(stdout.trim()));
+        return;
+      }
+      reject(new Error(`remote content helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -721,6 +750,24 @@ describe('MCP create route helper (CLI)', () => {
           visible: true,
         },
       ],
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-folder-layout',
+          engine: 'lightncandy',
+          section: 'works',
+        },
+      },
+    }, null, 2));
+    fs.mkdirSync(REMOTE_IMPORT_DIR, { recursive: true });
+    fs.mkdirSync(path.join(REMOTE_IMPORT_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(REMOTE_IMPORT_DIR, '.layout', 'works.hbs'), '{{#each items}}<a class="remote-link" href="{{pageLink}}">{{name}}</a>{{/each}}');
+    fs.writeFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), JSON.stringify({
+      folderName: 'remote-import-links',
+      slug: 'remote-import-links',
+      title: 'Remote Import Links',
+      description: 'Folder with imported remote entries',
+      tree: [],
       work: {
         type: 'folder',
         layout: {
@@ -2321,6 +2368,110 @@ describe('Worktype HBS renderer', () => {
     expect(output).toMatch(/href="\?view(?:=|&#x3D;)1&amp;path(?:=|&#x3D;)linkone"/);
     expect(output).toContain('href="https://example.com/contact"');
     expect(output).not.toContain('%3Fview%3D1%26path%3Dlinkone');
+  });
+
+  test('exports normalized remote content with absolute viewer and asset links', async () => {
+    const result = await runRemoteContent('export', POFF_DIR, 'viewer-folder', {
+      baseUrl: 'https://origin.example/index.php',
+      sourceId: 'origin-example',
+    });
+
+    expect(result.route).toBe('export-content');
+    expect(result.source).toEqual(expect.objectContaining({
+      id: 'origin-example',
+      baseUrl: 'https://origin.example/index.php',
+      path: 'viewer-folder',
+    }));
+    expect(result.root.pageLink).toBe('https://origin.example/index.php?view=1&path=viewer-folder');
+    expect(result.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'child.txt',
+        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+        srcUrl: 'https://origin.example/viewer-folder/child.txt',
+      }),
+      expect.objectContaining({
+        name: 'nested-child',
+        isFolder: true,
+        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+      }),
+    ]));
+  });
+
+  test('imports remote exports into config tree as virtual entries and renders their links', async () => {
+    const remoteFeed = {
+      route: 'export-content',
+      source: {
+        id: 'origin-example',
+        path: 'viewer-folder',
+      },
+      items: [
+        {
+          name: 'Portfolio',
+          title: 'Portfolio',
+          type: 'folder',
+          kind: 'folder',
+          path: 'viewer-folder/nested-child',
+          relativePath: 'viewer-folder/nested-child',
+          pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+          srcUrl: 'https://origin.example/index.php?path=viewer-folder%2Fnested-child',
+          visible: true,
+          isFolder: true,
+          isFile: false,
+        },
+        {
+          name: 'Leaf Note',
+          title: 'Leaf Note',
+          type: 'file',
+          kind: 'text',
+          path: 'viewer-folder/child.txt',
+          relativePath: 'viewer-folder/child.txt',
+          pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+          srcUrl: 'https://origin.example/viewer-folder/child.txt',
+          visible: true,
+          isFolder: false,
+          isFile: true,
+        },
+      ],
+    };
+
+    const result = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
+      url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
+      sourceId: 'origin-example',
+      mockResponse: {
+        status: 200,
+        body: remoteFeed,
+      },
+    });
+
+    expect(result.route).toBe('import-remote');
+    expect(result.saved).toBe(true);
+    expect(result.importedCount).toBe(2);
+
+    const storedConfig = JSON.parse(fs.readFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), 'utf8'));
+    expect(storedConfig.remoteSources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'origin-example',
+        url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
+      }),
+    ]));
+    expect(storedConfig.tree).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Portfolio',
+        type: 'folder',
+        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+        remoteSource: 'origin-example',
+      }),
+      expect.objectContaining({
+        name: 'Leaf Note',
+        type: 'file',
+        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+        remoteSource: 'origin-example',
+      }),
+    ]));
+
+    const output = await runViewer('remote-import-links');
+    expect(output).toMatch(/href="https:\/\/origin\.example\/index\.php\?view(?:=|&#x3D;)1&amp;path(?:=|&#x3D;)viewer-folder%2Fnested-child"/);
+    expect(output).toMatch(/href="https:\/\/origin\.example\/index\.php\?view(?:=|&#x3D;)1&amp;file(?:=|&#x3D;)viewer-folder%2Fchild\.txt"/);
   });
 
   test('normalizes duplicated viewer urls in custom layout links', async () => {
