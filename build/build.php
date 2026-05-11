@@ -8,6 +8,7 @@
 $config = require __DIR__ . '/BuildConfig.php';
 require_once __DIR__ . '/ComponentReader.php';
 require_once __DIR__ . '/FileCopier.php';
+require_once __DIR__ . '/PoffConfigBuilder.php';
 
 // Extract configuration
 $sourceDir = $config['sourceDir'];
@@ -144,7 +145,6 @@ try {
     $poffConfigLayoutFiles = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-files.php');
     $poffConfigLayoutView = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-view.php');
     $poffConfigLayoutCollections = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-collections.php');
-    $poffConfigLayoutPersistence = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-persistence.php');
     $poffConfigPromptHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/prompt-helpers.php');
     $viewerLinkTargets = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/link-targets.php');
     $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
@@ -155,25 +155,19 @@ try {
     $editModeHelpers = $stripPhp($editModeHelpers);
     $projectRootHelpers = $stripPhp($projectRootHelpers);
     $promptTemplateSanitize = $stripPhp($promptTemplateSanitize);
-    $poffConfigLayoutHelpers = $stripPhp($poffConfigLayoutHelpers);
-    $poffConfigCoreHelpers = $stripPhp($poffConfigCoreHelpers);
-    $poffConfigLayoutFiles = $stripPhp($poffConfigLayoutFiles);
-    $poffConfigLayoutView = $stripPhp($poffConfigLayoutView);
-    $poffConfigLayoutCollections = $stripPhp($poffConfigLayoutCollections);
-    $poffConfigLayoutPersistence = $stripPhp($poffConfigLayoutPersistence);
-    $poffConfigPromptHelpers = $stripPhp($poffConfigPromptHelpers);
-    $viewerLinkTargets = $stripPhp($viewerLinkTargets);
+    $poffConfigContent = PoffConfigBuilder::buildClass($poffConfigContent, [
+        $poffConfigLayoutHelpers,
+        $poffConfigCoreHelpers,
+        $poffConfigLayoutFiles,
+        $poffConfigLayoutView,
+        $poffConfigLayoutCollections,
+        $poffConfigPromptHelpers,
+    ]);
     $poffConfigContent = $stripPhp($poffConfigContent);
+    $viewerLinkTargets = $stripPhp($viewerLinkTargets);
     $buildContent .= trim($editModeHelpers) . "\n\n";
     $buildContent .= trim($projectRootHelpers) . "\n\n";
     $buildContent .= trim($promptTemplateSanitize) . "\n\n";
-    $buildContent .= trim($poffConfigLayoutHelpers) . "\n\n";
-    $buildContent .= trim($poffConfigCoreHelpers) . "\n\n";
-    $buildContent .= trim($poffConfigLayoutFiles) . "\n\n";
-    $buildContent .= trim($poffConfigLayoutView) . "\n\n";
-    $buildContent .= trim($poffConfigLayoutCollections) . "\n\n";
-    $buildContent .= trim($poffConfigLayoutPersistence) . "\n\n";
-    $buildContent .= trim($poffConfigPromptHelpers) . "\n\n";
     $buildContent .= trim($viewerLinkTargets) . "\n\n";
     $buildContent .= trim($poffConfigContent) . "\n\n";
 

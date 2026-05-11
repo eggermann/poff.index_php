@@ -19,6 +19,8 @@ class PoffConfig
 
     use PoffConfigLayoutHelpers;
     use PoffConfigCoreHelpers;
-    use PoffConfigLayoutPersistenceHelpers;
+    use PoffConfigLayoutFileHelpers;
+    use PoffConfigLayoutViewHelpers;
+    use PoffConfigLayoutCollectionHelpers;
     use PoffConfigPromptHelpers;
 }
