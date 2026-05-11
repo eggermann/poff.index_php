@@ -115,7 +115,7 @@ function startWatcher() {
     building = true;
     console.log(`[watch] Running build (${reason || 'change'})...`);
 
-    const proc = spawn('node', [path.join('scripts', 'build-all.js')], {
+    const proc = spawn('npm', ['run', 'build'], {
       cwd: rootDir,
       stdio: 'inherit',
     });

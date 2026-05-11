@@ -168,6 +168,12 @@ node scripts/build-assets.js
 php build/build.php
 ```
 
+Equivalent npm commands:
+```sh
+npm run build:assets
+npm run build:php
+```
+
 Auto build:
 - The watcher script is `scripts/watch-build.js`.
 - If your `package.json` includes the watch script, run `npm run watch`.
@@ -213,3 +219,34 @@ Responses:
 1) Run the build.
 2) Deploy the generated `index.php` and required assets.
 3) Ensure PHP has read/write access where configs are stored.
+
+Deploy script:
+```sh
+npm run deploy
+```
+
+`npm run deploy` uploads only built output from `pages/dominikeggermann.com` by default. It reads deploy settings from `.env` or process env.
+
+Required `.env` keys:
+```dotenv
+DEPLOY_HOST=example.com
+DEPLOY_USERNAME=my-user
+DEPLOY_REMOTE_PATH=/var/www/virtual/my-user/dominikeggermann.com/
+```
+
+Authentication:
+```dotenv
+DEPLOY_PASSWORD=my-password
+```
+
+or:
+```dotenv
+DEPLOY_PRIVATE_KEY=/absolute/path/to/id_rsa
+DEPLOY_PASSPHRASE=my-passphrase
+```
+
+Optional keys:
+```dotenv
+DEPLOY_SOURCE_PATH=pages/dominikeggermann.com
+DEPLOY_CONCURRENCY=8
+```
