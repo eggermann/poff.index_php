@@ -4,6 +4,7 @@ node_modules
 pages
 .history
 vendor/
+.env
 
 .DS_Store
 /tests/poff-tests/

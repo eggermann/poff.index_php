@@ -34,6 +34,15 @@ switch ($action) {
     case 'resolve-target':
         echo json_encode(cmsResolveTarget($dir, $fileName), JSON_UNESCAPED_SLASHES);
         exit(0);
+    case 'resolve-work-template':
+        $work = is_array($payload['work'] ?? null) ? $payload['work'] : [];
+        $kind = is_string($payload['kind'] ?? null) ? (string) $payload['kind'] : 'folder';
+        $mime = is_string($payload['mime'] ?? null) && trim((string) $payload['mime']) !== '' ? (string) $payload['mime'] : null;
+        $resolvedFileName = is_string($payload['fileName'] ?? null) && trim((string) $payload['fileName']) !== ''
+            ? (string) $payload['fileName']
+            : null;
+        echo json_encode(PoffConfig::resolveWorkTemplateState($dir, $work, $kind, $mime, $resolvedFileName), JSON_UNESCAPED_SLASHES);
+        exit(0);
 }
 
 fwrite(STDERR, "Unknown action: {$action}\n");

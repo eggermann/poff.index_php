@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/edit-mode.php';
-require_once __DIR__ . '/edit-config/helpers.php';
+require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/edit-config/payload.php';
 require_once __DIR__ . '/edit-config/apply.php';
 
@@ -20,7 +20,7 @@ function handleEditConfig(array $opts): array
         ];
     }
 
-    $targetDir = mcpResolveEditPath($rootDir, (string) $path);
+    $targetDir = mcpResolveDirectoryInsideRoot($rootDir, (string) $path);
     if ($targetDir === null) {
         return [
             'route' => 'edit-config',
@@ -44,7 +44,7 @@ function handleEditConfig(array $opts): array
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
     if ($method === 'POST') {
-        $data = mcpReadEditConfigRequest();
+        $data = mcpReadRequestData();
         $payload = mcpParseEditConfigPayload($data);
         $result = mcpApplyEditConfigPayload($config, $payload, $targetDir);
 
@@ -58,15 +58,14 @@ function handleEditConfig(array $opts): array
 
         $config = $result['config'];
         $configPath = PoffConfig::configPath($targetDir);
-        $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($encoded === false) {
+        $writeError = mcpWriteJsonFile($configPath, $config);
+        if ($writeError !== null) {
             return [
                 'route' => 'edit-config',
                 'allowed' => true,
-                'error' => 'Failed to encode config JSON.',
+                'error' => $writeError,
             ];
         }
-        file_put_contents($configPath, $encoded);
 
         return [
             'route' => 'edit-config',

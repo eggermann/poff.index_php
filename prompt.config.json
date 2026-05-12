@@ -1,0 +1,36 @@
+{
+  "excludeFolders": [
+    "node_modules",
+    "dist",
+    "pages",
+    "vendor",
+    ".git",
+    ".history",
+    "memory-bank"
+  ],
+  "excludeFiles": [
+    "README.md",
+    "output-prompt.txt",
+    "package-lock.json",
+    ".DS_Store"
+  ],
+  "patterns": [
+    {
+      "src": "./src/**/*"
+    },
+    {
+      "src": "./scripts/**/*"
+    },
+    {
+      "src": "./tests/**/*"
+    },
+    {
+      "src": "./build/**/*"
+    },
+    {
+      "src": "./input-prompt.txt"
+    }
+  ],
+  "textEdit": true,
+  "ignoreGitignore": false
+}

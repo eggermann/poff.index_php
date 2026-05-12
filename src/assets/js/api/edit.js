@@ -111,6 +111,42 @@ export async function requestEditDelete(payload) {
     }
 }
 
+export async function requestEditReset(payload) {
+    const url = buildCmsUrl('reset', payload.path || '');
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return data || {
+                allowed: false,
+                error: responseText.trim() || `Reset endpoint failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || {
+            allowed: false,
+            error: responseText.trim() || 'Reset endpoint returned invalid JSON.',
+        };
+    } catch (err) {
+        return {
+            allowed: false,
+            error: err?.message || 'Reset endpoint unavailable.',
+        };
+    }
+}
+
 export async function requestPromptTemplate(payload) {
     const url = buildCmsUrl('prompt', payload.path || '');
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -196,6 +232,43 @@ function emitPromptStreamDelta(data, onDelta) {
     }
 }
 
+function parsePromptStreamFallbackPayload(rawText) {
+    const trimmed = String(rawText || '').trim();
+    if (trimmed === '') {
+        return null;
+    }
+
+    const candidates = [trimmed];
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const jsonCandidate = trimmed.slice(firstBrace, lastBrace + 1).trim();
+        if (jsonCandidate !== '') {
+            candidates.push(jsonCandidate);
+        }
+    }
+
+    const uniqueCandidates = [];
+    for (const candidate of candidates) {
+        if (!uniqueCandidates.includes(candidate)) {
+            uniqueCandidates.push(candidate);
+        }
+    }
+
+    for (const candidate of uniqueCandidates) {
+        try {
+            const decoded = JSON.parse(candidate);
+            if (decoded && typeof decoded === 'object') {
+                return decoded;
+            }
+        } catch (err) {
+            // Ignore parse failures and keep trying the next candidate.
+        }
+    }
+
+    return null;
+}
+
 export async function requestPromptTemplateStream(payload, { onDelta } = {}) {
     const url = buildCmsUrl('prompt', payload.path || '');
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -247,6 +320,15 @@ export async function requestPromptTemplateStream(payload, { onDelta } = {}) {
         const decoder = new TextDecoder();
         let buffer = '';
         let finalPayload = null;
+        let streamedText = '';
+        const handleDelta = (chunk) => {
+            if (typeof chunk === 'string' && chunk !== '') {
+                streamedText += chunk;
+            }
+            if (typeof onDelta === 'function') {
+                onDelta(chunk);
+            }
+        };
 
         while (true) {
             const { done, value } = await reader.read();
@@ -269,7 +351,7 @@ export async function requestPromptTemplateStream(payload, { onDelta } = {}) {
                             };
                         }
                     } else {
-                        emitPromptStreamDelta(event.data, onDelta);
+                        emitPromptStreamDelta(event.data, handleDelta);
                     }
                 }
                 splitIndex = buffer.indexOf('\n\n');
@@ -289,7 +371,23 @@ export async function requestPromptTemplateStream(payload, { onDelta } = {}) {
                     };
                 }
             } else {
-                emitPromptStreamDelta(event.data, onDelta);
+                emitPromptStreamDelta(event.data, handleDelta);
+            }
+        }
+
+        if (!finalPayload) {
+            const fallbackPayload = parsePromptStreamFallbackPayload(streamedText);
+            if (fallbackPayload) {
+                finalPayload = {
+                    allowed: true,
+                    ...fallbackPayload,
+                };
+                if (typeof finalPayload.template !== 'string' && typeof finalPayload.content === 'string') {
+                    finalPayload.template = finalPayload.content;
+                }
+                if (typeof finalPayload.template !== 'string' && typeof finalPayload.response === 'string') {
+                    finalPayload.template = finalPayload.response;
+                }
             }
         }
 

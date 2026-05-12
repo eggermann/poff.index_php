@@ -121,6 +121,86 @@ function cmsResolveTarget(string $rootDir, string $relativePath): ?array
     return cmsResolvePhysicalTarget($rootDir, $trimmed);
 }
 
+function cmsNormalizeRouteSlug(string $value): string
+{
+    return strtolower(trim(str_replace('\\', '/', $value), "/ \t\n\r\0\x0B"));
+}
+
+function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string $slug, int $depth = 0): ?array
+{
+    if ($depth > 8 || !class_exists('PoffConfig')) {
+        return null;
+    }
+
+    $dir = rtrim($rootDir, DIRECTORY_SEPARATOR);
+    if ($relativeDir !== '') {
+        $dir .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, trim($relativeDir, "/\\"));
+    }
+    if (!is_dir($dir)) {
+        return null;
+    }
+
+    $config = PoffConfig::ensure($dir);
+    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    foreach ($tree as $item) {
+        if (!is_array($item) || (($item['visible'] ?? true) === false)) {
+            continue;
+        }
+
+        $name = trim((string) ($item['name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+        $itemSlug = cmsNormalizeRouteSlug((string) ($item['slug'] ?? PoffConfig::slugify((string) ($item['title'] ?? $name))));
+        $itemPath = trim((string) ($item['path'] ?? $name), "/\\");
+        $relativePath = $relativeDir !== ''
+            ? trim($relativeDir, "/\\") . '/' . $itemPath
+            : $itemPath;
+        $type = (string) ($item['type'] ?? 'file');
+
+        if ($itemSlug === $slug || cmsNormalizeRouteSlug($itemPath) === $slug) {
+            return [
+                'path' => $relativePath,
+                'type' => $type === 'folder' ? 'folder' : 'file',
+                'isFile' => $type !== 'folder',
+                'slug' => (string) ($item['slug'] ?? $itemSlug),
+            ];
+        }
+
+        if ($type === 'folder') {
+            $found = cmsResolveSlugRouteInTree($rootDir, $relativePath, $slug, $depth + 1);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+    }
+
+    return null;
+}
+
+function cmsHandleResolveRoute(string $rootDir): void
+{
+    $slug = cmsNormalizeRouteSlug((string) ($_GET['slug'] ?? $_GET['route'] ?? ''));
+    if ($slug === '' || str_contains($slug, '..')) {
+        cmsJsonResponse([
+            'resolved' => false,
+            'error' => 'Invalid route.',
+        ], 400);
+    }
+
+    $resolved = cmsResolveSlugRouteInTree($rootDir, '', $slug);
+    if ($resolved === null) {
+        cmsJsonResponse([
+            'resolved' => false,
+            'error' => 'Route not found.',
+        ], 404);
+    }
+
+    cmsJsonResponse([
+        'resolved' => true,
+    ] + $resolved);
+}
+
 function cmsLoadEnv(string $rootDir): array
 {
     $envPath = rtrim($rootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.env';

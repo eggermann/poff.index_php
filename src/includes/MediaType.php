@@ -9,7 +9,8 @@ class MediaType
     private const VIDEO_EXTS = ['mp4','mov','webm','avi','mkv','m4v','mts'];
     private const AUDIO_EXTS = ['mp3','wav','ogg','m4a','flac','aac'];
     private const LINK_EXTS  = ['webloc','url','desktop'];
-    private const TEXT_EXTS  = ['txt','md','csv','json','log','ini','yml','yaml','xml','html','htm','css','js'];
+    private const TEXT_EXTS  = ['txt','md','csv','json','log','ini','yml','yaml','xml','html','htm','css','js','rtf','hbs','tpl','mustache'];
+    private const INLINE_TEXT_PREVIEW_EXTS = ['rtf','hbs','tpl','mustache'];
 
     public static function classifyExtension(string $fileName): string
     {
@@ -87,8 +88,20 @@ class MediaType
             'htm' => 'text/html',
             'css' => 'text/css',
             'js' => 'application/javascript',
+            'rtf' => 'application/rtf',
         ];
 
         return $map[$ext] ?? null;
+    }
+
+    public static function shouldUseInlineTextPreview(string $fileName, ?string $mimeType = null): bool
+    {
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        if (in_array($ext, self::INLINE_TEXT_PREVIEW_EXTS, true)) {
+            return true;
+        }
+
+        $mime = strtolower(trim((string) $mimeType));
+        return $mime === 'application/rtf' || $mime === 'text/rtf';
     }
 }

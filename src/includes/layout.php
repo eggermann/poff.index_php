@@ -35,6 +35,7 @@
     <div class="main-content">
         <div id="editPanel" class="edit-panel" hidden></div>
         <aside id="editDrawer" class="edit-drawer" hidden></aside>
+        
         <div id="preview" class="preview-shell" tabindex="-1">
             <div id="iframeLoading" class="loading-row">
                 <span class="loader"></span>

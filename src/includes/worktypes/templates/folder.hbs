@@ -1,17 +1,17 @@
-<div class="folder-view">
-    <div class="folder-view-summary">
+<div class="folder-view flex flex-col gap-4">
+    <div class="folder-view-summary flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
         <span>{{displayPath}}</span>
         <span>{{itemCount}} entries</span>
     </div>
     {{#if hasItems}}
-        <div class="folder-view-grid">
+        <div class="folder-view-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {{#each items}}
-                <article class="folder-view-card folder-view-card--{{type}}">
-                    <span class="folder-view-card-label">{{#if isFolder}}Folder{{else}}File{{/if}}</span>
-                    <strong class="folder-view-card-name">
-                        <a class="folder-view-card-link" href="{{pageLink}}">{{name}}</a>
+                <article class="folder-view-card folder-view-card--{{type}} rounded-2xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl">
+                    <span class="folder-view-card-label inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-2.5 py-1 text-xs uppercase tracking-wide text-blue-300">{{#if isFolder}}Folder{{else}}File{{/if}}</span>
+                    <strong class="folder-view-card-name mt-3.5 block break-words text-base font-semibold text-slate-50">
+                        <a class="folder-view-card-link text-inherit no-underline hover:underline focus-visible:underline" href="{{pageLink}}">{{name}}</a>
                     </strong>
-                    <span class="folder-view-card-path">{{path}}</span>
+                    <span class="folder-view-card-path mt-2 block break-words text-xs text-slate-400">{{path}}</span>
                 </article>
             {{/each}}
         </div>

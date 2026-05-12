@@ -2,6 +2,28 @@ export function tagHistory(history) {
     return history.map((msg, idx) => ({ ...msg, _index: idx }));
 }
 
+export function isPendingAssistantHistory(item) {
+    return item?.role === 'assistant'
+        && String(item?.content || '').trim() === 'Generating answer...'
+        && !item?.templateSnapshot;
+}
+
+export function cleanPersistedHistory(history) {
+    return Array.isArray(history)
+        ? history.filter((item) => !isPendingAssistantHistory(item)).slice(-12)
+        : [];
+}
+
+export function shouldUsePersistedPromptHistory(config, mode = 'folder') {
+    const layout = config?.work?.layout && typeof config.work.layout === 'object'
+        ? config.work.layout
+        : {};
+    if (mode !== 'layout' && typeof layout.sectionTemplate === 'string' && layout.sectionTemplate.trim() === '') {
+        return false;
+    }
+    return true;
+}
+
 function trimHistoryText(value, maxLength = 600) {
     const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
     if (!normalized) {
@@ -48,9 +70,20 @@ export function buildTemplateHistorySnapshot({
         snapshot.description = trimHistoryText(nextDescription, 220);
     }
     if (nextWork && typeof nextWork === 'object') {
+        try {
+            snapshot.workSnapshot = JSON.parse(JSON.stringify(nextWork));
+        } catch {
+            snapshot.workSnapshot = { ...nextWork };
+        }
         const keys = Object.keys(nextWork).filter((key) => key !== 'layout').slice(0, 6);
         if (keys.length) {
             snapshot.workKeys = keys;
+        }
+        if (Array.isArray(nextWork.fields) && nextWork.fields.length) {
+            snapshot.workFieldNames = nextWork.fields
+                .map((field) => (field && typeof field.name === 'string') ? field.name.trim() : '')
+                .filter(Boolean)
+                .slice(0, 8);
         }
         if (nextWork.layout && typeof nextWork.layout === 'object') {
             const layoutCandidate = nextWork.layout.name || nextWork.layout.mode || nextWork.layout.value || '';
@@ -65,9 +98,9 @@ export function buildTemplateHistorySnapshot({
     return snapshot;
 }
 
-export function serializeHistoryForRequest(history) {
+export function serializeHistoryForRequest(history, options = {}) {
     const list = Array.isArray(history) ? history : [];
-    return list.map((item) => {
+    const serialized = list.map((item) => {
         const role = item?.role || 'user';
         let content = String(item?.content || '');
         const snapshot = item?.templateSnapshot;
@@ -94,6 +127,9 @@ export function serializeHistoryForRequest(history) {
             if (Array.isArray(snapshot.workKeys) && snapshot.workKeys.length) {
                 lines.push(`Work keys updated: ${snapshot.workKeys.join(', ')}`);
             }
+            if (Array.isArray(snapshot.workFieldNames) && snapshot.workFieldNames.length) {
+                lines.push(`Work fields snapshot: ${snapshot.workFieldNames.join(', ')}`);
+            }
             if (typeof snapshot.layoutName === 'string' && snapshot.layoutName) {
                 lines.push(`Layout name snapshot: ${snapshot.layoutName}`);
             }
@@ -105,6 +141,21 @@ export function serializeHistoryForRequest(history) {
         }
         return { role, content };
     });
+
+    const seedTemplateText = typeof options?.initialTemplateText === 'string'
+        ? options.initialTemplateText
+        : '';
+    const seedRole = typeof options?.initialTemplateRole === 'string' && options.initialTemplateRole.trim() === 'system'
+        ? 'system'
+        : 'assistant';
+    if (seedTemplateText.trim() !== '' && !serialized.some((item) => item && item.role === 'assistant')) {
+        serialized.unshift({
+            role: seedRole,
+            content: seedTemplateText,
+        });
+    }
+
+    return serialized;
 }
 
 export function summarizeSerializedHistory(history) {
@@ -139,8 +190,17 @@ export function inferWorkChangesFromPrompt(prompt, config) {
     }
 
     const nextWork = {};
-    Object.entries(work).forEach(([key, value]) => {
-        if (typeof value !== 'boolean') {
+    const booleanKeys = new Set([
+        ...Object.entries(work)
+            .filter(([, value]) => typeof value === 'boolean')
+            .map(([key]) => key),
+        'autoplay',
+        'loop',
+        'muted',
+    ]);
+    booleanKeys.forEach((key) => {
+        const value = work[key];
+        if (typeof value !== 'boolean' && !['autoplay', 'loop', 'muted'].includes(key)) {
             return;
         }
         const compactKey = compactValue(key);
@@ -188,6 +248,12 @@ export function filterAllowedWork(work, config) {
         'type',
         'layout',
         'model',
+        'categories',
+        'category',
+        'autoplay',
+        'loop',
+        'muted',
+        'poster',
     ]);
     const filtered = {};
     Object.entries(work).forEach(([key, value]) => {

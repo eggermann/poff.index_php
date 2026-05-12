@@ -1,50 +1,99 @@
 import { escapeHtml } from '../core/utils.js';
 import { defaultFileSystemPrompt, defaultFolderSystemPrompt, defaultLayoutSystemPrompt } from './prompt/constants.js';
 
-export function renderPromptWindow(settings = {}, options = {}) {
-    const mode = options.mode === 'layout'
-        ? 'layout'
-        : options.mode === 'folder'
-            ? 'folder'
-            : 'file';
-    const systemPrompt = mode === 'layout'
+function resolvePromptWindowMode(mode = '') {
+    if (mode === 'layout') {
+        return 'layout';
+    }
+    if (mode === 'folder') {
+        return 'folder';
+    }
+    return 'file';
+}
+
+function buildPromptWindowModeConfig(mode, settings, sectionTarget) {
+    const isLayout = mode === 'layout';
+    const isFolder = mode === 'folder';
+    const currentSystemPrompt = isLayout
         ? (settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt)
-        : mode === 'folder'
+        : isFolder
             ? (settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt)
             : (settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt);
-    const promptTargetCopy = mode === 'layout'
+
+    const promptTargetCopy = isLayout
         ? 'Prompt edits the outer layout wrapper target for this virtual .layout page.'
-        : mode === 'folder'
+        : isFolder
             ? 'Prompt edits the wrapped works.hbs partial for the current folder.'
             : 'Prompt edits the wrapped work.hbs partial for the current file.';
-    const footerCopy = mode === 'layout'
-        ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || 'work.hbs')}</code>.`
-        : mode === 'folder'
+
+    const footerCopy = isLayout
+        ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(sectionTarget || 'work.hbs')}</code>.`
+        : isFolder
             ? 'Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders.'
             : 'Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.';
-    const contextCopy = mode === 'layout'
-        ? `<div>Prompt edits the outer layout wrapper. <code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>`
-        : mode === 'folder'
+
+    const insertNameLabel = isLayout
+        ? 'Insert layout name'
+        : isFolder
+            ? 'Insert item name'
+            : 'Insert file name';
+
+    const contextCopy = isLayout
+        ? `<div>Prompt edits the outer layout wrapper. <code>root.*</code> is the shell-level layout data and <code>work.*</code> is the inner item data. Use <code>root.title</code> for the wrapper title and <code>work.title</code> for the item title.</div><div><code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>`
+        : isFolder
             ? '<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>'
             : '<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>';
-    const editableCopy = mode === 'layout'
-        ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.*</strong>'
-        : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.*</strong>';
-    const placeholderCopy = mode === 'layout'
-        ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
+
+    const editableCopy = isLayout
+        ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.&lt;name&gt;</strong>'
+        : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.&lt;name&gt;</strong>';
+
+    const placeholderCopy = isLayout
+        ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{root.title}}, {{root.folderName}}, {{work.title}}, {{work.name}}, {{linkUrl}}, {{slug}}</div>
                         <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
+                        <div>Example context JSON: <code>{"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}</code></div>
                         <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>`
-        : mode === 'folder'
+        : isFolder
             ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
-                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>`
+                        <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>
+                        <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>
+                        <div>Parent/sibling prompt refs: current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks. Sibling refs are same-folder only.</div>`
             : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
-                        <div>{{> work}}, {{work.key}}, layout.*</div>`;
-    const inputPlaceholder = mode === 'layout'
+                        <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>
+                        <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>`;
+
+    const inputPlaceholder = isLayout
         ? 'Describe the layout you want...'
-        : mode === 'folder'
+        : isFolder
             ? 'Describe the folder component you want...'
             : 'Describe the file component you want...';
+
+    return {
+        systemPrompt: currentSystemPrompt,
+        promptTargetCopy,
+        footerCopy,
+        insertNameLabel,
+        contextCopy,
+        editableCopy,
+        placeholderCopy,
+        inputPlaceholder,
+    };
+}
+
+export function renderPromptWindow(settings = {}, options = {}) {
+    const mode = resolvePromptWindowMode(options.mode);
+    const {
+        systemPrompt,
+        promptTargetCopy,
+        footerCopy,
+        insertNameLabel,
+        contextCopy,
+        editableCopy,
+        placeholderCopy,
+        inputPlaceholder,
+    } = buildPromptWindowModeConfig(mode, settings, options.sectionTarget || 'work.hbs');
+    const provider = ['openai', 'gemini'].includes(settings.provider) ? settings.provider : 'local';
 
     return `
         <div class="prompt-layer" id="promptLayer">
@@ -63,9 +112,9 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         <div>
                             <label class="edit-label" for="prompt-provider">Provider</label>
                             <select class="form-input" id="prompt-provider">
-                                <option value="local">LM Studio</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="gemini">Gemini</option>
+                                <option value="local" ${provider === 'local' ? 'selected' : ''}>LM Studio</option>
+                                <option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+                                <option value="gemini" ${provider === 'gemini' ? 'selected' : ''}>Gemini</option>
                             </select>
                         </div>
                         <div>
@@ -144,6 +193,7 @@ export function renderPromptWindow(settings = {}, options = {}) {
                     <div class="prompt-actions-left">
                         <button class="btn" type="button" id="prompt-send">Send</button>
                         <button class="btn btn-secondary" type="button" id="prompt-attach">Attach image</button>
+                        <button class="btn btn-secondary" type="button" id="prompt-insert-name">${escapeHtml(insertNameLabel)}</button>
                         <button class="btn btn-secondary" type="button" id="prompt-clear">Clear</button>
                     </div>
                     <label class="prompt-inline-toggle">

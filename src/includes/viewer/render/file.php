@@ -9,9 +9,21 @@ function renderFileViewer(string $relativePath, string $fullPath): void
 
     $type = detectFileType($fullPath);
     $mimeType = MediaType::detectMimeType($fullPath, basename($fullPath));
-    $workDefaults = Worktype::definition($type, $mimeType);
     $workData = (isset($fileConfig['work']) && is_array($fileConfig['work'])) ? $fileConfig['work'] : [];
+    $workTemplateKey = trim((string) ($workData['template'] ?? ''));
+    $workDefinitionKey = $workTemplateKey !== '' ? $workTemplateKey : $type;
+    $workDefaults = Worktype::definition($workDefinitionKey, $mimeType);
     $work = array_merge($workDefaults, $workData);
+    if (class_exists('PoffConfig')) {
+        $resolvedWorkState = PoffConfig::resolveWorkTemplateState(dirname($fullPath), $work, $type, $mimeType, basename($fullPath));
+        if (is_array($resolvedWorkState['work'] ?? null)) {
+            $work = $resolvedWorkState['work'];
+        }
+    }
+    if ((!isset($work['template']) || trim((string) $work['template']) === '') && isset($workDefaults['template']) && is_string($workDefaults['template'])) {
+        $work['template'] = $workDefaults['template'];
+    }
+    $work['type'] = $work['type'] ?? $type;
     if (class_exists('PoffConfig')) {
         $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, true, 'work');
     }
@@ -19,6 +31,17 @@ function renderFileViewer(string $relativePath, string $fullPath): void
     $linkUrl = null;
     if ($type === 'link') {
         $linkUrl = extractLinkFileUrl($fullPath);
+    }
+    $showInlineTextPreview = false;
+    $textContent = '';
+    if ($type === 'text') {
+        $showInlineTextPreview = MediaType::shouldUseInlineTextPreview(basename($fullPath), $mimeType);
+        if ($showInlineTextPreview) {
+            $contents = @file_get_contents($fullPath);
+            if ($contents !== false) {
+                $textContent = $contents;
+            }
+        }
     }
 
     $rawName = basename($relativePath);
@@ -44,6 +67,8 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'descriptionHtml' => $descriptionHtml,
         'linkUrl' => $linkUrl ?? '',
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
+        'showInlineTextPreview' => $showInlineTextPreview,
+        'textContent' => $textContent,
         'work' => $work,
     ]);
 

@@ -15,6 +15,15 @@ if ($action === 'definition') {
     exit(0);
 }
 
+if ($action === 'catalog') {
+    $mime = isset($payload['mime']) ? (string) $payload['mime'] : null;
+    $fileName = isset($payload['fileName']) ? (string) $payload['fileName'] : null;
+    $selected = isset($payload['selected']) ? (string) $payload['selected'] : null;
+    $subjectType = isset($payload['subjectType']) ? (string) $payload['subjectType'] : null;
+    echo json_encode(Worktype::worktypeCatalog($mime, $fileName, $selected, $subjectType), JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($action === 'render') {
     $context = is_array($payload['ctx'] ?? null) ? $payload['ctx'] : [];
     echo Worktype::render($kind, $context);

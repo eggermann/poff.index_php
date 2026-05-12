@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const vm = require('vm');
 
@@ -27,6 +28,7 @@ const DELETE_FILE_DIR = path.join(POFF_DIR, 'delete-file-target');
 const DELETE_FOLDER_DIR = path.join(POFF_DIR, 'delete-folder-target');
 const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
 const VIRTUAL_LINK_DIR = path.join(POFF_DIR, 'virtual-links');
+const REMOTE_IMPORT_DIR = path.join(POFF_DIR, 'remote-import-links');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
@@ -109,9 +111,13 @@ function runWorktypeDetailed(action, kind, payload = null) {
   });
 }
 
-function runViewer(relativePath, baseDir = POFF_DIR) {
+function runViewer(relativePath, baseDir = POFF_DIR, editMode = false) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('php', [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath], {
+    const args = [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath];
+    if (editMode) {
+      args.push('edit');
+    }
+    const proc = spawn('php', args, {
       cwd: ROOT,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -123,6 +129,28 @@ function runViewer(relativePath, baseDir = POFF_DIR) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`viewer helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runNav(relativePath, baseDir = POFF_DIR, editMode = false) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_render_nav.php'), baseDir, relativePath];
+    if (editMode) {
+      args.push('edit');
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`nav helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -149,6 +177,24 @@ function runLayoutFilesystem(action, dir, fileName = '', payload = null) {
   });
 }
 
+function runLayoutView(payload = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_layout_view.php'), JSON.stringify(payload)], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`layout view helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runUpload(targetDir, sourcePath, uploadName) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_upload_files.php'), targetDir, sourcePath, uploadName];
@@ -164,6 +210,34 @@ function runUpload(targetDir, sourcePath, uploadName) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`upload helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runRemoteContent(mode, baseDir, relativePath = '', payload = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      path.join(ROOT, 'tests/php_remote_content_routes.php'),
+      mode,
+      baseDir,
+      relativePath,
+      JSON.stringify(payload),
+    ];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(stdout.trim()));
+        return;
+      }
+      reject(new Error(`remote content helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -202,6 +276,25 @@ function runDeleteTarget(targetDir, relativePath) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`delete helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runResetFolder(targetDir, relativePath) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_reset_folder.php'), targetDir, relativePath];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env, POFF_BASE: POFF_DIR },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`reset helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -294,6 +387,116 @@ function loadPromptDraftHelpers() {
   vm.runInContext(`${source}
 module.exports = {
   readPromptEditorDraft,
+};
+`, context);
+
+  return module.exports;
+}
+
+function loadPromptLayoutPayloadHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/edit/prompt/layout-payload.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*;\n/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    getLayoutState(config) {
+      return config && config.work && config.work.layout && typeof config.work.layout === 'object'
+        ? config.work.layout
+        : {};
+    },
+    getLayoutPresetValue() {
+      return 'actual';
+    },
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  buildPromptLayoutPayload,
+};
+`, context);
+
+  return module.exports;
+}
+
+function loadPromptApiHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/api/edit.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export async function /g, 'async function ')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const fetchState = {
+    impl: async () => {
+      throw new Error('fetch should be mocked in test');
+    },
+  };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    AbortController: global.AbortController,
+    TextDecoder: global.TextDecoder,
+    URL: global.URL,
+    window: {
+      location: {
+        pathname: '/dominikeggermann.com/',
+        origin: 'http://localhost:8888',
+      },
+    },
+    setTimeout,
+    clearTimeout,
+    fetch: (...args) => fetchState.impl(...args),
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  buildCmsUrl,
+  requestPromptTemplateStream,
+};
+`, context);
+
+  return {
+    ...module.exports,
+    setFetch(impl) {
+      fetchState.impl = impl;
+    },
+  };
+}
+
+function loadWorkFieldHelpers() {
+  const filePath = path.join(ROOT, 'src/assets/js/edit/work-fields.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    document: null,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  createDefaultWorkField,
+  extractWorkFields,
+  materializeWorkFields,
+  normalizeWorkField,
+  summarizeWorkFields,
 };
 `, context);
 
@@ -556,6 +759,24 @@ describe('MCP create route helper (CLI)', () => {
         },
       },
     }, null, 2));
+    fs.mkdirSync(REMOTE_IMPORT_DIR, { recursive: true });
+    fs.mkdirSync(path.join(REMOTE_IMPORT_DIR, '.layout'), { recursive: true });
+    fs.writeFileSync(path.join(REMOTE_IMPORT_DIR, '.layout', 'works.hbs'), '{{#each items}}<a class="remote-link" href="{{pageLink}}">{{name}}</a>{{/each}}');
+    fs.writeFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), JSON.stringify({
+      folderName: 'remote-import-links',
+      slug: 'remote-import-links',
+      title: 'Remote Import Links',
+      description: 'Folder with imported remote entries',
+      tree: [],
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-folder-layout',
+          engine: 'lightncandy',
+          section: 'works',
+        },
+      },
+    }, null, 2));
   });
 
   afterAll(() => {
@@ -633,7 +854,11 @@ describe('MCP create route helper (CLI)', () => {
         choices: [
           {
             message: {
-              content: '<section class="lm-studio-card">{{title}}</section>',
+              content: JSON.stringify({
+                template: '<section class="lm-studio-card">{{title}}</section>',
+                css: '.lm-studio-card{--card-surface:#fff;display:grid;gap:clamp(0.75rem,2vw,1.25rem);}',
+                js: 'document.querySelectorAll(".lm-studio-card").forEach((card) => card.dataset.ready = "true");',
+              }),
             },
           },
         ],
@@ -646,6 +871,8 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.provider).toBe('local');
     expect(result.model).toBe('gemma4');
     expect(result.template).toBe('<section class="lm-studio-card">{{title}}</section>');
+    expect(result.css).toContain('.lm-studio-card');
+    expect(result.js).toContain('dataset.ready');
     expect(captured.url).toBe(endpoint);
     expect(captured.headers).toEqual([]);
     expect(captured.payload.model).toBe('gemma4');
@@ -670,6 +897,40 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).toContain('"outerWrapper"');
     expect(captured.payload.messages[3].content).toContain('"source": "resolved active wrapper"');
     expect(captured.payload.messages[3].content).toContain('USER: Create a compact image card.');
+    expect(captured.payload.messages[3].content).not.toContain('Previous draft.');
+    expect(captured.payload.messages[3].content).not.toContain('Make it smaller.');
+  });
+
+  test('rejects prompt-template CSS with unsafe global styles', async () => {
+    const result = await runPromptTemplateLocal(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: 'gemma4',
+      endpoint: 'http://127.0.0.1:1234/v1/chat/completions',
+      prompt: 'Create a compact image card.',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                template: '<section class="unsafe-card">{{title}}</section>',
+                css: '<style>body{margin:0;} @import url("https://example.com/base.css");</style>',
+              }),
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.error).toContain('Generated CSS was rejected');
+    expect(result.error).toContain('CSS must not include <style> tags.');
+    expect(result.error).toContain('CSS must not import external stylesheets.');
+    expect(result.error).toContain('CSS must not include global html/body/:root/universal selectors.');
+    expect(result.template).toBeUndefined();
   });
 
   test('routes subject-path layout prompts through the layout wrapper handler', async () => {
@@ -800,26 +1061,144 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.file.current).toEqual(expect.objectContaining({
       subjectType: 'file',
       sectionTemplateTarget: '.works/viewer-file.txt.layout/work.hbs',
+      root: expect.objectContaining({
+        title: 'Viewer File',
+      }),
+      work: expect.objectContaining({
+        title: 'viewer-file.txt',
+      }),
       outerWrapper: expect.objectContaining({
         sectionPartial: 'work',
       }),
     }));
-    expect(result.file.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
+    expect(result.file.current.outerWrapper.template).toContain('poff-default-layout__main');
     expect(result.file.counts).toBeUndefined();
     expect(result.file.items).toBeUndefined();
+    expect(result.file.current.parentWork).toEqual(expect.objectContaining({
+      title: 'poff-tests',
+      path: '',
+    }));
+    expect(result.file.siblingWorks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'viewer-folder',
+        kind: 'folder',
+      }),
+    ]));
+    expect(result.file.siblingWorks.map((item) => item.name)).not.toContain('viewer-file.txt');
     expect(result.folder.current).toEqual(expect.objectContaining({
       subjectType: 'folder',
       sectionTemplateTarget: 'viewer-folder/.layout/works.hbs',
+      root: expect.objectContaining({
+        title: 'Folder Preview',
+      }),
+      work: expect.objectContaining({
+        title: 'viewer-folder',
+      }),
       outerWrapper: expect.objectContaining({
         sectionPartial: 'works',
       }),
     }));
-    expect(result.folder.current.outerWrapper.template).toContain('poff-default-layout__sidebar');
+    expect(result.folder.current.outerWrapper.template).toContain('poff-default-layout__main');
+    expect(result.folder.current.parentWork).toEqual(expect.objectContaining({
+      title: 'poff-tests',
+      path: '',
+    }));
+    expect(result.folder.siblingWorks.map((item) => item.name)).not.toContain('viewer-folder');
     expect(result.folder.counts).toEqual(expect.objectContaining({
       items: expect.any(Number),
       files: expect.any(Number),
     }));
     expect(Array.isArray(result.folder.items)).toBe(true);
+    expect(Array.isArray(result.folder.current.tree)).toBe(true);
+    expect(result.folder.current.tree).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'nested-child',
+        type: 'folder',
+        children: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'nested-video.mp4',
+            type: 'file',
+          }),
+        ]),
+      }),
+    ]));
+    expect(result.folder.current.workTree).toEqual(expect.objectContaining({
+      children: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'nested-child',
+          type: 'folder',
+        }),
+      ]),
+    }));
+  });
+
+  test('includes custom work fields in prompt compact output', async () => {
+    const result = await runPhpJson('php_prompt_compact_context.php');
+
+    expect(result.fileConfig).toEqual(expect.objectContaining({
+      work: expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'text',
+            name: 'text1',
+            label: 'Text 1',
+            value: 'Prominent section copy',
+          }),
+        ]),
+        text1: 'Prominent section copy',
+        templateMap: expect.objectContaining({
+          count: 2,
+          entries: expect.arrayContaining([
+            expect.objectContaining({
+              mime: 'image/jpeg',
+              template: 'image',
+            }),
+          ]),
+        }),
+      }),
+    }));
+    expect(result.folderConfig).toEqual(expect.objectContaining({
+      work: expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'text',
+            name: 'text1',
+            label: 'Text 1',
+            value: 'Folder prominent copy',
+          }),
+        ]),
+        text1: 'Folder prominent copy',
+        templateMap: expect.objectContaining({
+          count: 1,
+          entries: expect.arrayContaining([
+            expect.objectContaining({
+              mime: 'video/quicktime',
+              template: 'video',
+            }),
+          ]),
+        }),
+      }),
+    }));
+    expect(result.file.current).toEqual(expect.objectContaining({
+      workFields: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'text1',
+          type: 'text',
+          value: 'Prominent section copy',
+        }),
+      ]),
+      work: expect.objectContaining({
+        templateMap: expect.objectContaining({
+          count: 2,
+          entries: expect.arrayContaining([
+            expect.objectContaining({
+              mime: 'video/quicktime',
+              template: 'video',
+            }),
+          ]),
+        }),
+      }),
+    }));
   });
 
   test('keeps explicit internal and external configured tree links intact in prompt context', async () => {
@@ -1069,6 +1448,49 @@ describe('MCP create route helper (CLI)', () => {
     expect(viewerResult.error).toBe('Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.');
     expect(viewerResult.template).toBeUndefined();
   });
+
+  test('recovers streamed JSON when the final SSE event is dropped', async () => {
+    const api = loadPromptApiHelpers();
+    const chunks = [
+      'data: {"choices":[{"delta":{"content":"{\\"template\\":\\""}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"<div class=card></div>\\"}"}}]}\n\n',
+    ];
+    api.setFetch(async () => ({
+      ok: true,
+      headers: {
+        get(name) {
+          return name && name.toLowerCase() === 'content-type'
+            ? 'text/event-stream; charset=utf-8'
+            : null;
+        },
+      },
+      body: {
+        getReader() {
+          let index = 0;
+          return {
+            async read() {
+              if (index >= chunks.length) {
+                return { done: true, value: undefined };
+              }
+              const value = new TextEncoder().encode(chunks[index++]);
+              return { done: false, value };
+            },
+          };
+        },
+      },
+      text: async () => '',
+    }));
+
+    const response = await api.requestPromptTemplateStream({
+      path: '',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    });
+
+    expect(response.allowed).toBe(true);
+    expect(response.template).toBe('<div class=card></div>');
+    expect(response.error).toBeUndefined();
+  });
 });
 
 describe('Worktype HBS renderer', () => {
@@ -1098,16 +1520,359 @@ describe('Worktype HBS renderer', () => {
     });
   });
 
+  test('builds section-only save payloads for file prompts even when the model returns css/js', () => {
+    const { buildPromptLayoutPayload } = loadPromptLayoutPayloadHelpers();
+
+    const { layoutPayload } = buildPromptLayoutPayload({
+      selection: {
+        isLayout: false,
+        previewIsFile: true,
+        previewPath: '1er/12test2 (Konvertiert).mp4',
+      },
+      currentConfig: {
+        work: {
+          layout: {
+            name: 'poff-layout',
+            directory: '1er/.layout',
+            inheritedDirectory: '.layout',
+          },
+        },
+      },
+      drawerForm: {
+        elements: {
+          work_layout: { value: 'poff-layout' },
+        },
+      },
+      templateText: '<article class="file-prompt-result">{{title}}</article>',
+      nextCss: '.file-prompt-result{color:red;}',
+      nextJs: 'window.__filePrompt = true;',
+      responseModel: 'gpt-4o-mini',
+    });
+
+    expect(layoutPayload).toEqual({
+      sectionTemplate: '<article class="file-prompt-result">{{title}}</article>',
+    });
+    expect(layoutPayload).not.toHaveProperty('name');
+    expect(layoutPayload).not.toHaveProperty('engine');
+    expect(layoutPayload).not.toHaveProperty('css');
+    expect(layoutPayload).not.toHaveProperty('js');
+    expect(layoutPayload).not.toHaveProperty('model');
+  });
+
+  test('keeps layout prompts focused on the outer wrapper only', () => {
+    const { buildPromptLayoutPayload } = loadPromptLayoutPayloadHelpers();
+
+    const { layoutPayload } = buildPromptLayoutPayload({
+      selection: {
+        isLayout: true,
+        previewIsFile: false,
+        layoutIsFile: false,
+        previewPath: '1er/.layout',
+      },
+      currentConfig: {
+        work: {
+          layout: {
+            name: 'filesystem-layout',
+            directory: '1er/.layout',
+            storage: 'filesystem',
+          },
+        },
+      },
+      drawerForm: {
+        elements: {
+          work_layout: { value: 'filesystem-layout' },
+        },
+      },
+      templateText: '<div class="layout-shell"></div>',
+      responseSectionTemplate: '<article class="should-not-be-saved"></article>',
+      responseWorkTemplate: '<span class="should-not-be-saved"></span>',
+      responseWorksTemplate: '<div class="should-not-be-saved"></div>',
+      nextCss: '.layout-shell{color:rebeccapurple;}',
+      nextJs: 'console.log("layout");',
+      responseModel: 'gpt-4o-mini',
+      layoutPreset: 'actual',
+    });
+
+    expect(layoutPayload).toMatchObject({
+      originalTemplate: '<div class="layout-shell"></div>',
+      originalCss: '.layout-shell{color:rebeccapurple;}',
+      originalJs: 'console.log("layout");',
+      originalTarget: '1er/.layout',
+    });
+    expect(layoutPayload).not.toHaveProperty('sectionTemplate');
+    expect(layoutPayload).not.toHaveProperty('workTemplate');
+    expect(layoutPayload).not.toHaveProperty('worksTemplate');
+  });
+
+  test('persists prompt history in the shared config for other browsers', async () => {
+    const tempDir = path.join(POFF_DIR, `shared-prompt-history-${Date.now()}`);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    try {
+      const history = [
+        { role: 'user', content: 'set MAUAMAUAMAUAM' },
+        {
+          role: 'assistant',
+          content: '<div>ok</div>',
+          templateSnapshot: {
+            targetType: 'partial',
+            template: '<div>ok</div>',
+          },
+        },
+      ];
+
+      const saved = await runViewerSave(tempDir, '', {
+        promptHistory: history,
+      });
+
+      const storedConfig = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
+      expect(storedConfig.promptHistory).toHaveLength(2);
+      expect(storedConfig.promptHistory[0].content).toContain('MAUAMAUAMAUAM');
+      expect(storedConfig.promptHistory[1].templateSnapshot.template).toContain('<div>ok</div>');
+      expect(saved.config.promptHistory).toHaveLength(2);
+      expect(saved.config.promptHistory[0].content).toContain('MAUAMAUAMAUAM');
+      expect(saved.config.promptHistory[1].templateSnapshot.template).toContain('<div>ok</div>');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('normalizes and materializes custom work fields', () => {
+    const {
+      createDefaultWorkField,
+      extractWorkFields,
+      materializeWorkFields,
+      summarizeWorkFields,
+    } = loadWorkFieldHelpers();
+
+    const work = {
+      type: 'text',
+      fields: [
+        { type: 'text', name: 'text1', label: 'Text 1', value: 'Primary copy', const: 'Primary copy', uniqueItems: true },
+      ],
+      text1: 'Primary copy',
+    };
+
+    expect(extractWorkFields(work)).toEqual([
+      expect.objectContaining({
+        type: 'text',
+        name: 'text1',
+        label: 'Text 1',
+        value: 'Primary copy',
+        const: 'Primary copy',
+        uniqueItems: true,
+      }),
+    ]);
+    expect(summarizeWorkFields(work.fields)).toContain('Text 1: Primary copy');
+    expect(createDefaultWorkField([])).toEqual(expect.objectContaining({
+      type: 'text',
+      name: 'text1',
+      label: 'Text 1',
+      title: 'Text 1',
+      value: '',
+      description: '',
+      placeholder: '',
+      const: '',
+      uniqueItems: false,
+    }));
+
+    const rematerialized = materializeWorkFields({
+      ...work,
+      text1: 'Updated copy',
+    });
+    expect(rematerialized.fields).toEqual([
+      expect.objectContaining({
+        name: 'text1',
+        value: 'Updated copy',
+      }),
+    ]);
+    expect(rematerialized.text1).toBe('Updated copy');
+  });
+
   test('normalizes default layout metadata for files', async () => {
     const output = await runWorktype('definition', 'image');
     const definition = JSON.parse(output);
 
+    expect(definition.categories).toEqual(expect.arrayContaining(['image', 'media']));
     expect(definition.layout).toMatchObject({
       mode: 'poff-layout',
       name: 'poff-layout',
       engine: 'lightncandy',
       section: 'work',
     });
+  });
+
+  test('suggests the autoplay video template for quicktime files', async () => {
+    const output = await runWorktype('catalog', 'video', {
+      mime: 'video/quicktime',
+      fileName: 'sample.mov',
+      subjectType: 'file',
+    });
+    const catalog = JSON.parse(output);
+
+    expect(catalog.selected).toBe('video');
+    expect(catalog.choices.map((choice) => choice.value)).toContain('video');
+    expect(catalog.choices.map((choice) => choice.value)).not.toContain('video-autoplay');
+    expect(catalog.choices.map((choice) => choice.kind)).toEqual(expect.arrayContaining(['video']));
+    expect(catalog.choices.every((choice) => choice.kind === 'video')).toBe(true);
+  });
+
+  test('resolves inherited template maps and keeps autoplay on quicktime files', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-template-map-'));
+    try {
+      const parentDir = path.join(tempRoot, 'parent');
+      fs.mkdirSync(parentDir, { recursive: true });
+      fs.writeFileSync(path.join(parentDir, 'poff.config.json'), JSON.stringify({
+        folderName: 'parent',
+        title: 'Parent',
+        slug: 'parent',
+        description: '',
+        work: {
+          type: 'folder',
+          templateMap: {
+            'video/quicktime': 'image',
+          },
+        },
+        tree: [],
+      }, null, 2));
+      fs.writeFileSync(path.join(parentDir, 'sample.mov'), 'fake video');
+
+      const resolvedInherited = JSON.parse(await runLayoutFilesystem('resolve-work-template', parentDir, '', {
+        kind: 'video',
+        mime: 'video/quicktime',
+        fileName: 'sample.mov',
+        work: {
+          type: 'video',
+        },
+      }));
+      expect(resolvedInherited.template).toBe('image');
+      expect(resolvedInherited.autoplay).toBe(false);
+
+      const resolvedOverride = JSON.parse(await runLayoutFilesystem('resolve-work-template', parentDir, '', {
+        kind: 'video',
+        mime: 'video/quicktime',
+        fileName: 'sample.mov',
+        work: {
+          type: 'video',
+          template: 'video',
+        },
+      }));
+      expect(resolvedOverride.template).toBe('video');
+      expect(resolvedOverride.autoplay).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('accepts wildcard MIME template map keys for video files', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-template-map-wildcard-'));
+    try {
+      const parentDir = path.join(tempRoot, 'parent');
+      fs.mkdirSync(parentDir, { recursive: true });
+      fs.writeFileSync(path.join(parentDir, 'poff.config.json'), JSON.stringify({
+        folderName: 'parent',
+        title: 'Parent',
+        slug: 'parent',
+        description: '',
+        work: {
+          type: 'folder',
+          templateMap: {
+            'video/.*': 'image',
+          },
+        },
+        tree: [],
+      }, null, 2));
+      fs.writeFileSync(path.join(parentDir, 'sample.mov'), 'fake video');
+
+      const resolvedWildcard = JSON.parse(await runLayoutFilesystem('resolve-work-template', parentDir, '', {
+        kind: 'video',
+        mime: 'video/quicktime',
+        fileName: 'sample.mov',
+        work: {
+          type: 'video',
+        },
+      }));
+      expect(resolvedWildcard.template).toBe('image');
+      expect(resolvedWildcard.autoplay).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('limits folder templates to folder worktypes', async () => {
+    const output = await runWorktype('catalog', 'folder', {
+      subjectType: 'folder',
+    });
+    const catalog = JSON.parse(output);
+
+    expect(catalog.selected).toBe('folder');
+    expect(catalog.choices).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: 'folder', kind: 'folder' }),
+    ]));
+    expect(catalog.choices.map((choice) => choice.kind).every((kind) => kind === 'folder')).toBe(true);
+  });
+
+  test('exposes the shared work category pool in the catalog', async () => {
+    const output = await runWorktype('catalog', 'image', {
+      subjectType: 'file',
+    });
+    const catalog = JSON.parse(output);
+
+    expect(catalog.categories).toEqual(expect.arrayContaining([
+      'image',
+      'media',
+      'visual',
+      'video',
+      'motion',
+      'audio',
+      'sound',
+      'pdf',
+      'document',
+      'text',
+      'link',
+      'reference',
+      'folder',
+      'collection',
+      'other',
+    ]));
+  });
+
+  test('renders a selected work template variant as the active section partial', async () => {
+    const lightnCandyInstalled = await hasLightnCandy();
+    const output = await runWorktype('render', 'video', {
+      ctx: {
+        path: 'movies/sample.mov',
+        name: 'sample.mov',
+        title: 'Sample Movie',
+        description: '',
+        descriptionHtml: '',
+        linkUrl: '',
+        slug: 'sample-movie',
+        mimeType: 'video/quicktime',
+        work: {
+          type: 'video',
+          template: 'video',
+          autoplay: true,
+          muted: true,
+          layout: {
+            name: 'poff-layout',
+            engine: 'lightncandy',
+            section: 'work',
+          },
+        },
+      },
+    });
+
+    if (!lightnCandyInstalled) {
+      expect(output).toBe('<iframe src="movies/sample.mov" title="sample.mov"></iframe>');
+      return;
+    }
+
+    expect(output).toContain('<video class="mx-auto block max-h-screen max-w-full"');
+    expect(output).toContain('autoplay');
+    expect(output).toContain('muted');
+    expect(output).toContain('src="movies/sample.mov"');
   });
 
   test('hydrates folder layout metadata from the .layout filesystem', async () => {
@@ -1120,6 +1885,7 @@ describe('Worktype HBS renderer', () => {
       storage: 'filesystem',
       directory: '.layout',
     });
+    expect(config.work.categories).toEqual(expect.arrayContaining(['folder', 'collection']));
     expect(config.work.layout.template).toContain('folder-custom');
     expect(config.work.layout.css).toContain('.folder-custom');
     expect(config.work.layout.js).toContain('__folderLayout');
@@ -1129,6 +1895,30 @@ describe('Worktype HBS renderer', () => {
       ]),
     );
     expect(config.tree.map((item) => item.name)).not.toContain('.layout');
+  });
+
+  test('.htaccess stays hidden in the default tree but is shown in edit mode', async () => {
+    const tempDir = path.join(POFF_DIR, `htaccess-visibility-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, '.htaccess'), 'RewriteEngine On');
+    fs.writeFileSync(path.join(tempDir, 'visible.txt'), 'visible');
+
+    try {
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', tempDir));
+      expect(ensured.tree.map((item) => item.name)).not.toContain('.htaccess');
+      expect(ensured.tree.map((item) => item.name)).toContain('visible.txt');
+
+      const normalNav = await runNav('', tempDir);
+      const editNav = await runNav('', tempDir, true);
+
+      expect(normalNav).not.toContain('data-file=".htaccess"');
+      expect(normalNav).not.toContain('.htaccess</a>');
+      expect(editNav).toContain('data-file=".htaccess"');
+      expect(editNav).toContain('.htaccess</a>');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('sanitizes persisted raw chat JSON in section templates on read', async () => {
@@ -1190,9 +1980,50 @@ describe('Worktype HBS renderer', () => {
     }
 
     expect(output).toContain('<div class="poff-default-layout poff-default-layout--image">');
-    expect(output).toContain('poff-default-layout__sidebar');
-    expect(output).toContain('<img src="assets/photo.png" alt="Project Photo"');
+    expect(output).toContain('src="assets/photo.png" alt="Project Photo"');
     expect(output).toContain('Inline description');
+    expect(fs.readFileSync(path.join(ROOT, 'src/includes/worktypes/templates/layout/default/script.js'), 'utf8'))
+      .toContain('DOMContentLoaded');
+  });
+
+  test('falls back to the default layout script when a filesystem layout has no script.js', async () => {
+    const tempDir = path.join(POFF_DIR, 'missing-script-layout');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.works', `${fileName}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'fake image');
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.layout`, 'template.hbs'),
+      '<section class="custom-shell">{{> poff-layout}}</section>',
+    );
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.layout`, 'work.hbs'),
+      '<article class="custom-work">{{title}}</article>',
+    );
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.config.json`),
+      JSON.stringify({
+        title: 'Poster',
+        description: '',
+        work: {
+          type: 'image',
+          layout: {
+            mode: 'filesystem-file-layout',
+            name: 'filesystem-file-layout',
+            engine: 'lightncandy',
+            section: 'work',
+          },
+        },
+      }, null, 2),
+    );
+
+    try {
+      const output = await runViewer(fileName, tempDir);
+
+      expect(output).toContain('const initDefaultLayout = () => {');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('allows a custom HBS layout template to include the default layout partial', async () => {
@@ -1360,8 +2191,58 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<div class="default-fs-layout">');
     expect(rendered).toContain('tests/poff-tests/.layout/style.css');
     expect(rendered).toContain('tests/poff-tests/.layout/script.js');
+    expect(rendered).toContain('const initDefaultLayout = () => {');
     expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
     expect(rendered).toContain('<span class="item">child.txt</span>');
+  });
+
+  test('actual layout preset ignores stale shared source and inherits parent .layout', async () => {
+    const tempRoot = path.join(POFF_DIR, 'stale-shared-inherit');
+    const childDir = path.join(tempRoot, 'child');
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempRoot, '.layout'), { recursive: true });
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(childDir, 'note.txt'), 'note');
+    fs.writeFileSync(
+      path.join(tempRoot, '.layout', 'template.hbs'),
+      '<div class="parent-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+    );
+    fs.writeFileSync(path.join(tempRoot, '.layout', 'works.hbs'), '<section class="parent-works">{{title}}</section>');
+    fs.writeFileSync(path.join(childDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'child',
+      slug: 'child',
+      title: 'child',
+      description: '',
+      type: 'folder',
+      id: 'poff_stale_shared',
+      tree: [],
+      treeHash: 'stale',
+      updatedAt: new Date().toISOString(),
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-layout',
+          engine: 'lightncandy',
+          section: 'works',
+          preset: 'actual',
+          source: 'shared',
+          sharedName: '1er/.layout',
+          storage: 'shared',
+          directory: '1er/.layout',
+          sectionDirectory: '1er/.layout',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', childDir));
+      expect(ensured.work.layout.storage).toBe('filesystem');
+      expect(ensured.work.layout.directory).toBe('tests/poff-tests/stale-shared-inherit/.layout');
+      expect(ensured.work.layout.template).toContain('parent-layout');
+      expect(ensured.work.layout.sectionTemplate).toContain('parent-works');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('can persist edits back into the inherited original filesystem layout source', async () => {
@@ -1402,7 +2283,7 @@ describe('Worktype HBS renderer', () => {
     const output = await runViewer('inherits-default');
     expect(output).not.toContain('<div class="default-fs-layout">');
     expect(output).not.toContain('tests/poff-tests/.layout/style.css');
-    expect(output).toContain('<div class="folder-view">');
+    expect(output).toContain('<div class="folder-view ');
     expect(output).toContain('child.txt');
 
     await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
@@ -1489,6 +2370,163 @@ describe('Worktype HBS renderer', () => {
     expect(output).not.toContain('%3Fview%3D1%26path%3Dlinkone');
   });
 
+  test('exports normalized remote content with absolute viewer and asset links', async () => {
+    const result = await runRemoteContent('export', POFF_DIR, 'viewer-folder', {
+      baseUrl: 'https://origin.example/index.php',
+      sourceId: 'origin-example',
+    });
+
+    expect(result.route).toBe('export-content');
+    expect(result.source).toEqual(expect.objectContaining({
+      id: 'origin-example',
+      baseUrl: 'https://origin.example/index.php',
+      path: 'viewer-folder',
+    }));
+    expect(result.root.pageLink).toBe('https://origin.example/index.php?view=1&path=viewer-folder');
+    expect(result.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'child.txt',
+        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+        srcUrl: 'https://origin.example/viewer-folder/child.txt',
+      }),
+      expect.objectContaining({
+        name: 'nested-child',
+        isFolder: true,
+        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+      }),
+    ]));
+  });
+
+  test('imports remote exports into config tree as virtual entries and renders their links', async () => {
+    const remoteFeed = {
+      route: 'export-content',
+      source: {
+        id: 'origin-example',
+        path: 'viewer-folder',
+      },
+      items: [
+        {
+          name: 'Portfolio',
+          title: 'Portfolio',
+          type: 'folder',
+          kind: 'folder',
+          path: 'viewer-folder/nested-child',
+          relativePath: 'viewer-folder/nested-child',
+          pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+          srcUrl: 'https://origin.example/index.php?path=viewer-folder%2Fnested-child',
+          visible: true,
+          isFolder: true,
+          isFile: false,
+        },
+        {
+          name: 'Leaf Note',
+          title: 'Leaf Note',
+          type: 'file',
+          kind: 'text',
+          path: 'viewer-folder/child.txt',
+          relativePath: 'viewer-folder/child.txt',
+          pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+          srcUrl: 'https://origin.example/viewer-folder/child.txt',
+          visible: true,
+          isFolder: false,
+          isFile: true,
+        },
+      ],
+    };
+
+    const result = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
+      url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
+      sourceId: 'origin-example',
+      mockResponse: {
+        status: 200,
+        body: remoteFeed,
+      },
+    });
+
+    expect(result.route).toBe('import-remote');
+    expect(result.saved).toBe(true);
+    expect(result.importedCount).toBe(2);
+
+    const storedConfig = JSON.parse(fs.readFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), 'utf8'));
+    expect(storedConfig.remoteSources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'origin-example',
+        url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
+      }),
+    ]));
+    expect(storedConfig.tree).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Portfolio',
+        type: 'folder',
+        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+        remoteSource: 'origin-example',
+      }),
+      expect.objectContaining({
+        name: 'Leaf Note',
+        type: 'file',
+        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+        remoteSource: 'origin-example',
+      }),
+    ]));
+
+    const output = await runViewer('remote-import-links');
+    expect(output).toMatch(/href="https:\/\/origin\.example\/index\.php\?view(?:=|&#x3D;)1&amp;path(?:=|&#x3D;)viewer-folder%2Fnested-child"/);
+    expect(output).toMatch(/href="https:\/\/origin\.example\/index\.php\?view(?:=|&#x3D;)1&amp;file(?:=|&#x3D;)viewer-folder%2Fchild\.txt"/);
+  });
+
+  test('normalizes duplicated viewer urls in custom layout links', async () => {
+    const tempDir = path.join(POFF_DIR, 'viewer-link-normalize');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'note.txt'), 'note');
+
+    try {
+      await runLayoutFilesystem('persist-folder', tempDir, '', {
+        name: 'custom-layout',
+        engine: 'lightncandy',
+        section: 'works',
+        template: '<header class="poff-default-layout__header"><div class="poff-default-layout__content"><a href="{{pageLink}}?view=1&path=linkone">Portfolio</a></div></header><main class="poff-default-layout__main">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main>',
+        worksTemplate: '<div>{{#each items}}<a href="{{pageLink}}">{{name}}</a>{{/each}}</div>',
+        workTemplate: '<span>{{name}}</span>',
+      });
+
+      const template = fs.readFileSync(path.join(tempDir, '.layout', 'template.hbs'), 'utf8');
+      const output = await runViewer('', tempDir);
+
+      expect(template).toContain('href="?view=1&path=linkone"');
+      expect(template).not.toContain('{{pageLink}}?view=1&path=linkone');
+      expect(output).toContain('href="?view=1&path=linkone"');
+      expect(output).not.toContain('?view=1&amp;path=viewer-link-normalize?view=1&amp;path=linkone');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('file views inherit the containing folder work partial over stale file-local sections', async () => {
+    const tempDir = path.join(POFF_DIR, 'file-layout-inheritance');
+    const fileName = 'clip.mp4';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.works', `${fileName}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'video');
+    fs.writeFileSync(
+      path.join(tempDir, '.layout', 'template.hbs'),
+      '<div class="folder-shell">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+    );
+    fs.writeFileSync(path.join(tempDir, '.layout', 'work.hbs'), '<article class="folder-work">{{name}}</article>');
+    fs.writeFileSync(path.join(tempDir, '.works', `${fileName}.layout`, 'work.hbs'), '<article class="stale-file-work">{{name}}</article>');
+
+    try {
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-file', tempDir, fileName));
+      expect(ensured.work.layout.directory).toBe('tests/poff-tests/file-layout-inheritance/.layout');
+      expect(ensured.work.layout.sectionDirectory).toBe('tests/poff-tests/file-layout-inheritance/.layout');
+      expect(ensured.work.layout.sectionTemplate).toContain('folder-work');
+      expect(ensured.work.layout.sectionTemplate).not.toContain('stale-file-work');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('renders file previews from .works/<file>.layout', async () => {
     const output = await runViewer(VIEWER_FILE_NAME);
 
@@ -1498,6 +2536,184 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="file-custom">');
     expect(output).toContain('Viewer File');
     expect(output).toContain('.works/viewer-file.txt.layout/thumbnail.txt');
+  });
+
+  test('persists a prompt-generated file layout into the file page with template, CSS, and JS', async () => {
+    const tempDir = path.join(POFF_DIR, `prompt-file-layout-${Date.now()}`);
+    const fileName = 'clip.mp4';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.works', `${fileName}.layout`), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'video');
+
+    try {
+      await runLayoutFilesystem('persist-file', tempDir, fileName, {
+        name: 'filesystem-layout',
+        engine: 'lightncandy',
+        section: 'work',
+        template: '<section class="prompt-file-layout"><h2>{{title}}</h2><div class="prompt-file-layout__body">{{> work}}</div></section>',
+        css: '.prompt-file-layout{border:1px solid #5f5;padding:1rem;}',
+        js: 'console.log(\'ok\');',
+        sectionTemplate: '<article class="prompt-file-work">{{name}}</article>',
+      });
+
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-file', tempDir, fileName));
+      expect(ensured.work.layout.directory).toBe(`.works/${fileName}.layout`);
+      expect(ensured.work.layout.template).toContain('prompt-file-layout');
+      expect(ensured.work.layout.css).toContain('.prompt-file-layout');
+      expect(ensured.work.layout.js).toContain("console.log('ok')");
+      expect(ensured.work.layout.sectionTemplate).toContain('prompt-file-work');
+
+      const output = await runViewer(fileName, tempDir);
+      expect(output).toContain('<section class="prompt-file-layout">');
+      expect(output).toContain('.works/clip.mp4.layout/style.css');
+      expect(output).toContain('.works/clip.mp4.layout/script.js');
+      expect(output).toContain('<article class="prompt-file-work">');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('renders built-in file layout assets from the containing folder .layout', async () => {
+    const tempDir = path.join(POFF_DIR, 'default-file-layout-assets');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.works'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'fake image');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'eggman_profile-image.jpg'), 'fake profile image');
+    fs.writeFileSync(path.join(tempDir, '.works', `${fileName}.config.json`), JSON.stringify({
+      title: 'Poster',
+      description: '',
+      work: {
+        type: 'image',
+        layout: {
+          mode: 'poff-layout',
+          name: 'poff-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const output = await runViewer(`default-file-layout-assets/${fileName}`);
+
+      expect(output).toContain('default-file-layout-assets/.layout/eggman_profile-image.jpg');
+      expect(output).not.toContain(`default-file-layout-assets/.works/${fileName}.layout/eggman_profile-image.jpg`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('renders built-in file layout assets from inherited parent .layout', async () => {
+    const tempDir = path.join(POFF_DIR, 'default-file-layout-inherited-assets');
+    const childDir = path.join(tempDir, 'child');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(path.join(childDir, '.works'), { recursive: true });
+    fs.writeFileSync(path.join(childDir, fileName), 'fake image');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'eggman_profile-image.jpg'), 'fake profile image');
+    fs.writeFileSync(path.join(childDir, '.works', `${fileName}.config.json`), JSON.stringify({
+      title: 'Poster',
+      description: '',
+      work: {
+        type: 'image',
+        layout: {
+          mode: 'poff-layout',
+          name: 'poff-layout',
+          engine: 'lightncandy',
+          section: 'work',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const output = await runViewer(`default-file-layout-inherited-assets/child/${fileName}`);
+
+      expect(output).toContain('default-file-layout-inherited-assets/.layout/eggman_profile-image.jpg');
+      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.layout/eggman_profile-image.jpg`);
+      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.works/${fileName}.layout/eggman_profile-image.jpg`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('uses a child folder .layout over an inherited parent .layout and persists the full layout set', async () => {
+    const tempDir = path.join(POFF_DIR, `nested-folder-layout-${Date.now()}`);
+    const parentDir = path.join(tempDir, 'parent');
+    const childDir = path.join(parentDir, 'child');
+    const childRelativePath = path.relative(POFF_DIR, childDir).replace(/\\/g, '/');
+    const parentLayoutRelativePath = path.relative(ROOT, path.join(parentDir, '.layout')).replace(/\\/g, '/');
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(parentDir, '.layout'), { recursive: true });
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(parentDir, 'parent.txt'), 'parent');
+    fs.writeFileSync(path.join(childDir, 'child.txt'), 'child');
+    fs.writeFileSync(
+      path.join(parentDir, '.layout', 'template.hbs'),
+      '<div class="parent-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+    );
+    fs.writeFileSync(path.join(parentDir, '.layout', 'style.css'), '.parent-layout{color:#f55;}');
+    fs.writeFileSync(path.join(parentDir, '.layout', 'script.js'), 'window.__parentLayout = true;');
+    fs.writeFileSync(
+      path.join(parentDir, '.layout', 'works.hbs'),
+      '<section class="parent-works">{{#each items}}<span class="parent-item">{{name}}</span>{{/each}}</section>',
+    );
+
+    try {
+      const payload = {
+        name: 'child-layout',
+        engine: 'lightncandy',
+        section: 'works',
+        preset: 'actual',
+        template: '<div class="child-layout">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>',
+        css: '.child-layout{color:#5f5;}',
+        js: 'window.__childLayout = true;',
+        worksTemplate: '<section class="child-works">{{#each items}}<span class="child-item">{{name}}</span>{{/each}}</section>',
+        workTemplate: '<article class="child-work">{{name}}</article>',
+      };
+
+      const output = await runLayoutFilesystem('persist-folder', childDir, '', payload);
+      const persisted = JSON.parse(output);
+      expect(persisted).toMatchObject({
+        name: 'child-layout',
+        section: 'works',
+        engine: 'lightncandy',
+        preset: 'actual',
+      });
+
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'template.hbs'), 'utf8')).toContain('child-layout');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'style.css'), 'utf8')).toContain('.child-layout');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'script.js'), 'utf8')).toContain('__childLayout');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'works.hbs'), 'utf8')).toContain('child-works');
+      expect(fs.readFileSync(path.join(childDir, '.layout', 'work.hbs'), 'utf8')).toContain('child-work');
+      expect(fs.readFileSync(path.join(parentDir, '.layout', 'template.hbs'), 'utf8')).toContain('parent-layout');
+
+      const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', childDir));
+      expect(ensured.work.layout.directory).toBe('.layout');
+      expect(ensured.work.layout.inheritedDirectory).toBe(parentLayoutRelativePath);
+      expect(ensured.work.layout.template).toContain('child-layout');
+      expect(ensured.work.layout.css).toContain('.child-layout');
+      expect(ensured.work.layout.js).toContain('__childLayout');
+      expect(ensured.work.layout.sectionTemplate).toContain('child-works');
+
+      const rendered = await runViewer(childRelativePath);
+      expect(rendered).toContain('<div class="child-layout">');
+      expect(rendered).toContain('<section class="child-works">');
+      expect(rendered).toContain('<span class="child-item">child.txt</span>');
+      expect(rendered).not.toContain('parent-layout');
+      expect(rendered).not.toContain('parent-works');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('renders the viewer shell stylesheet inline in the generated page', async () => {
+    const output = await runViewer(VIEWER_FILE_NAME);
+
+    expect(output).toContain('<style data-app-style>');
+    expect(output).not.toContain('href="/build/assets/app.css"');
   });
 
   test('sanitizes persisted file work partials that accidentally include outer wrapper shell blocks', async () => {
@@ -1583,6 +2799,53 @@ describe('Worktype HBS renderer', () => {
     fs.unlinkSync(path.join(nestedRuntimeDir, 'edit.not-allow'));
   });
 
+  test('exposes worktype-specific config fields in the default work definitions', async () => {
+    const videoDef = JSON.parse(await runWorktype('definition', 'video'));
+    const imageDef = JSON.parse(await runWorktype('definition', 'image'));
+
+    expect(videoDef).toMatchObject({
+      type: 'video',
+      autoplay: false,
+      loop: false,
+      muted: false,
+      poster: null,
+    });
+    expect(imageDef).toMatchObject({
+      type: 'image',
+      fit: 'contain',
+      background: '#000',
+      caption: '',
+    });
+  });
+
+  test('persists worktype-specific config fields from edit save', async () => {
+    const tempDir = path.join(POFF_DIR, `work-config-save-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'clip.mp4'), 'video');
+
+    try {
+      const result = await runViewerSave(tempDir, 'clip.mp4', {
+        work: {
+          type: 'video',
+          autoplay: true,
+          loop: true,
+          muted: false,
+          poster: 'poster.png',
+        },
+      });
+
+      expect(result.saved).toBe(true);
+      expect(result.config.work.type).toBe('video');
+      expect(result.config.work.autoplay).toBe(true);
+      expect(result.config.work.loop).toBe(true);
+      expect(result.config.work.muted).toBe(false);
+      expect(result.config.work.poster).toBe('poster.png');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('injects the wrapped work partial when a filesystem file wrapper forgets to include it', async () => {
     await runLayoutFilesystem('persist-file', POFF_DIR, VIEWER_FILE_NAME, {
       name: 'filesystem-layout',
@@ -1607,9 +2870,12 @@ describe('Worktype HBS renderer', () => {
       preset: 'actual',
       template: '<div class="persisted-layout">Persisted</div>',
       css: '.persisted-layout{color:#fff;}',
-      js: 'window.__persistedLayout = true;',
+      js: 'console.log(\'ok\');',
+      worksTemplate: '<div class="persisted-folder-inner">{{#each items}}<span>{{name}}</span>{{/each}}</div>',
+      workTemplate: '<div class="persisted-file-inner">{{name}}</div>',
     };
 
+    fs.writeFileSync(path.join(PERSIST_LAYOUT_DIR, 'shared-file.txt'), 'shared');
     const output = await runLayoutFilesystem('persist-folder', PERSIST_LAYOUT_DIR, '', payload);
     const serializedLayout = JSON.parse(output);
 
@@ -1621,7 +2887,9 @@ describe('Worktype HBS renderer', () => {
     });
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'template.hbs'), 'utf8')).toContain('Persisted');
     expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'style.css'), 'utf8')).toContain('.persisted-layout');
-    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain('__persistedLayout');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'script.js'), 'utf8')).toContain("console.log('ok')");
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'works.hbs'), 'utf8')).toContain('persisted-folder-inner');
+    expect(fs.readFileSync(path.join(PERSIST_LAYOUT_DIR, '.layout', 'work.hbs'), 'utf8')).toContain('persisted-file-inner');
     await runLayoutFilesystem('ensure-folder', PERSIST_LAYOUT_DIR);
     const persistConfigPath = path.join(PERSIST_LAYOUT_DIR, 'poff.config.json');
     const persistConfig = JSON.parse(fs.readFileSync(persistConfigPath, 'utf8'));
@@ -1636,6 +2904,13 @@ describe('Worktype HBS renderer', () => {
     expect(ensuredConfig.work.layout.template).toContain('Persisted');
     expect(ensuredConfig.work.layout.storage).toBe('filesystem');
     expect(ensuredConfig.work.layout.preset).toBe('actual');
+    expect(ensuredConfig.work.layout.js).toContain("console.log('ok')");
+
+    const ensuredFileOutput = await runLayoutFilesystem('ensure-file', PERSIST_LAYOUT_DIR, 'shared-file.txt');
+    const ensuredFileConfig = JSON.parse(ensuredFileOutput);
+    expect(ensuredFileConfig.work.layout.directory).toBe('tests/poff-tests/persist-layout/.layout');
+    expect(ensuredFileConfig.work.layout.sectionTemplate).toContain('persisted-file-inner');
+    expect(await runViewer('persist-layout')).toContain('.layout/script.js');
   });
 
   test('keeps custom layout files when switching presets away from custom', async () => {
@@ -1807,5 +3082,157 @@ describe('Worktype HBS renderer', () => {
         expect.objectContaining({ name: 'nested' }),
       ]),
     );
+  });
+
+  test('resets a folder work override back to the inherited default layout', async () => {
+    const tempDir = path.join(POFF_DIR, `reset-layout-${Date.now()}`);
+    copyDirSync(PERSIST_LAYOUT_DIR, tempDir);
+
+    try {
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(true);
+
+      const output = await runResetFolder(tempDir, '');
+      const result = JSON.parse(output);
+
+      expect(result.errors).toEqual([]);
+      expect(result.reset).toEqual([
+        expect.objectContaining({ name: '.layout', path: '.layout', type: 'layout' }),
+      ]);
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(false);
+      expect(result.config.work.layout).toEqual(
+        expect.objectContaining({
+          name: 'filesystem-layout',
+          mode: 'filesystem-layout',
+          section: 'works',
+        }),
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('hydrates a shared marketplace layout without creating local wrapper files', async () => {
+    const tempDir = path.join(os.tmpdir(), `shared-layout-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'story.txt'), 'shared');
+
+    try {
+      const output = await runLayoutFilesystem('persist-folder', tempDir, '', {
+        name: 'filesystem-layout',
+        engine: 'lightncandy',
+        section: 'works',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'filesystem-layout',
+      });
+      const serializedLayout = JSON.parse(output);
+
+      expect(serializedLayout).toMatchObject({
+        name: 'filesystem-layout',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'filesystem-layout',
+      });
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(false);
+
+      const configPath = path.join(tempDir, 'poff.config.json');
+      fs.writeFileSync(configPath, JSON.stringify({
+        folderName: 'shared-layout',
+        slug: 'shared-layout',
+        title: 'shared-layout',
+        description: '',
+        type: 'folder',
+        id: 'poff_shared_layout',
+        tree: [
+          {
+            name: 'story.txt',
+            slug: 'story-txt',
+            type: 'file',
+            path: 'story.txt',
+            modifiedAt: new Date().toISOString(),
+            visible: true,
+          },
+        ],
+        treeHash: 'shared',
+        updatedAt: new Date().toISOString(),
+        work: {
+          type: 'folder',
+          layout: serializedLayout,
+        },
+      }, null, 2));
+
+      const ensuredOutput = await runLayoutFilesystem('ensure-folder', tempDir);
+      const ensuredConfig = JSON.parse(ensuredOutput);
+      expect(ensuredConfig.work.layout).toEqual(
+        expect.objectContaining({
+          preset: 'shared',
+          source: 'shared',
+          sharedName: 'filesystem-layout',
+        }),
+      );
+      expect(Array.isArray(ensuredConfig.work.layout.sharedLayouts)).toBe(true);
+      expect(ensuredConfig.work.layout.sharedLayouts.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('hydrates a recursive folder collection layout by relative layout path', async () => {
+    const tempDir = path.join(POFF_DIR, `recursive-layout-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'story.txt'), 'recursive shared');
+
+    try {
+      const output = await runLayoutFilesystem('persist-folder', tempDir, '', {
+        name: 'viewer-folder/.layout',
+        engine: 'lightncandy',
+        section: 'works',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'viewer-folder/.layout',
+      });
+      const serializedLayout = JSON.parse(output);
+
+      const configPath = path.join(tempDir, 'poff.config.json');
+      fs.writeFileSync(configPath, JSON.stringify({
+        folderName: 'recursive-layout',
+        slug: 'recursive-layout',
+        title: 'recursive-layout',
+        description: '',
+        type: 'folder',
+        id: 'poff_recursive_layout',
+        tree: [
+          {
+            name: 'story.txt',
+            slug: 'story-txt',
+            type: 'file',
+            path: 'story.txt',
+            modifiedAt: new Date().toISOString(),
+            visible: true,
+          },
+        ],
+        treeHash: 'recursive',
+        updatedAt: new Date().toISOString(),
+        work: {
+          type: 'folder',
+          layout: serializedLayout,
+        },
+      }, null, 2));
+
+      const ensuredOutput = await runLayoutFilesystem('ensure-folder', tempDir);
+      const ensuredConfig = JSON.parse(ensuredOutput);
+      expect(ensuredConfig.work.layout).toEqual(
+        expect.objectContaining({
+          preset: 'shared',
+          source: 'shared',
+          sharedName: 'viewer-folder/.layout',
+          storage: 'shared',
+          directory: 'viewer-folder/.layout',
+        }),
+      );
+      expect(ensuredConfig.work.layout.template).toContain('folder-custom');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

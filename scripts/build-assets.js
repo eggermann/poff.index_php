@@ -13,7 +13,7 @@ const scriptsPath = path.join(rootDir, 'src', 'includes', 'scripts.built.php');
 const distDir = path.join(rootDir, 'build', 'assets');
 const unoConfig = require(path.join(rootDir, 'uno.config.js'));
 const srcDir = path.join(rootDir, 'src');
-const contentExtensions = new Set(['.php', '.js']);
+const contentExtensions = new Set(['.php', '.js', '.hbs']);
 
 function replaceBetween(content, startMarker, endMarker, replacement) {
   const startIndex = content.indexOf(startMarker);

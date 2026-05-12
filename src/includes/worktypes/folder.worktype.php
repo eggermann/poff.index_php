@@ -9,5 +9,6 @@ return [
             'section' => 'works',
         ],
     ],
+    'mimes' => [],
     'template' => (string) file_get_contents(__DIR__ . '/templates/folder.hbs'),
 ];

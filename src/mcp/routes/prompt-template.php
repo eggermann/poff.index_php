@@ -4,6 +4,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/viewer/link-targets.php';
 require_once __DIR__ . '/../../includes/edit-mode.php';
 require_once __DIR__ . '/../../includes/prompt-template-sanitize.php';
+require_once __DIR__ . '/../../includes/viewer/utils.php';
+require_once __DIR__ . '/../../includes/viewer/render/data.php';
+require_once __DIR__ . '/../helpers.php';
 
 const MCP_PROMPT_HTTP_TIMEOUT_SECONDS = 300;
 
@@ -155,7 +158,6 @@ function mcpParsePromptModelResult(string $raw): array
     }
 
     $template = '';
-    $modelReturnedReasoningOnly = false;
     $extractedFromEnvelope = false;
     if (isset($decoded['choices'][0]['message']['content'])) {
         $extractedFromEnvelope = true;
@@ -211,38 +213,69 @@ function mcpParsePromptModelResult(string $raw): array
     if (isset($decoded['work']) && is_array($decoded['work'])) {
         $result['work'] = $decoded['work'];
     }
+    if (isset($decoded['treeVisible']) && is_array($decoded['treeVisible'])) {
+        $result['treeVisible'] = array_values(array_filter($decoded['treeVisible'], static fn(mixed $value): bool => is_scalar($value)));
+    }
+    if (array_key_exists('css', $decoded) || array_key_exists('style', $decoded)) {
+        $result['css'] = (string) ($decoded['css'] ?? $decoded['style'] ?? '');
+    }
+    if (array_key_exists('js', $decoded) || array_key_exists('script', $decoded)) {
+        $result['js'] = (string) ($decoded['js'] ?? $decoded['script'] ?? '');
+    }
 
     return $result;
 }
 
-function mcpPromptResolvePath(string $rootDir, string $relativePath): ?string
+function mcpPromptCssDesignRules(): array
 {
-    $trimmed = trim($relativePath, "/\\");
-    $base = rtrim($rootDir, DIRECTORY_SEPARATOR);
-    if ($trimmed === '') {
-        return realpath($base) ?: null;
-    }
-    $candidate = realpath($base . DIRECTORY_SEPARATOR . $trimmed);
-    if ($candidate === false) {
-        return null;
-    }
-    if (strpos($candidate, $base) !== 0) {
-        return null;
-    }
-    if (!is_dir($candidate)) {
-        return null;
-    }
-    return $candidate;
+    return [
+        'CSS quality rules:',
+        '- Use one unique root class for the returned template, for example .work-gallery, .work-profile, .work-reader, .work-index, or a class derived from the requested design.',
+        '- Every CSS selector must be scoped under that root class.',
+        '- Use semantic class names that describe structure or content, not appearance.',
+        '- Use modern plain CSS: custom properties, grid, flexbox, clamp(), minmax(), aspect-ratio, object-fit, media queries, and color-mix() when useful.',
+        '- Put reusable design tokens on the root class: colors, surface, text, muted text, accent, border, radius, shadow, spacing.',
+        '- Prefer fluid spacing and typography with clamp().',
+        '- Create visual depth with subtle gradients, borders, shadows, overlays, and hover/focus states when appropriate.',
+        '- Keep text readable and contrast accessible.',
+        '- Add visible :focus-visible styles for links, buttons, and interactive elements.',
+        '- If transitions or animations are used, add @media (prefers-reduced-motion: reduce).',
+        '- Do not use Tailwind utility classes.',
+        '- Do not use inline style attributes.',
+        '- Do not include <style> tags.',
+        '- Do not use @import.',
+        '- Do not define unscoped global selectors such as body, html, :root, *, a, img, h1, p.',
+        '- Avoid !important unless absolutely necessary.',
+        '- Keep CSS self-contained so it can live in style.css beside the generated template.',
+    ];
 }
 
-function mcpPromptReadJsonBody(): array
+function mcpPromptValidateScopedCss(string $css): array
 {
-    $raw = (string) file_get_contents('php://input');
-    if ($raw === '') {
-        return [];
+    $errors = [];
+    $trimmed = trim($css);
+
+    if ($trimmed === '') {
+        return $errors;
     }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
+
+    if (preg_match('/<\s*style\b/i', $trimmed)) {
+        $errors[] = 'CSS must not include <style> tags.';
+    }
+
+    if (preg_match('/@import\s/i', $trimmed)) {
+        $errors[] = 'CSS must not import external stylesheets.';
+    }
+
+    if (preg_match('/(^|[{}>])\s*(html|body|:root|\*)\s*(?:[,{]|$)/i', $trimmed)) {
+        $errors[] = 'CSS must not include global html/body/:root/universal selectors.';
+    }
+
+    if (preg_match('/\b(?:position\s*:\s*fixed|z-index\s*:\s*9999)/i', $trimmed)) {
+        $errors[] = 'CSS should not create global overlay behavior.';
+    }
+
+    return $errors;
 }
 
 function mcpPromptLoadEnv(string $rootDir): array
@@ -509,6 +542,22 @@ function mcpPromptRefKind(string $name, string $type): string
     return MediaType::classifyExtension($name);
 }
 
+function mcpPromptUrlAliases(string $pageLink, string $assetUrl): array
+{
+    return [
+        'pageLink' => $pageLink,
+        'pageUrl' => $pageLink,
+        'workUrl' => $pageLink,
+        'viewUrl' => $pageLink,
+        'viewerHref' => $pageLink,
+        'assetUrl' => $assetUrl,
+        'assetLink' => $assetUrl,
+        'rawHref' => $assetUrl,
+        'srcUrl' => $assetUrl,
+        'sourceUrl' => $assetUrl,
+    ];
+}
+
 function mcpBuildPromptRef(string $basePath, array $item): ?array
 {
     $name = trim((string) ($item['name'] ?? $item['path'] ?? ''));
@@ -535,27 +584,17 @@ function mcpBuildPromptRef(string $basePath, array $item): ?array
         : mcpPromptAssetUrl($relativePath, !$isFolder);
     $linkUrl = cmsConfiguredTreeExternalLinkUrl($item);
 
-    $result = [
+    $result = array_merge([
         'name' => $name,
         'title' => (string) ($item['title'] ?? $name),
         'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
         'type' => $isFolder ? 'folder' : 'file',
         'kind' => $kind,
         'path' => $relativePath,
-        'pageLink' => $pageLink,
-        'pageUrl' => $pageLink,
-        'workUrl' => $pageLink,
-        'viewUrl' => $pageLink,
-        'viewerHref' => $pageLink,
-        'assetUrl' => $assetUrl,
-        'assetLink' => $assetUrl,
-        'rawHref' => $assetUrl,
-        'srcUrl' => $assetUrl,
-        'sourceUrl' => $assetUrl,
         'isFolder' => $isFolder,
         'isFile' => !$isFolder,
         'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
-    ];
+    ], mcpPromptUrlAliases($pageLink, $assetUrl));
 
     if ($linkUrl !== '') {
         $result['linkUrl'] = $linkUrl;
@@ -564,7 +603,7 @@ function mcpBuildPromptRef(string $basePath, array $item): ?array
     return $result;
 }
 
-function mcpBuildPromptContext(string $relativePath, array $config): array
+function mcpBuildPromptContext(string $relativePath, array $config, array $folderViewData = []): array
 {
     $normalizedPath = trim($relativePath, "/\\");
     $currentName = (string) ($config['folderName'] ?? basename($normalizedPath));
@@ -573,27 +612,67 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     $layoutValue = is_array($config['work'] ?? null) && is_array($config['work']['layout'] ?? null)
         ? $config['work']['layout']
         : [];
+    $rootTitle = trim((string) ($config['title'] ?? $currentName));
+    if ($rootTitle === '') {
+        $rootTitle = $currentName;
+    }
+    $rootFolderName = trim((string) ($config['folderName'] ?? $currentName));
+    if ($rootFolderName === '') {
+        $rootFolderName = $currentName;
+    }
+    $rootSlug = trim((string) ($config['slug'] ?? ''));
+    if ($rootSlug === '') {
+        $rootSlug = PoffConfig::slugify($rootFolderName);
+    }
+    $rootDescription = trim((string) ($config['description'] ?? ''));
+    $workSource = is_array($config['work'] ?? null) ? $config['work'] : [];
+    $workTitle = trim((string) ($workSource['title'] ?? $currentName));
+    if ($workTitle === '') {
+        $workTitle = $currentName;
+    }
+    $workName = trim((string) ($workSource['name'] ?? $currentName));
+    if ($workName === '') {
+        $workName = $currentName;
+    }
+    $workSlug = trim((string) ($workSource['slug'] ?? ''));
+    if ($workSlug === '') {
+        $workSlug = $rootSlug;
+    }
+    $workDescription = trim((string) ($workSource['description'] ?? $rootDescription));
+    $workType = trim((string) ($workSource['type'] ?? 'folder'));
+    if ($workType === '') {
+        $workType = 'folder';
+    }
 
     $context = [
-        'current' => [
+        'current' => array_merge([
             'targetType' => 'folder',
             'sectionPartial' => 'works',
+            'title' => $rootTitle,
             'name' => $currentName,
             'path' => $normalizedPath,
-            'pageLink' => $currentPageLink,
-            'pageUrl' => $currentPageLink,
-            'workUrl' => $currentPageLink,
-            'viewUrl' => $currentPageLink,
-            'viewerHref' => $currentPageLink,
-            'assetUrl' => $currentAssetUrl,
-            'assetLink' => $currentAssetUrl,
-            'rawHref' => $currentAssetUrl,
-            'srcUrl' => $currentAssetUrl,
-            'sourceUrl' => $currentAssetUrl,
             'templateTarget' => mcpPromptTemplateTarget($normalizedPath),
             'layoutTemplateTarget' => mcpPromptLayoutTemplateTarget($normalizedPath),
             'outerWrapper' => mcpPromptOuterWrapperReference($layoutValue),
-        ],
+            'root' => [
+                'title' => $rootTitle,
+                'name' => $rootFolderName,
+                'folderName' => $rootFolderName,
+                'path' => $normalizedPath,
+                'slug' => $rootSlug,
+                'description' => $rootDescription,
+                'type' => 'folder',
+            ],
+            'work' => [
+                'title' => $workTitle,
+                'name' => $workName,
+                'path' => $normalizedPath,
+                'slug' => $workSlug,
+                'description' => $workDescription,
+                'type' => $workType,
+                'kind' => $workType,
+            ],
+        ], mcpPromptUrlAliases($currentPageLink, $currentAssetUrl)),
         'items' => [],
         'allItems' => [],
         'allFiles' => [],
@@ -606,6 +685,27 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
         'allLinks' => [],
         'allOther' => [],
     ];
+    if (is_array($folderViewData['tree'] ?? null)) {
+        $context['current']['tree'] = $folderViewData['tree'];
+        $context['current']['workTree'] = $folderViewData['workTree'] ?? null;
+        foreach (['allItems', 'allFiles', 'allFolders', 'allImages', 'allVideos', 'allAudio', 'allPdfs', 'allTexts', 'allLinks', 'allOther'] as $key) {
+            if (array_key_exists($key, $folderViewData) && is_array($folderViewData[$key])) {
+                $context['current'][$key] = $folderViewData[$key];
+                $context[$key] = $folderViewData[$key];
+            }
+        }
+        $context['items'] = $folderViewData['tree'];
+        $context['allItems'] = $folderViewData['allItems'] ?? [];
+        $context['allFiles'] = $folderViewData['allFiles'] ?? [];
+        $context['allFolders'] = $folderViewData['allFolders'] ?? [];
+        $context['allImages'] = $folderViewData['allImages'] ?? [];
+        $context['allVideos'] = $folderViewData['allVideos'] ?? [];
+        $context['allAudio'] = $folderViewData['allAudio'] ?? [];
+        $context['allPdfs'] = $folderViewData['allPdfs'] ?? [];
+        $context['allTexts'] = $folderViewData['allTexts'] ?? [];
+        $context['allLinks'] = $folderViewData['allLinks'] ?? [];
+        $context['allOther'] = $folderViewData['allOther'] ?? [];
+    }
 
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
     foreach ($tree as $item) {
@@ -652,6 +752,15 @@ function mcpBuildPromptContext(string $relativePath, array $config): array
     return $context;
 }
 
+function mcpPromptFolderViewData(string $relativePath, string $fullPath, array $config, array $rootMeta): array
+{
+    if (!is_dir($fullPath)) {
+        return [];
+    }
+
+    return buildFolderViewerData($relativePath, $fullPath, $config, $rootMeta);
+}
+
 function mcpPromptTrimText(string $text, int $maxLength = 240): string
 {
     $normalized = preg_replace('/\s+/', ' ', trim($text)) ?? trim($text);
@@ -660,6 +769,23 @@ function mcpPromptTrimText(string $text, int $maxLength = 240): string
     }
 
     return substr($normalized, 0, max(0, $maxLength - 3)) . '...';
+}
+
+function mcpPromptNormalizeStringList(array|string|null $value): array
+{
+    $items = is_array($value)
+        ? $value
+        : (is_string($value) && trim($value) !== '' ? preg_split('/\r?\n|,/', $value) : []);
+    $result = [];
+    foreach ($items ?: [] as $item) {
+        $normalized = strtolower(trim((string) $item));
+        if ($normalized === '' || in_array($normalized, $result, true)) {
+            continue;
+        }
+        $result[] = $normalized;
+    }
+
+    return $result;
 }
 
 function mcpPromptCompactRef(array $ref): array
@@ -674,6 +800,29 @@ function mcpPromptCompactRef(array $ref): array
     }
 
     return $compact;
+}
+
+function mcpPromptCompactTreeItems(array $items, int $maxDepth = 3, int $maxChildren = 12): array
+{
+    $compactItems = [];
+    foreach (array_slice($items, 0, $maxChildren) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $compact = mcpPromptCompactRef($item);
+        if (array_key_exists('childCount', $item) && is_scalar($item['childCount'])) {
+            $compact['childCount'] = (int) $item['childCount'];
+        }
+
+        if ($maxDepth > 0 && is_array($item['children'] ?? null) && $item['children'] !== []) {
+            $compact['children'] = mcpPromptCompactTreeItems($item['children'], $maxDepth - 1, $maxChildren);
+        }
+
+        $compactItems[] = $compact;
+    }
+
+    return $compactItems;
 }
 
 function mcpPromptCompactConfig(array $config): array
@@ -715,6 +864,14 @@ function mcpPromptCompactConfig(array $config): array
 
             if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
                 $summary['work'][$key] = $value;
+                continue;
+            }
+
+            if ($key === 'categories' || $key === 'category') {
+                $categories = mcpPromptNormalizeStringList($value);
+                if ($categories !== []) {
+                    $summary['work']['categories'] = $categories;
+                }
                 continue;
             }
 
@@ -765,11 +922,46 @@ function mcpPromptCompactContext(array $context): array
         }
         $current['outerWrapper'] = $outerWrapper;
     }
+    if (is_array($current['root'] ?? null)) {
+        $root = [];
+        foreach (['title', 'name', 'folderName', 'path', 'slug', 'description', 'type'] as $key) {
+            if (!array_key_exists($key, $current['root'])) {
+                continue;
+            }
+            $value = $current['root'][$key];
+            $root[$key] = is_string($value)
+                ? mcpPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['root'] = $root;
+    }
+    if (is_array($current['work'] ?? null)) {
+        $work = [];
+        foreach (['title', 'name', 'path', 'slug', 'description', 'type', 'kind'] as $key) {
+            if (!array_key_exists($key, $current['work'])) {
+                continue;
+            }
+            $value = $current['work'][$key];
+            $work[$key] = is_string($value)
+                ? mcpPromptTrimText($value, 220)
+                : $value;
+        }
+        $current['work'] = $work;
+    }
+    if (is_array($current['tree'] ?? null)) {
+        $current['tree'] = mcpPromptCompactTreeItems($current['tree']);
+    }
+    if (is_array($current['workTree'] ?? null)) {
+        $current['workTree']['children'] = mcpPromptCompactTreeItems(
+            is_array($current['workTree']['children'] ?? null) ? $current['workTree']['children'] : [],
+            3,
+            12
+        );
+    }
 
-    $items = array_values(array_filter(array_map(
-        static fn(array $ref): array => mcpPromptCompactRef($ref),
-        array_slice(is_array($context['items'] ?? null) ? $context['items'] : [], 0, 24)
-    )));
+    $items = is_array($context['items'] ?? null)
+        ? mcpPromptCompactTreeItems($context['items'])
+        : [];
 
     $counts = [
         'items' => count(is_array($context['items'] ?? null) ? $context['items'] : []),
@@ -810,43 +1002,228 @@ function mcpPromptHistoryText(array $history): string
     return $historyText;
 }
 
+function mcpPromptSystemPrompt(): string
+{
+    return implode("\n", array_merge([
+        'You are a Handlebars (HBS) template generator for this single-page CMS.',
+        cmsPromptSharedWorkPromptLead(),
+        'Optional key "treeVisible" may list same-folder parent tree item names/paths to keep visible when the user asks to hide used sibling works.',
+        'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
+        'Return only the JSON object (no Markdown, no fences).',
+    ], cmsPromptSharedWorkSystemPromptLines(), [
+        'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
+        'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
+        'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes and template variants: image, video, audio, pdf, text, link, folder, other.',
+        'Use work.type for the base family and work.template for the exact template override. Use work.templateMap as inherited MIME => template defaults for child items. If the item is a movie or similar autoplay candidate, prefer video plus work.autoplay=true instead of a separate video-autoplay template key.',
+        'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
+        'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
+        'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
+        'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
+        'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this prompt.',
+        'If the current layout preset is shared, keep the selected sharedName within the same worktype family instead of inventing a new wrapper name.',
+        'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this prompt.',
+        'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
+        'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
+        'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
+        'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
+        'Put all template-specific styling in the JSON "css" field as plain CSS that works without a build step.',
+        ...mcpPromptCssDesignRules(),
+        'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.',
+    ]));
+}
+
+function mcpPromptError(string $message, bool $allowed = true): array
+{
+    return [
+        'route' => 'prompt-template',
+        'allowed' => $allowed,
+        'error' => $message,
+    ];
+}
+
+function mcpPromptUserContent(string $userPrompt, ?array $image)
+{
+    return $image ? [
+        ['type' => 'text', 'text' => $userPrompt],
+        ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
+    ] : $userPrompt;
+}
+
+function mcpPromptOpenAiMessages(string $systemPrompt, string $userPrompt, ?array $image, array $history = []): array
+{
+    $messages = [['role' => 'system', 'content' => $systemPrompt]];
+    foreach ($history as $message) {
+        if (!is_array($message)) {
+            continue;
+        }
+        $role = strtolower(trim((string) ($message['role'] ?? 'user')));
+        $content = trim((string) ($message['content'] ?? ''));
+        if ($content !== '' && in_array($role, ['system', 'user', 'assistant'], true)) {
+            $messages[] = ['role' => $role, 'content' => $content];
+        }
+    }
+    $messages[] = [
+        'role' => 'user',
+        'content' => mcpPromptUserContent($userPrompt, $image),
+    ];
+
+    return $messages;
+}
+
+function mcpPromptProviderResult(string $template, string $model, bool $reasoningOnly = false, ?string $error = null): array
+{
+    return [
+        'template' => $template,
+        'model' => $model,
+        'reasoningOnly' => $reasoningOnly,
+        'error' => $error,
+    ];
+}
+
+function mcpPromptGenerateOpenAi(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image, array $history = []): array
+{
+    $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'OPENAI_API_KEY') ?? '');
+    if ($key === '') {
+        return mcpPromptProviderResult('', $model, false, 'OpenAI API key not set.');
+    }
+
+    $usedModel = $model !== '' ? $model : 'gpt-4o-mini';
+    $payload = [
+        'model' => $usedModel,
+        'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image, $history),
+        'temperature' => 0.4,
+    ];
+    $response = mcpPromptHttpPost('https://api.openai.com/v1/chat/completions', [
+        'Authorization: Bearer ' . $key,
+    ], $payload);
+    if (!$response['ok']) {
+        return mcpPromptProviderResult('', $usedModel, false, mcpPromptFormatHttpError('OpenAI', $response));
+    }
+
+    $decoded = json_decode($response['body'], true);
+    $template = is_array($decoded) ? (string) ($decoded['choices'][0]['message']['content'] ?? '') : '';
+
+    return mcpPromptProviderResult($template, $usedModel);
+}
+
+function mcpPromptGenerateGemini(array $env, string $model, string $apiKey, string $systemPrompt, string $userPrompt, ?array $image, array $history = []): array
+{
+    $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'GEMINI_API_KEY') ?? '');
+    if ($key === '') {
+        return mcpPromptProviderResult('', $model, false, 'Gemini API key not set.');
+    }
+
+    $usedModel = $model !== '' ? $model : 'gemini-1.5-flash';
+    $historyText = mcpPromptHistoryText($history);
+    $promptParts = array_filter([
+        $systemPrompt,
+        $historyText,
+        $userPrompt,
+    ], static fn(string $part): bool => trim($part) !== '');
+    $promptText = implode("\n\n", $promptParts);
+    $payload = [
+        'contents' => [
+            [
+                'parts' => [
+                    ['text' => $promptText],
+                    ...($image ? [[
+                        'inline_data' => [
+                            'mime_type' => $image['mimeType'],
+                            'data' => $image['base64'],
+                        ],
+                    ]] : []),
+                ],
+            ],
+        ],
+    ];
+    $url = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', rawurlencode($usedModel), $key);
+    $response = mcpPromptHttpPost($url, [], $payload);
+    if (!$response['ok']) {
+        return mcpPromptProviderResult('', $usedModel, false, mcpPromptFormatHttpError('Gemini', $response));
+    }
+
+    $decoded = json_decode($response['body'], true);
+    $template = is_array($decoded) ? (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '') : '';
+
+    return mcpPromptProviderResult($template, $usedModel);
+}
+
+function mcpPromptGenerateLocal(
+    string $model,
+    string $endpoint,
+    string $prompt,
+    string $systemPrompt,
+    string $userPrompt,
+    ?array $image,
+    array $history,
+    array $config
+): array {
+    $usedEndpoint = $endpoint !== '' ? $endpoint : 'http://127.0.0.1:1234/v1/chat/completions';
+    $usedModel = $model !== '' ? $model : 'gemma4';
+    if (mcpPromptIsOpenAiCompatibleEndpoint($usedEndpoint)) {
+        $payload = [
+            'model' => $usedModel,
+            'messages' => mcpPromptOpenAiMessages($systemPrompt, $userPrompt, $image, $history),
+            'temperature' => 0.4,
+        ];
+    } else {
+        $payload = [
+            'prompt' => $prompt,
+            'history' => $history,
+            'config' => $config,
+            'instruction' => $systemPrompt,
+            'image' => $image,
+        ];
+    }
+
+    $response = mcpPromptHttpPost($usedEndpoint, [], $payload);
+    if (!$response['ok']) {
+        return mcpPromptProviderResult('', $usedModel, false, mcpPromptFormatHttpError('Local endpoint', $response));
+    }
+
+    $template = '';
+    $reasoningOnly = false;
+    $decoded = json_decode($response['body'], true);
+    if (is_array($decoded)) {
+        $message = $decoded['choices'][0]['message'] ?? null;
+        if (is_array($message) && array_key_exists('content', $message)) {
+            $template = (string) $message['content'];
+            $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
+            $reasoningOnly = trim($template) === '' && $reasoningContent !== '';
+        } elseif (isset($decoded['template'])) {
+            $template = (string) $decoded['template'];
+        } elseif (isset($decoded['content'])) {
+            $template = (string) $decoded['content'];
+        }
+    } else {
+        $template = trim((string) $response['body']);
+    }
+
+    return mcpPromptProviderResult($template, $usedModel, $reasoningOnly);
+}
+
 function handlePromptTemplate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = $opts['path'] ?? '';
     $allowFile = $opts['allowFile'] ?? null;
     if (!class_exists('PoffConfig')) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => 'PoffConfig unavailable.',
-        ];
+        return mcpPromptError('PoffConfig unavailable.');
     }
 
-    $targetDir = mcpPromptResolvePath($rootDir, (string) $path);
+    $targetDir = mcpResolveDirectoryInsideRoot($rootDir, (string) $path);
     if ($targetDir === null) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => 'Invalid folder path.',
-        ];
+        return mcpPromptError('Invalid folder path.');
     }
 
     $allowed = is_string($allowFile) && $allowFile !== ''
         ? is_file($allowFile)
         : cmsEditModeAllowedForDirectory($targetDir, $rootDir);
     if (!$allowed) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => false,
-            'error' => 'Edit mode not enabled.',
-        ];
+        return mcpPromptError('Edit mode not enabled.', false);
     }
 
-    $data = mcpPromptReadJsonBody();
-    if ($data === []) {
-        $data = $_POST;
-    }
+    $data = mcpReadRequestData();
 
     $provider = strtolower((string) ($data['provider'] ?? 'local'));
     $prompt = trim((string) ($data['prompt'] ?? ''));
@@ -857,195 +1234,60 @@ function handlePromptTemplate(array $opts): array
     $image = mcpPromptImagePayload($data);
 
     if ($prompt === '' && !$image) {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => 'Missing prompt or image.',
-        ];
+        return mcpPromptError('Missing prompt or image.');
     }
 
     $config = PoffConfig::ensure($targetDir);
     $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $systemPrompt = implode("\n", [
-        'You are a Handlebars (HBS) template generator for this single-page CMS.',
-        'Return one HBS template string for the wrapped inner section partial rendered through LightnCandy.',
-        'Save target is work.hbs for files and works.hbs for folders inside the active item layout folder.',
-        'Return only the template (no Markdown, no fences).',
-        'Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.',
-        'Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available. Folder items also expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.',
-        'For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.',
-        'Use config/title/description, layout name/template, and tree data when relevant; prefer existing worktypes: image, video, audio, pdf, text, link, folder, other.',
-        'Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.',
-        'When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.',
-        'Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.',
-        'Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.',
-        'Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this prompt.',
-        'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this prompt.',
-        'Return only the inner partial content that will be rendered inside the existing layout wrapper.',
-        'If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.',
-        'Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.',
-        'You may embed scoped <style> and <script>; keep everything self-contained, avoid external URLs, and namespace ids/classes to prevent collisions.',
-        'If you add JS, guard for DOM readiness and avoid network calls; degrade gracefully if JS is disabled.',
-    ]);
-    $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config));
+    $systemPrompt = mcpPromptSystemPrompt();
+    $folderViewData = mcpPromptFolderViewData(
+        (string) $path,
+        $targetDir,
+        $config,
+        [
+            'name' => (string) ($config['folderName'] ?? basename((string) $path)),
+            'title' => (string) ($config['title'] ?? $config['folderName'] ?? basename((string) $path)),
+            'slug' => (string) ($config['slug'] ?? PoffConfig::slugify((string) ($config['folderName'] ?? basename((string) $path)))),
+        ]
+    );
+    $promptContext = mcpPromptCompactContext(mcpBuildPromptContext((string) $path, $config, $folderViewData));
     $promptContextJson = json_encode($promptContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $historyText = mcpPromptHistoryText($history);
-    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\n" . $historyText . "USER: " . $prompt;
+    $userPrompt = "Config JSON:\n" . $configJson . "\n\nPrompt context JSON:\n" . $promptContextJson . "\n\nUSER: " . $prompt;
     if ($image) {
         $userPrompt .= "\n\nAttached image: " . ($image['name'] ?: 'clipboard-image.png');
     }
 
     $env = mcpPromptLoadEnv($rootDir);
-    $template = '';
-    $usedModel = $model;
-
     if ($provider === 'openai') {
-        $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'OPENAI_API_KEY') ?? '');
-        if ($key === '') {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => 'OpenAI API key not set.',
-            ];
-        }
-        if ($usedModel === '') {
-            $usedModel = 'gpt-4o-mini';
-        }
-        $payload = [
-            'model' => $usedModel,
-            'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $image ? [
-                    ['type' => 'text', 'text' => $userPrompt],
-                    ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
-                ] : $userPrompt],
-            ],
-            'temperature' => 0.4,
-        ];
-        $response = mcpPromptHttpPost('https://api.openai.com/v1/chat/completions', [
-            'Authorization: Bearer ' . $key,
-        ], $payload);
-        if (!$response['ok']) {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => mcpPromptFormatHttpError('OpenAI', $response),
-            ];
-        }
-        $decoded = json_decode($response['body'], true);
-        $template = (string) ($decoded['choices'][0]['message']['content'] ?? '');
+        $generation = mcpPromptGenerateOpenAi($env, $model, $apiKey, $systemPrompt, $userPrompt, $image, $history);
     } elseif ($provider === 'gemini') {
-        $key = $apiKey !== '' ? $apiKey : (mcpPromptEnvValue($env, 'GEMINI_API_KEY') ?? '');
-        if ($key === '') {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => 'Gemini API key not set.',
-            ];
-        }
-        if ($usedModel === '') {
-            $usedModel = 'gemini-1.5-flash';
-        }
-        $promptText = $systemPrompt . "\n\n" . $userPrompt;
-        $payload = [
-            'contents' => [
-                [
-                    'parts' => [
-                        ['text' => $promptText],
-                        ...($image ? [[
-                            'inline_data' => [
-                                'mime_type' => $image['mimeType'],
-                                'data' => $image['base64'],
-                            ],
-                        ]] : []),
-                    ],
-                ],
-            ],
-        ];
-        $url = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', rawurlencode($usedModel), $key);
-        $response = mcpPromptHttpPost($url, [], $payload);
-        if (!$response['ok']) {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => mcpPromptFormatHttpError('Gemini', $response),
-            ];
-        }
-        $decoded = json_decode($response['body'], true);
-        $template = (string) ($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        $generation = mcpPromptGenerateGemini($env, $model, $apiKey, $systemPrompt, $userPrompt, $image, $history);
     } else {
-        if ($endpoint === '') {
-            $endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
-        }
-        if ($usedModel === '') {
-            $usedModel = 'gemma4';
-        }
-        if (mcpPromptIsOpenAiCompatibleEndpoint($endpoint)) {
-            $messages = [['role' => 'system', 'content' => $systemPrompt]];
-            foreach ($history as $message) {
-                if (!is_array($message)) {
-                    continue;
-                }
-                $role = strtolower(trim((string) ($message['role'] ?? 'user')));
-                $content = trim((string) ($message['content'] ?? ''));
-                if ($content === '' || !in_array($role, ['system', 'user', 'assistant'], true)) {
-                    continue;
-                }
-                $messages[] = ['role' => $role, 'content' => $content];
-            }
-            $messages[] = ['role' => 'user', 'content' => $image ? [
-                ['type' => 'text', 'text' => $userPrompt],
-                ['type' => 'image_url', 'image_url' => ['url' => $image['dataUrl']]],
-            ] : $userPrompt];
-            $payload = [
-                'model' => $usedModel,
-                'messages' => $messages,
-                'temperature' => 0.4,
-            ];
-        } else {
-            $payload = [
-                'prompt' => $prompt,
-                'history' => $history,
-                'config' => $config,
-                'instruction' => $systemPrompt,
-                'image' => $image,
-            ];
-        }
-        $response = mcpPromptHttpPost($endpoint, [], $payload);
-        if (!$response['ok']) {
-            return [
-                'route' => 'prompt-template',
-                'allowed' => true,
-                'error' => mcpPromptFormatHttpError('Local endpoint', $response),
-            ];
-        }
-        $decoded = json_decode($response['body'], true);
-        if (is_array($decoded)) {
-            $message = $decoded['choices'][0]['message'] ?? null;
-            if (is_array($message) && array_key_exists('content', $message)) {
-                $template = (string) $message['content'];
-                $reasoningContent = trim((string) ($message['reasoning_content'] ?? ''));
-                $modelReturnedReasoningOnly = trim($template) === '' && $reasoningContent !== '';
-            } elseif (isset($decoded['template'])) {
-                $template = (string) $decoded['template'];
-            } elseif (isset($decoded['content'])) {
-                $template = (string) $decoded['content'];
-            }
-        } elseif ($template === '') {
-            $template = trim((string) $response['body']);
+        $generation = mcpPromptGenerateLocal($model, $endpoint, $prompt, $systemPrompt, $userPrompt, $image, $history, $config);
+    }
+
+    if (($generation['error'] ?? null) !== null) {
+        return mcpPromptError((string) $generation['error']);
+    }
+
+    $template = (string) ($generation['template'] ?? '');
+    $usedModel = (string) ($generation['model'] ?? $model);
+    $modelReturnedReasoningOnly = (bool) ($generation['reasoningOnly'] ?? false);
+    $parsedResult = mcpParsePromptModelResult($template);
+    if (isset($parsedResult['css']) && is_string($parsedResult['css'])) {
+        $cssErrors = mcpPromptValidateScopedCss($parsedResult['css']);
+        if ($cssErrors !== []) {
+            return mcpPromptError('Generated CSS was rejected: ' . implode(' ', $cssErrors));
         }
     }
 
-    $parsedResult = mcpParsePromptModelResult($template);
     $templateText = trim((string) ($parsedResult['template'] ?? ''));
     if ($templateText === '') {
-        return [
-            'route' => 'prompt-template',
-            'allowed' => true,
-            'error' => $modelReturnedReasoningOnly
+        return mcpPromptError(
+            $modelReturnedReasoningOnly
                 ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
-                : 'Template was empty.',
-        ];
+                : 'Template was empty.'
+        );
     }
 
     $response = [
@@ -1055,7 +1297,7 @@ function handlePromptTemplate(array $opts): array
         'model' => $usedModel,
         'template' => $templateText,
     ];
-    foreach (['title', 'description', 'work'] as $key) {
+    foreach (['title', 'description', 'work', 'css', 'js', 'treeVisible'] as $key) {
         if (array_key_exists($key, $parsedResult)) {
             $response[$key] = $parsedResult[$key];
         }

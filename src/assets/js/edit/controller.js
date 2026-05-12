@@ -1,8 +1,64 @@
-import { requestEditConfig, requestEditDelete, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
+import { requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
+import { materializeWorkFields } from './work-fields.js';
+import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layout.js';
+import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
+import { setStatusMessage } from './status.js';
+
+function readMediaConfigFromElements(elements, form, currentWork = {}) {
+    const nextWork = { ...(currentWork && typeof currentWork === 'object' ? currentWork : {}) };
+    const typeField = elements.work_type;
+    if (typeField && typeof typeField.value === 'string') {
+        const type = typeField.value.trim();
+        if (type) {
+            nextWork.type = type;
+        }
+    }
+    const configFields = form?.querySelectorAll('[data-work-config-field]') || [];
+    configFields.forEach((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+            return;
+        }
+        const key = String(field.dataset.workConfigKey || '').trim();
+        if (!key) {
+            return;
+        }
+        const kind = String(field.dataset.workConfigKind || 'text').trim();
+        const isNullable = field.dataset.workConfigNullable === 'true';
+        if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+            nextWork[key] = !!field.checked;
+            return;
+        }
+        const rawValue = field.value;
+        if (kind === 'number') {
+            nextWork[key] = rawValue === '' ? null : Number(rawValue);
+            return;
+        }
+        if (kind === 'json') {
+            const trimmed = String(rawValue || '').trim();
+            if (trimmed === '') {
+                nextWork[key] = null;
+                return;
+            }
+            try {
+                nextWork[key] = JSON.parse(trimmed);
+            } catch {
+                nextWork[key] = trimmed;
+            }
+            return;
+        }
+        const trimmed = String(rawValue || '').trim();
+        if (isNullable && trimmed === '') {
+            nextWork[key] = null;
+            return;
+        }
+        nextWork[key] = rawValue;
+    });
+    return nextWork;
+}
 
 export function createEditController({ elements, context, editRequested }) {
     const { editPanel, editDrawer, editToggle } = elements;
@@ -15,30 +71,29 @@ export function createEditController({ elements, context, editRequested }) {
     let editTarget = 'folder';
     let drawerOpen = false;
 
-    function getContentTargetPath(selection = getActiveSelection()) {
-        if (selection?.isLayout) {
-            return selection.path || '';
+    function annotateConfigPath(config, selection = getActiveSelection(), status = {}) {
+        if (!config || typeof config !== 'object') {
+            return config;
         }
-        const previewPath = selection?.previewPath || selection?.path || '';
-        if (selection?.previewIsFile) {
-            return previewPath.split('/').slice(0, -1).join('/');
-        }
-        return previewPath;
+        const relativePath = selection?.previewPath || selection?.path || context?.currentPathForIframe || '';
+        const isFile = status?.subjectTarget === 'file'
+            || (status?.target === 'file')
+            || selection?.previewIsFile === true;
+        Object.defineProperties(config, {
+            __poffRelativePath: {
+                value: relativePath,
+                configurable: true,
+            },
+            __poffIsFile: {
+                value: isFile,
+                configurable: true,
+            },
+        });
+        return config;
     }
 
-    function getEditTargetPath(selection = getActiveSelection()) {
-        if (selection?.isLayout) {
-            return selection.path || '';
-        }
-        if (selection?.previewIsFile) {
-            const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
-            const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
-            if (navPath) {
-                return navPath;
-            }
-        }
-        return selection?.previewPath || selection?.path || '';
-    }
+    annotateConfigPath(folderConfig, getActiveSelection(), { target: 'folder' });
+    annotateConfigPath(editConfig, getActiveSelection(), { target: editTarget });
 
     function renderFolderMeta() {
         return folderConfig;
@@ -70,37 +125,31 @@ export function createEditController({ elements, context, editRequested }) {
 
     async function saveConfig(payload, statusEl) {
         try {
-            if (statusEl) {
-                statusEl.textContent = 'Saving...';
-                statusEl.className = 'edit-status';
-            }
+            setStatusMessage(statusEl, 'Saving...');
             const data = await requestEditConfig('save', payload);
             if (!data || data.error) {
                 throw new Error(data?.error || 'Save failed.');
             }
-            editConfig = data.config || editConfig;
+            editConfig = annotateConfigPath(data.config || editConfig, getActiveSelection(), data);
             editTarget = data.target || editTarget;
             if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
-            if (statusEl) {
-                statusEl.textContent = 'Config saved.';
-                statusEl.className = 'edit-status edit-status-success';
-            }
+            setStatusMessage(statusEl, 'Config saved.', true);
             window.dispatchEvent(new CustomEvent('poff:content-updated', {
                 detail: {
-                    path: payload?.path || '',
+                    path: data.routePath || payload?.path || '',
+                    slug: data.routeSlug || data.config?.slug || '',
+                    routePath: data.routePath || payload?.path || '',
+                    routeSlug: data.routeSlug || data.config?.slug || '',
                     target: editTarget,
                     subjectTarget: data.subjectTarget || editTarget,
                 },
             }));
             return data.config;
         } catch (err) {
-            if (statusEl) {
-                statusEl.textContent = err.message || 'Save failed.';
-                statusEl.className = 'edit-status';
-            }
+            setStatusMessage(statusEl, err.message || 'Save failed.');
             throw err;
         }
     }
@@ -121,14 +170,14 @@ export function createEditController({ elements, context, editRequested }) {
     async function refreshCurrentEditState(selection = getActiveSelection()) {
         const refreshed = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (refreshed?.config) {
-            editConfig = refreshed.config;
+            editConfig = annotateConfigPath(refreshed.config, selection, refreshed);
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
             if (editTarget === 'folder' || (editTarget === 'layout' && refreshed.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
         }
-        renderEditUI(refreshed?.config || editConfig, {
+        renderEditUI(editConfig, {
             allowed: refreshed?.allowed !== false,
             error: refreshed?.error,
             target: refreshed?.target || editTarget,
@@ -138,28 +187,7 @@ export function createEditController({ elements, context, editRequested }) {
     }
 
     function renderEditUI(config, status) {
-        const layoutNameForPreset = (layoutPreset = 'actual') => {
-            const preset = String(layoutPreset || 'actual').trim() === 'inherit'
-                ? 'actual'
-                : String(layoutPreset || 'actual').trim();
-            if (preset === 'none') {
-                return 'none';
-            }
-            if (preset === 'custom') {
-                return 'custom-layout';
-            }
-            const currentLayout = editConfig?.work?.layout;
-            const hasFilesystemSource = !!(
-                currentLayout
-                && typeof currentLayout === 'object'
-                && (
-                    currentLayout.storage === 'filesystem'
-                    || (typeof currentLayout.directory === 'string' && currentLayout.directory.trim() !== '')
-                    || (typeof currentLayout.inheritedDirectory === 'string' && currentLayout.inheritedDirectory.trim() !== '')
-                )
-            );
-            return hasFilesystemSource ? 'filesystem-layout' : 'poff-layout';
-        };
+        const layoutNameForPreset = createLayoutNameForPreset(editConfig);
         const panelState = renderEditPanel({
             editPanel,
             editRequested,
@@ -186,13 +214,37 @@ export function createEditController({ elements, context, editRequested }) {
                     renderFolderMeta();
                 }
             },
+            onWorkFieldsInput: (fields) => {
+                if (!editConfig) {
+                    return;
+                }
+                const currentWork = (editConfig.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                editConfig.work = materializeWorkFields(currentWork, fields);
+                if (status?.target !== 'file') {
+                    folderConfig = editConfig;
+                    renderFolderMeta();
+                }
+            },
+            onMediaInput: (mediaState) => {
+                if (!editConfig || !mediaState || typeof mediaState !== 'object') {
+                    return;
+                }
+                const currentWork = (editConfig.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
+            },
             onSubmit: async ({ elements, statusEl }) => {
                 const selection = getActiveSelection();
+                const currentWork = (editConfig?.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                const form = elements?.form || null;
+                const mediaWork = readMediaConfigFromElements(elements, form, currentWork);
                 const payload = {
                     path: getEditTargetPath(selection),
                     title: (elements.title?.value || '').trim(),
                     description: (elements.description?.value || '').trim(),
                 };
+                if (editConfig?.work && typeof editConfig.work === 'object') {
+                    payload.work = materializeWorkFields(mediaWork);
+                }
                 await saveConfig(payload, statusEl);
             },
             onToggleDrawer: () => {
@@ -221,17 +273,29 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 drawerOpen = false;
                 syncDrawerVisibility();
-                if (statusEl) {
-                    statusEl.textContent = 'Deleted.';
-                    statusEl.className = 'edit-status edit-status-success';
-                }
+                setStatusMessage(statusEl, 'Deleted.', true);
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
                 const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
-                if (nextPath) {
-                    window.location.hash = `#/${nextPath}`;
-                } else {
-                    window.location.hash = '';
+                window.location.hash = nextPath ? `#/${nextPath}` : '';
+                await refreshCurrentEditState(getActiveSelection());
+            },
+            onResetFolderWork: async ({ statusEl }) => {
+                const selection = getActiveSelection();
+                const targetPath = getEditTargetPath(selection);
+                if (!targetPath) {
+                    throw new Error('Reset target unavailable.');
                 }
+                const data = await requestEditReset({
+                    path: targetPath,
+                    return: selection.previewPath || selection.path || '',
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Reset failed.');
+                }
+                drawerOpen = false;
+                syncDrawerVisibility();
+                setStatusMessage(statusEl, 'Folder work reset to default.', true);
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
                 await refreshCurrentEditState(getActiveSelection());
             },
             onReturnToWork: () => {
@@ -248,55 +312,32 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onSubmitLayout: async ({ payload, statusEl }) => {
                 const selection = getActiveSelection();
-                const rawLayoutPreset = (payload.layoutPreset || 'actual').trim();
-                const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
-                const layoutName = layoutNameForPreset(layoutPreset);
-                const layoutPayload = {
-                    name: layoutName,
-                    engine: 'lightncandy',
-                    preset: layoutPreset,
-                };
-                if (Object.prototype.hasOwnProperty.call(payload, 'contentTemplate')) {
-                    layoutPayload.sectionTemplate = payload.contentTemplate ?? '';
-                }
-                if (Object.prototype.hasOwnProperty.call(payload, 'layoutTemplate')) {
-                    layoutPayload.template = payload.layoutTemplate ?? '';
-                }
-                if (Object.prototype.hasOwnProperty.call(payload, 'layoutCss')) {
-                    layoutPayload.css = payload.layoutCss ?? '';
-                }
-                if (Object.prototype.hasOwnProperty.call(payload, 'layoutJs')) {
-                    layoutPayload.js = payload.layoutJs ?? '';
-                }
-                const hasOriginalDraftWrite = (
-                    Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTemplate')
-                    || Object.prototype.hasOwnProperty.call(payload, 'originalLayoutCss')
-                    || Object.prototype.hasOwnProperty.call(payload, 'originalLayoutJs')
-                );
-                if (Object.prototype.hasOwnProperty.call(payload, 'originalLayoutTarget') && hasOriginalDraftWrite) {
-                    layoutPayload.originalTarget = payload.originalLayoutTarget ?? '';
-                    layoutPayload.originalTemplate = payload.originalLayoutTemplate ?? '';
-                    layoutPayload.originalCss = payload.originalLayoutCss ?? '';
-                    layoutPayload.originalJs = payload.originalLayoutJs ?? '';
-                }
+                const { layoutPayload } = buildLayoutPayload(payload, layoutNameForPreset);
                 await saveConfig({
                     path: getEditTargetPath(selection),
                     layout: layoutPayload,
                 }, statusEl);
             },
             onLayoutPresetChange: async ({ payload, statusEl }) => {
-                const rawLayoutPreset = (payload?.layoutPreset || 'actual').trim();
-                const layoutPreset = rawLayoutPreset === 'inherit' ? 'actual' : rawLayoutPreset;
+                const layoutPreset = (payload?.layoutPreset || 'actual').trim() === 'inherit'
+                    ? 'actual'
+                    : (payload?.layoutPreset || 'actual').trim();
                 await saveConfig({
                     path: getEditTargetPath(getActiveSelection()),
                     layout: {
-                        name: layoutNameForPreset(layoutPreset),
+                        name: layoutNameForPreset(layoutPreset, payload?.layoutSharedName || ''),
                         engine: 'lightncandy',
                         preset: layoutPreset,
+                        ...(layoutPreset === 'shared'
+                            ? {
+                                source: 'shared',
+                                sharedName: payload?.layoutSharedName || layoutNameForPreset(layoutPreset, payload?.layoutSharedName || ''),
+                            }
+                            : {}),
                     },
                 }, statusEl);
             },
-            onUploadFiles: async ({ source, files, statusEl }) => {
+            onUploadFiles: async ({ source, files }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
@@ -306,17 +347,15 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Upload failed.');
                 }
-
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
-                    inlineStatus.textContent = count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`;
-                    inlineStatus.className = 'edit-status edit-status-success';
+                    setStatusMessage(inlineStatus, count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateBlankFile: async ({ source, fileName, statusEl }) => {
+            onCreateBlankFile: async ({ source, fileName }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
@@ -327,19 +366,17 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create blank file failed.');
                 }
-
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : fileName;
-                    inlineStatus.textContent = `Created ${createdName}.`;
-                    inlineStatus.className = 'edit-status edit-status-success';
+                    setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateFolder: async ({ source, folderName, statusEl }) => {
+            onCreateFolder: async ({ source, folderName }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
@@ -350,42 +387,15 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create folder failed.');
                 }
-
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : folderName;
-                    inlineStatus.textContent = `Created folder ${createdName}.`;
-                    inlineStatus.className = 'edit-status edit-status-success';
+                    setStatusMessage(inlineStatus, `Created folder ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
-            },
-            onDeleteTarget: async ({ statusEl }) => {
-                const selection = getActiveSelection();
-                const targetPath = getEditTargetPath(selection);
-                if (!targetPath) {
-                    throw new Error('Delete target unavailable.');
-                }
-                const data = await requestEditDelete({
-                    path: targetPath,
-                    return: selection.previewPath || selection.path || '',
-                });
-                if (!data || data.error) {
-                    throw new Error(data?.error || 'Delete failed.');
-                }
-                if (statusEl) {
-                    statusEl.textContent = 'Deleted.';
-                    statusEl.className = 'edit-status edit-status-success';
-                }
-                window.dispatchEvent(new CustomEvent('poff:content-updated'));
-                const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
-                if (nextPath) {
-                    window.location.hash = `#/${nextPath}`;
-                } else {
-                    window.location.hash = '';
-                }
             },
         });
 
@@ -398,16 +408,41 @@ export function createEditController({ elements, context, editRequested }) {
                 drawerOpen = false;
                 syncDrawerVisibility();
             },
-            onSubmit: async ({ elements, statusEl, treeVisible }) => {
+            onSubmit: async ({ elements, drawerForm, statusEl, treeVisible }) => {
                 const selection = getActiveSelection();
+                const templateField = elements.work_template || elements.work_type;
+                const selectedTemplateOption = templateField?.selectedOptions && templateField.selectedOptions[0]
+                    ? templateField.selectedOptions[0]
+                    : null;
+                const selectedTemplate = (templateField?.value || '').trim();
+                const selectedKind = (selectedTemplateOption?.dataset?.kind || selectedTemplate || '').trim();
+                const templateMap = {};
+                if (drawerForm) {
+                    drawerForm.querySelectorAll('select[data-template-map-mime]').forEach((select) => {
+                        const mime = String(select.dataset.templateMapMime || '').trim();
+                        if (!mime) {
+                            return;
+                        }
+                        const selectedValue = String(select.value || '').trim();
+                        const baselineValue = String(select.dataset.templateMapSelected || '').trim();
+                        if (selectedValue === baselineValue) {
+                            return;
+                        }
+                        templateMap[mime] = selectedValue;
+                    });
+                }
                 const payload = {
                     path: getEditTargetPath(selection),
                     link: (elements.link?.value || '').trim(),
                     url: (elements.url?.value || '').trim(),
                     work: {
-                        type: (elements.work_type?.value || '').trim(),
+                        type: selectedKind,
+                        template: selectedTemplate,
                     },
                 };
+                if (Object.keys(templateMap).length > 0) {
+                    payload.work.templateMap = templateMap;
+                }
                 if (status?.target !== 'file') {
                     payload.treeVisible = treeVisible;
                 }
@@ -436,17 +471,18 @@ export function createEditController({ elements, context, editRequested }) {
         const selection = getActiveSelection();
         const data = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (data.config) {
-            editConfig = data.config;
+            editConfig = annotateConfigPath(data.config, selection, data);
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');
             if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
             }
         }
-        renderEditUI(data.config || editConfig, {
+        renderEditUI(editConfig, {
             allowed: data.allowed !== false,
             error: data.error,
             target: editTarget,
+            subjectTarget: data.subjectTarget,
             uploadLimits: data.uploadLimits,
         });
     }

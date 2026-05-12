@@ -4,22 +4,28 @@
  * Edit this if you prefer one-file maintenance over per-type files.
  */
 
-$types = ['image','video','audio','pdf','text','link','folder','other'];
-$definitions = [];
-$templates = [];
+ $definitions = [];
+ $templates = [];
 
-foreach ($types as $type) {
-    $entry = include __DIR__ . '/' . $type . '.worktype.php';
-    if (!is_array($entry)) {
-        continue;
-    }
+ foreach ((glob(__DIR__ . '/*.worktype.php') ?: []) as $worktypePath) {
+     $type = pathinfo($worktypePath, PATHINFO_FILENAME);
+     $type = preg_replace('/\.worktype$/', '', $type) ?? $type;
+     if ($type === 'worktypes') {
+         continue;
+     }
+     $entry = include $worktypePath;
+     if (!is_array($entry)) {
+         continue;
+     }
 
-    if (isset($entry['model']) && is_array($entry['model'])) {
-        $definitions[$type] = $entry['model'];
-    } elseif (isset($entry['definition']) && is_array($entry['definition'])) {
-        $definitions[$type] = $entry['definition'];
-    }
-}
+     if (isset($entry['model']) && is_array($entry['model'])) {
+         $definitions[$type] = $entry['model'];
+     } elseif (isset($entry['definition']) && is_array($entry['definition'])) {
+         $definitions[$type] = $entry['definition'];
+     } else {
+         $definitions[$type] = $entry;
+     }
+ }
 
 foreach ((glob(__DIR__ . '/templates/*.hbs') ?: []) as $tplPath) {
     $templates[pathinfo($tplPath, PATHINFO_FILENAME)] = (string) file_get_contents($tplPath);

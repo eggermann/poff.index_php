@@ -1,6 +1,69 @@
 <?php
 declare(strict_types=1);
 
+function mcpPoffDirOverride(): ?string
+{
+    $poffBase = getenv('POFF_BASE');
+    if (!is_string($poffBase) || trim($poffBase) === '') {
+        return null;
+    }
+
+    return rtrim($poffBase, '/\\');
+}
+
+function mcpRuntimeContext(): array
+{
+    $rootDir = getcwd();
+    $scriptName = rtrim($_SERVER['SCRIPT_NAME'] ?? '/index.php', '/');
+
+    return [
+        'rootDir' => $rootDir,
+        'configPath' => $rootDir . DIRECTORY_SEPARATOR . 'poff.config.toon',
+        'poffDir' => mcpPoffDirOverride(),
+        'mcpUrl' => $scriptName . '#mcp',
+    ];
+}
+
+function mcpRoutePath(): string
+{
+    return mcpQueryString('path', '') ?? '';
+}
+
+function mcpRouteFile(): string
+{
+    return mcpQueryString('file', '') ?? '';
+}
+
+function mcpRouteStyle(): string
+{
+    return mcpQueryString('style', '') ?? '';
+}
+
+function mcpRouteDest(): string
+{
+    return mcpQueryString('dest', '') ?? '';
+}
+
+function mcpWorkPromptArgs(string $rootDir, string $file, string $style): array
+{
+    return [
+        'rootDir' => $rootDir,
+        'file' => $file,
+        'style' => $style,
+    ];
+}
+
+function mcpCreateArgs(string $rootDir, array $input): array
+{
+    return [
+        'rootDir' => $rootDir,
+        'dest' => $input['dest'] ?? '',
+        'path' => $input['path'] ?? null,
+        'url' => $input['url'] ?? null,
+        'poffDir' => $input['poffDir'] ?? mcpPoffDirOverride(),
+    ];
+}
+
 function mcpBuildFileTree(string $dir, string $base): array
 {
     $items = [];
@@ -44,6 +107,7 @@ function mcpEnsureConfig(string $path, array $tree): array
     $now = date('c');
     $created = false;
     $updated = false;
+    $error = null;
     $existing = [];
     $config = [
         'name' => basename(getcwd()),
@@ -69,7 +133,7 @@ function mcpEnsureConfig(string $path, array $tree): array
         $config['updatedAt'] = $now;
         $config['treeHash'] = $treeHash;
         $config['tree'] = $tree;
-        file_put_contents($path, json_encode($config, JSON_PRETTY_PRINT));
+        $error = mcpWriteJsonFile($path, $config);
     } else {
         $config['updatedAt'] = $existing['updatedAt'] ?? $now;
     }
@@ -78,24 +142,96 @@ function mcpEnsureConfig(string $path, array $tree): array
         'config' => $config,
         'created' => $created,
         'updated' => $updated,
+        'error' => $error,
     ];
 }
 
-function mcpLoadTreeFromConfig(string $path): ?array
+function mcpJsonError(string $msg, array $extra = [], int $status = 400): void
 {
-    if (!file_exists($path)) {
-        return null;
-    }
-    $data = json_decode((string) file_get_contents($path), true);
-    if (!is_array($data) || !isset($data['tree']) || !is_array($data['tree'])) {
-        return null;
-    }
-    return $data['tree'];
+    mcpJsonResponse(array_merge(['error' => $msg], $extra), $status);
 }
 
-function mcpJsonError(string $msg, array $extra = []): void
+function mcpWriteJsonFile(string $path, array $data): ?string
 {
-    http_response_code(400);
-    echo json_encode(array_merge(['error' => $msg], $extra), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        return 'Failed to encode JSON: ' . json_last_error_msg();
+    }
+
+    $dir = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        return 'Failed to create directory.';
+    }
+
+    if (file_put_contents($path, $json) === false) {
+        return 'Failed to write file.';
+    }
+
+    return null;
+}
+
+function mcpJsonResponse(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => 'Failed to encode JSON response',
+            'jsonError' => json_last_error_msg(),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+    echo $json;
     exit;
+}
+
+function mcpQueryString(string $key, ?string $default = ''): ?string
+{
+    if (!array_key_exists($key, $_GET)) {
+        return $default;
+    }
+    return trim((string) $_GET[$key]);
+}
+
+function mcpReadRequestData(): array
+{
+    $raw = (string) file_get_contents('php://input');
+    $data = $raw !== '' ? json_decode($raw, true) : [];
+    if (!is_array($data) || $data === []) {
+        $data = $_POST;
+    }
+    return is_array($data) ? $data : [];
+}
+
+function mcpResolvePathInsideRoot(string $rootDir, string $relativePath): ?string
+{
+    $base = realpath(rtrim($rootDir, DIRECTORY_SEPARATOR));
+    if ($base === false) {
+        return null;
+    }
+    $trimmed = trim($relativePath, "/\\");
+    $candidate = $trimmed === ''
+        ? $base
+        : realpath($base . DIRECTORY_SEPARATOR . $trimmed);
+    if ($candidate === false) {
+        return null;
+    }
+    $basePrefix = rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if ($candidate !== $base && strpos($candidate, $basePrefix) !== 0) {
+        return null;
+    }
+    return $candidate;
+}
+
+function mcpResolveDirectoryInsideRoot(string $rootDir, string $relativePath): ?string
+{
+    $path = mcpResolvePathInsideRoot($rootDir, $relativePath);
+    return $path !== null && is_dir($path) ? $path : null;
+}
+
+function mcpResolveFileInsideRoot(string $rootDir, string $relativePath): ?string
+{
+    $path = mcpResolvePathInsideRoot($rootDir, $relativePath);
+    return $path !== null && is_file($path) ? $path : null;
 }

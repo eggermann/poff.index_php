@@ -20,8 +20,71 @@ function loadPromptHistoryHelpers() {
   vm.runInContext(`${source}
 module.exports = {
   buildTemplateHistorySnapshot,
+  cleanPersistedHistory,
+  isPendingAssistantHistory,
   serializeHistoryForRequest,
+  shouldUsePersistedPromptHistory,
   summarizeSerializedHistory,
+};
+`, context);
+
+  return module.exports;
+}
+
+function loadPromptHistoryRenderer() {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/render/history.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*;\r?\n/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+    escapeHtml: (value) => String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;'),
+    summarizeSerializedHistory: (history) => ({
+      count: Array.isArray(history) ? history.length : 0,
+      chars: Array.isArray(history) ? history.reduce((total, item) => total + String(item?.content || '').length, 0) : 0,
+    }),
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  renderPromptHistory,
+};
+`, context);
+
+  return module.exports;
+}
+
+function loadPromptWorkflowHelpers() {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/workflows.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*;\r?\n/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  buildPromptResetSavePayload,
 };
 `, context);
 
@@ -31,7 +94,10 @@ module.exports = {
 describe('prompt history helpers', () => {
   const {
     buildTemplateHistorySnapshot,
+    cleanPersistedHistory,
+    isPendingAssistantHistory,
     serializeHistoryForRequest,
+    shouldUsePersistedPromptHistory,
     summarizeSerializedHistory,
   } = loadPromptHistoryHelpers();
 
@@ -57,6 +123,10 @@ describe('prompt history helpers', () => {
       title: 'Card view',
       description: 'Compact card layout',
       layoutName: 'poff-layout',
+      workSnapshot: expect.objectContaining({
+        layout: 'poff-layout',
+        featured: true,
+      }),
       workKeys: ['featured'],
     }));
   });
@@ -91,6 +161,23 @@ describe('prompt history helpers', () => {
     expect(serialized[1].content).toContain('Work keys updated: featured');
   });
 
+  test('seeds the first prompt request with the current template', () => {
+    const serialized = serializeHistoryForRequest([
+      { role: 'user', content: 'Make it tighter.' },
+    ], {
+      initialTemplateText: '<section class="card">{{title}}</section>',
+    });
+
+    expect(serialized[0]).toEqual({
+      role: 'assistant',
+      content: '<section class="card">{{title}}</section>',
+    });
+    expect(serialized[1]).toEqual({
+      role: 'user',
+      content: 'Make it tighter.',
+    });
+  });
+
   test('summarizes serialized history character totals', () => {
     const summary = summarizeSerializedHistory([
       { role: 'user', content: 'abc' },
@@ -106,5 +193,98 @@ describe('prompt history helpers', () => {
 
     expect(summary.count).toBe(2);
     expect(summary.chars).toBeGreaterThan(7);
+  });
+
+  test('drops transient pending assistant entries from persisted history', () => {
+    const pending = { role: 'assistant', content: 'Generating answer...' };
+    const final = {
+      role: 'assistant',
+      content: '<section>done</section>',
+      templateSnapshot: {
+        targetType: 'partial',
+        template: '<section>done</section>',
+      },
+    };
+
+    expect(isPendingAssistantHistory(pending)).toBe(true);
+    expect(isPendingAssistantHistory(final)).toBe(false);
+    expect(cleanPersistedHistory([
+      { role: 'user', content: 'Make it red.' },
+      pending,
+      final,
+    ])).toEqual([
+      { role: 'user', content: 'Make it red.' },
+      final,
+    ]);
+  });
+
+  test('ignores stale work prompt history after template reset', () => {
+    expect(shouldUsePersistedPromptHistory({
+      work: {
+        layout: {
+          sectionTemplate: '',
+        },
+      },
+    }, 'file')).toBe(false);
+
+    expect(shouldUsePersistedPromptHistory({
+      work: {
+        layout: {
+          sectionTemplate: '',
+        },
+      },
+    }, 'layout')).toBe(true);
+
+    expect(shouldUsePersistedPromptHistory({
+      work: {
+        layout: {
+          sectionTemplate: '<article>{{title}}</article>',
+        },
+      },
+    }, 'file')).toBe(true);
+  });
+});
+
+describe('prompt history renderer', () => {
+  const { renderPromptHistory } = loadPromptHistoryRenderer();
+
+  test('shows a reset action for assistant snapshots', () => {
+    const container = {
+      innerHTML: '',
+      scrollHeight: 0,
+      clientHeight: 0,
+      scrollTop: 0,
+    };
+
+    renderPromptHistory(container, [
+      {
+        role: 'assistant',
+        content: 'ready',
+        _index: 3,
+        templateSnapshot: {
+          targetType: 'partial',
+          template: '<section>ready</section>',
+        },
+      },
+    ], null);
+
+    expect(container.innerHTML).toContain('data-history-reset-index="3"');
+    expect(container.innerHTML).toContain('>reset<');
+  });
+});
+
+describe('prompt workflows', () => {
+  const { buildPromptResetSavePayload } = loadPromptWorkflowHelpers();
+
+  test('reset template save clears persisted prompt history', () => {
+    expect(buildPromptResetSavePayload('folder/file.jpg', {
+      sectionTemplate: '',
+    })).toEqual({
+      path: 'folder/file.jpg',
+      layout: {
+        sectionTemplate: '',
+      },
+      promptHistory: [],
+    });
   });
 });

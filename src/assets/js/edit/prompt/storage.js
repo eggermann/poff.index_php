@@ -16,7 +16,7 @@ export function loadPromptSettings() {
             apiKey: rawStored.apiKey,
             streamPreview: rawStored.streamPreview,
         };
-        const looksLikeLegacyProviderDefault = (!stored.provider || stored.provider === 'openai')
+        const looksLikeLegacyProviderDefault = !stored.provider
             && (!stored.model || stored.model === 'gpt-4o-mini')
             && !stored.endpoint;
         if (looksLikeLegacyProviderDefault) {

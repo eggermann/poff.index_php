@@ -17,7 +17,10 @@ The visible `Prompt context` panel on the right side is rendered in the browser.
 
 Main file:
 
-- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/build/context.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render/context.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render/history.js`
+- `/Users/eggermann/Desktop/speedProjects/poff.index_php/src/assets/js/edit/prompt/render/summary.js`
 
 Relevant functions:
 
@@ -218,4 +221,8 @@ The actual source for the CSS is usually one of:
 - The actual model prompt context is built separately on the server.
 - The CSS shown in the UI prompt context usually comes from `config.work.layout.css`.
 - `config.work.layout.css` is hydrated in `PoffConfig::hydrateLayoutFilesystem(...)`.
+
+Related guide:
+
+- [Prompt Layout Root And Work Vars](./prompt-layout-root-work-vars.md)
 - If filesystem layout is active, the CSS comes from the real `.layout/style.css` or `.works/<file>.layout/style.css`, not necessarily from the bundled default preset CSS.
