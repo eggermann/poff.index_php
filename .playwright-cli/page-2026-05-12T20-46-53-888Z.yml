@@ -1,0 +1,173 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - button "Enable edit mode" [ref=e10] [cursor=pointer]
+    - list [ref=e11]:
+      - listitem [ref=e12]:
+        - link "./ MAUSMAUS" [ref=e13] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e14]:
+        - link "AAA" [ref=e15] [cursor=pointer]:
+          - /url: "?path=AAA"
+          - img [ref=e16]
+          - text: AAA
+  - document [ref=e20]:
+    - text: "use \\LightnCandy\\SafeString as SafeString;use \\LightnCandy\\Runtime as LR;return function ($in = null, $options = null) { $helpers = array(); $partials = array('works' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e21]:
+      - text: "'.$sp.'"
+      - generic [ref=e22]:
+        - text: "'.$sp.'"
+        - generic [ref=e23]: "'.LR::encq($cx, (($inary && isset($in['displayPath'])) ? $in['displayPath'] : null)).'"
+        - text: "'.$sp.'"
+        - generic [ref=e24]: "'.LR::encq($cx, (($inary && isset($in['itemCount'])) ? $in['itemCount'] : null)).' entries"
+        - text: "'.$sp.'"
+      - text: "'.$sp.''.((LR::ifvar($cx, (($inary && isset($in['hasItems'])) ? $in['hasItems'] : null), false)) ? '"
+      - generic [ref=e25]:
+        - text: "'.$sp.''.LR::sec($cx, (($inary && isset($in['items'])) ? $in['items'] : null), null, $in, true, function($cx, $in)use($sp){$inary=is_array($in);return '"
+        - article [ref=e26]:
+          - text: "'.$sp.'"
+          - generic [ref=e27]: "'.((LR::ifvar($cx, (($inary && isset($in['isFolder'])) ? $in['isFolder'] : null), false)) ? 'Folder' : 'File').'"
+          - text: "'.$sp.'"
+          - strong [ref=e28]:
+            - text: "'.$sp.'"
+            - 'link "''.LR::encq($cx, (($inary && isset($in[''name''])) ? $in[''name''] : null)).''" [ref=e29] [cursor=pointer]':
+              - /url: "'.LR::encq($cx, (($inary && isset($in['pageLink'])) ? $in['pageLink'] : null)).'"
+            - text: "'.$sp.'"
+          - text: "'.$sp.'"
+          - generic [ref=e30]: "'.LR::encq($cx, (($inary && isset($in['path'])) ? $in['path'] : null)).'"
+          - text: "'.$sp.'"
+        - text: "'.$sp.'';}).'"
+      - text: "'.$sp.'' : '"
+      - generic [ref=e31]: This folder is empty.
+      - text: "'.$sp.'').'"
+    - text: "';}, 'image' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e32]:
+      - text: "'.$sp.'"
+      - 'img "''.LR::encq($cx, (($inary && isset($in[''title''])) ? $in[''title''] : null)).''" [ref=e33]'
+      - text: "'.$sp.'"
+    - text: "';}, 'video' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e34]: "'.$sp.' '.$sp.' Your browser does not support the video tag. '.$sp.'"
+    - text: "';}, 'audio' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e35]: "'.$sp.' '.$sp.' Your browser does not support the audio element. '.$sp.'"
+    - text: "';}, 'pdf' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - iframe [ref=e36]:
+      - generic [active] [ref=f1e1]:
+        - heading "Not Found" [level=1] [ref=f1e2]
+        - paragraph [ref=f1e3]: The requested URL was not found on this server.
+    - text: "';}, 'text' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.((LR::ifvar($cx, (($inary && isset($in['showInlineTextPreview'])) ? $in['showInlineTextPreview'] : null), false)) ? ' '.$sp.'"
+    - generic [ref=e37]: "'.LR::encq($cx, (($inary && isset($in['textContent'])) ? $in['textContent'] : null)).'"
+    - text: "'.$sp.'' : '"
+    - iframe [ref=e38]:
+      - generic [active] [ref=f2e1]:
+        - heading "Not Found" [level=1] [ref=f2e2]
+        - paragraph [ref=f2e3]: The requested URL was not found on this server.
+    - text: "'.$sp.'').'';}, 'link' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e39]:
+      - text: "'.$sp.'"
+      - generic [ref=e40]: External link
+      - text: "'.$sp.'"
+      - 'link "''.LR::encq($cx, (($inary && isset($in[''linkUrl''])) ? $in[''linkUrl''] : null)).''" [ref=e41] [cursor=pointer]':
+        - /url: "'.LR::encq($cx, (($inary && isset($in['linkUrl'])) ? $in['linkUrl'] : null)).'"
+      - text: "'.$sp.'"
+    - text: "';}, 'other' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - iframe [ref=e42]:
+      - generic [active] [ref=f3e1]:
+        - heading "Not Found" [level=1] [ref=f3e2]
+        - paragraph [ref=f3e3]: The requested URL was not found on this server.
+    - text: "';}, 'work' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isImage'])) ? $in['isImage'] : null), false)) ? ''.LR::p($cx, 'image', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isVideo'])) ? $in['isVideo'] : null), false)) ? ''.LR::p($cx, 'video', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isAudio'])) ? $in['isAudio'] : null), false)) ? ''.LR::p($cx, 'audio', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isPdf'])) ? $in['isPdf'] : null), false)) ? ''.LR::p($cx, 'pdf', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isText'])) ? $in['isText'] : null), false)) ? ''.LR::p($cx, 'text', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isLink'])) ? $in['isLink'] : null), false)) ? ''.LR::p($cx, 'link', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isOther'])) ? $in['isOther'] : null), false)) ? ''.LR::p($cx, 'other', array(array($in),array()),0).'' : '').' ';}); $cx = array( 'flags' => array( 'jstrue' => true, 'jsobj' => true, 'jslen' => true, 'spvar' => true, 'prop' => false, 'method' => false, 'lambda' => false, 'mustlok' => false, 'mustlam' => false, 'mustsec' => false, 'echo' => false, 'partnc' => false, 'knohlp' => false, 'debug' => isset($options['debug']) ? $options['debug'] : 1, ), 'constants' => array(), 'helpers' => isset($options['helpers']) ? array_merge($helpers, $options['helpers']) : $helpers, 'partials' => isset($options['partials']) ? array_merge($partials, $options['partials']) : $partials, 'scopes' => array(), 'sp_vars' => isset($options['data']) ? array_merge(array('root' => $in), $options['data']) : array('root' => $in), 'blparam' => array(), 'partialid' => 0, 'runtime' => '\\LightnCandy\\Runtime', ); $inary=is_array($in); return '"
+    - generic [ref=e43]:
+      - banner [ref=e44]:
+        - img "Eggman profile" [ref=e46]
+        - generic [ref=e47]:
+          - 'heading "''.LR::encq($cx, (($inary && isset($in[''title''])) ? $in[''title''] : null)).''" [level=1] [ref=e48]'
+          - text: "'.((LR::ifvar($cx, (($inary && isset($in['categories'])) ? $in['categories'] : null), false)) ? '"
+          - generic "Categories" [ref=e49]:
+            - text: "'.LR::sec($cx, (($inary && isset($in['categories'])) ? $in['categories'] : null), null, $in, true, function($cx, $in) {$inary=is_array($in);return '"
+            - generic [ref=e50]: "'.LR::encq($cx, $in).'"
+            - text: "';}).'"
+          - text: "' : '').''.((LR::ifvar($cx, (($inary && isset($in['description'])) ? $in['description'] : null), false)) ? '"
+          - paragraph [ref=e51]: "'.LR::encq($cx, (($inary && isset($in['description'])) ? $in['description'] : null)).'"
+          - text: "' : '').'"
+      - main [ref=e52]: "'.((LR::ifvar($cx, (($inary && isset($in['isFolder'])) ? $in['isFolder'] : null), false)) ? ''.LR::p($cx, 'works', array(array($in),array()),0, ' ').'' : ''.LR::p($cx, 'work', array(array($in),array()),0, ' ').'').'"
+      - contentinfo [ref=e53]:
+        - generic [ref=e54]: Copyright eggman
+    - text: "'; }; use \\LightnCandy\\SafeString as SafeString;use \\LightnCandy\\Runtime as LR;return function ($in = null, $options = null) { $helpers = array(); $partials = array('folder' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e55]:
+      - text: "'.$sp.'"
+      - generic [ref=e56]:
+        - text: "'.$sp.'"
+        - generic [ref=e57]: "'.LR::encq($cx, (($inary && isset($in['displayPath'])) ? $in['displayPath'] : null)).'"
+        - text: "'.$sp.'"
+        - generic [ref=e58]: "'.LR::encq($cx, (($inary && isset($in['itemCount'])) ? $in['itemCount'] : null)).' entries"
+        - text: "'.$sp.'"
+      - text: "'.$sp.''.((LR::ifvar($cx, (($inary && isset($in['hasItems'])) ? $in['hasItems'] : null), false)) ? '"
+      - generic [ref=e59]:
+        - text: "'.$sp.''.LR::sec($cx, (($inary && isset($in['items'])) ? $in['items'] : null), null, $in, true, function($cx, $in)use($sp){$inary=is_array($in);return '"
+        - article [ref=e60]:
+          - text: "'.$sp.'"
+          - generic [ref=e61]: "'.((LR::ifvar($cx, (($inary && isset($in['isFolder'])) ? $in['isFolder'] : null), false)) ? 'Folder' : 'File').'"
+          - text: "'.$sp.'"
+          - strong [ref=e62]:
+            - text: "'.$sp.'"
+            - 'link "''.LR::encq($cx, (($inary && isset($in[''name''])) ? $in[''name''] : null)).''" [ref=e63] [cursor=pointer]':
+              - /url: "'.LR::encq($cx, (($inary && isset($in['pageLink'])) ? $in['pageLink'] : null)).'"
+            - text: "'.$sp.'"
+          - text: "'.$sp.'"
+          - generic [ref=e64]: "'.LR::encq($cx, (($inary && isset($in['path'])) ? $in['path'] : null)).'"
+          - text: "'.$sp.'"
+        - text: "'.$sp.'';}).'"
+      - text: "'.$sp.'' : '"
+      - generic [ref=e65]: This folder is empty.
+      - text: "'.$sp.'').'"
+    - text: "';}, 'works' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.LR::p($cx, 'folder', array(array($in),array()),0).'';}, 'image' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e66]:
+      - text: "'.$sp.'"
+      - 'img "''.LR::encq($cx, (($inary && isset($in[''title''])) ? $in[''title''] : null)).''" [ref=e67]'
+      - text: "'.$sp.'"
+    - text: "';}, 'video' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e68]: "'.$sp.' '.$sp.' Your browser does not support the video tag. '.$sp.'"
+    - text: "';}, 'audio' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e69]: "'.$sp.' '.$sp.' Your browser does not support the audio element. '.$sp.'"
+    - text: "';}, 'pdf' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - iframe [ref=e70]:
+      - generic [active] [ref=f4e1]:
+        - heading "Not Found" [level=1] [ref=f4e2]
+        - paragraph [ref=f4e3]: The requested URL was not found on this server.
+    - text: "';}, 'text' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.((LR::ifvar($cx, (($inary && isset($in['showInlineTextPreview'])) ? $in['showInlineTextPreview'] : null), false)) ? ' '.$sp.'"
+    - generic [ref=e71]: "'.LR::encq($cx, (($inary && isset($in['textContent'])) ? $in['textContent'] : null)).'"
+    - text: "'.$sp.'' : '"
+    - iframe [ref=e72]:
+      - generic [active] [ref=f5e1]:
+        - heading "Not Found" [level=1] [ref=f5e2]
+        - paragraph [ref=f5e3]: The requested URL was not found on this server.
+    - text: "'.$sp.'').'';}, 'link' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - generic [ref=e73]:
+      - text: "'.$sp.'"
+      - generic [ref=e74]: External link
+      - text: "'.$sp.'"
+      - 'link "''.LR::encq($cx, (($inary && isset($in[''linkUrl''])) ? $in[''linkUrl''] : null)).''" [ref=e75] [cursor=pointer]':
+        - /url: "'.LR::encq($cx, (($inary && isset($in['linkUrl'])) ? $in['linkUrl'] : null)).'"
+      - text: "'.$sp.'"
+    - text: "';}, 'other' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'"
+    - iframe [ref=e76]:
+      - generic [active] [ref=f6e1]:
+        - heading "Not Found" [level=1] [ref=f6e2]
+        - paragraph [ref=f6e3]: The requested URL was not found on this server.
+    - text: "';}, 'work' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isImage'])) ? $in['isImage'] : null), false)) ? ''.LR::p($cx, 'image', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isVideo'])) ? $in['isVideo'] : null), false)) ? ''.LR::p($cx, 'video', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isAudio'])) ? $in['isAudio'] : null), false)) ? ''.LR::p($cx, 'audio', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isPdf'])) ? $in['isPdf'] : null), false)) ? ''.LR::p($cx, 'pdf', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isText'])) ? $in['isText'] : null), false)) ? ''.LR::p($cx, 'text', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isLink'])) ? $in['isLink'] : null), false)) ? ''.LR::p($cx, 'link', array(array($in),array()),0).'' : '').' '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isOther'])) ? $in['isOther'] : null), false)) ? ''.LR::p($cx, 'other', array(array($in),array()),0).'' : '').' ';}); $cx = array( 'flags' => array( 'jstrue' => true, 'jsobj' => true, 'jslen' => true, 'spvar' => true, 'prop' => false, 'method' => false, 'lambda' => false, 'mustlok' => false, 'mustlam' => false, 'mustsec' => false, 'echo' => false, 'partnc' => false, 'knohlp' => false, 'debug' => isset($options['debug']) ? $options['debug'] : 1, ), 'constants' => array(), 'helpers' => isset($options['helpers']) ? array_merge($helpers, $options['helpers']) : $helpers, 'partials' => isset($options['partials']) ? array_merge($partials, $options['partials']) : $partials, 'scopes' => array(), 'sp_vars' => isset($options['data']) ? array_merge(array('root' => $in), $options['data']) : array('root' => $in), 'blparam' => array(), 'partialid' => 0, 'runtime' => '\\LightnCandy\\Runtime', ); $inary=is_array($in); return '"
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - img "Eggman profile" [ref=e80]
+        - generic [ref=e81]:
+          - 'heading "''.LR::encq($cx, (($inary && isset($in[''title''])) ? $in[''title''] : null)).''" [level=1] [ref=e82]'
+          - text: "'.((LR::ifvar($cx, (($inary && isset($in['categories'])) ? $in['categories'] : null), false)) ? '"
+          - generic "Categories" [ref=e83]:
+            - text: "'.LR::sec($cx, (($inary && isset($in['categories'])) ? $in['categories'] : null), null, $in, true, function($cx, $in) {$inary=is_array($in);return '"
+            - generic [ref=e84]: "'.LR::encq($cx, $in).'"
+            - text: "';}).'"
+          - text: "' : '').''.((LR::ifvar($cx, (($inary && isset($in['description'])) ? $in['description'] : null), false)) ? '"
+          - paragraph [ref=e85]: "'.LR::encq($cx, (($inary && isset($in['description'])) ? $in['description'] : null)).'"
+          - text: "' : '').'"
+      - main [ref=e86]: "'.((LR::ifvar($cx, (($inary && isset($in['isFolder'])) ? $in['isFolder'] : null), false)) ? ''.LR::p($cx, 'works', array(array($in),array()),0, ' ').'' : ''.LR::p($cx, 'work', array(array($in),array()),0, ' ').'').'"
+      - contentinfo [ref=e87]:
+        - generic [ref=e88]: Copyright eggman
+    - text: "'; };"
