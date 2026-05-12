@@ -289,7 +289,14 @@ PHP;
     // Add initialization code
     $buildContent .= <<<'PHP'
 // Initialize path variables
-$baseDir = realpath(__DIR__) ?: __DIR__;
+$baseDirOverride = '';
+if (defined('POFF_BASE_DIR') && is_string(POFF_BASE_DIR)) {
+    $baseDirOverride = trim(POFF_BASE_DIR);
+} elseif (isset($_GET['base']) && is_string($_GET['base'])) {
+    $baseDirOverride = trim($_GET['base']);
+}
+$resolvedBaseDir = $baseDirOverride !== '' ? realpath($baseDirOverride) : false;
+$baseDir = ($resolvedBaseDir !== false && is_dir($resolvedBaseDir)) ? $resolvedBaseDir : (realpath(__DIR__) ?: __DIR__);
 $currentScript = basename($_SERVER['SCRIPT_NAME']);
 $currentRelativePath = isset($_GET['path']) ? trim($_GET['path'], '/\\') : '';
 $currentAbsolutePath = $baseDir . ($currentRelativePath ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $currentRelativePath) : '');
