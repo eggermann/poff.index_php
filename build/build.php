@@ -135,6 +135,11 @@ try {
     $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
     $buildContent .= '$__worktypeLayoutAssets = ' . var_export($embeddedLayoutAssets, true) . ";\n";
     $buildContent .= "Worktype::setEmbeddedLayoutAssets(\$__worktypeLayoutAssets);\n\n";
+    $viewerShellCssAsset = __DIR__ . '/assets/app.css';
+    $buildContent .= '$__embeddedViewerShellCss = ' . var_export(
+        is_file($viewerShellCssAsset) ? trim((string) file_get_contents($viewerShellCssAsset)) : '',
+        true
+    ) . ";\n\n";
 
     // Add edit-mode helpers, root detection, prompt/template sanitizers, and PoffConfig model so the built output stays single-file.
     $editModeHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/edit-mode.php');

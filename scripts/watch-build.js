@@ -6,6 +6,7 @@ const { spawn, spawnSync } = require('child_process');
 const rootDir = path.resolve(__dirname, '..');
 const mampHtdocs = '/Applications/MAMP/htdocs';
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
+const standaloneCopyTargets = ['MAUSMAUS'];
 
 function logBrowseUrl(linkName) {
   if (!linkName) return;
@@ -73,6 +74,29 @@ function ensureSymlink(outputDir) {
   return linkName;
 }
 
+function ensureStandaloneCopies(outputDir, outputFile) {
+  const resolvedHtdocs = path.resolve(mampHtdocs);
+  if (!fs.existsSync(resolvedHtdocs)) {
+    console.warn(`[watch] MAMP htdocs not found at ${resolvedHtdocs}, skipping standalone copies.`);
+    return;
+  }
+
+  const sourceFile = path.join(path.resolve(outputDir), outputFile);
+  if (!fs.existsSync(sourceFile)) {
+    console.warn(`[watch] Built file not found at ${sourceFile}, skipping standalone copies.`);
+    return;
+  }
+
+  standaloneCopyTargets.forEach((targetName) => {
+    const targetDir = path.join(resolvedHtdocs, targetName);
+    const targetFile = path.join(targetDir, outputFile);
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.copyFileSync(sourceFile, targetFile);
+    console.log(`[watch] Copied standalone build ${sourceFile} -> ${targetFile}.`);
+    logBrowseUrl(targetName);
+  });
+}
+
 function refreshBrowser() {
   const scripts = [
     'tell application "Google Chrome" to if exists window 1 then tell the active tab of window 1 to reload',
@@ -127,6 +151,7 @@ function startWatcher() {
         try {
           const freshConfig = readBuildConfig();
           ensureSymlink(freshConfig.outputDir);
+          ensureStandaloneCopies(freshConfig.outputDir, freshConfig.outputFile);
           refreshBrowser();
         } catch (err) {
           console.error(`[watch] Post-build step failed: ${err.message}`);

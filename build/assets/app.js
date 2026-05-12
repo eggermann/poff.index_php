@@ -1,4 +1,51 @@
 (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __esm = (fn, res) => function __init() {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  };
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+
+  // src/assets/js/edit/prompt/image.js
+  var image_exports = {};
+  __export(image_exports, {
+    isSupportedImageFile: () => isSupportedImageFile,
+    readImageFile: () => readImageFile
+  });
+  function isSupportedImageFile(file) {
+    return !!file && typeof file.type === "string" && file.type.startsWith("image/");
+  }
+  function readImageFile(file) {
+    return new Promise((resolve, reject) => {
+      if (!isSupportedImageFile(file)) {
+        reject(new Error("Only image files are supported."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = typeof reader.result === "string" ? reader.result : "";
+        if (!dataUrl.startsWith("data:image/")) {
+          reject(new Error("Invalid image data."));
+          return;
+        }
+        resolve({
+          name: file.name || "clipboard-image.png",
+          mimeType: file.type || "image/png",
+          dataUrl
+        });
+      };
+      reader.onerror = () => reject(new Error("Failed to read image."));
+      reader.readAsDataURL(file);
+    });
+  }
+  var init_image = __esm({
+    "src/assets/js/edit/prompt/image.js"() {
+    }
+  });
+
   // src/assets/js/api/edit.js
   var PROMPT_REQUEST_TIMEOUT_MS = 3e5;
   function buildCmsUrl(action, path) {
@@ -225,6 +272,37 @@
       }
     }
   }
+  function parsePromptStreamFallbackPayload(rawText) {
+    const trimmed = String(rawText || "").trim();
+    if (trimmed === "") {
+      return null;
+    }
+    const candidates = [trimmed];
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonCandidate = trimmed.slice(firstBrace, lastBrace + 1).trim();
+      if (jsonCandidate !== "") {
+        candidates.push(jsonCandidate);
+      }
+    }
+    const uniqueCandidates = [];
+    for (const candidate of candidates) {
+      if (!uniqueCandidates.includes(candidate)) {
+        uniqueCandidates.push(candidate);
+      }
+    }
+    for (const candidate of uniqueCandidates) {
+      try {
+        const decoded = JSON.parse(candidate);
+        if (decoded && typeof decoded === "object") {
+          return decoded;
+        }
+      } catch (err) {
+      }
+    }
+    return null;
+  }
   async function requestPromptTemplateStream(payload, { onDelta } = {}) {
     const url = buildCmsUrl("prompt", payload.path || "");
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -274,6 +352,15 @@
       const decoder = new TextDecoder();
       let buffer = "";
       let finalPayload = null;
+      let streamedText = "";
+      const handleDelta = (chunk) => {
+        if (typeof chunk === "string" && chunk !== "") {
+          streamedText += chunk;
+        }
+        if (typeof onDelta === "function") {
+          onDelta(chunk);
+        }
+      };
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
@@ -295,7 +382,7 @@
                 };
               }
             } else {
-              emitPromptStreamDelta(event.data, onDelta);
+              emitPromptStreamDelta(event.data, handleDelta);
             }
           }
           splitIndex = buffer.indexOf("\n\n");
@@ -314,7 +401,22 @@
             };
           }
         } else {
-          emitPromptStreamDelta(event.data, onDelta);
+          emitPromptStreamDelta(event.data, handleDelta);
+        }
+      }
+      if (!finalPayload) {
+        const fallbackPayload = parsePromptStreamFallbackPayload(streamedText);
+        if (fallbackPayload) {
+          finalPayload = {
+            allowed: true,
+            ...fallbackPayload
+          };
+          if (typeof finalPayload.template !== "string" && typeof finalPayload.content === "string") {
+            finalPayload.template = finalPayload.content;
+          }
+          if (typeof finalPayload.template !== "string" && typeof finalPayload.response === "string") {
+            finalPayload.template = finalPayload.response;
+          }
         }
       }
       return finalPayload || {
@@ -404,6 +506,470 @@
       return getSelectionFromPath(filePath, { isFile: true });
     }
     return getSelectionFromPath(folderPath);
+  }
+
+  // src/assets/js/edit/prompt/shared-work-prompt.json
+  var shared_work_prompt_default = {
+    lead: 'Return strict JSON with a required "template" string and an optional "work" object for structured work config updates.',
+    lines: [
+      "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
+      "Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.",
+      'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
+      "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
+      "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
+      "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
+      "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants that match the current MIME. For example, video files should favor video templates or explicit MIME-bound overrides such as video/* or video/.*.",
+      "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items, and only apply a mapped template when the item MIME matches the key or its family wildcard. When a worktype exposes fields such as autoplay, loop, muted, poster, fit, background, or caption, set those as config values on work instead of hardcoding them into the template unless the user explicitly asks for one-off markup.",
+      "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
+      "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item. MIME keys may be exact values like video/quicktime or family wildcards like video/* and video/.*.",
+      "Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.",
+      'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
+      'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
+      "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
+      "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
+      "Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.",
+      "Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.",
+      'Do not return "css" or "js" for work prompts. Work prompts update only the inner HBS partial; layout prompts own wrapper CSS and JS.',
+      "Do not put <style> tags inside template and do not use inline style attributes.",
+      "Template sources live in .layout and .works layout folders; keep the source files as the authoring target."
+    ],
+    fileLines: [
+      "Save target is work.hbs for the current file inside the active item layout folder.",
+      "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
+      "Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.",
+      "Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.",
+      "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
+      "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
+      "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
+      "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.",
+      'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
+      'The JSON "template" must contain only the inner file partial content rendered inside the existing layout wrapper.'
+    ],
+    folderLines: [
+      "Save target is works.hbs for the current folder inside the active item layout folder.",
+      "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
+      "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
+      "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
+      "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
+      "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
+      "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
+      "Use folder tree data and resolved refs when relevant instead of inventing paths.",
+      "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
+      "When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.",
+      "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
+      "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
+      "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.",
+      'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
+      'The JSON "template" must contain only the inner folder partial content rendered inside the existing layout wrapper.'
+    ],
+    layoutLines: [
+      'Return a JSON object with a required "template" string and optional "css" and "js" fields.',
+      "Do not return work.hbs, works.hbs, sectionTemplate, or any inner partial content for layout prompts.",
+      "Transform the user description into an updated outer layout wrapper rendered by LightnCandy.",
+      "Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, css, and js after filesystem, inheritance, and preset resolution.",
+      "Use current.root.title for the outer wrapper title and current.work.title for the nested item title. Keep shell vars and work vars separate when naming or copying content.",
+      'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
+      "When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.",
+      "The prompt edits the outer layout wrapper template only; do not add or preserve an inner work/works partial chain.",
+      "Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.",
+      "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
+      "Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.",
+      'Put all wrapper-specific styling in the JSON "css" field as plain CSS that works without a build step.',
+      "Scope CSS under a unique root class used by the returned wrapper. Do not define global selectors like body, a, img, h1 unless nested under that root class.",
+      "Do not put <style> tags inside template and do not use inline style attributes.",
+      "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
+      "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
+      "When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.",
+      "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom.",
+      "Prompt context JSON current.activeLayout.template is the active outer wrapper, and current.activeLayout.css/js are the currently active style and script sources.",
+      "If Prompt context JSON current.editorDraft is present, treat those unsaved draft template/css/js values as the latest version to evolve from before falling back to current.activeLayout.",
+      "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
+      "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
+      "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets to help you choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
+      "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
+      "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
+      "If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.",
+      "Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.",
+      'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.'
+    ]
+  };
+
+  // src/assets/js/edit/prompt/constants.js
+  var promptSettingsKey = "poffEditPromptSettings";
+  var promptHistoryKey = "poffEditPromptHistory";
+  var defaultLocalPromptEndpoint = "http://127.0.0.1:1234/v1/chat/completions";
+  function getDefaultModelForProvider(provider = "local") {
+    if (provider === "openai") {
+      return "gpt-4o-mini";
+    }
+    if (provider === "gemini") {
+      return "gemini-1.5-flash";
+    }
+    return "gemma4";
+  }
+  var sharedWorkSystemPromptLead = shared_work_prompt_default.lead;
+  var sharedWorkSystemPrompt = [
+    "You are a Handlebars (HBS) template generator for this single-page CMS.",
+    sharedWorkSystemPromptLead,
+    ...shared_work_prompt_default.lines
+  ].join("\n");
+  var defaultFileSystemPrompt = [
+    sharedWorkSystemPrompt,
+    ...shared_work_prompt_default.fileLines
+  ].join("\n");
+  var defaultFolderSystemPrompt = [
+    sharedWorkSystemPrompt,
+    ...shared_work_prompt_default.folderLines
+  ].join("\n");
+  var defaultLayoutSystemPrompt = [
+    "You are a Handlebars (HBS) layout generator for this single-page CMS.",
+    ...shared_work_prompt_default.layoutLines
+  ].join("\n");
+  var defaultPromptSettings = {
+    provider: "local",
+    model: getDefaultModelForProvider("local"),
+    endpoint: defaultLocalPromptEndpoint,
+    apiKey: "",
+    systemPrompt: defaultFileSystemPrompt,
+    systemPromptFile: defaultFileSystemPrompt,
+    systemPromptFolder: defaultFolderSystemPrompt,
+    systemPromptLayout: defaultLayoutSystemPrompt,
+    streamPreview: true
+  };
+
+  // src/assets/js/edit/prompt/storage.js
+  function normalizeHistoryScope(path, mode = "") {
+    const normalizedPath = String(path != null ? path : "").trim().replace(/^\/+|\/+$/g, "");
+    const normalizedMode = String(mode != null ? mode : "").trim() || "folder";
+    return `${normalizedMode}:${normalizedPath || "__root__"}`;
+  }
+  function loadPromptSettings() {
+    try {
+      const rawStored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
+      const stored = {
+        provider: rawStored.provider,
+        model: rawStored.model,
+        endpoint: rawStored.endpoint,
+        apiKey: rawStored.apiKey,
+        streamPreview: rawStored.streamPreview
+      };
+      const looksLikeLegacyProviderDefault = !stored.provider && (!stored.model || stored.model === "gpt-4o-mini") && !stored.endpoint;
+      if (looksLikeLegacyProviderDefault) {
+        stored.provider = defaultPromptSettings.provider;
+        stored.model = defaultPromptSettings.model;
+        stored.endpoint = defaultPromptSettings.endpoint;
+      }
+      if ((stored.provider === "local" || !stored.provider) && !stored.endpoint) {
+        stored.endpoint = defaultPromptSettings.endpoint;
+      }
+      return { ...defaultPromptSettings, ...stored };
+    } catch (err) {
+      return defaultPromptSettings;
+    }
+  }
+  function savePromptSettings(settings) {
+    try {
+      const persisted = {
+        provider: (settings == null ? void 0 : settings.provider) || defaultPromptSettings.provider,
+        model: (settings == null ? void 0 : settings.model) || "",
+        endpoint: (settings == null ? void 0 : settings.endpoint) || "",
+        apiKey: (settings == null ? void 0 : settings.apiKey) || "",
+        streamPreview: (settings == null ? void 0 : settings.streamPreview) !== false
+      };
+      localStorage.setItem(promptSettingsKey, JSON.stringify(persisted));
+    } catch (err) {
+    }
+  }
+  function readStoredHistory(path, mode = "") {
+    try {
+      const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || "{}");
+      const scopedKey = normalizeHistoryScope(path, mode);
+      const legacyKey = String(path != null ? path : "").trim();
+      const list = stored[scopedKey] || stored[legacyKey] || [];
+      return Array.isArray(list) ? list : [];
+    } catch (err) {
+      return [];
+    }
+  }
+  function writeStoredHistory(path, history, mode = "") {
+    try {
+      const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || "{}");
+      stored[normalizeHistoryScope(path, mode)] = history;
+      localStorage.setItem(promptHistoryKey, JSON.stringify(stored));
+    } catch (err) {
+    }
+  }
+
+  // src/assets/js/edit/prompt/settings.js
+  function bindPromptSettings({
+    providerEl,
+    modelEl,
+    endpointRow,
+    endpointEl,
+    apiKeyEl,
+    systemPromptEl,
+    systemResetEl,
+    settingsResetEl,
+    streamToggleEl,
+    defaultPromptSettings: defaultPromptSettings2,
+    currentDefaultSystemPrompt,
+    currentPromptMode,
+    currentSystemPromptSettingKey,
+    getDefaultModelForProvider: getDefaultModelForProvider2,
+    loadPromptSettings: loadPromptSettings2,
+    savePromptSettings: savePromptSettings2,
+    onRenderContext
+  }) {
+    const settings = loadPromptSettings2();
+    let suppressSave = false;
+    const readSettings = () => {
+      const systemPrompt = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim() || currentDefaultSystemPrompt();
+      const nextSettings = {
+        provider: providerEl ? providerEl.value : "local",
+        model: modelEl ? modelEl.value : "",
+        endpoint: endpointEl ? endpointEl.value : "",
+        apiKey: apiKeyEl ? apiKeyEl.value : "",
+        systemPrompt,
+        systemPromptFile: settings.systemPromptFile || defaultPromptSettings2.systemPromptFile,
+        systemPromptFolder: settings.systemPromptFolder || defaultPromptSettings2.systemPromptFolder,
+        systemPromptLayout: settings.systemPromptLayout || defaultPromptSettings2.systemPromptLayout,
+        streamPreview: streamToggleEl ? !!streamToggleEl.checked : true
+      };
+      nextSettings[currentSystemPromptSettingKey()] = systemPrompt;
+      return nextSettings;
+    };
+    const persistSettings = () => {
+      if (!suppressSave) {
+        savePromptSettings2(readSettings());
+      }
+    };
+    const updateProviderUi = ({ resetModel = false } = {}) => {
+      const provider = providerEl ? providerEl.value : "local";
+      if (endpointRow) {
+        endpointRow.hidden = provider !== "local";
+      }
+      if (modelEl && resetModel && !modelEl.value.trim()) {
+        modelEl.value = getDefaultModelForProvider2(provider);
+      }
+      persistSettings();
+    };
+    const applySettingsToUi = (nextSettings) => {
+      suppressSave = true;
+      if (providerEl) providerEl.value = nextSettings.provider || defaultPromptSettings2.provider;
+      if (modelEl) modelEl.value = nextSettings.model || "";
+      if (endpointEl) endpointEl.value = nextSettings.endpoint || "";
+      if (apiKeyEl) apiKeyEl.value = nextSettings.apiKey || "";
+      if (systemPromptEl) {
+        const mode = currentPromptMode();
+        systemPromptEl.value = mode === "layout" ? nextSettings.systemPromptLayout || nextSettings.systemPrompt || currentDefaultSystemPrompt() : mode === "folder" ? nextSettings.systemPromptFolder || nextSettings.systemPrompt || currentDefaultSystemPrompt() : nextSettings.systemPromptFile || nextSettings.systemPrompt || currentDefaultSystemPrompt();
+      }
+      if (streamToggleEl) streamToggleEl.checked = nextSettings.streamPreview !== false;
+      suppressSave = false;
+      updateProviderUi();
+    };
+    const syncModeAwareSystemPrompt = () => {
+      if (!systemPromptEl) {
+        return;
+      }
+      const currentValue = (systemPromptEl.value || "").trim();
+      if (currentValue !== "" && !(/* @__PURE__ */ new Set([settings.systemPromptFile, settings.systemPromptFolder, settings.systemPromptLayout])).has(currentValue)) {
+        return;
+      }
+      const nextValue = currentDefaultSystemPrompt();
+      if (systemPromptEl.value !== nextValue) {
+        systemPromptEl.value = nextValue;
+        settings[currentSystemPromptSettingKey()] = nextValue;
+        savePromptSettings2(readSettings());
+      }
+    };
+    if (providerEl) {
+      providerEl.addEventListener("change", () => updateProviderUi({ resetModel: false }));
+    }
+    if (modelEl) {
+      modelEl.addEventListener("input", persistSettings);
+    }
+    if (endpointEl) {
+      endpointEl.addEventListener("input", persistSettings);
+    }
+    if (apiKeyEl) {
+      apiKeyEl.addEventListener("input", persistSettings);
+    }
+    if (systemPromptEl) {
+      systemPromptEl.addEventListener("input", () => {
+        settings[currentSystemPromptSettingKey()] = (systemPromptEl.value || "").trim() || currentDefaultSystemPrompt();
+        savePromptSettings2(readSettings());
+      });
+    }
+    if (streamToggleEl) {
+      streamToggleEl.addEventListener("change", () => {
+        savePromptSettings2(readSettings());
+      });
+    }
+    if (systemResetEl && systemPromptEl) {
+      systemResetEl.addEventListener("click", () => {
+        systemPromptEl.value = currentDefaultSystemPrompt();
+        settings[currentSystemPromptSettingKey()] = systemPromptEl.value;
+        savePromptSettings2(readSettings());
+      });
+    }
+    if (settingsResetEl) {
+      settingsResetEl.addEventListener("click", () => {
+        const nextSettings = {
+          ...defaultPromptSettings2,
+          systemPrompt: currentDefaultSystemPrompt()
+        };
+        applySettingsToUi(nextSettings);
+        savePromptSettings2(nextSettings);
+        if (typeof onRenderContext === "function") {
+          onRenderContext();
+        }
+      });
+    }
+    return {
+      settings,
+      readSettings,
+      applySettingsToUi,
+      updateProviderUi,
+      syncModeAwareSystemPrompt
+    };
+  }
+
+  // src/assets/js/edit/prompt/layer.js
+  function createPromptLayerController({
+    root,
+    windowEl,
+    closeEl,
+    openEl,
+    storageKey,
+    storage
+  }) {
+    const readState = () => {
+      try {
+        const stored = JSON.parse(storage.getItem(storageKey) || "{}");
+        return !!stored.collapsed;
+      } catch (err) {
+        return false;
+      }
+    };
+    const writeState = (collapsed) => {
+      try {
+        storage.setItem(storageKey, JSON.stringify({ collapsed: !!collapsed }));
+      } catch (err) {
+      }
+    };
+    const applyState = (collapsed, options = {}) => {
+      const nextCollapsed = !!collapsed;
+      root.classList.toggle("prompt-layer-collapsed", nextCollapsed);
+      if (windowEl) {
+        windowEl.hidden = nextCollapsed;
+      }
+      if (closeEl) {
+        closeEl.hidden = nextCollapsed;
+      }
+      if (openEl) {
+        openEl.hidden = !nextCollapsed;
+      }
+      if (!options.skipPersist) {
+        writeState(nextCollapsed);
+      }
+    };
+    if (closeEl) {
+      closeEl.addEventListener("click", () => applyState(true));
+    }
+    if (openEl) {
+      openEl.addEventListener("click", () => applyState(false));
+    }
+    if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
+      document.addEventListener("keydown", (event) => {
+        if (!event || event.key !== "Escape") {
+          return;
+        }
+        applyState(true);
+      });
+    }
+    return {
+      readState,
+      writeState,
+      applyState
+    };
+  }
+
+  // src/assets/js/edit/prompt/actions.js
+  function bindPromptActions({
+    promptClearEl,
+    promptTemplateResetEl,
+    promptSendEl,
+    promptInputEl,
+    promptAttachEl,
+    promptInsertNameEl,
+    promptImageInputEl,
+    promptAttachmentRemoveEl,
+    layoutPresetEl,
+    onClearChat,
+    onResetTemplate,
+    onSendPrompt,
+    onAttachImage,
+    onInsertName,
+    onRemoveImage,
+    onTemplateInput,
+    onLayoutPresetChange
+  }) {
+    if (layoutPresetEl && typeof onLayoutPresetChange === "function") {
+      layoutPresetEl.addEventListener("change", onLayoutPresetChange);
+    }
+    if (promptClearEl && typeof onClearChat === "function") {
+      promptClearEl.addEventListener("click", onClearChat);
+    }
+    if (promptTemplateResetEl && typeof onResetTemplate === "function") {
+      promptTemplateResetEl.addEventListener("click", onResetTemplate);
+    }
+    if (promptSendEl && promptInputEl && typeof onSendPrompt === "function") {
+      promptSendEl.addEventListener("click", () => {
+        void onSendPrompt();
+      });
+      promptInputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing) {
+          event.preventDefault();
+          void onSendPrompt();
+        }
+      });
+      promptInputEl.addEventListener("paste", (event) => {
+        var _a;
+        const items = ((_a = event.clipboardData) == null ? void 0 : _a.items) ? Array.from(event.clipboardData.items) : [];
+        const imageItem = items.find((item) => typeof item.type === "string" && item.type.startsWith("image/"));
+        if (!imageItem) {
+          return;
+        }
+        const file = imageItem.getAsFile();
+        if (!file) {
+          return;
+        }
+        event.preventDefault();
+        if (typeof onAttachImage === "function") {
+          void onAttachImage(file);
+        }
+      });
+    }
+    if (promptInsertNameEl && typeof onInsertName === "function") {
+      promptInsertNameEl.addEventListener("click", () => {
+        void onInsertName();
+      });
+    }
+    if (promptAttachEl && promptImageInputEl) {
+      promptAttachEl.addEventListener("click", () => {
+        promptImageInputEl.click();
+      });
+      promptImageInputEl.addEventListener("change", async () => {
+        const file = promptImageInputEl.files && promptImageInputEl.files[0] ? promptImageInputEl.files[0] : null;
+        if (!file || typeof onAttachImage !== "function") {
+          return;
+        }
+        await onAttachImage(file);
+      });
+    }
+    if (promptAttachmentRemoveEl && typeof onRemoveImage === "function") {
+      promptAttachmentRemoveEl.addEventListener("click", onRemoveImage);
+    }
   }
 
   // src/assets/js/core/utils.js
@@ -550,190 +1116,23 @@
     return defaultPlaceholder;
   }
 
-  // src/assets/js/edit/prompt/constants.js
-  var promptSettingsKey = "poffEditPromptSettings";
-  var promptHistoryKey = "poffEditPromptHistory";
-  var defaultLocalPromptEndpoint = "http://127.0.0.1:1234/v1/chat/completions";
-  function getDefaultModelForProvider(provider = "local") {
-    if (provider === "openai") {
-      return "gpt-4o-mini";
-    }
-    if (provider === "gemini") {
-      return "gemini-1.5-flash";
-    }
-    return "gemma4";
-  }
-  var legacyWorkSystemPrompt = [
-    "You are a Handlebars (HBS) template generator for this single-page CMS.",
-    'Return strict JSON with a required "template" string and optional "work" field.',
-    "Inputs available: {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
-    "Treat root.* as the outer layout shell vars and work.* as the inner content vars. Use root.title for the wrapper title and work.title for the nested item title.",
-    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
-    "Extra fields added below Description are stored as work.fields metadata and also flattened into work.<name> values.",
-    "When the user refers to a custom work field, bind that field in HBS with {{work.<name>}} or the matching variable name instead of hardcoding the visible text into markup.",
-    "Treat work fields as structured data for template values, labels, placeholders, alt text, captions, and conditional rendering.",
-    "Use config/title/description, layout name/template, and work type/template when relevant; prefer existing worktypes and template variants that match the current MIME. For example, video files should favor video templates or explicit MIME-bound overrides such as video/* or video/.*.",
-    "Use work.type for the base family and work.template for the exact template override. Use work.templateMap as the inherited MIME => template defaults for child items, and only apply a mapped template when the item MIME matches the key or its family wildcard. When a worktype exposes fields such as autoplay, loop, muted, poster, fit, background, or caption, set those as config values on work instead of hardcoding them into the template unless the user explicitly asks for one-off markup.",
-    "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
-    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item. MIME keys may be exact values like video/quicktime or family wildcards like video/* and video/.*.",
-    "Prompt context JSON current.parentWork contains the immediate parent folder/work. siblingWorks and siblingImages/siblingVideos/siblingLinks/etc contain only same-folder siblings, excluding the current item and without recursive children.",
-    'Use sibling srcUrl/pageLink/linkUrl refs directly for prompts like "use the image in this folder as background" or "overlay the video in the center".',
-    'If the user asks to hide used sibling works, return "treeVisible" as the full list of parent tree item names/paths that should remain visible. Include the current item unless the user explicitly asks to hide it.',
-    "Use variables exactly as they exist in the current HBS scope. Prefer direct references like {{description}} when the variable is top-level.",
-    "Only use parent lookups like {{../description}} when you are actually inside a nested Handlebars block such as {{#each}}, {{#with}}, or another scope-changing block.",
-    "Do not invent alternate variable paths. Follow the variable path that exists in the provided HBS context.",
-    "Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.",
-    'Do not return "css" or "js" for work prompts. Work prompts update only the inner HBS partial; layout prompts own wrapper CSS and JS.',
-    "Do not put <style> tags inside template and do not use inline style attributes."
-  ].join("\n");
-  var defaultFileSystemPrompt = [
-    legacyWorkSystemPrompt,
-    "Save target is work.hbs for the current file inside the active item layout folder.",
-    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Focus on a single file view. Do not assume folder tree loops or folder aggregate lists unless the user explicitly asks for them.",
-    "Prefer file-relevant fields such as {{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.*.",
-    "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
-    "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
-    "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
-    "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this file prompt.",
-    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this file prompt.',
-    'The JSON "template" must contain only the inner file partial content rendered inside the existing layout wrapper.'
-  ].join("\n");
-  var defaultFolderSystemPrompt = [
-    legacyWorkSystemPrompt,
-    "Save target is works.hbs for the current folder inside the active item layout folder.",
-    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
-    "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
-    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
-    "Folder items expose {{pageLink}} for navigation and {{srcUrl}} / {{assetUrl}} for direct sources.",
-    "For folder item loops, prefer item booleans like {{#if isFile}} and {{#if isFolder}} over custom helpers.",
-    "Use folder tree data and resolved refs when relevant instead of inventing paths.",
-    "Prompt context JSON current.outerWrapper contains a compact summary of the active outer layout wrapper, with template/css/js excerpts. Use it as structure and styling reference only.",
-    "When the current folder is root or otherwise sparse, use current.outerWrapper as the main visual grounding instead of inventing a generic standalone page.",
-    "Align your inner partial with the current outer wrapper semantics and class language when useful, but do not return or rewrite the wrapper itself.",
-    "Do not return the outer layout wrapper, page shell, navigation chrome, or a full page template.",
-    "Never return {{> work}}, {{> works}}, {{> poff-layout}}, {{> filesystem-layout}}, or a poff-default-layout wrapper from this folder prompt.",
-    'Never emit outer shell blocks like <header class="poff-default-layout__header">, <main class="poff-default-layout__main">, footer/nav/sidebar chrome, or wrapper-only include chains from this folder prompt.',
-    'The JSON "template" must contain only the inner folder partial content rendered inside the existing layout wrapper.'
-  ].join("\n");
-  var defaultLayoutSystemPrompt = [
-    "You are a Handlebars (HBS) layout generator for this single-page CMS.",
-    "Transform the user description into an updated outer layout wrapper rendered by LightnCandy.",
-    'Return a JSON object with a required "template" string and optional "css", "js", and "work" fields.',
-    'For layout wrappers that should look consistent for folders and files, put sibling partials in work: {"works.hbs":"folder inner partial","work.hbs":"file inner partial"}.',
-    "Treat the currently resolved active wrapper as your primary reference. Prompt context JSON current.activeLayout and Config JSON work.layout contain the actual active template, sectionTemplate, css, and js after filesystem, inheritance, and preset resolution.",
-    "Use current.root.title for the outer wrapper title and current.work.title for the nested item title. Keep shell vars and work vars separate when naming or copying content.",
-    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
-    "When the active layout is empty or too minimal, fall back to the built-in default wrapper shape from src/includes/worktypes/templates/layout/default/template.hbs.",
-    "The prompt edits the outer layout wrapper template, not the wrapped inner work.hbs or works.hbs partial.",
-    "Keep the wrapped content chain active and preserve the data flow from the current item context all the way down to the inner partial. Use {{> works}} for folders and {{> work}} for files inside the layout wrapper unless the user explicitly asks to remove or replace it.",
-    "The wrapper owns the page shell and must wrap the inner partial. Return one outer template that includes {{> works}} or {{> work}} exactly once unless the user explicitly asks for a different structure.",
-    'Always keep a <main class="poff-default-layout__main"> block whose content is exactly {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}. Do not omit this block.',
-    "Return the wrapper as real Handlebars template code. Use the same runtime fields, partials, conditionals, and folder/file context that the active template already uses when they are still relevant.",
-    "Template sources live in .layout and .works layout folders; keep the source files as the authoring target.",
-    "Use semantic HTML and stable readable class names. Do not use Tailwind utility classes in generated runtime templates.",
-    'Put all wrapper-specific styling in the JSON "css" field as plain CSS that works without a build step.',
-    "Scope CSS under a unique root class used by the returned wrapper. Do not define global selectors like body, a, img, h1 unless nested under that root class.",
-    "Do not put <style> tags inside template and do not use inline style attributes.",
-    "Use the actual resolved template/css/js as style and structure cues. Redesign them when requested, but keep useful Handlebars structure, routing fields, and wrapper semantics unless the user explicitly asks for a break.",
-    "Use current.templateTarget as the active save target for this layout page. It follows the current layout mode: the resolved active wrapper for Inherit, the local custom wrapper for Custom, and never the inner partial by default.",
-    "When layoutPreset is shared, treat current.work.layout.sharedName as the marketplace layout source and keep it within the same worktype family.",
-    "current.layoutTemplateTarget is the local custom wrapper path if you explicitly switch to Custom. current.sectionTemplateTarget is the advanced inner partial path, not the default save target here.",
-    "Prompt context JSON current.activeLayout.template is the active outer wrapper, current.activeLayout.sectionTemplate is the current wrapped work/works partial, and current.activeLayout.css/js are the currently active style and script sources.",
-    "Use work.categories as the main filter and grouping hint when it exists; prefer existing categories instead of inventing new ones.",
-    "Use work.templateMap as the inherited MIME => template defaults from folder/layout parents. work.template is the exact override for the current item.",
-    "For images, icons, CSS backgrounds, or other assets owned by the layout wrapper, do not build URLs from {{path}}. {{path}} points to the current folder/file, not the layout asset folder.",
-    "Use runtime layout URLs such as {{layout.baseHref}}/file.ext for local or inherited folder layout assets. Reusing the bundled default profile image should look like {{layout.baseHref}}/eggman_profile-image.jpg when the active wrapper comes from the built-in default layout bundle.",
-    "Prompt context JSON includes current.layoutBaseHref, current.inheritedLayoutDirectory, and current.layoutAssets so you can choose the right asset path and understand whether the wrapper comes from a parent folder .layout.",
-    "Choose URL fields by intent: use {{pageLink}} for navigation and clickable cards that should open the CMS-templated page. Use {{srcUrl}} / {{assetUrl}} for direct sources such as <img src>, <video src>, <source src>, poster, download links, CSS url(...), and background-image.",
-    "Never build internal CMS links manually with ?path=, ?file=, {{slug}}, or string concatenation. {{slug}} is an identifier, not a navigable path.",
-    "If a provided item/pageLink/path/linkUrl value already contains a full CMS viewer URL like ?view=1&path=... or ?view=1&file=..., or an external URL, use it verbatim. Never prepend another ?view=1&path= or ?view=1&file= around it.",
-    "Configured tree items may be virtual navigation links without a backing local file or folder. Respect their provided pageLink/linkUrl instead of forcing them into a filesystem path.",
-    "Inputs available: {{pageLink}} / {{pageUrl}} / {{workUrl}} / {{viewUrl}} / {{viewerHref}} for the templated CMS viewer URL, {{srcUrl}} / {{sourceUrl}} / {{assetUrl}} / {{assetLink}} / {{rawHref}} for direct source URLs, {{path}} for the raw relative file path, plus {{name}}, {{title}}, {{linkUrl}}, {{slug}}, layout.*, and work.* values from config/work.",
-    "Folder views get recursive tree data: tree/items include children on nested folders, workTree is the folder root, and helper lists like allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, and allOther are available.",
-    "Use current.root.title for the folder shell title and current.work.title for the inner item title when the folder prompt needs both levels.",
-    'Example context JSON: {"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}',
-    'JS belongs in the JSON "js" field only. Guard DOM readiness, avoid network calls, and degrade gracefully if JS is disabled.'
-  ].join("\n");
-  var defaultPromptSettings = {
-    provider: "local",
-    model: getDefaultModelForProvider("local"),
-    endpoint: defaultLocalPromptEndpoint,
-    apiKey: "",
-    systemPrompt: defaultFileSystemPrompt,
-    systemPromptFile: defaultFileSystemPrompt,
-    systemPromptFolder: defaultFolderSystemPrompt,
-    systemPromptLayout: defaultLayoutSystemPrompt,
-    streamPreview: true
-  };
-
-  // src/assets/js/edit/prompt/storage.js
-  function normalizeHistoryScope(path, mode = "") {
-    const normalizedPath = String(path != null ? path : "").trim().replace(/^\/+|\/+$/g, "");
-    const normalizedMode = String(mode != null ? mode : "").trim() || "folder";
-    return `${normalizedMode}:${normalizedPath || "__root__"}`;
-  }
-  function loadPromptSettings() {
-    try {
-      const rawStored = JSON.parse(localStorage.getItem(promptSettingsKey) || "{}");
-      const stored = {
-        provider: rawStored.provider,
-        model: rawStored.model,
-        endpoint: rawStored.endpoint,
-        apiKey: rawStored.apiKey,
-        streamPreview: rawStored.streamPreview
-      };
-      const looksLikeLegacyProviderDefault = !stored.provider && (!stored.model || stored.model === "gpt-4o-mini") && !stored.endpoint;
-      if (looksLikeLegacyProviderDefault) {
-        stored.provider = defaultPromptSettings.provider;
-        stored.model = defaultPromptSettings.model;
-        stored.endpoint = defaultPromptSettings.endpoint;
-      }
-      if ((stored.provider === "local" || !stored.provider) && !stored.endpoint) {
-        stored.endpoint = defaultPromptSettings.endpoint;
-      }
-      return { ...defaultPromptSettings, ...stored };
-    } catch (err) {
-      return defaultPromptSettings;
-    }
-  }
-  function savePromptSettings(settings) {
-    try {
-      const persisted = {
-        provider: (settings == null ? void 0 : settings.provider) || defaultPromptSettings.provider,
-        model: (settings == null ? void 0 : settings.model) || "",
-        endpoint: (settings == null ? void 0 : settings.endpoint) || "",
-        apiKey: (settings == null ? void 0 : settings.apiKey) || "",
-        streamPreview: (settings == null ? void 0 : settings.streamPreview) !== false
-      };
-      localStorage.setItem(promptSettingsKey, JSON.stringify(persisted));
-    } catch (err) {
-    }
-  }
-  function readStoredHistory(path, mode = "") {
-    try {
-      const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || "{}");
-      const scopedKey = normalizeHistoryScope(path, mode);
-      const legacyKey = String(path != null ? path : "").trim();
-      const list = stored[scopedKey] || stored[legacyKey] || [];
-      return Array.isArray(list) ? list : [];
-    } catch (err) {
-      return [];
-    }
-  }
-  function writeStoredHistory(path, history, mode = "") {
-    try {
-      const stored = JSON.parse(localStorage.getItem(promptHistoryKey) || "{}");
-      stored[normalizeHistoryScope(path, mode)] = history;
-      localStorage.setItem(promptHistoryKey, JSON.stringify(stored));
-    } catch (err) {
-    }
-  }
-
   // src/assets/js/edit/prompt/history.js
   function tagHistory(history) {
     return history.map((msg, idx) => ({ ...msg, _index: idx }));
+  }
+  function isPendingAssistantHistory(item) {
+    return (item == null ? void 0 : item.role) === "assistant" && String((item == null ? void 0 : item.content) || "").trim() === "Generating answer..." && !(item == null ? void 0 : item.templateSnapshot);
+  }
+  function cleanPersistedHistory(history) {
+    return Array.isArray(history) ? history.filter((item) => !isPendingAssistantHistory(item)).slice(-12) : [];
+  }
+  function shouldUsePersistedPromptHistory(config, mode = "folder") {
+    var _a;
+    const layout = ((_a = config == null ? void 0 : config.work) == null ? void 0 : _a.layout) && typeof config.work.layout === "object" ? config.work.layout : {};
+    if (mode !== "layout" && typeof layout.sectionTemplate === "string" && layout.sectionTemplate.trim() === "") {
+      return false;
+    }
+    return true;
   }
   function trimHistoryText(value, maxLength = 600) {
     const normalized = String(value != null ? value : "").replace(/\s+/g, " ").trim();
@@ -801,9 +1200,9 @@
     }
     return snapshot;
   }
-  function serializeHistoryForRequest(history) {
+  function serializeHistoryForRequest(history, options = {}) {
     const list = Array.isArray(history) ? history : [];
-    return list.map((item) => {
+    const serialized = list.map((item) => {
       const role = (item == null ? void 0 : item.role) || "user";
       let content = String((item == null ? void 0 : item.content) || "");
       const snapshot = item == null ? void 0 : item.templateSnapshot;
@@ -847,6 +1246,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return { role, content };
     });
+    const seedTemplateText = typeof (options == null ? void 0 : options.initialTemplateText) === "string" ? options.initialTemplateText : "";
+    const seedRole = typeof (options == null ? void 0 : options.initialTemplateRole) === "string" && options.initialTemplateRole.trim() === "system" ? "system" : "assistant";
+    if (seedTemplateText.trim() !== "" && !serialized.some((item) => item && item.role === "assistant")) {
+      serialized.unshift({
+        role: seedRole,
+        content: seedTemplateText
+      });
+    }
+    return serialized;
   }
   function summarizeSerializedHistory(history) {
     const serialized = serializeHistoryForRequest(history);
@@ -1668,43 +2076,65 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   function createStreamState() {
     return { state: null };
   }
-  function stopStreaming(stream2) {
-    if (!stream2) {
+  function stopStreaming(stream) {
+    if (!stream) {
       return;
     }
-    stream2.state = null;
+    stream.state = null;
   }
-  function beginStreaming({ stream: stream2, targetIndex, history, renderHistory }) {
-    if (!stream2 || typeof renderHistory !== "function") {
+  function beginStreaming({ stream, targetIndex, history, renderHistory }) {
+    if (!stream || typeof renderHistory !== "function") {
       return;
     }
-    stopStreaming(stream2);
+    stopStreaming(stream);
     if (history && history[targetIndex]) {
       history[targetIndex].content = "";
     }
-    stream2.state = { index: targetIndex, text: "" };
+    stream.state = { index: targetIndex, text: "" };
     renderHistory();
   }
-  function appendStreamingChunk({ stream: stream2, chunk = "", history, renderHistory }) {
-    if (!stream2 || !stream2.state || typeof renderHistory !== "function" || chunk === "") {
+  function appendStreamingChunk({ stream, chunk = "", history, renderHistory }) {
+    if (!stream || !stream.state || typeof renderHistory !== "function" || chunk === "") {
       return;
     }
-    stream2.state.text += chunk;
-    if (history && history[stream2.state.index]) {
-      history[stream2.state.index].content = stream2.state.text;
+    stream.state.text += chunk;
+    if (history && history[stream.state.index]) {
+      history[stream.state.index].content = stream.state.text;
     }
     renderHistory();
   }
-  function finishStreaming({ stream: stream2, history, fullText = "", renderHistory }) {
-    if (!stream2 || typeof renderHistory !== "function" || !stream2.state) {
+  function finishStreaming({ stream, history, fullText = "", renderHistory }) {
+    if (!stream || typeof renderHistory !== "function" || !stream.state) {
       return;
     }
-    const nextText = fullText || stream2.state.text || "";
-    if (history && history[stream2.state.index]) {
-      history[stream2.state.index].content = nextText;
+    const nextText = fullText || stream.state.text || "";
+    if (history && history[stream.state.index]) {
+      history[stream.state.index].content = nextText;
     }
-    stopStreaming(stream2);
+    stopStreaming(stream);
     renderHistory();
+  }
+
+  // src/assets/js/edit/selection.js
+  function getSelectionOrFallback(getActiveSelection2, fallback = {}) {
+    return typeof getActiveSelection2 === "function" ? getActiveSelection2() || fallback : fallback;
+  }
+  function getLayoutPresetValue(defaultValue = "actual") {
+    const presetEl = document.getElementById("edit-layout-preset");
+    if (!presetEl || typeof presetEl.value !== "string") {
+      return defaultValue;
+    }
+    const value = presetEl.value.trim();
+    return value || defaultValue;
+  }
+
+  // src/assets/js/edit/status.js
+  function setStatusMessage(statusEl, message, success = false) {
+    if (!statusEl) {
+      return;
+    }
+    statusEl.textContent = message;
+    statusEl.className = success ? "edit-status edit-status-success" : "edit-status";
   }
 
   // src/assets/js/edit/prompt/editor-fields.js
@@ -1854,118 +2284,370 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     });
   }
 
-  // src/assets/js/edit/prompt/actions.js
-  function bindPromptActions({
-    promptClearEl,
-    promptTemplateResetEl,
-    promptSendEl,
+  // src/assets/js/edit/prompt/runtime.js
+  function createPromptRuntime({
+    root,
+    statusEl,
+    drawerForm,
+    getActiveSelection: getActiveSelection2,
+    getConfig,
+    requestEditConfig: requestEditConfig2,
     promptInputEl,
+    promptMessagesEl,
+    promptContextEl,
+    promptSummaryEl,
+    promptGenerationEl,
+    promptGenerationLabelEl,
+    promptTemplateLabelEl,
+    promptTemplateCodeEl,
+    promptAttachmentEl,
     promptAttachEl,
-    promptInsertNameEl,
+    promptAttachmentPreviewEl,
+    promptAttachmentNameEl,
     promptImageInputEl,
-    promptAttachmentRemoveEl,
-    layoutPresetEl,
-    onClearChat,
-    onResetTemplate,
-    onSendPrompt,
-    onAttachImage,
-    onInsertName,
-    onRemoveImage,
-    onTemplateInput,
-    onLayoutPresetChange
+    promptSendEl,
+    promptClearEl,
+    promptAttachmentRemoveEl
   }) {
-    if (layoutPresetEl && typeof onLayoutPresetChange === "function") {
-      layoutPresetEl.addEventListener("change", onLayoutPresetChange);
-    }
-    if (promptClearEl && typeof onClearChat === "function") {
-      promptClearEl.addEventListener("click", onClearChat);
-    }
-    if (promptTemplateResetEl && typeof onResetTemplate === "function") {
-      promptTemplateResetEl.addEventListener("click", onResetTemplate);
-    }
-    if (promptSendEl && promptInputEl && typeof onSendPrompt === "function") {
-      promptSendEl.addEventListener("click", () => {
-        void onSendPrompt();
-      });
-      promptInputEl.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing) {
-          event.preventDefault();
-          void onSendPrompt();
+    const stream = createStreamState();
+    const state = {
+      promptHistory: [],
+      activePath: getSelectionOrFallback(getActiveSelection2, { path: "" }).path,
+      activePromptMode: getSelectionOrFallback(getActiveSelection2, {}).isLayout ? "layout" : getSelectionOrFallback(getActiveSelection2, {}).previewIsFile ? "file" : "folder",
+      imageAttachment: null,
+      isSending: false
+    };
+    const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
+    const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
+    const currentSelection = (fallback = {}) => getSelectionOrFallback(getActiveSelection2, fallback);
+    const currentPromptMode = () => getPromptMode(currentSelection());
+    const currentPromptPlaceholder = () => getPromptPlaceholderForMode(currentPromptMode(), defaultPromptPlaceholder);
+    const currentDefaultSystemPrompt = () => getDefaultSystemPromptForMode(currentPromptMode(), {
+      file: defaultFileSystemPrompt,
+      folder: defaultFolderSystemPrompt,
+      layout: defaultLayoutSystemPrompt
+    });
+    const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
+    const setPromptStatus = (message, success = false) => setStatusMessage(statusEl, message, success);
+    const getLayoutPreset = () => getLayoutPresetValue();
+    const forceLayoutPromptToCustom = () => {
+      const presetEl = document.getElementById("edit-layout-preset");
+      if (presetEl && presetEl.value !== "custom") {
+        presetEl.value = "custom";
+      }
+      return "custom";
+    };
+    const currentHasImageContext = () => {
+      const selection2 = currentSelection(null);
+      const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
+      return imageContextPattern.test(selectionPath);
+    };
+    const currentSelectionName = () => {
+      const selection2 = currentSelection(null);
+      const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
+      const normalizedPath = String(selectionPath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+      if (!normalizedPath) {
+        return "";
+      }
+      const parts = normalizedPath.split("/").filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : "";
+    };
+    const insertPromptText2 = async (text) => {
+      var _a;
+      if (!promptInputEl || !text) {
+        return false;
+      }
+      const start = typeof promptInputEl.selectionStart === "number" ? promptInputEl.selectionStart : promptInputEl.value.length;
+      const end = typeof promptInputEl.selectionEnd === "number" ? promptInputEl.selectionEnd : promptInputEl.value.length;
+      const before = promptInputEl.value.slice(0, start);
+      const after = promptInputEl.value.slice(end);
+      const separator = before && !/\s$/.test(before) ? " " : "";
+      const nextValue = `${before}${separator}${text}${after}`;
+      promptInputEl.value = nextValue;
+      const caret = (before + separator + text).length;
+      if (typeof promptInputEl.setSelectionRange === "function") {
+        promptInputEl.setSelectionRange(caret, caret);
+      }
+      promptInputEl.focus({ preventScroll: true });
+      renderSummary(`Inserted ${text} into the prompt.`);
+      try {
+        if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
+          await navigator.clipboard.writeText(text);
         }
-      });
-      promptInputEl.addEventListener("paste", (event) => {
-        var _a;
-        const items = ((_a = event.clipboardData) == null ? void 0 : _a.items) ? Array.from(event.clipboardData.items) : [];
-        const imageItem = items.find((item) => typeof item.type === "string" && item.type.startsWith("image/"));
-        if (!imageItem) {
-          return;
+        setPromptStatus(`Inserted and copied: ${text}`, true);
+      } catch (e) {
+        setPromptStatus(`Inserted: ${text}`);
+      }
+      return true;
+    };
+    const setHistory = (nextHistory) => {
+      const list = Array.isArray(nextHistory) ? nextHistory : [];
+      state.promptHistory = tagHistory(list);
+    };
+    const getHistoryScope = (selection2 = null) => {
+      const selected = selection2 || currentSelection({ path: "" });
+      return {
+        path: (selected == null ? void 0 : selected.path) || "",
+        mode: (selected == null ? void 0 : selected.isLayout) ? "layout" : (selected == null ? void 0 : selected.previewIsFile) ? "file" : "folder"
+      };
+    };
+    const readHistoryForSelection = (selection2 = null) => {
+      const scope = getHistoryScope(selection2);
+      const config = getConfig ? getConfig() || {} : {};
+      if (config && Object.prototype.hasOwnProperty.call(config, "promptHistory")) {
+        if (!shouldUsePersistedPromptHistory(config, scope.mode)) {
+          return [];
         }
-        const file = imageItem.getAsFile();
-        if (!file) {
-          return;
-        }
-        event.preventDefault();
-        if (typeof onAttachImage === "function") {
-          void onAttachImage(file);
-        }
+        return cleanPersistedHistory(config.promptHistory);
+      }
+      return cleanPersistedHistory(readStoredHistory(scope.path, scope.mode));
+    };
+    const writeHistoryForSelection = (history, selection2 = null, options = {}) => {
+      const scope = getHistoryScope(selection2);
+      writeStoredHistory(scope.path, Array.isArray(history) ? history.slice(-12) : [], scope.mode);
+      if (options.persistRemote === false) {
+        return Promise.resolve(null);
+      }
+      const persistedHistory = cleanPersistedHistory(history);
+      writeStoredHistory(scope.path, persistedHistory, scope.mode);
+      return requestEditConfig2("save", {
+        path: scope.path,
+        promptHistory: persistedHistory
       });
-    }
-    if (promptInsertNameEl && typeof onInsertName === "function") {
-      promptInsertNameEl.addEventListener("click", () => {
-        void onInsertName();
-      });
-    }
-    if (promptAttachEl && promptImageInputEl) {
-      promptAttachEl.addEventListener("click", () => {
-        promptImageInputEl.click();
-      });
-      promptImageInputEl.addEventListener("change", async () => {
-        const file = promptImageInputEl.files && promptImageInputEl.files[0] ? promptImageInputEl.files[0] : null;
-        if (!file || typeof onAttachImage !== "function") {
-          return;
-        }
-        await onAttachImage(file);
-      });
-    }
-    if (promptAttachmentRemoveEl && typeof onRemoveImage === "function") {
-      promptAttachmentRemoveEl.addEventListener("click", onRemoveImage);
-    }
-  }
-
-  // src/assets/js/edit/prompt/log.js
-  function debugPromptLog(label, payload) {
-    try {
-      console.info(`[prompt] ${label}`, payload);
-    } catch (err) {
-    }
-  }
-
-  // src/assets/js/edit/prompt/image.js
-  function isSupportedImageFile(file) {
-    return !!file && typeof file.type === "string" && file.type.startsWith("image/");
-  }
-  function readImageFile(file) {
-    return new Promise((resolve, reject) => {
-      if (!isSupportedImageFile(file)) {
-        reject(new Error("Only image files are supported."));
+    };
+    const renderHistory = (options = {}) => {
+      renderPromptHistory(promptMessagesEl, state.promptHistory, stream.state, options);
+    };
+    const getCurrentTemplateField = () => {
+      const selection2 = currentSelection(null);
+      const selector = (selection2 == null ? void 0 : selection2.isLayout) ? "#edit-layout-primary-template" : "#edit-content-template";
+      return document.querySelector(selector);
+    };
+    const getCurrentTemplateText = () => {
+      var _a;
+      const selection2 = currentSelection(null);
+      const templateField = getCurrentTemplateField();
+      const currentConfig = getConfig ? getConfig() || {} : {};
+      const layout = ((_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) && typeof currentConfig.work.layout === "object" ? currentConfig.work.layout : {};
+      const explicitTemplate = templateField && typeof templateField.value === "string" ? templateField.value : "";
+      const fallbackTemplate = (selection2 == null ? void 0 : selection2.isLayout) ? typeof layout.template === "string" && layout.template || (typeof layout.phpTemplate === "string" ? layout.phpTemplate : "") : typeof layout.sectionTemplate === "string" && layout.sectionTemplate || (typeof layout.defaultSectionTemplate === "string" ? layout.defaultSectionTemplate : "");
+      return explicitTemplate || fallbackTemplate || "";
+    };
+    const renderTemplatePreview = () => {
+      var _a;
+      if (!promptTemplateCodeEl) {
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = typeof reader.result === "string" ? reader.result : "";
-        if (!dataUrl.startsWith("data:image/")) {
-          reject(new Error("Invalid image data."));
-          return;
-        }
-        resolve({
-          name: file.name || "clipboard-image.png",
-          mimeType: file.type || "image/png",
-          dataUrl
-        });
+      const selection2 = currentSelection(null);
+      const templateField = getCurrentTemplateField();
+      const currentConfig = getConfig ? getConfig() || {} : {};
+      const layout = ((_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) && typeof currentConfig.work.layout === "object" ? currentConfig.work.layout : {};
+      const explicitTemplate = templateField && typeof templateField.value === "string" ? templateField.value : "";
+      const fallbackTemplate = (selection2 == null ? void 0 : selection2.isLayout) ? typeof layout.template === "string" && layout.template || (typeof layout.phpTemplate === "string" ? layout.phpTemplate : "") : typeof layout.sectionTemplate === "string" && layout.sectionTemplate || (typeof layout.defaultSectionTemplate === "string" ? layout.defaultSectionTemplate : "");
+      promptTemplateCodeEl.value = explicitTemplate || fallbackTemplate || "";
+      if (promptTemplateLabelEl) {
+        promptTemplateLabelEl.textContent = (selection2 == null ? void 0 : selection2.isLayout) ? "Current layout wrapper template" : "Current wrapped partial template";
+      }
+    };
+    const renderContext = () => {
+      const context = buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig });
+      state.activePath = context.isLayout ? context.virtualPath || context.path : context.path;
+      state.activePromptMode = currentPromptMode();
+      if (promptInputEl && !state.isSending) {
+        promptInputEl.placeholder = currentPromptPlaceholder();
+      }
+      renderPromptContext(promptContextEl, context);
+      renderTemplatePreview();
+    };
+    const renderSummary = (content) => {
+      renderPromptSummary(promptSummaryEl, content);
+    };
+    const updateAttachmentUi = () => {
+      if (!promptAttachmentEl || !promptAttachmentPreviewEl || !promptAttachmentNameEl || !promptInputEl) {
+        return;
+      }
+      const hasImageContext = currentHasImageContext() || !!state.imageAttachment;
+      const hasAttachment = !!state.imageAttachment;
+      root.classList.toggle("prompt-has-image-context", hasImageContext);
+      promptAttachmentEl.hidden = !hasAttachment;
+      if (promptAttachEl) {
+        promptAttachEl.hidden = !hasImageContext;
+      }
+      promptInputEl.classList.toggle("prompt-input-has-attachment", hasAttachment);
+      if (!hasAttachment) {
+        promptAttachmentPreviewEl.removeAttribute("src");
+        promptAttachmentNameEl.textContent = "Image attached";
+        return;
+      }
+      promptAttachmentPreviewEl.src = state.imageAttachment.dataUrl;
+      promptAttachmentNameEl.textContent = state.imageAttachment.name || "clipboard-image.png";
+    };
+    const clearAttachment = () => {
+      state.imageAttachment = null;
+      if (promptImageInputEl) {
+        promptImageInputEl.value = "";
+      }
+      updateAttachmentUi();
+    };
+    const clearPromptHistory = () => {
+      state.promptHistory = [];
+      renderHistory();
+    };
+    const attachImageFile = async (file) => {
+      const { readImageFile: readImageFile2 } = await Promise.resolve().then(() => (init_image(), image_exports));
+      try {
+        state.imageAttachment = await readImageFile2(file);
+        updateAttachmentUi();
+        setPromptStatus(`Attached image: ${state.imageAttachment.name}`, true);
+      } catch (err) {
+        setPromptStatus(err.message || "Failed to attach image.");
+      }
+    };
+    const setGeneratingState = (active, label = "Generating answer...") => {
+      root.classList.toggle("prompt-window-generating", active);
+      root.setAttribute("aria-busy", active ? "true" : "false");
+      if (promptSummaryEl) {
+        promptSummaryEl.classList.toggle("prompt-summary-generating", active);
+      }
+      if (promptGenerationEl) {
+        promptGenerationEl.hidden = !active;
+      }
+      if (promptGenerationLabelEl) {
+        promptGenerationLabelEl.textContent = label;
+      }
+      if (promptSendEl) {
+        promptSendEl.disabled = active;
+        promptSendEl.textContent = active ? "Generating..." : "Send";
+      }
+      if (promptAttachEl) {
+        promptAttachEl.disabled = active;
+      }
+      if (promptClearEl) {
+        promptClearEl.disabled = active;
+      }
+      if (promptAttachmentRemoveEl) {
+        promptAttachmentRemoveEl.disabled = active;
+      }
+      if (promptInputEl) {
+        promptInputEl.disabled = active;
+        promptInputEl.placeholder = active ? "Generating answer..." : defaultPromptPlaceholder;
+      }
+    };
+    const reloadViewer = () => {
+      const frame = document.getElementById("contentFrame");
+      const selection2 = currentSelection({ path: "", isFile: false });
+      const selectionPath = selection2 && Object.prototype.hasOwnProperty.call(selection2, "previewPath") ? selection2.previewPath : void 0;
+      const activeViewerPath = selectionPath != null ? selectionPath : state.activePath;
+      if (frame && activeViewerPath !== null && activeViewerPath !== void 0) {
+        window.dispatchEvent(new CustomEvent("poff:content-updated", {
+          detail: {
+            path: activeViewerPath,
+            target: (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder"
+          }
+        }));
+      }
+    };
+    const syncHistoryForPath = () => {
+      const selection2 = currentSelection({ path: "" });
+      const nextPath = (selection2 == null ? void 0 : selection2.path) || "";
+      const nextPromptMode = (selection2 == null ? void 0 : selection2.isLayout) ? "layout" : (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder";
+      if (nextPath !== state.activePath || nextPromptMode !== state.activePromptMode) {
+        state.activePath = nextPath;
+        state.activePromptMode = nextPromptMode;
+        setHistory(readHistoryForSelection(selection2));
+        renderHistory();
+        renderContext();
+        renderSummary("Waiting for response...");
+        updateAttachmentUi();
+      }
+    };
+    const restoreHistorySnapshot = async (snapshot, { saveConfig, drawerForm: nextDrawerForm, updatePromptEditorFields: updateFields = updatePromptEditorFields, buildPromptLayoutPayload: buildPromptLayoutPayload2, focusPromptTemplateField: focusField = focusPromptTemplateField } = {}) => {
+      if (!snapshot || typeof snapshot !== "object") {
+        return false;
+      }
+      const isLayoutTarget = snapshot.targetType === "layout";
+      const templateText = typeof snapshot.template === "string" ? snapshot.template : "";
+      if (!templateText) {
+        return false;
+      }
+      const restoredWork = snapshot.workSnapshot && typeof snapshot.workSnapshot === "object" ? snapshot.workSnapshot : {};
+      updateFields({
+        templateText,
+        nextTitle: typeof snapshot.title === "string" ? snapshot.title : null,
+        nextDescription: typeof snapshot.description === "string" ? snapshot.description : null,
+        nextWork: restoredWork,
+        isLayoutTarget,
+        nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
+        nextJs: typeof snapshot.js === "string" ? snapshot.js : null
+      });
+      renderContext();
+      const selection2 = currentSelection({ path: state.activePath, previewPath: state.activePath, previewIsFile: false, isLayout: isLayoutTarget });
+      const currentConfig = getConfig ? getConfig() || {} : {};
+      const { layoutPayload } = buildPromptLayoutPayload2({
+        selection: selection2,
+        currentConfig,
+        drawerForm: nextDrawerForm,
+        templateText,
+        nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
+        nextJs: typeof snapshot.js === "string" ? snapshot.js : null,
+        layoutPreset: isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset()
+      });
+      const savePayload = {
+        path: state.activePath,
+        layout: layoutPayload
       };
-      reader.onerror = () => reject(new Error("Failed to read image."));
-      reader.readAsDataURL(file);
-    });
+      if (typeof snapshot.title === "string" && snapshot.title.trim() !== "") {
+        savePayload.title = snapshot.title.trim();
+      }
+      if (typeof snapshot.description === "string" && snapshot.description.trim() !== "") {
+        savePayload.description = snapshot.description.trim();
+      }
+      await saveConfig(savePayload, statusEl);
+      renderSummary(`Restored ${isLayoutTarget ? "layout" : "template"} from assistant stage.`);
+      reloadViewer();
+      focusField(isLayoutTarget);
+      setPromptStatus("Restored template from assistant stage.", true);
+      return true;
+    };
+    return {
+      stream,
+      state,
+      setPromptStatus,
+      currentSelection,
+      currentPromptMode,
+      currentPromptPlaceholder,
+      currentDefaultSystemPrompt,
+      currentSystemPromptSettingKey,
+      currentHasImageContext,
+      currentSelectionName,
+      insertPromptText: insertPromptText2,
+      setHistory,
+      getHistoryScope,
+      readHistoryForSelection,
+      writeHistoryForSelection,
+      renderHistory,
+      getCurrentTemplateField,
+      getCurrentTemplateText,
+      renderTemplatePreview,
+      renderContext,
+      renderSummary,
+      updateAttachmentUi,
+      clearAttachment,
+      clearPromptHistory,
+      attachImageFile,
+      setGeneratingState,
+      reloadViewer,
+      syncHistoryForPath,
+      restoreHistorySnapshot,
+      getLayoutPreset,
+      forceLayoutPromptToCustom,
+      updatePromptEditorFields,
+      focusPromptTemplateField,
+      syncWorkFieldEditors,
+      setActivePath: (path) => {
+        state.activePath = path;
+      }
+    };
   }
 
   // src/assets/js/edit/prompt/summary.js
@@ -2003,211 +2685,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     };
   }
 
-  // src/assets/js/edit/prompt/settings.js
-  function bindPromptSettings({
-    providerEl,
-    modelEl,
-    endpointRow,
-    endpointEl,
-    apiKeyEl,
-    systemPromptEl,
-    systemResetEl,
-    settingsResetEl,
-    streamToggleEl,
-    defaultPromptSettings: defaultPromptSettings2,
-    currentDefaultSystemPrompt,
-    currentPromptMode,
-    currentSystemPromptSettingKey,
-    getDefaultModelForProvider: getDefaultModelForProvider2,
-    loadPromptSettings: loadPromptSettings2,
-    savePromptSettings: savePromptSettings2,
-    onRenderContext
-  }) {
-    const settings = loadPromptSettings2();
-    let suppressSave = false;
-    const readSettings = () => {
-      const systemPrompt = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim() || currentDefaultSystemPrompt();
-      const nextSettings = {
-        provider: providerEl ? providerEl.value : "local",
-        model: modelEl ? modelEl.value : "",
-        endpoint: endpointEl ? endpointEl.value : "",
-        apiKey: apiKeyEl ? apiKeyEl.value : "",
-        systemPrompt,
-        systemPromptFile: settings.systemPromptFile || defaultPromptSettings2.systemPromptFile,
-        systemPromptFolder: settings.systemPromptFolder || defaultPromptSettings2.systemPromptFolder,
-        systemPromptLayout: settings.systemPromptLayout || defaultPromptSettings2.systemPromptLayout,
-        streamPreview: streamToggleEl ? !!streamToggleEl.checked : true
-      };
-      nextSettings[currentSystemPromptSettingKey()] = systemPrompt;
-      return nextSettings;
-    };
-    const persistSettings = () => {
-      if (!suppressSave) {
-        savePromptSettings2(readSettings());
-      }
-    };
-    const updateProviderUi = ({ resetModel = false } = {}) => {
-      const provider = providerEl ? providerEl.value : "local";
-      if (endpointRow) {
-        endpointRow.hidden = provider !== "local";
-      }
-      if (modelEl && resetModel && !modelEl.value.trim()) {
-        modelEl.value = getDefaultModelForProvider2(provider);
-      }
-      persistSettings();
-    };
-    const applySettingsToUi = (nextSettings) => {
-      suppressSave = true;
-      if (providerEl) providerEl.value = nextSettings.provider || defaultPromptSettings2.provider;
-      if (modelEl) modelEl.value = nextSettings.model || "";
-      if (endpointEl) endpointEl.value = nextSettings.endpoint || "";
-      if (apiKeyEl) apiKeyEl.value = nextSettings.apiKey || "";
-      if (systemPromptEl) {
-        const mode = currentPromptMode();
-        systemPromptEl.value = mode === "layout" ? nextSettings.systemPromptLayout || nextSettings.systemPrompt || currentDefaultSystemPrompt() : mode === "folder" ? nextSettings.systemPromptFolder || nextSettings.systemPrompt || currentDefaultSystemPrompt() : nextSettings.systemPromptFile || nextSettings.systemPrompt || currentDefaultSystemPrompt();
-      }
-      if (streamToggleEl) streamToggleEl.checked = nextSettings.streamPreview !== false;
-      suppressSave = false;
-      updateProviderUi();
-    };
-    const syncModeAwareSystemPrompt = () => {
-      if (!systemPromptEl) {
-        return;
-      }
-      const currentValue = (systemPromptEl.value || "").trim();
-      if (currentValue !== "" && !(/* @__PURE__ */ new Set([settings.systemPromptFile, settings.systemPromptFolder, settings.systemPromptLayout])).has(currentValue)) {
-        return;
-      }
-      const nextValue = currentDefaultSystemPrompt();
-      if (systemPromptEl.value !== nextValue) {
-        systemPromptEl.value = nextValue;
-        settings[currentSystemPromptSettingKey()] = nextValue;
-        savePromptSettings2(readSettings());
-      }
-    };
-    if (providerEl) {
-      providerEl.addEventListener("change", () => updateProviderUi({ resetModel: false }));
+  // src/assets/js/edit/prompt/log.js
+  function debugPromptLog(label, payload) {
+    try {
+      console.info(`[prompt] ${label}`, payload);
+    } catch (err) {
     }
-    if (modelEl) {
-      modelEl.addEventListener("input", persistSettings);
-    }
-    if (endpointEl) {
-      endpointEl.addEventListener("input", persistSettings);
-    }
-    if (apiKeyEl) {
-      apiKeyEl.addEventListener("input", persistSettings);
-    }
-    if (systemPromptEl) {
-      systemPromptEl.addEventListener("input", () => {
-        settings[currentSystemPromptSettingKey()] = (systemPromptEl.value || "").trim() || currentDefaultSystemPrompt();
-        savePromptSettings2(readSettings());
-      });
-    }
-    if (streamToggleEl) {
-      streamToggleEl.addEventListener("change", () => {
-        savePromptSettings2(readSettings());
-      });
-    }
-    if (systemResetEl && systemPromptEl) {
-      systemResetEl.addEventListener("click", () => {
-        systemPromptEl.value = currentDefaultSystemPrompt();
-        settings[currentSystemPromptSettingKey()] = systemPromptEl.value;
-        savePromptSettings2(readSettings());
-      });
-    }
-    if (settingsResetEl) {
-      settingsResetEl.addEventListener("click", () => {
-        const nextSettings = {
-          ...defaultPromptSettings2,
-          systemPrompt: currentDefaultSystemPrompt()
-        };
-        applySettingsToUi(nextSettings);
-        savePromptSettings2(nextSettings);
-        if (typeof onRenderContext === "function") {
-          onRenderContext();
-        }
-      });
-    }
-    return {
-      settings,
-      readSettings,
-      applySettingsToUi,
-      updateProviderUi,
-      syncModeAwareSystemPrompt
-    };
-  }
-
-  // src/assets/js/edit/prompt/layer.js
-  function createPromptLayerController({
-    root,
-    windowEl,
-    closeEl,
-    openEl,
-    storageKey,
-    storage
-  }) {
-    const readState = () => {
-      try {
-        const stored = JSON.parse(storage.getItem(storageKey) || "{}");
-        return !!stored.collapsed;
-      } catch (err) {
-        return false;
-      }
-    };
-    const writeState = (collapsed) => {
-      try {
-        storage.setItem(storageKey, JSON.stringify({ collapsed: !!collapsed }));
-      } catch (err) {
-      }
-    };
-    const applyState = (collapsed, options = {}) => {
-      const nextCollapsed = !!collapsed;
-      root.classList.toggle("prompt-layer-collapsed", nextCollapsed);
-      if (windowEl) {
-        windowEl.hidden = nextCollapsed;
-      }
-      if (closeEl) {
-        closeEl.hidden = nextCollapsed;
-      }
-      if (openEl) {
-        openEl.hidden = !nextCollapsed;
-      }
-      if (!options.skipPersist) {
-        writeState(nextCollapsed);
-      }
-    };
-    if (closeEl) {
-      closeEl.addEventListener("click", () => applyState(true));
-    }
-    if (openEl) {
-      openEl.addEventListener("click", () => applyState(false));
-    }
-    if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
-      document.addEventListener("keydown", (event) => {
-        if (!event || event.key !== "Escape") {
-          return;
-        }
-        applyState(true);
-      });
-    }
-    return {
-      readState,
-      writeState,
-      applyState
-    };
-  }
-
-  // src/assets/js/edit/selection.js
-  function getSelectionOrFallback(getActiveSelection2, fallback = {}) {
-    return typeof getActiveSelection2 === "function" ? getActiveSelection2() || fallback : fallback;
-  }
-  function getLayoutPresetValue(defaultValue = "actual") {
-    const presetEl = document.getElementById("edit-layout-preset");
-    if (!presetEl || typeof presetEl.value !== "string") {
-      return defaultValue;
-    }
-    const value = presetEl.value.trim();
-    return value || defaultValue;
   }
 
   // src/assets/js/edit/prompt/layout-payload.js
@@ -2267,14 +2750,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (responseModel) {
       layoutPayload.model = responseModel;
     }
-    const attachSiblingSectionTemplates = () => {
-      if (responseWorkTemplate !== null) {
-        layoutPayload.workTemplate = responseWorkTemplate;
-      }
-      if (responseWorksTemplate !== null) {
-        layoutPayload.worksTemplate = responseWorksTemplate;
-      }
-    };
     const preset = (layoutPreset || layoutState.preset || "actual").trim();
     layoutPayload.preset = preset;
     if (preset === "shared") {
@@ -2289,10 +2764,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : preset === "shared" ? resolvedSharedName || resolvedLayoutName || "poff-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
     if (shouldPersistToLocalWrapper) {
       layoutPayload.template = templateText;
-      if (responseSectionTemplate !== null) {
-        layoutPayload.sectionTemplate = responseSectionTemplate;
-      }
-      attachSiblingSectionTemplates();
       if (nextCss !== null) {
         layoutPayload.css = nextCss;
       }
@@ -2302,10 +2773,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     } else if (canEditResolvedFilesystemTarget) {
       layoutPayload.originalTarget = resolvedLayoutDirectory;
       layoutPayload.originalTemplate = templateText;
-      if (responseSectionTemplate !== null) {
-        layoutPayload.sectionTemplate = responseSectionTemplate;
-      }
-      attachSiblingSectionTemplates();
       if (nextCss !== null) {
         layoutPayload.originalCss = nextCss;
       }
@@ -2315,10 +2782,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     } else {
       layoutPayload.name = "custom-layout";
       layoutPayload.template = templateText;
-      if (responseSectionTemplate !== null) {
-        layoutPayload.sectionTemplate = responseSectionTemplate;
-      }
-      attachSiblingSectionTemplates();
       if (nextCss !== null) {
         layoutPayload.css = nextCss;
       }
@@ -2329,20 +2792,462 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return { layoutPayload, layoutState, resolvedLayoutName };
   }
 
-  // src/assets/js/edit/status.js
-  function setStatusMessage(statusEl, message, success = false) {
-    if (!statusEl) {
-      return;
-    }
-    statusEl.textContent = message;
-    statusEl.className = success ? "edit-status edit-status-success" : "edit-status";
+  // src/assets/js/edit/prompt/workflows.js
+  function buildPromptResetSavePayload(path, layoutPayload) {
+    return {
+      path,
+      layout: layoutPayload,
+      promptHistory: []
+    };
+  }
+  function createPromptWindowWorkflows({
+    root,
+    statusEl,
+    drawerForm,
+    getConfig,
+    saveConfig,
+    promptInputEl,
+    providerEl,
+    modelEl,
+    endpointEl,
+    apiKeyEl,
+    systemPromptEl,
+    streamToggleEl,
+    currentSelection,
+    currentSelectionName,
+    setPromptStatus,
+    setHistory,
+    writeHistoryForSelection,
+    readHistoryForSelection,
+    renderHistory,
+    renderContext,
+    renderSummary,
+    setGeneratingState,
+    clearAttachment,
+    attachImageFile,
+    getCurrentTemplateText,
+    getLayoutPreset,
+    forceLayoutPromptToCustom,
+    updatePromptEditorFields: updatePromptEditorFields2,
+    syncWorkFieldEditors: syncWorkFieldEditors2,
+    focusPromptTemplateField: focusPromptTemplateField2,
+    reloadViewer,
+    state,
+    stream
+  }) {
+    const dropPendingAssistantHistory = (pendingAssistantIndex) => {
+      if (pendingAssistantIndex === null || pendingAssistantIndex < 0 || pendingAssistantIndex >= state.promptHistory.length) {
+        return state.promptHistory;
+      }
+      const nextHistory = state.promptHistory.slice();
+      nextHistory.splice(pendingAssistantIndex, 1);
+      return nextHistory;
+    };
+    const onClearChat = () => {
+      stopStreaming(stream);
+      setHistory([]);
+      writeHistoryForSelection(state.promptHistory);
+      renderHistory();
+    };
+    const onResetTemplate = async () => {
+      var _a, _b, _c, _d;
+      if (state.isSending) {
+        return;
+      }
+      const selection2 = currentSelection({ path: state.activePath, isLayout: false, previewPath: state.activePath, layoutIsFile: false });
+      const isLayoutTarget = !!(selection2 == null ? void 0 : selection2.isLayout);
+      const resetLabel = isLayoutTarget ? "current layout wrapper template" : "current wrapped partial template";
+      if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
+        return;
+      }
+      try {
+        state.isSending = true;
+        setGeneratingState(true, "Resetting template...");
+        setPromptStatus("Resetting template...");
+        const currentConfig = getConfig ? getConfig() || {} : {};
+        const layoutState = getLayoutState(currentConfig || {});
+        const layoutPayload = {
+          name: ((_b = (_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) == null ? void 0 : _b.name) || "poff-layout",
+          engine: ((_d = (_c = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _c.layout) == null ? void 0 : _d.engine) || "lightncandy"
+        };
+        if (isLayoutTarget) {
+          const preset = (getLayoutPreset() || layoutState.preset || "actual").trim();
+          const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
+          const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
+          const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
+          const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
+          const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
+          layoutPayload.preset = preset;
+          layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
+          if (shouldPersistToLocalWrapper) {
+            layoutPayload.template = "";
+          } else if (canEditResolvedFilesystemTarget) {
+            layoutPayload.originalTarget = resolvedLayoutDirectory;
+            layoutPayload.originalTemplate = "";
+          } else {
+            layoutPayload.template = "";
+          }
+          updatePromptEditorFields2({
+            templateText: "",
+            nextTitle: null,
+            nextDescription: null,
+            nextWork: null,
+            isLayoutTarget: true
+          });
+        } else {
+          layoutPayload.sectionTemplate = "";
+          updatePromptEditorFields2({
+            templateText: "",
+            nextTitle: null,
+            nextDescription: null,
+            nextWork: null,
+            isLayoutTarget: false
+          });
+        }
+        setHistory([]);
+        writeHistoryForSelection(state.promptHistory, selection2, { persistRemote: false });
+        await saveConfig(buildPromptResetSavePayload(state.activePath, layoutPayload), statusEl);
+        renderHistory();
+        renderContext();
+        renderSummary(`Reset ${isLayoutTarget ? "layout wrapper" : "wrapped partial"} to inherited/default template.`);
+        reloadViewer();
+        setPromptStatus(`${isLayoutTarget ? "Layout wrapper" : "Wrapped partial"} reset to inherited/default template.`, true);
+      } catch (err) {
+        setPromptStatus((err == null ? void 0 : err.message) || "Template reset failed.");
+        renderSummary("Template reset failed.");
+      } finally {
+        setGeneratingState(false);
+        state.isSending = false;
+      }
+    };
+    const onSendPrompt = async () => {
+      if (state.isSending || !promptInputEl.value.trim() && !state.imageAttachment) {
+        return;
+      }
+      state.isSending = true;
+      setGeneratingState(true, "Generating answer...");
+      stopStreaming(stream);
+      let pendingAssistantIndex = null;
+      let settled = false;
+      let requestSummary = null;
+      const fallbackTimer = window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        stopStreaming(stream);
+        setGeneratingState(false);
+        const errMsg = "Prompt timed out after 5 minutes.";
+        setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+        renderHistory({ forceScroll: true });
+        setPromptStatus(errMsg);
+        state.isSending = false;
+      }, 305e3);
+      try {
+        const userPrompt = promptInputEl.value.trim();
+        const providerValue = providerEl ? providerEl.value : "local";
+        const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
+        const selection2 = currentSelection({ path: state.activePath, previewPath: state.activePath, previewIsFile: false, isLayout: false });
+        if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
+          setGeneratingState(false);
+          setPromptStatus(providerValue === "openai" ? "Add an OpenAI API key to send prompts." : "Add a Gemini API key to send prompts.");
+          state.isSending = false;
+          return;
+        }
+        setHistory([...state.promptHistory, { role: "user", content: userPrompt }].slice(-12));
+        setHistory([...state.promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
+        pendingAssistantIndex = state.promptHistory.length - 1;
+        writeHistoryForSelection(state.promptHistory, selection2, { persistRemote: false });
+        renderHistory({ forceScroll: true });
+        renderContext();
+        promptInputEl.value = "";
+        setPromptStatus("Generating answer...");
+        renderSummary("Generating answer...");
+        const historyForRequest = serializeHistoryForRequest(state.promptHistory.slice(0, -1), {
+          initialTemplateText: getCurrentTemplateText()
+        });
+        const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
+        const payload = {
+          path: state.activePath,
+          provider: providerEl ? providerEl.value : "local",
+          model: modelEl ? modelEl.value.trim() : "",
+          endpoint: endpointEl ? endpointEl.value.trim() : "",
+          apiKey: apiKeyEl ? apiKeyEl.value.trim() : "",
+          prompt: userPrompt,
+          history: historyForRequest,
+          systemPrompt: systemPromptValue
+        };
+        const editorDraft = readPromptEditorDraft(selection2);
+        if (editorDraft) {
+          payload.draft = editorDraft;
+        }
+        if (selection2 == null ? void 0 : selection2.isLayout) {
+          const layoutPreset = getLayoutPreset();
+          if (layoutPreset) {
+            payload.layoutPreset = layoutPreset;
+          }
+        }
+        if (state.imageAttachment) {
+          payload.image = { ...state.imageAttachment };
+        }
+        requestSummary = summarizePromptRequest(payload);
+        debugPromptLog("request", requestSummary);
+        const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
+        if (useStreaming) {
+          beginStreaming({
+            stream,
+            targetIndex: pendingAssistantIndex,
+            history: state.promptHistory,
+            renderHistory: () => renderHistory({ forceScroll: true })
+          });
+        }
+        const response = useStreaming ? await requestPromptTemplateStream(payload, {
+          onDelta: (chunk) => appendStreamingChunk({
+            stream,
+            chunk,
+            history: state.promptHistory,
+            renderHistory: () => renderHistory({ forceScroll: true })
+          })
+        }) : await requestPromptTemplate(payload);
+        settled = true;
+        debugPromptLog("response", summarizePromptResponse(response, requestSummary));
+        const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
+        const nextTitle = typeof response.title === "string" ? response.title.trim() : null;
+        const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
+        const nextCss = typeof response.css === "string" ? response.css : null;
+        const nextJs = typeof response.js === "string" ? response.js : null;
+        const isLayoutTarget = !!selection2.isLayout;
+        const currentConfig = getConfig ? getConfig() : null;
+        const layoutSectionKey = isLayoutTarget ? (selection2 == null ? void 0 : selection2.previewIsFile) || (selection2 == null ? void 0 : selection2.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
+        const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
+        const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
+        const responseWorkTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork["work.hbs"] === "string" ? rawResponseWork["work.hbs"] : null;
+        const responseWorksTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork["works.hbs"] === "string" ? rawResponseWork["works.hbs"] : null;
+        const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
+        const mergedWork = {
+          ...inferredWork || {},
+          ...rawResponseWork || {}
+        };
+        const nextWork = filterAllowedWork(mergedWork, currentConfig);
+        const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, "layout") ? nextWork.layout : null;
+        const persistedWork = nextWork && typeof nextWork === "object" ? materializeWorkFields(nextWork) : null;
+        if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, "layout")) {
+          delete persistedWork.layout;
+        }
+        if (response.error || !templateText) {
+          stopStreaming(stream);
+          setGeneratingState(false);
+          const errMsg = response.error || "Prompt returned no content.";
+          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+          writeHistoryForSelection(state.promptHistory, selection2);
+          renderHistory({ forceScroll: true });
+          setPromptStatus(errMsg);
+          renderSummary(errMsg);
+          return;
+        }
+        const templateSnapshot = buildTemplateHistorySnapshot({
+          templateText,
+          nextCss,
+          nextJs,
+          nextTitle,
+          nextDescription,
+          nextWork: persistedWork || nextWork,
+          isLayoutTarget
+        });
+        if (pendingAssistantIndex !== null && state.promptHistory[pendingAssistantIndex]) {
+          state.promptHistory[pendingAssistantIndex].content = templateText;
+          state.promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
+          setHistory(state.promptHistory);
+        } else {
+          setHistory([...state.promptHistory, {
+            role: "assistant",
+            content: templateText,
+            templateSnapshot
+          }].slice(-12));
+          pendingAssistantIndex = state.promptHistory.length - 1;
+        }
+        if (useStreaming) {
+          finishStreaming({
+            stream,
+            history: state.promptHistory,
+            fullText: templateText,
+            renderHistory: () => renderHistory({ forceScroll: true })
+          });
+        }
+        writeHistoryForSelection(state.promptHistory, selection2);
+        renderHistory({ forceScroll: true });
+        renderContext();
+        if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
+          systemPromptEl.value = response.systemPrompt;
+        }
+        updatePromptEditorFields2({
+          templateText,
+          nextTitle,
+          nextDescription,
+          nextWork,
+          isLayoutTarget,
+          nextCss,
+          nextJs
+        });
+        syncWorkFieldEditors2(nextWork);
+        focusPromptTemplateField2(isLayoutTarget);
+        if (drawerForm) {
+          const templateField = drawerForm.querySelector("#edit-content-template");
+          if (!isLayoutTarget && templateField) {
+            templateField.value = templateText;
+          }
+          const layoutNameField = drawerForm.querySelector("#edit-work-layout");
+          if (layoutNameField && !layoutNameField.value.trim()) {
+            layoutNameField.value = "poff-layout";
+          }
+          if (nextWork && (typeof nextWork.template === "string" || typeof nextWork.type === "string")) {
+            const workTypeField = drawerForm.querySelector("#edit-work-type");
+            if (workTypeField) {
+              workTypeField.value = nextWork.template || nextWork.type;
+            }
+          }
+        }
+        const effectiveLayoutPreset = isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset();
+        const { layoutPayload } = buildPromptLayoutPayload({
+          selection: selection2,
+          currentConfig,
+          drawerForm,
+          templateText,
+          responseSectionTemplate,
+          responseWorkTemplate,
+          responseWorksTemplate,
+          nextCss,
+          nextJs,
+          nextLayoutValue,
+          responseModel: response.model || "",
+          layoutPreset: effectiveLayoutPreset
+        });
+        const savePayload = {
+          path: state.activePath,
+          layout: layoutPayload
+        };
+        if (nextTitle !== null) {
+          savePayload.title = nextTitle;
+        }
+        if (nextDescription !== null) {
+          savePayload.description = nextDescription;
+        }
+        if (persistedWork && Object.keys(persistedWork).length) {
+          savePayload.work = persistedWork;
+        }
+        if (Array.isArray(response == null ? void 0 : response.treeVisible)) {
+          savePayload.treeVisible = response.treeVisible;
+        }
+        savePayload.promptHistory = state.promptHistory.slice(-12);
+        await saveConfig(savePayload, statusEl);
+        renderContext();
+        const providerLabel = response.provider || payload.provider;
+        const modelLabel = response.model || payload.model || "";
+        setPromptStatus(`${isLayoutTarget ? "Layout" : "Template"} updated via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}`, true);
+        const extra = [];
+        if (nextTitle !== null) extra.push("title");
+        if (nextDescription !== null) extra.push("description");
+        if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(", ")}`);
+        if (nextLayoutValue) extra.push("layout");
+        if (isLayoutTarget && nextCss !== null) extra.push("css");
+        if (isLayoutTarget && nextJs !== null) extra.push("js");
+        const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? "layout " : ""}HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
+        renderSummary(summaryText);
+        clearAttachment();
+        reloadViewer();
+      } catch (err) {
+        settled = true;
+        stopStreaming(stream);
+        setGeneratingState(false);
+        debugPromptLog("error", summarizePromptError(err, requestSummary || (state.activePath ? { path: state.activePath } : null)));
+        setPromptStatus("Prompt failed.");
+        const errMsg = "Prompt failed.";
+        setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
+        writeHistoryForSelection(state.promptHistory, selection);
+        renderHistory({ forceScroll: true });
+        renderSummary(errMsg);
+      } finally {
+        window.clearTimeout(fallbackTimer);
+        setGeneratingState(false);
+        state.isSending = false;
+        promptInputEl.focus();
+      }
+    };
+    return {
+      onClearChat,
+      onResetTemplate,
+      onSendPrompt,
+      onAttachImage: attachImageFile,
+      onInsertName: async () => {
+        const name = currentSelectionName();
+        if (!name) {
+          setPromptStatus("No file name selected.");
+          return;
+        }
+        await insertPromptText(name);
+      },
+      onRemoveImage: () => {
+        clearAttachment();
+        setPromptStatus("Image removed.");
+      },
+      onTemplateInput: () => {
+        if (typeof renderContext === "function") {
+          renderContext();
+        }
+      },
+      onLayoutPresetChange: renderContext,
+      restoreHistorySnapshot: async (snapshot) => {
+        if (!snapshot || typeof snapshot !== "object") {
+          return false;
+        }
+        const isLayoutTarget = snapshot.targetType === "layout";
+        const templateText = typeof snapshot.template === "string" ? snapshot.template : "";
+        if (!templateText) {
+          return false;
+        }
+        const restoredWork = snapshot.workSnapshot && typeof snapshot.workSnapshot === "object" ? snapshot.workSnapshot : {};
+        updatePromptEditorFields2({
+          templateText,
+          nextTitle: typeof snapshot.title === "string" ? snapshot.title : null,
+          nextDescription: typeof snapshot.description === "string" ? snapshot.description : null,
+          nextWork: restoredWork,
+          isLayoutTarget,
+          nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
+          nextJs: typeof snapshot.js === "string" ? snapshot.js : null
+        });
+        renderContext();
+        const selection2 = currentSelection({ path: state.activePath, previewPath: state.activePath, previewIsFile: false, isLayout: isLayoutTarget });
+        const currentConfig = getConfig ? getConfig() || {} : {};
+        const { layoutPayload } = buildPromptLayoutPayload({
+          selection: selection2,
+          currentConfig,
+          drawerForm,
+          templateText,
+          nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
+          nextJs: typeof snapshot.js === "string" ? snapshot.js : null,
+          layoutPreset: isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset()
+        });
+        const savePayload = {
+          path: state.activePath,
+          layout: layoutPayload
+        };
+        if (typeof snapshot.title === "string" && snapshot.title.trim() !== "") {
+          savePayload.title = snapshot.title.trim();
+        }
+        if (typeof snapshot.description === "string" && snapshot.description.trim() !== "") {
+          savePayload.description = snapshot.description.trim();
+        }
+        await saveConfig(savePayload, statusEl);
+        renderSummary(`Restored ${isLayoutTarget ? "layout" : "template"} from assistant stage.`);
+        reloadViewer();
+        focusPromptTemplateField2(isLayoutTarget);
+        setPromptStatus("Restored template from assistant stage.", true);
+        return true;
+      }
+    };
   }
 
   // src/assets/js/edit/prompt.js
-  var PROMPT_FALLBACK_TIMEOUT_MS = 305e3;
   var PROMPT_LAYER_STATE_KEY = "poffEditPromptLayerState";
-  var promptHistory = [];
-  var stream = createStreamState();
   function bindPromptWindow({
     root,
     statusEl,
@@ -2385,258 +3290,101 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const promptAttachmentPreviewEl = root.querySelector("#promptAttachmentPreview");
     const promptAttachmentNameEl = root.querySelector("#promptAttachmentName");
     const promptAttachmentRemoveEl = root.querySelector("#prompt-attachment-remove");
-    let isSending = false;
-    const currentSelection = (fallback = {}) => getSelectionOrFallback(getActiveSelection2, fallback);
-    const setPromptStatus = (message, success = false) => setStatusMessage(statusEl, message, success);
-    const getLayoutPreset = () => getLayoutPresetValue();
-    const forceLayoutPromptToCustom = () => {
-      const presetEl = document.getElementById("edit-layout-preset");
-      if (presetEl && presetEl.value !== "custom") {
-        presetEl.value = "custom";
-      }
-      return "custom";
-    };
-    let activePath = currentSelection({ path: "" }).path;
-    let activePromptMode = currentSelection().isLayout ? "layout" : currentSelection().previewIsFile ? "file" : "folder";
-    let imageAttachment = null;
-    const imageContextPattern = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
-    const defaultPromptPlaceholder = (promptInputEl == null ? void 0 : promptInputEl.getAttribute("placeholder")) || "Describe the component you want...";
-    const currentPromptMode = () => getPromptMode(currentSelection());
-    const currentPromptPlaceholder = () => getPromptPlaceholderForMode(currentPromptMode(), defaultPromptPlaceholder);
-    const currentDefaultSystemPrompt = () => getDefaultSystemPromptForMode(currentPromptMode(), {
-      file: defaultFileSystemPrompt,
-      folder: defaultFolderSystemPrompt,
-      layout: defaultLayoutSystemPrompt
+    const runtime = createPromptRuntime({
+      root,
+      statusEl,
+      drawerForm,
+      getActiveSelection: getActiveSelection2,
+      getConfig,
+      requestEditConfig,
+      promptInputEl,
+      promptMessagesEl,
+      promptContextEl,
+      promptSummaryEl,
+      promptGenerationEl,
+      promptGenerationLabelEl,
+      promptTemplateLabelEl,
+      promptTemplateCodeEl,
+      promptAttachmentEl,
+      promptAttachEl,
+      promptAttachmentPreviewEl,
+      promptAttachmentNameEl,
+      promptImageInputEl,
+      promptSendEl,
+      promptClearEl,
+      promptAttachmentRemoveEl
     });
-    const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
-    const dropPendingAssistantHistory = (pendingAssistantIndex) => {
-      if (pendingAssistantIndex === null || pendingAssistantIndex < 0 || pendingAssistantIndex >= promptHistory.length) {
-        return promptHistory;
-      }
-      const nextHistory = promptHistory.slice();
-      nextHistory.splice(pendingAssistantIndex, 1);
-      return nextHistory;
-    };
-    const currentHasImageContext = () => {
-      const selection2 = currentSelection(null);
-      const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
-      return imageContextPattern.test(selectionPath);
-    };
-    const currentSelectionName = () => {
-      const selection2 = currentSelection(null);
-      const selectionPath = typeof (selection2 == null ? void 0 : selection2.previewPath) === "string" && selection2.previewPath.trim() !== "" ? selection2.previewPath : typeof (selection2 == null ? void 0 : selection2.path) === "string" ? selection2.path : "";
-      const normalizedPath = String(selectionPath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-      if (!normalizedPath) {
-        return "";
-      }
-      const parts = normalizedPath.split("/").filter(Boolean);
-      return parts.length ? parts[parts.length - 1] : "";
-    };
-    const insertPromptText = async (text) => {
-      var _a;
-      if (!promptInputEl || !text) {
-        return false;
-      }
-      const start = typeof promptInputEl.selectionStart === "number" ? promptInputEl.selectionStart : promptInputEl.value.length;
-      const end = typeof promptInputEl.selectionEnd === "number" ? promptInputEl.selectionEnd : promptInputEl.value.length;
-      const before = promptInputEl.value.slice(0, start);
-      const after = promptInputEl.value.slice(end);
-      const separator = before && !/\s$/.test(before) ? " " : "";
-      const nextValue = `${before}${separator}${text}${after}`;
-      promptInputEl.value = nextValue;
-      const caret = (before + separator + text).length;
-      if (typeof promptInputEl.setSelectionRange === "function") {
-        promptInputEl.setSelectionRange(caret, caret);
-      }
-      promptInputEl.focus({ preventScroll: true });
-      renderSummary(`Inserted ${text} into the prompt.`);
-      try {
-        if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
-          await navigator.clipboard.writeText(text);
-        }
-        setPromptStatus(`Inserted and copied: ${text}`, true);
-      } catch (e) {
-        setPromptStatus(`Inserted: ${text}`);
-      }
-      return true;
-    };
-    const restoreHistorySnapshot = async (snapshot) => {
-      if (!snapshot || typeof snapshot !== "object") {
-        return false;
-      }
-      const isLayoutTarget = snapshot.targetType === "layout";
-      const templateText = typeof snapshot.template === "string" ? snapshot.template : "";
-      if (!templateText) {
-        return false;
-      }
-      const restoredWork = snapshot.workSnapshot && typeof snapshot.workSnapshot === "object" ? snapshot.workSnapshot : {};
-      updatePromptEditorFields({
-        templateText,
-        nextTitle: typeof snapshot.title === "string" ? snapshot.title : null,
-        nextDescription: typeof snapshot.description === "string" ? snapshot.description : null,
-        nextWork: restoredWork,
-        isLayoutTarget,
-        nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
-        nextJs: typeof snapshot.js === "string" ? snapshot.js : null
-      });
-      renderContext();
-      const selection2 = currentSelection({ path: activePath, previewPath: activePath, previewIsFile: false, isLayout: isLayoutTarget });
-      const currentConfig = getConfig ? getConfig() || {} : {};
-      const { layoutPayload } = buildPromptLayoutPayload({
-        selection: selection2,
-        currentConfig,
-        drawerForm,
-        templateText,
-        nextCss: typeof snapshot.css === "string" ? snapshot.css : null,
-        nextJs: typeof snapshot.js === "string" ? snapshot.js : null,
-        layoutPreset: isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset()
-      });
-      const savePayload = {
-        path: activePath,
-        layout: layoutPayload
-      };
-      if (typeof snapshot.title === "string" && snapshot.title.trim() !== "") {
-        savePayload.title = snapshot.title.trim();
-      }
-      if (typeof snapshot.description === "string" && snapshot.description.trim() !== "") {
-        savePayload.description = snapshot.description.trim();
-      }
-      await saveConfig(savePayload, statusEl);
-      renderSummary(`Restored ${isLayoutTarget ? "layout" : "template"} from assistant stage.`);
-      reloadViewer();
-      focusPromptTemplateField(isLayoutTarget);
-      setPromptStatus("Restored template from assistant stage.", true);
-      return true;
-    };
-    const setHistory = (nextHistory) => {
-      const list = Array.isArray(nextHistory) ? nextHistory : [];
-      promptHistory = tagHistory(list);
-    };
-    const getHistoryScope = (selection2 = null) => {
-      const selected = selection2 || currentSelection({ path: "" });
-      return {
-        path: (selected == null ? void 0 : selected.path) || "",
-        mode: (selected == null ? void 0 : selected.isLayout) ? "layout" : (selected == null ? void 0 : selected.previewIsFile) ? "file" : "folder"
-      };
-    };
-    const readHistoryForSelection = (selection2 = null) => {
-      const scope = getHistoryScope(selection2);
-      return readStoredHistory(scope.path, scope.mode);
-    };
-    const writeHistoryForSelection = (history, selection2 = null) => {
-      const scope = getHistoryScope(selection2);
-      writeStoredHistory(scope.path, history, scope.mode);
-    };
-    const renderHistory = (options = {}) => {
-      renderPromptHistory(promptMessagesEl, promptHistory, stream.state, options);
-    };
-    const getCurrentTemplateField = () => {
-      const selection2 = currentSelection(null);
-      const selector = (selection2 == null ? void 0 : selection2.isLayout) ? "#edit-layout-primary-template" : "#edit-content-template";
-      return document.querySelector(selector);
-    };
-    const renderTemplatePreview = () => {
-      var _a;
-      if (!promptTemplateCodeEl) {
-        return;
-      }
-      const selection2 = currentSelection(null);
-      const templateField = getCurrentTemplateField();
-      const currentConfig = getConfig ? getConfig() || {} : {};
-      const layout = ((_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) && typeof currentConfig.work.layout === "object" ? currentConfig.work.layout : {};
-      const explicitTemplate = templateField && typeof templateField.value === "string" ? templateField.value : "";
-      const fallbackTemplate = (selection2 == null ? void 0 : selection2.isLayout) ? typeof layout.template === "string" && layout.template || (typeof layout.phpTemplate === "string" ? layout.phpTemplate : "") : typeof layout.sectionTemplate === "string" && layout.sectionTemplate || (typeof layout.defaultSectionTemplate === "string" ? layout.defaultSectionTemplate : "");
-      promptTemplateCodeEl.value = explicitTemplate || fallbackTemplate || "";
-      if (promptTemplateLabelEl) {
-        promptTemplateLabelEl.textContent = (selection2 == null ? void 0 : selection2.isLayout) ? "Current layout wrapper template" : "Current wrapped partial template";
-      }
-    };
-    const renderContext = () => {
-      const context = buildPromptContext({ getActiveSelection: getActiveSelection2, getConfig });
-      activePath = context.isLayout ? context.virtualPath || context.path : context.path;
-      activePromptMode = currentPromptMode();
-      syncModeAwareSystemPrompt();
-      if (promptInputEl && !isSending) {
-        promptInputEl.placeholder = currentPromptPlaceholder();
-      }
-      renderPromptContext(promptContextEl, context);
-      renderTemplatePreview();
-    };
-    const renderSummary = (content) => {
-      renderPromptSummary(promptSummaryEl, content);
-    };
-    const updateAttachmentUi = () => {
-      if (!promptAttachmentEl || !promptAttachmentPreviewEl || !promptAttachmentNameEl || !promptInputEl) {
-        return;
-      }
-      const hasImageContext = currentHasImageContext() || !!imageAttachment;
-      const hasAttachment = !!imageAttachment;
-      root.classList.toggle("prompt-has-image-context", hasImageContext);
-      promptAttachmentEl.hidden = !hasAttachment;
-      if (promptAttachEl) {
-        promptAttachEl.hidden = !hasImageContext;
-      }
-      promptInputEl.classList.toggle("prompt-input-has-attachment", hasAttachment);
-      if (!hasAttachment) {
-        promptAttachmentPreviewEl.removeAttribute("src");
-        promptAttachmentNameEl.textContent = "Image attached";
-        return;
-      }
-      promptAttachmentPreviewEl.src = imageAttachment.dataUrl;
-      promptAttachmentNameEl.textContent = imageAttachment.name || "clipboard-image.png";
-    };
-    const clearAttachment = () => {
-      imageAttachment = null;
-      if (promptImageInputEl) {
-        promptImageInputEl.value = "";
-      }
-      updateAttachmentUi();
-    };
-    const clearPromptHistory = () => {
-      stopStreaming(stream);
-      setHistory([]);
-      writeHistoryForSelection(promptHistory);
-      renderHistory();
-    };
-    const attachImageFile = async (file) => {
-      try {
-        imageAttachment = await readImageFile(file);
-        updateAttachmentUi();
-        setPromptStatus(`Attached image: ${imageAttachment.name}`, true);
-      } catch (err) {
-        setPromptStatus(err.message || "Failed to attach image.");
-      }
-    };
-    const setGeneratingState = (active, label = "Generating answer...") => {
-      root.classList.toggle("prompt-window-generating", active);
-      root.setAttribute("aria-busy", active ? "true" : "false");
-      if (promptSummaryEl) {
-        promptSummaryEl.classList.toggle("prompt-summary-generating", active);
-      }
-      if (promptGenerationEl) {
-        promptGenerationEl.hidden = !active;
-      }
-      if (promptGenerationLabelEl) {
-        promptGenerationLabelEl.textContent = label;
-      }
-      if (promptSendEl) {
-        promptSendEl.disabled = active;
-        promptSendEl.textContent = active ? "Generating..." : "Send";
-      }
-      if (promptAttachEl) {
-        promptAttachEl.disabled = active;
-      }
-      if (promptClearEl) {
-        promptClearEl.disabled = active;
-      }
-      if (promptAttachmentRemoveEl) {
-        promptAttachmentRemoveEl.disabled = active;
-      }
-      if (promptInputEl) {
-        promptInputEl.disabled = active;
-        promptInputEl.placeholder = active ? "Generating answer..." : defaultPromptPlaceholder;
-      }
-    };
+    const {
+      stream,
+      state,
+      setPromptStatus,
+      currentSelection,
+      currentHasImageContext,
+      currentSelectionName,
+      insertPromptText: insertPromptText2,
+      setHistory,
+      readHistoryForSelection,
+      writeHistoryForSelection,
+      renderHistory,
+      getCurrentTemplateText,
+      renderTemplatePreview,
+      renderContext,
+      renderSummary,
+      updateAttachmentUi,
+      clearAttachment,
+      clearPromptHistory,
+      attachImageFile,
+      setGeneratingState,
+      reloadViewer,
+      syncHistoryForPath,
+      currentDefaultSystemPrompt,
+      currentPromptMode,
+      currentSystemPromptSettingKey,
+      getLayoutPreset,
+      forceLayoutPromptToCustom,
+      updatePromptEditorFields: updatePromptEditorFields2,
+      focusPromptTemplateField: focusPromptTemplateField2,
+      syncWorkFieldEditors: syncWorkFieldEditors2
+    } = runtime;
+    const workflows = createPromptWindowWorkflows({
+      root,
+      statusEl,
+      drawerForm,
+      getConfig,
+      saveConfig,
+      promptInputEl,
+      providerEl,
+      modelEl,
+      endpointEl,
+      apiKeyEl,
+      systemPromptEl,
+      streamToggleEl,
+      currentSelection,
+      currentHasImageContext,
+      currentSelectionName,
+      currentPromptPlaceholder: runtime.currentPromptPlaceholder,
+      currentDefaultSystemPrompt: runtime.currentDefaultSystemPrompt,
+      setPromptStatus,
+      setHistory,
+      writeHistoryForSelection,
+      readHistoryForSelection,
+      renderHistory,
+      renderContext,
+      renderSummary,
+      setGeneratingState,
+      clearAttachment,
+      attachImageFile,
+      currentPromptMode: runtime.currentPromptMode,
+      getCurrentTemplateText,
+      getLayoutPreset,
+      forceLayoutPromptToCustom,
+      updatePromptEditorFields: updatePromptEditorFields2,
+      syncWorkFieldEditors: syncWorkFieldEditors2,
+      focusPromptTemplateField: focusPromptTemplateField2,
+      reloadViewer,
+      state,
+      stream
+    });
     bindPromptActions({
       promptClearEl,
       promptTemplateResetEl,
@@ -2649,345 +3397,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       layoutPresetEl: document.getElementById("edit-layout-preset"),
       onClearChat: () => {
         syncHistoryForPath();
-        clearPromptHistory();
+        workflows.onClearChat();
         clearAttachment();
         setPromptStatus("Chat cleared.");
       },
-      onResetTemplate: async () => {
-        var _a, _b, _c, _d;
-        if (isSending) {
-          return;
-        }
-        const selection2 = currentSelection({ path: activePath, isLayout: false, previewPath: activePath, layoutIsFile: false });
-        const isLayoutTarget = !!(selection2 == null ? void 0 : selection2.isLayout);
-        const resetLabel = isLayoutTarget ? "current layout wrapper template" : "current wrapped partial template";
-        if (!window.confirm(`Reset the ${resetLabel} to the inherited/default version?`)) {
-          return;
-        }
-        try {
-          isSending = true;
-          setGeneratingState(true, "Resetting template...");
-          setPromptStatus("Resetting template...");
-          const currentConfig = getConfig ? getConfig() || {} : {};
-          const layoutState = getLayoutState(currentConfig || {});
-          const layoutPayload = {
-            name: ((_b = (_a = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _a.layout) == null ? void 0 : _b.name) || "poff-layout",
-            engine: ((_d = (_c = currentConfig == null ? void 0 : currentConfig.work) == null ? void 0 : _c.layout) == null ? void 0 : _d.engine) || "lightncandy"
-          };
-          if (isLayoutTarget) {
-            const preset = (getLayoutPreset() || layoutState.preset || "actual").trim();
-            const layoutPathName = (selection2.previewPath || "").split("/").pop() || "item";
-            const localLayoutDirectory = selection2.layoutIsFile ? `.works/${layoutPathName}.layout` : ".layout";
-            const resolvedLayoutDirectory = typeof layoutState.directory === "string" ? layoutState.directory.trim() : "";
-            const canEditResolvedFilesystemTarget = layoutState.storage === "filesystem" && resolvedLayoutDirectory !== "";
-            const shouldPersistToLocalWrapper = preset === "custom" || !canEditResolvedFilesystemTarget || resolvedLayoutDirectory === localLayoutDirectory;
-            layoutPayload.preset = preset;
-            layoutPayload.name = preset === "none" ? "none" : preset === "custom" ? "custom-layout" : canEditResolvedFilesystemTarget ? "filesystem-layout" : "poff-layout";
-            if (shouldPersistToLocalWrapper) {
-              layoutPayload.template = "";
-            } else if (canEditResolvedFilesystemTarget) {
-              layoutPayload.originalTarget = resolvedLayoutDirectory;
-              layoutPayload.originalTemplate = "";
-            } else {
-              layoutPayload.template = "";
-            }
-            updatePromptEditorFields({
-              templateText: "",
-              nextTitle: null,
-              nextDescription: null,
-              nextWork: null,
-              isLayoutTarget: true
-            });
-          } else {
-            layoutPayload.sectionTemplate = "";
-            updatePromptEditorFields({
-              templateText: "",
-              nextTitle: null,
-              nextDescription: null,
-              nextWork: null,
-              isLayoutTarget: false
-            });
-          }
-          await saveConfig({
-            path: activePath,
-            layout: layoutPayload
-          }, statusEl);
-          clearPromptHistory();
-          renderContext();
-          renderSummary(`Reset ${isLayoutTarget ? "layout wrapper" : "wrapped partial"} to inherited/default template.`);
-          reloadViewer();
-          setPromptStatus(`${isLayoutTarget ? "Layout wrapper" : "Wrapped partial"} reset to inherited/default template.`, true);
-        } catch (err) {
-          setPromptStatus((err == null ? void 0 : err.message) || "Template reset failed.");
-          renderSummary("Template reset failed.");
-        } finally {
-          setGeneratingState(false);
-          isSending = false;
-        }
-      },
-      onSendPrompt: async () => {
-        if (isSending || !promptInputEl.value.trim() && !imageAttachment) {
-          return;
-        }
-        isSending = true;
-        setGeneratingState(true, "Generating answer...");
-        stopStreaming(stream);
-        let pendingAssistantIndex = null;
-        let settled = false;
-        let requestSummary = null;
-        const fallbackTimer = window.setTimeout(() => {
-          if (settled) {
-            return;
-          }
-          stopStreaming(stream);
-          setGeneratingState(false);
-          const errMsg = "Prompt timed out after 5 minutes.";
-          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
-          renderHistory({ forceScroll: true });
-          setPromptStatus(errMsg);
-          isSending = false;
-        }, PROMPT_FALLBACK_TIMEOUT_MS);
-        try {
-          const userPrompt = promptInputEl.value.trim();
-          const providerValue = providerEl ? providerEl.value : "local";
-          const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
-          const selection2 = currentSelection({ path: activePath, previewPath: activePath, previewIsFile: false, isLayout: false });
-          if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
-            setGeneratingState(false);
-            setPromptStatus(providerValue === "openai" ? "Add an OpenAI API key to send prompts." : "Add a Gemini API key to send prompts.");
-            isSending = false;
-            return;
-          }
-          setHistory([...promptHistory, { role: "user", content: userPrompt }].slice(-12));
-          setHistory([...promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
-          pendingAssistantIndex = promptHistory.length - 1;
-          writeHistoryForSelection(promptHistory, selection2);
-          renderHistory({ forceScroll: true });
-          renderContext();
-          promptInputEl.value = "";
-          setPromptStatus("Generating answer...");
-          renderSummary("Generating answer...");
-          const historyForRequest = serializeHistoryForRequest(promptHistory.slice(0, -1));
-          const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
-          const payload = {
-            path: activePath,
-            provider: providerEl ? providerEl.value : "local",
-            model: modelEl ? modelEl.value.trim() : "",
-            endpoint: endpointEl ? endpointEl.value.trim() : "",
-            apiKey: apiKeyEl ? apiKeyEl.value.trim() : "",
-            prompt: userPrompt,
-            history: historyForRequest,
-            systemPrompt: systemPromptValue
-          };
-          const editorDraft = readPromptEditorDraft(selection2);
-          if (editorDraft) {
-            payload.draft = editorDraft;
-          }
-          if (selection2 == null ? void 0 : selection2.isLayout) {
-            const layoutPreset = getLayoutPreset();
-            if (layoutPreset) {
-              payload.layoutPreset = layoutPreset;
-            }
-          }
-          if (imageAttachment) {
-            payload.image = { ...imageAttachment };
-          }
-          requestSummary = summarizePromptRequest(payload);
-          debugPromptLog("request", requestSummary);
-          const useStreaming = !!(streamToggleEl && streamToggleEl.checked);
-          if (useStreaming) {
-            beginStreaming({
-              stream,
-              targetIndex: pendingAssistantIndex,
-              history: promptHistory,
-              renderHistory: () => renderHistory({ forceScroll: true })
-            });
-          }
-          const response = useStreaming ? await requestPromptTemplateStream(payload, {
-            onDelta: (chunk) => appendStreamingChunk({
-              stream,
-              chunk,
-              history: promptHistory,
-              renderHistory: () => renderHistory({ forceScroll: true })
-            })
-          }) : await requestPromptTemplate2(payload);
-          settled = true;
-          debugPromptLog("response", summarizePromptResponse(response, requestSummary));
-          const templateText = response && typeof response.template === "string" ? response.template.trim() : "";
-          const nextTitle = typeof response.title === "string" ? response.title.trim() : null;
-          const nextDescription = typeof response.description === "string" ? response.description.trim() : null;
-          const nextCss = typeof response.css === "string" ? response.css : null;
-          const nextJs = typeof response.js === "string" ? response.js : null;
-          const isLayoutTarget = !!selection2.isLayout;
-          const currentConfig = getConfig ? getConfig() : null;
-          const layoutSectionKey = isLayoutTarget ? (selection2 == null ? void 0 : selection2.previewIsFile) || (selection2 == null ? void 0 : selection2.layoutIsFile) ? "work.hbs" : "works.hbs" : "";
-          const rawResponseWork = response && response.work && typeof response.work === "object" ? response.work : null;
-          const responseSectionTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork[layoutSectionKey] === "string" ? rawResponseWork[layoutSectionKey] : null;
-          const responseWorkTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork["work.hbs"] === "string" ? rawResponseWork["work.hbs"] : null;
-          const responseWorksTemplate = isLayoutTarget && rawResponseWork && typeof rawResponseWork["works.hbs"] === "string" ? rawResponseWork["works.hbs"] : null;
-          const inferredWork = inferWorkChangesFromPrompt(userPrompt, currentConfig);
-          const mergedWork = {
-            ...inferredWork || {},
-            ...rawResponseWork || {}
-          };
-          const nextWork = filterAllowedWork(mergedWork, currentConfig);
-          const nextLayoutValue = nextWork && Object.prototype.hasOwnProperty.call(nextWork, "layout") ? nextWork.layout : null;
-          const persistedWork = nextWork && typeof nextWork === "object" ? materializeWorkFields(nextWork) : null;
-          if (persistedWork && Object.prototype.hasOwnProperty.call(persistedWork, "layout")) {
-            delete persistedWork.layout;
-          }
-          if (response.error || !templateText) {
-            stopStreaming(stream);
-            setGeneratingState(false);
-            const errMsg = response.error || "Prompt returned no content.";
-            setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
-            writeHistoryForSelection(promptHistory, selection2);
-            renderHistory({ forceScroll: true });
-            setPromptStatus(errMsg);
-            renderSummary(errMsg);
-            return;
-          }
-          const templateSnapshot = buildTemplateHistorySnapshot({
-            templateText,
-            nextCss,
-            nextJs,
-            nextTitle,
-            nextDescription,
-            nextWork: persistedWork || nextWork,
-            isLayoutTarget
-          });
-          if (pendingAssistantIndex !== null && promptHistory[pendingAssistantIndex]) {
-            promptHistory[pendingAssistantIndex].content = templateText;
-            promptHistory[pendingAssistantIndex].templateSnapshot = templateSnapshot;
-            setHistory(promptHistory);
-          } else {
-            setHistory([...promptHistory, {
-              role: "assistant",
-              content: templateText,
-              templateSnapshot
-            }].slice(-12));
-            pendingAssistantIndex = promptHistory.length - 1;
-          }
-          if (useStreaming) {
-            finishStreaming({
-              stream,
-              history: promptHistory,
-              fullText: templateText,
-              renderHistory: () => renderHistory({ forceScroll: true })
-            });
-          }
-          writeHistoryForSelection(promptHistory, selection2);
-          renderHistory({ forceScroll: true });
-          renderContext();
-          if (response.systemPrompt && systemPromptEl && !systemPromptEl.value.trim()) {
-            systemPromptEl.value = response.systemPrompt;
-            savePromptSettings(readSettings());
-          }
-          updatePromptEditorFields({
-            templateText,
-            nextTitle,
-            nextDescription,
-            nextWork,
-            isLayoutTarget,
-            nextCss,
-            nextJs
-          });
-          syncWorkFieldEditors(nextWork);
-          focusPromptTemplateField(isLayoutTarget);
-          if (drawerForm) {
-            const templateField = drawerForm.querySelector("#edit-content-template");
-            if (!isLayoutTarget && templateField) {
-              templateField.value = templateText;
-            }
-            const layoutNameField = drawerForm.querySelector("#edit-work-layout");
-            if (layoutNameField && !layoutNameField.value.trim()) {
-              layoutNameField.value = "poff-layout";
-            }
-            if (nextWork && (typeof nextWork.template === "string" || typeof nextWork.type === "string")) {
-              const workTypeField = drawerForm.querySelector("#edit-work-type");
-              if (workTypeField) {
-                workTypeField.value = nextWork.template || nextWork.type;
-              }
-            }
-          }
-          const effectiveLayoutPreset = isLayoutTarget ? forceLayoutPromptToCustom() : getLayoutPreset();
-          const { layoutPayload } = buildPromptLayoutPayload({
-            selection: selection2,
-            currentConfig,
-            drawerForm,
-            templateText,
-            responseSectionTemplate,
-            responseWorkTemplate,
-            responseWorksTemplate,
-            nextCss,
-            nextJs,
-            nextLayoutValue,
-            responseModel: response.model || "",
-            layoutPreset: effectiveLayoutPreset
-          });
-          const savePayload = {
-            path: activePath,
-            layout: layoutPayload
-          };
-          if (nextTitle !== null) {
-            savePayload.title = nextTitle;
-          }
-          if (nextDescription !== null) {
-            savePayload.description = nextDescription;
-          }
-          if (persistedWork && Object.keys(persistedWork).length) {
-            savePayload.work = persistedWork;
-          }
-          if (Array.isArray(response == null ? void 0 : response.treeVisible)) {
-            savePayload.treeVisible = response.treeVisible;
-          }
-          await saveConfig(savePayload, statusEl);
-          renderContext();
-          const providerLabel = response.provider || payload.provider;
-          const modelLabel = response.model || payload.model || "";
-          setPromptStatus(`${isLayoutTarget ? "Layout" : "Template"} updated via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}`, true);
-          const extra = [];
-          if (nextTitle !== null) extra.push("title");
-          if (nextDescription !== null) extra.push("description");
-          if (persistedWork && Object.keys(persistedWork).length) extra.push(`work: ${Object.keys(persistedWork).join(", ")}`);
-          if (nextLayoutValue) extra.push("layout");
-          if (isLayoutTarget && nextCss !== null) extra.push("css");
-          if (isLayoutTarget && nextJs !== null) extra.push("js");
-          const summaryText = `Saved ${templateText.length} ${isLayoutTarget ? "layout " : ""}HBS chars via ${providerLabel}${modelLabel ? ` \xB7 ${modelLabel}` : ""}${extra.length ? ` \xB7 updated ${extra.join("; ")}` : ""}`;
-          renderSummary(summaryText);
-          clearAttachment();
-          reloadViewer();
-        } catch (err) {
-          settled = true;
-          stopStreaming(stream);
-          setGeneratingState(false);
-          debugPromptLog("error", summarizePromptError(err, requestSummary || (activePath ? { path: activePath } : null)));
-          setPromptStatus("Prompt failed.");
-          const errMsg = "Prompt failed.";
-          setHistory(dropPendingAssistantHistory(pendingAssistantIndex));
-          writeHistoryForSelection(promptHistory, selection);
-          renderHistory({ forceScroll: true });
-          renderSummary(errMsg);
-        } finally {
-          window.clearTimeout(fallbackTimer);
-          setGeneratingState(false);
-          isSending = false;
-          promptInputEl.focus();
-        }
-      },
-      onAttachImage: attachImageFile,
-      onInsertName: async () => {
-        const name = currentSelectionName();
-        if (!name) {
-          setPromptStatus("No file name selected.");
-          return;
-        }
-        await insertPromptText(name);
-      },
-      onRemoveImage: () => {
-        clearAttachment();
-        setPromptStatus("Image removed.");
-      },
+      onResetTemplate: workflows.onResetTemplate,
+      onSendPrompt: workflows.onSendPrompt,
+      onAttachImage: workflows.onAttachImage,
+      onInsertName: workflows.onInsertName,
+      onRemoveImage: workflows.onRemoveImage,
       onTemplateInput: renderTemplatePreview,
       onLayoutPresetChange: renderContext
     });
@@ -3027,35 +3445,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     renderContext();
     renderSummary("Waiting for response...");
     updateAttachmentUi();
-    const reloadViewer = () => {
-      const frame = document.getElementById("contentFrame");
-      const selection2 = currentSelection({ path: "", isFile: false });
-      const selectionPath = selection2 && Object.prototype.hasOwnProperty.call(selection2, "previewPath") ? selection2.previewPath : void 0;
-      const activeViewerPath = selectionPath != null ? selectionPath : activePath;
-      if (frame && activeViewerPath !== null && activeViewerPath !== void 0) {
-        window.dispatchEvent(new CustomEvent("poff:content-updated", {
-          detail: {
-            path: activeViewerPath,
-            target: (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder"
-          }
-        }));
-      }
-    };
-    const syncHistoryForPath = () => {
-      const selection2 = currentSelection({ path: "" });
-      const nextPath = (selection2 == null ? void 0 : selection2.path) || "";
-      const nextPromptMode = (selection2 == null ? void 0 : selection2.isLayout) ? "layout" : (selection2 == null ? void 0 : selection2.previewIsFile) ? "file" : "folder";
-      if (nextPath !== activePath || nextPromptMode !== activePromptMode) {
-        activePath = nextPath;
-        activePromptMode = nextPromptMode;
-        setHistory(readHistoryForSelection(selection2));
-        syncModeAwareSystemPrompt();
-        renderHistory();
-        renderContext();
-        renderSummary("Waiting for response...");
-        updateAttachmentUi();
-      }
-    };
     window.addEventListener("hashchange", syncHistoryForPath);
     document.addEventListener("input", (event) => {
       const target = event.target;
@@ -3080,13 +3469,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (!Number.isInteger(index)) {
           return;
         }
-        const historyEntry = promptHistory.find((item) => item && item._index === index);
+        const historyEntry = state.promptHistory.find((item) => item && item._index === index);
         if (!historyEntry || !historyEntry.templateSnapshot) {
           return;
         }
         event.preventDefault();
         event.stopPropagation();
-        void restoreHistorySnapshot(historyEntry.templateSnapshot);
+        void workflows.restoreHistorySnapshot(historyEntry.templateSnapshot);
       });
     }
   }
@@ -3328,26 +3717,59 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/prompt-window.js
-  function renderPromptWindow(settings = {}, options = {}) {
-    const mode = options.mode === "layout" ? "layout" : options.mode === "folder" ? "folder" : "file";
-    const systemPrompt = mode === "layout" ? settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt : mode === "folder" ? settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt : settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt;
-    const promptTargetCopy = mode === "layout" ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : mode === "folder" ? "Prompt edits the wrapped works.hbs partial for the current folder." : "Prompt edits the wrapped work.hbs partial for the current file.";
-    const footerCopy = mode === "layout" ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(options.sectionTarget || "work.hbs")}</code>.` : mode === "folder" ? "Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders." : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.";
-    const insertNameLabel = mode === "file" ? "Insert file name" : mode === "folder" ? "Insert item name" : "Insert layout name";
-    const contextCopy = mode === "layout" ? `<div>Prompt edits the outer layout wrapper. <code>root.*</code> is the shell-level layout data and <code>work.*</code> is the inner item data. Use <code>root.title</code> for the wrapper title and <code>work.title</code> for the item title.</div><div><code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : mode === "folder" ? "<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>" : "<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>";
-    const editableCopy = mode === "layout" ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.&lt;name&gt;</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.&lt;name&gt;</strong>';
-    const placeholderCopy = mode === "layout" ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{root.title}}, {{root.folderName}}, {{work.title}}, {{work.name}}, {{linkUrl}}, {{slug}}</div>
+  function resolvePromptWindowMode(mode = "") {
+    if (mode === "layout") {
+      return "layout";
+    }
+    if (mode === "folder") {
+      return "folder";
+    }
+    return "file";
+  }
+  function buildPromptWindowModeConfig(mode, settings, sectionTarget) {
+    const isLayout = mode === "layout";
+    const isFolder = mode === "folder";
+    const currentSystemPrompt = isLayout ? settings.systemPromptLayout || settings.systemPrompt || defaultLayoutSystemPrompt : isFolder ? settings.systemPromptFolder || settings.systemPrompt || defaultFolderSystemPrompt : settings.systemPromptFile || settings.systemPrompt || defaultFileSystemPrompt;
+    const promptTargetCopy = isLayout ? "Prompt edits the outer layout wrapper target for this virtual .layout page." : isFolder ? "Prompt edits the wrapped works.hbs partial for the current folder." : "Prompt edits the wrapped work.hbs partial for the current file.";
+    const footerCopy = isLayout ? `Template responses are saved to the current active layout wrapper target shown in Prompt context. The wrapped inner partial stays separate at <code>${escapeHtml(sectionTarget || "work.hbs")}</code>.` : isFolder ? "Template responses are saved to the wrapped partial: <code>works.hbs</code> for folders." : "Template responses are saved to the wrapped partial: <code>work.hbs</code> for files.";
+    const insertNameLabel = isLayout ? "Insert layout name" : isFolder ? "Insert item name" : "Insert file name";
+    const contextCopy = isLayout ? `<div>Prompt edits the outer layout wrapper. <code>root.*</code> is the shell-level layout data and <code>work.*</code> is the inner item data. Use <code>root.title</code> for the wrapper title and <code>work.title</code> for the item title.</div><div><code>current.templateTarget</code> is the active wrapper target. <code>current.layoutTemplateTarget</code> is the local custom wrapper path if you switch to <code>Custom</code>. <code>current.sectionTemplateTarget</code> is the advanced inner partial.</div><div>For wrapper-owned images/assets, do not use <code>{{path}}</code>. Use <code>{{layout.baseHref}}</code> in the HBS and use <code>current.layoutBaseHref</code> plus <code>current.inheritedLayoutDirectory</code> in the prompt context to understand whether the wrapper came from a parent folder.</div>` : isFolder ? "<div>Prompt edits the wrapped <code>{{> works}}</code> partial and can use folder tree data, helper lists, and item refs.</div>" : "<div>Prompt edits the wrapped <code>{{> work}}</code> partial for one file view.</div>";
+    const editableCopy = isLayout ? '<span class="prompt-dot"></span> Editable via prompt: <strong>layout.template</strong>, optional <strong>work.&lt;name&gt;</strong>' : '<span class="prompt-dot"></span> Editable via prompt: <strong>title</strong>, <strong>description</strong>, <strong>work.&lt;name&gt;</strong>';
+    const placeholderCopy = isLayout ? `<div>{{pageLink}}, {{pageUrl}}, {{workUrl}}, {{viewUrl}}, {{srcUrl}}, {{assetUrl}}, {{path}}, {{name}}, {{title}}, {{root.title}}, {{root.folderName}}, {{work.title}}, {{work.name}}, {{linkUrl}}, {{slug}}</div>
                         <div><code>{{pageLink}}</code> is for navigation. <code>{{srcUrl}}</code> is for direct sources like <code>src=</code>, <code>poster</code>, downloads, and CSS <code>url(...)</code>.</div>
                         <div>{{> poff-layout}}, {{> filesystem-layout}}, {{> works}}, {{> work}}, {{work.key}}, {{layout.baseHref}}, {{layout.sectionBaseHref}}</div>
                         <div>Example context JSON: <code>{"root":{"title":"dominikeggermann.com"},"work":{"title":"tests"}}</code></div>
-                        <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : mode === "folder" ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
+                        <div>Theme shell: <code>.poff-default-layout</code> with <code>--poff-shell-*</code> CSS vars</div>` : isFolder ? `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}, {{pageLink}}, {{srcUrl}}, {{assetUrl}}</div>
                         <div>{{> works}}, {{work.key}}, tree/items, workTree, allItems, allFiles, allFolders, allVideos, allImages, allAudio, allPdfs, allTexts, allLinks, allOther</div>
                         <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>
                         <div>Parent/sibling prompt refs: current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks. Sibling refs are same-folder only.</div>` : `<div>{{path}}, {{name}}, {{title}}, {{linkUrl}}, {{slug}}</div>
                         <div>{{> work}}, {{work.key}}, layout.*, current.parentWork, siblingWorks, siblingImages, siblingVideos, siblingLinks</div>
                         <div><code>work.templateMap</code> is the inherited MIME => template defaults. <code>work.template</code> is the exact override for the current item.</div>`;
-    const inputPlaceholder = mode === "layout" ? "Describe the layout you want..." : mode === "folder" ? "Describe the folder component you want..." : "Describe the file component you want...";
-    const provider = settings.provider === "openai" ? "openai" : settings.provider === "gemini" ? "gemini" : "local";
+    const inputPlaceholder = isLayout ? "Describe the layout you want..." : isFolder ? "Describe the folder component you want..." : "Describe the file component you want...";
+    return {
+      systemPrompt: currentSystemPrompt,
+      promptTargetCopy,
+      footerCopy,
+      insertNameLabel,
+      contextCopy,
+      editableCopy,
+      placeholderCopy,
+      inputPlaceholder
+    };
+  }
+  function renderPromptWindow(settings = {}, options = {}) {
+    const mode = resolvePromptWindowMode(options.mode);
+    const {
+      systemPrompt,
+      promptTargetCopy,
+      footerCopy,
+      insertNameLabel,
+      contextCopy,
+      editableCopy,
+      placeholderCopy,
+      inputPlaceholder
+    } = buildPromptWindowModeConfig(mode, settings, options.sectionTarget || "work.hbs");
+    const provider = ["openai", "gemini"].includes(settings.provider) ? settings.provider : "local";
     return `
         <div class="prompt-layer" id="promptLayer">
             <button class="prompt-layer-toggle prompt-layer-toggle-close" type="button" id="promptLayerClose" aria-label="Hide prompt window" title="Hide prompt window">&times;</button>
@@ -3461,6 +3883,229 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             </div>
         </div>
     `;
+  }
+
+  // src/assets/js/edit/panel/categories.js
+  var DEFAULT_CATEGORY_OPTIONS = ["image", "media", "visual", "video", "motion", "audio", "sound", "pdf", "document", "text", "link", "reference", "folder", "collection", "other"];
+  var CATEGORY_FIELD_ID = "edit-work-categories";
+  var CATEGORY_SELECT_ID = "edit-work-category-select";
+  var CATEGORY_CUSTOM_ID = "edit-work-category-custom";
+  var CATEGORY_PILLS_ID = "editWorkCategoryPills";
+  var CATEGORY_ADD_ID = "editWorkCategoryAdd";
+  var CATEGORY_CUSTOM_ADD_ID = "editWorkCategoryCustomAdd";
+  var CATEGORY_MAX_LENGTH = 24;
+  var CATEGORY_MAX_COUNT = 12;
+  function normalizeCategoryValue(value) {
+    return String(value != null ? value : "").trim().toLowerCase().slice(0, CATEGORY_MAX_LENGTH);
+  }
+  function normalizeWorkCategories2(value) {
+    let rawValues = [];
+    if (Array.isArray(value)) {
+      rawValues = value;
+    } else if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            rawValues = parsed;
+          } else {
+            rawValues = trimmed.split(/\r?\n|,/);
+          }
+        } catch (e) {
+          rawValues = trimmed.split(/\r?\n|,/);
+        }
+      } else {
+        rawValues = trimmed.split(/\r?\n|,/);
+      }
+    }
+    const categories = [];
+    rawValues.forEach((candidate) => {
+      const normalized = normalizeCategoryValue(candidate);
+      if (!normalized || categories.includes(normalized) || categories.length >= CATEGORY_MAX_COUNT) {
+        return;
+      }
+      categories.push(normalized);
+    });
+    return categories;
+  }
+  function getWorkCategoryOptions(catalog = null) {
+    const options = Array.isArray(catalog == null ? void 0 : catalog.categories) && catalog.categories.length ? catalog.categories : DEFAULT_CATEGORY_OPTIONS;
+    return Array.from(new Set(options.map((category) => normalizeCategoryValue(category)).filter(Boolean)));
+  }
+  function renderCategoryPill(category) {
+    const normalized = normalizeCategoryValue(category);
+    if (!normalized) {
+      return "";
+    }
+    return `
+        <button type="button" class="edit-work-category-pill" data-work-category-remove="${escapeHtml(normalized)}" aria-label="Remove category ${escapeHtml(normalized)}">
+            <span>${escapeHtml(normalized)}</span>
+            <span aria-hidden="true">\u2212</span>
+        </button>
+    `;
+  }
+  function renderCategoryOptions(options, selectedValue = "") {
+    const normalizedSelected = normalizeCategoryValue(selectedValue);
+    return options.map((option) => {
+      const normalized = normalizeCategoryValue(option);
+      return `<option value="${escapeHtml(normalized)}"${normalized === normalizedSelected ? " selected" : ""}>${escapeHtml(normalized)}</option>`;
+    }).join("");
+  }
+  function renderWorkCategorySection(config = {}) {
+    var _a, _b;
+    const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
+    const catalog = (config == null ? void 0 : config.workTemplateCatalog) && typeof config.workTemplateCatalog === "object" ? config.workTemplateCatalog : null;
+    const categories = normalizeWorkCategories2((_b = (_a = work.categories) != null ? _a : work.category) != null ? _b : []);
+    const options = Array.from(/* @__PURE__ */ new Set([
+      ...getWorkCategoryOptions(catalog),
+      ...categories
+    ]));
+    const selectedCategory = normalizeCategoryValue(options.find((option) => !categories.includes(option)) || options[0] || "");
+    return `
+        <div class="edit-work-category-section" data-work-category-section>
+            <div class="edit-work-category-header">
+                <div>
+                    <div class="edit-work-fields-title">Categories</div>
+                    <div class="small-note">Pick shared work categories for filtering and prompt context.</div>
+                </div>
+            </div>
+            <div class="edit-work-category-controls">
+                <div class="edit-work-category-picker">
+                    <label class="edit-label" for="${CATEGORY_SELECT_ID}">Add from works</label>
+                    <div class="edit-work-category-picker-row">
+                        <select class="form-select" id="${CATEGORY_SELECT_ID}" name="work_category_select">
+                            ${renderCategoryOptions(options, selectedCategory)}
+                        </select>
+                        <button class="btn btn-secondary" type="button" id="${CATEGORY_ADD_ID}" aria-label="Add selected category">+</button>
+                    </div>
+                    <div class="small-note">The list comes from the shared worktype categories.</div>
+                </div>
+                <div class="edit-work-category-picker">
+                    <label class="edit-label" for="${CATEGORY_CUSTOM_ID}">Custom category</label>
+                    <div class="edit-work-category-picker-row">
+                        <input class="form-input" id="${CATEGORY_CUSTOM_ID}" type="text" maxlength="${CATEGORY_MAX_LENGTH}" placeholder="type a custom category">
+                        <button class="btn btn-secondary" type="button" id="${CATEGORY_CUSTOM_ADD_ID}" aria-label="Add custom category">+</button>
+                    </div>
+                    <div class="small-note">Limit ${CATEGORY_MAX_LENGTH} chars, max ${CATEGORY_MAX_COUNT} categories.</div>
+                </div>
+                <div class="edit-work-category-current">
+                    <div class="edit-label">Current categories</div>
+                    <div class="edit-work-category-pills" id="${CATEGORY_PILLS_ID}">
+                        ${categories.length ? categories.map(renderCategoryPill).join("") : '<div class="small-note">No categories selected yet.</div>'}
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="${CATEGORY_FIELD_ID}" data-work-config-field data-work-config-key="categories" data-work-config-kind="json" value="${escapeHtml(JSON.stringify(categories))}">
+        </div>
+    `;
+  }
+  function renderCategoryPills(editPanel, categories) {
+    const pillsEl = editPanel.querySelector(`#${CATEGORY_PILLS_ID}`);
+    if (!pillsEl) {
+      return;
+    }
+    const normalizedCategories = normalizeWorkCategories2(categories);
+    pillsEl.innerHTML = normalizedCategories.length ? normalizedCategories.map(renderCategoryPill).join("") : '<div class="small-note">No categories selected yet.</div>';
+  }
+  function writeCategoriesField(editPanel, categories) {
+    const field = editPanel.querySelector(`#${CATEGORY_FIELD_ID}`);
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+      return;
+    }
+    const normalizedCategories = normalizeWorkCategories2(categories);
+    field.value = JSON.stringify(normalizedCategories);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  function readCategoriesField(editPanel) {
+    const field = editPanel.querySelector(`#${CATEGORY_FIELD_ID}`);
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) {
+      return [];
+    }
+    return normalizeWorkCategories2(field.value);
+  }
+  function addCategory(editPanel, category) {
+    const normalized = normalizeCategoryValue(category);
+    if (!normalized) {
+      return;
+    }
+    const categories = readCategoriesField(editPanel);
+    if (!categories.includes(normalized)) {
+      categories.push(normalized);
+    }
+    renderCategoryPills(editPanel, categories);
+    writeCategoriesField(editPanel, categories);
+  }
+  function removeCategory(editPanel, category) {
+    const normalized = normalizeCategoryValue(category);
+    if (!normalized) {
+      return;
+    }
+    const categories = readCategoriesField(editPanel).filter((item) => item !== normalized);
+    renderCategoryPills(editPanel, categories);
+    writeCategoriesField(editPanel, categories);
+  }
+  function bindWorkCategoryControls({ editPanel, onMediaInput }) {
+    if (!editPanel) {
+      return () => {
+      };
+    }
+    const selectEl = editPanel.querySelector(`#${CATEGORY_SELECT_ID}`);
+    const customEl = editPanel.querySelector(`#${CATEGORY_CUSTOM_ID}`);
+    const addEl = editPanel.querySelector(`#${CATEGORY_ADD_ID}`);
+    const customAddEl = editPanel.querySelector(`#${CATEGORY_CUSTOM_ADD_ID}`);
+    const sectionEl = editPanel.querySelector("[data-work-category-section]");
+    if (!sectionEl) {
+      return () => {
+      };
+    }
+    const onAddClick = () => {
+      if (!(selectEl instanceof HTMLSelectElement)) {
+        return;
+      }
+      addCategory(editPanel, selectEl.value);
+    };
+    const onCustomAddClick = () => {
+      if (!(customEl instanceof HTMLInputElement)) {
+        return;
+      }
+      addCategory(editPanel, customEl.value);
+      customEl.value = "";
+    };
+    const onSectionClick = (event) => {
+      const target = event.target;
+      const button = target && typeof target.closest === "function" ? target.closest("[data-work-category-remove]") : null;
+      if (!button) {
+        return;
+      }
+      removeCategory(editPanel, button.dataset.workCategoryRemove || button.getAttribute("data-work-category-remove") || "");
+    };
+    if (addEl) {
+      addEl.addEventListener("click", onAddClick);
+    }
+    if (customAddEl) {
+      customAddEl.addEventListener("click", onCustomAddClick);
+    }
+    sectionEl.addEventListener("click", onSectionClick);
+    if (customEl) {
+      customEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          onCustomAddClick();
+        }
+      });
+    }
+    renderCategoryPills(editPanel, readCategoriesField(editPanel));
+    return () => {
+      if (addEl) {
+        addEl.removeEventListener("click", onAddClick);
+      }
+      if (customAddEl) {
+        customAddEl.removeEventListener("click", onCustomAddClick);
+      }
+      sectionEl.removeEventListener("click", onSectionClick);
+    };
   }
 
   // src/assets/js/edit/panel/shared.js
@@ -4386,7 +5031,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return options.filter((option, index) => option && options.indexOf(option) === index).map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
   }
   function readMediaConfigFromForm(form, currentWork = {}) {
-    var _a;
+    var _a, _b, _c;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const typeField = (_a = form == null ? void 0 : form.elements) == null ? void 0 : _a.work_type;
     if (typeField && typeof typeField.value === "string") {
@@ -4435,6 +5080,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       nextWork[key] = rawValue;
     });
+    const categories = normalizeWorkCategories2((_c = (_b = nextWork.categories) != null ? _b : nextWork.category) != null ? _c : []);
+    nextWork.categories = categories;
+    nextWork.category = categories;
     return nextWork;
   }
   function renderWorkValueControl(key, value) {
@@ -4458,9 +5106,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="text"${isNullable ? ' data-work-config-nullable="true"' : ""} type="text" value="${escapeHtml(value === null || value === void 0 ? "" : String(value))}" placeholder="Value">`;
   }
   function renderWorkConfigFieldsSection(config = {}) {
+    var _a, _b;
     const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
     const workType = String(work.type || "").trim();
     const catalog = (config == null ? void 0 : config.workTemplateCatalog) && typeof config.workTemplateCatalog === "object" ? config.workTemplateCatalog : null;
+    const categoryOptions = getWorkCategoryOptions(catalog);
     const fieldNames = new Set(extractWorkFields(work).map((field) => field.name));
     const dynamicKeys = Object.keys(work).filter((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) && key !== "type" && !fieldNames.has(key));
     const workTypeSummary = dynamicKeys.length ? dynamicKeys.join(", ") : "No additional work fields yet.";
@@ -4486,6 +5136,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <div class="small-note">${escapeHtml(workTypeSummary)}</div>
                 </div>
             </div>
+            ${categoryOptions.length || normalizeWorkCategories2((_b = (_a = work.categories) != null ? _a : work.category) != null ? _b : []).length ? renderWorkCategorySection(config) : ""}
             ${dynamicKeys.length ? `
             <div class="edit-work-config-grid">
                 ${dynamicKeys.map((key) => `
@@ -4837,7 +5488,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <label class="edit-label" for="edit-description">Description</label>
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
             </div>
-            ${(status == null ? void 0 : status.target) === "file" || (config == null ? void 0 : config.work) && typeof config.work === "object" && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === "type") ? renderWorkConfigFieldsSection(config) : ""}
+            ${(status == null ? void 0 : status.target) === "file" || (status == null ? void 0 : status.target) === "folder" || (config == null ? void 0 : config.work) && typeof config.work === "object" && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === "type") ? renderWorkConfigFieldsSection(config) : ""}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -4918,6 +5569,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       input.addEventListener("input", syncMediaState);
       input.addEventListener("change", syncMediaState);
+    });
+    bindWorkCategoryControls({
+      editPanel,
+      onMediaInput
     });
     if (form && typeof onSubmit === "function") {
       form.addEventListener("submit", (event) => {
@@ -5509,186 +6164,38 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     };
   }
 
-  // src/assets/js/nav/navigation.js
-  function initNavigation({
-    elements: elements2,
-    editQuery: editQuery2,
-    currentPathForIframe: currentPathForIframe2,
-    renderFolderMeta,
-    initEditMode
-  }) {
-    const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
-    let activeLink = null;
-    let ignoreNextHashSync = false;
-    let previewRequestId = 0;
-    const initialQueryPath = new URLSearchParams(window.location.search).get("path") || "";
-    let previewClickBound = false;
-    let previewDisabled = false;
-    let lastPreviewKey = "";
-    const slugToPathAliases = /* @__PURE__ */ new Map();
-    const pathToSlugAliases = /* @__PURE__ */ new Map();
-    function normalizeHashPath(value = "") {
-      return String(value || "").replace(/\\/g, "/").replace(/^#\/?/, "").replace(/^\/+|\/+$/g, "");
-    }
-    function normalizeHashAlias(value = "") {
-      return normalizeHashPath(value).toLowerCase();
-    }
-    function routeResolution(path = "", isFile = inferFilePath(path)) {
+  // src/assets/js/nav/preview-helpers.js
+  function previewStateFromUrl(url) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      const isFile = parsed.searchParams.get("view") === "1" && parsed.searchParams.has("file");
+      const path = parsed.searchParams.get(isFile ? "file" : "path") || "";
       return {
+        key: `${isFile ? "file" : "path"}:${path}`,
         path,
         isFile
       };
+    } catch (err) {
+      return {
+        key: "",
+        path: "",
+        isFile: false
+      };
     }
-    function rememberSlugPathAlias(detail = {}) {
-      const path = normalizeHashPath((detail == null ? void 0 : detail.routePath) || (detail == null ? void 0 : detail.path) || (detail == null ? void 0 : detail.relativePath) || "");
-      const slug = normalizeHashPath((detail == null ? void 0 : detail.routeSlug) || (detail == null ? void 0 : detail.slug) || "");
-      if (!path || !slug || slug.includes("/")) {
-        return;
-      }
-      slugToPathAliases.set(normalizeHashAlias(slug), path);
-      pathToSlugAliases.set(normalizeHashAlias(path), slug);
-    }
-    function findNavLinkByAttribute(attributeName, value = "") {
-      if (!navList || !value) {
-        return null;
-      }
-      const normalizedValue = normalizeHashAlias(value);
-      for (const link of navList.querySelectorAll(`[${attributeName}]`)) {
-        if (normalizeHashAlias(link.getAttribute(attributeName) || "") === normalizedValue) {
-          return link;
-        }
-      }
+  }
+  function parseCmsLinkValue(value = "") {
+    const trimmed = (value || "").trim();
+    if (!trimmed) {
       return null;
     }
-    function navTargetPath(link) {
-      if (!link) {
-        return "";
-      }
-      return link.getAttribute("data-layout-path") || link.getAttribute("data-path") || link.getAttribute("data-src") || "";
-    }
-    function navTargetIsFile(link, path = "") {
-      if (!link) {
-        return inferFilePath(path);
-      }
-      if (link.hasAttribute("data-layout-path")) {
-        return false;
-      }
-      if (link.hasAttribute("data-file") || link.hasAttribute("data-src")) {
-        return true;
-      }
-      const href = link.getAttribute("href") || "";
-      if (href.startsWith("?path=")) {
-        return false;
-      }
-      return inferFilePath(path);
-    }
-    function resolveHashPath(path = "") {
-      const normalizedPath = normalizeHashPath(path);
-      const aliasPath = slugToPathAliases.get(normalizeHashAlias(normalizedPath));
-      if (aliasPath) {
-        return routeResolution(aliasPath);
-      }
-      if (!normalizedPath.includes("/")) {
-        const link = findNavLinkByAttribute("data-slug", normalizedPath);
-        const targetPath = navTargetPath(link);
-        if (targetPath) {
-          rememberSlugPathAlias({
-            path: targetPath,
-            slug: normalizedPath
-          });
-          return routeResolution(targetPath, navTargetIsFile(link, targetPath));
-        }
-      }
-      return routeResolution(normalizedPath);
-    }
-    async function resolveHashPathAsync(path = "") {
-      const resolved = resolveHashPath(path);
-      const normalizedPath = normalizeHashPath(path);
-      if (!normalizedPath || normalizedPath.includes("/") || normalizedPath === ".layout" || normalizedPath.endsWith("/.layout") || inferFilePath(normalizedPath) || resolved.path !== normalizedPath) {
-        return resolved;
-      }
-      try {
-        const response = await fetch(`?ajax=resolve&slug=${encodeURIComponent(normalizedPath)}`, {
-          credentials: "same-origin",
-          headers: {
-            "Accept": "application/json"
-          }
-        });
-        if (!response.ok) {
-          return resolved;
-        }
-        const data = await response.json();
-        if (!(data == null ? void 0 : data.resolved) || !data.path) {
-          return resolved;
-        }
-        rememberSlugPathAlias({
-          path: data.path,
-          slug: data.slug || normalizedPath
-        });
-        return routeResolution(data.path, typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder");
-      } catch (err) {
-        return resolved;
-      }
-    }
-    function displayHashPath(path = "") {
-      const normalizedPath = normalizeHashPath(path);
-      if (!normalizedPath || normalizedPath.includes("/.layout") || normalizedPath === ".layout") {
-        return normalizedPath;
-      }
-      const aliasSlug = pathToSlugAliases.get(normalizeHashAlias(normalizedPath));
-      if (aliasSlug) {
-        return aliasSlug;
-      }
-      const link = findNavLinkByAttribute("data-path", normalizedPath);
-      const slug = (link == null ? void 0 : link.getAttribute("data-slug")) || "";
-      if (slug && !slug.includes("/")) {
-        rememberSlugPathAlias({
-          path: normalizedPath,
-          slug
-        });
-        return slug;
-      }
-      return normalizedPath;
-    }
-    window.POFF_RESOLVE_HASH_PATH = resolveHashPath;
-    function previewStateFromUrl(url) {
-      try {
-        const parsed = new URL(url, window.location.href);
-        const isFile = parsed.searchParams.get("view") === "1" && parsed.searchParams.has("file");
-        const path = parsed.searchParams.get(isFile ? "file" : "path") || "";
-        return {
-          key: `${isFile ? "file" : "path"}:${path}`,
-          path,
-          isFile
-        };
-      } catch (err) {
-        return {
-          key: "",
-          path: "",
-          isFile: false
-        };
-      }
-    }
-    function parseCmsLinkValue(value = "") {
-      const trimmed = (value || "").trim();
-      if (!trimmed) {
-        return null;
-      }
-      if (trimmed.startsWith("?")) {
-        const params = new URLSearchParams(trimmed.replace(/^\?/, ""));
-        if (params.get("view") === "1") {
-          if (params.has("file")) {
-            return {
-              path: params.get("file") || "",
-              isFile: true
-            };
-          }
-          if (params.has("path")) {
-            return {
-              path: params.get("path") || "",
-              isFile: false
-            };
-          }
+    if (trimmed.startsWith("?")) {
+      const params = new URLSearchParams(trimmed.replace(/^\?/, ""));
+      if (params.get("view") === "1") {
+        if (params.has("file")) {
+          return {
+            path: params.get("file") || "",
+            isFile: true
+          };
         }
         if (params.has("path")) {
           return {
@@ -5696,167 +6203,93 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             isFile: false
           };
         }
-        return null;
+      }
+      if (params.has("path")) {
+        return {
+          path: params.get("path") || "",
+          isFile: false
+        };
       }
       return null;
     }
-    function normalizeCmsRelativePath(value = "") {
-      const trimmed = (value || "").trim();
-      if (!trimmed || trimmed.startsWith("#")) {
-        return "";
-      }
-      if (/^(data|blob|mailto|tel):/i.test(trimmed)) {
-        return "";
-      }
-      const parsedLink = parseCmsLinkValue(trimmed);
-      if (parsedLink == null ? void 0 : parsedLink.path) {
-        return parsedLink.path;
-      }
-      if (/^[a-z]+:\/\//i.test(trimmed)) {
-        try {
-          const url = new URL(trimmed, window.location.href);
-          if (url.origin !== window.location.origin) {
-            return "";
-          }
-          const rootPath = window.location.pathname.replace(/\/?$/, "/");
-          if (!url.pathname.startsWith(rootPath)) {
-            return "";
-          }
-          return decodeURIComponent(url.pathname.slice(rootPath.length));
-        } catch (err) {
+    return null;
+  }
+  function normalizeCmsRelativePath(value = "") {
+    const trimmed = (value || "").trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      return "";
+    }
+    if (/^(data|blob|mailto|tel):/i.test(trimmed)) {
+      return "";
+    }
+    const parsedLink = parseCmsLinkValue(trimmed);
+    if (parsedLink == null ? void 0 : parsedLink.path) {
+      return parsedLink.path;
+    }
+    if (/^[a-z]+:\/\//i.test(trimmed)) {
+      try {
+        const url = new URL(trimmed, window.location.href);
+        if (url.origin !== window.location.origin) {
           return "";
         }
-      }
-      return decodeURIComponent(trimmed.replace(/^\.\//, "").replace(/^\/+/, ""));
-    }
-    function extractFallbackAnchorPath(anchor) {
-      if (!anchor) {
-        return null;
-      }
-      const currentSelection = getSelectionFromPath(readHashPath() || initialQueryPath || "");
-      const currentFolderPath = currentSelection.previewIsFile ? currentSelection.previewPath.split("/").slice(0, -1).join("/") : currentSelection.previewPath;
-      const candidates = [
-        anchor.getAttribute("data-page-link"),
-        anchor.getAttribute("data-work-url"),
-        anchor.getAttribute("data-view-url"),
-        anchor.getAttribute("data-path"),
-        anchor.getAttribute("data-src")
-      ];
-      anchor.querySelectorAll("[data-page-link],[data-work-url],[data-view-url],[data-path],[data-src],[src],[poster]").forEach((node) => {
-        candidates.push(
-          node.getAttribute("data-page-link"),
-          node.getAttribute("data-work-url"),
-          node.getAttribute("data-view-url"),
-          node.getAttribute("data-path"),
-          node.getAttribute("data-src"),
-          node.getAttribute("src"),
-          node.getAttribute("poster")
-        );
-      });
-      for (const candidate of candidates) {
-        const normalized = normalizeCmsRelativePath(candidate || "");
-        if (!normalized) {
-          continue;
+        const rootPath = window.location.pathname.replace(/\/?$/, "/");
+        if (!url.pathname.startsWith(rootPath)) {
+          return "";
         }
-        if (inferFilePath(normalized)) {
-          return {
-            path: normalized,
-            isFile: true
-          };
-        }
-        if (currentFolderPath && inferFilePath(`${currentFolderPath}/${normalized}`)) {
-          return {
-            path: `${currentFolderPath}/${normalized}`.replace(/^\/+/, ""),
-            isFile: true
-          };
-        }
-      }
-      return null;
-    }
-    function readHashPath() {
-      const rawHashPath = window.location.hash.replace(/^#\/?/, "");
-      if (!rawHashPath) {
-        return "";
-      }
-      try {
-        return decodeURIComponent(rawHashPath);
+        return decodeURIComponent(url.pathname.slice(rootPath.length));
       } catch (err) {
-        return rawHashPath;
-      }
-    }
-    function clearActiveLink() {
-      if (activeLink) {
-        activeLink.classList.remove("nav-link-active");
-        activeLink = null;
-      }
-      if (!navList) {
-        return;
-      }
-      navList.querySelectorAll(".nav-link-active").forEach((link) => {
-        if (link !== activeLink) {
-          link.classList.remove("nav-link-active");
-        }
-      });
-    }
-    function setActiveFileLink(fileName = "") {
-      clearActiveLink();
-      if (!navList || !fileName) {
-        return;
-      }
-      const fileEls = navList.querySelectorAll("a[data-file]");
-      fileEls.forEach((el) => {
-        if (el.getAttribute("data-file") === fileName) {
-          el.classList.add("nav-link-active");
-          activeLink = el;
-        }
-      });
-    }
-    function setActiveLayoutLink(layoutPath = "") {
-      clearActiveLink();
-      if (!navList || !layoutPath) {
-        return;
-      }
-      const layoutEls = navList.querySelectorAll("a[data-layout-path]");
-      layoutEls.forEach((el) => {
-        if (el.getAttribute("data-layout-path") === layoutPath) {
-          el.classList.add("nav-link-active");
-          activeLink = el;
-        }
-      });
-    }
-    function showNavLoading() {
-      if (!navList) return;
-      navList.innerHTML = `
-            <div id="navLoading" class="loading-row flex items-center">
-                <span class="loader"></span>
-                <span class="loader-label">Loading...</span>
-            </div>
-        `;
-    }
-    function setLoadingVisible(element, visible) {
-      if (!element) {
-        return;
-      }
-      element.classList.toggle("flex", visible);
-      element.classList.toggle("items-center", visible);
-    }
-    function loadNav(relPath = "") {
-      if (!navList) return;
-      showNavLoading();
-      return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
-        const extracted = extractNavHtml(html) || "";
-        if (extracted.trim()) {
-          navList.innerHTML = extracted;
-          navList.dataset.loaded = "1";
-        } else {
-          navList.dataset.stale = "1";
-        }
-        return extracted;
-      }).catch(() => {
-        navList.dataset.error = "1";
         return "";
-      });
+      }
     }
+    return decodeURIComponent(trimmed.replace(/^\.\//, "").replace(/^\/+/, ""));
+  }
+  function scopePreviewRootSelector(selector = "") {
+    const trimmed = selector.trim();
+    if (trimmed === "body") {
+      return "#contentFrame > .viewer";
+    }
+    if (trimmed === "html") {
+      return "#contentFrame";
+    }
+    if (trimmed === "html body" || trimmed === "body html") {
+      return "#contentFrame > .viewer";
+    }
+    if (trimmed.startsWith("body.")) {
+      return `#contentFrame > .viewer${trimmed.slice("body".length)}`;
+    }
+    if (trimmed.startsWith("html.")) {
+      return `#contentFrame${trimmed.slice("html".length)}`;
+    }
+    return selector;
+  }
+  function scopePreviewStyleText(css = "") {
+    return String(css || "").replace(/(^|})\s*([^@{}][^{]*)\{/g, (match, prefix, selectorList) => {
+      const scopedSelectors = selectorList.split(",").map(scopePreviewRootSelector).join(", ");
+      return `${prefix} ${scopedSelectors} {`;
+    });
+  }
+  function normalizePreviewStyleNode(node) {
+    if (!(node instanceof HTMLStyleElement)) {
+      return node.outerHTML;
+    }
+    const clone = node.cloneNode(true);
+    clone.textContent = scopePreviewStyleText(node.textContent || "");
+    return clone.outerHTML;
+  }
+
+  // src/assets/js/nav/preview-controller.js
+  function createPreviewController({
+    contentFrame,
+    iframeLoading,
+    initialQueryPath = "",
+    navigateToPath,
+    setLoadingVisible,
+    getCurrentSelection
+  }) {
+    let previewRequestId = 0;
+    let previewClickBound = false;
+    let previewDisabled = false;
+    let lastPreviewKey = "";
     function buildViewerUrl(path, isFile = false, forceRefresh = false) {
       const url = new URL(window.location.href);
       url.search = "";
@@ -5897,72 +6330,49 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       });
     }
-    function writeHashPath(path = "") {
-      const hashPath = displayHashPath(path);
-      const nextHash = hashPath ? `#/${hashPath.replace(/^\/+/, "")}` : "";
-      if (window.location.hash === nextHash) {
-        return;
+    function extractFallbackAnchorPath(anchor) {
+      if (!anchor) {
+        return null;
       }
-      if (!nextHash) {
-        const nextUrl = window.location.pathname + window.location.search;
-        ignoreNextHashSync = true;
-        window.history.replaceState(null, "", nextUrl);
-        return;
-      }
-      ignoreNextHashSync = true;
-      window.location.hash = nextHash;
-    }
-    function syncSidebarSelection(path = "", isFile = false, isLayout = false) {
-      if (isLayout) {
-        setActiveLayoutLink(path);
-        return;
-      }
-      if (!isFile) {
-        clearActiveLink();
-        return;
-      }
-      const parts = path.split("/");
-      const fileName = parts[parts.length - 1] || "";
-      setActiveFileLink(fileName);
-    }
-    function navigateToPath(path = "", options = {}) {
-      const resolved = resolveHashPath(path);
-      const selection2 = getSelectionFromPath(resolved.path, {
-        isFile: typeof (options == null ? void 0 : options.isFile) === "boolean" ? options.isFile : resolved.isFile
+      const currentSelection = (getCurrentSelection == null ? void 0 : getCurrentSelection()) || getSelectionFromPath(initialQueryPath || "");
+      const currentFolderPath = currentSelection.previewIsFile ? currentSelection.previewPath.split("/").slice(0, -1).join("/") : currentSelection.previewPath;
+      const candidates = [
+        anchor.getAttribute("data-page-link"),
+        anchor.getAttribute("data-work-url"),
+        anchor.getAttribute("data-view-url"),
+        anchor.getAttribute("data-path"),
+        anchor.getAttribute("data-src")
+      ];
+      anchor.querySelectorAll("[data-page-link],[data-work-url],[data-view-url],[data-path],[data-src],[src],[poster]").forEach((node) => {
+        candidates.push(
+          node.getAttribute("data-page-link"),
+          node.getAttribute("data-work-url"),
+          node.getAttribute("data-view-url"),
+          node.getAttribute("data-path"),
+          node.getAttribute("data-src"),
+          node.getAttribute("src"),
+          node.getAttribute("poster")
+        );
       });
-      navigateToSelection(selection2, options);
-    }
-    function navigateToSelection(selectionInput, options = {}) {
-      const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
-      const {
-        updateHash = true,
-        forceRefresh = false
-      } = options;
-      const previewPath = selection2.previewPath || "";
-      const previewIsFile = !!selection2.previewIsFile;
-      const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
-      setLoadingVisible(iframeLoading, true);
-      if (contentFrame) {
-        contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
-        syncPreviewDisabledState(!!selection2.isLayout);
-        renderPreview(buildViewerUrl(previewPath, previewIsFile, forceRefresh));
+      for (const candidate of candidates) {
+        const normalized = normalizeCmsRelativePath(candidate || "");
+        if (!normalized) {
+          continue;
+        }
+        if (inferFilePath(normalized)) {
+          return {
+            path: normalized,
+            isFile: true
+          };
+        }
+        if (currentFolderPath && inferFilePath(`${currentFolderPath}/${normalized}`)) {
+          return {
+            path: `${currentFolderPath}/${normalized}`.replace(/^\/+/, ""),
+            isFile: true
+          };
+        }
       }
-      if (updateHash) {
-        writeHashPath(selection2.path || "");
-      }
-      if (navList) {
-        setLoadingVisible(sidebarLoading, true);
-        loadNav(folderPath).then(() => {
-          syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          setLoadingVisible(sidebarLoading, false);
-        }).catch(() => {
-          syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          setLoadingVisible(sidebarLoading, false);
-        });
-      }
-      if (initEditMode) {
-        initEditMode();
-      }
+      return null;
     }
     function resolvePreviewTarget(anchor) {
       if (!anchor) {
@@ -6046,39 +6456,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         navigateToPath(nextTarget.path, { isFile: nextTarget.isFile });
       });
     }
-    function scopePreviewRootSelector(selector = "") {
-      const trimmed = selector.trim();
-      if (trimmed === "body") {
-        return "#contentFrame > .viewer";
-      }
-      if (trimmed === "html") {
-        return "#contentFrame";
-      }
-      if (trimmed === "html body" || trimmed === "body html") {
-        return "#contentFrame > .viewer";
-      }
-      if (trimmed.startsWith("body.")) {
-        return `#contentFrame > .viewer${trimmed.slice("body".length)}`;
-      }
-      if (trimmed.startsWith("html.")) {
-        return `#contentFrame${trimmed.slice("html".length)}`;
-      }
-      return selector;
-    }
-    function scopePreviewStyleText(css = "") {
-      return String(css || "").replace(/(^|})\s*([^@{}][^{]*)\{/g, (match, prefix, selectorList) => {
-        const scopedSelectors = selectorList.split(",").map(scopePreviewRootSelector).join(", ");
-        return `${prefix} ${scopedSelectors} {`;
-      });
-    }
-    function normalizePreviewStyleNode(node) {
-      if (!(node instanceof HTMLStyleElement)) {
-        return node.outerHTML;
-      }
-      const clone = node.cloneNode(true);
-      clone.textContent = scopePreviewStyleText(node.textContent || "");
-      return clone.outerHTML;
-    }
     async function renderPreview(url) {
       var _a;
       if (!contentFrame) {
@@ -6146,33 +6523,254 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       }
     }
-    function loadCurrentFolderInIframe() {
-      var _a;
-      const selection2 = getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : "");
-      navigateToSelection(selection2, { updateHash: false });
-      if (renderFolderMeta) {
-        renderFolderMeta();
+    return {
+      bindPreviewNavigation,
+      buildViewerUrl,
+      renderPreview,
+      syncPreviewDisabledState
+    };
+  }
+
+  // src/assets/js/nav/path-helpers.js
+  function normalizeHashPath(value = "") {
+    return String(value || "").replace(/\\/g, "/").replace(/^#\/?/, "").replace(/^\/+|\/+$/g, "");
+  }
+  function normalizeHashAlias(value = "") {
+    return normalizeHashPath(value).toLowerCase();
+  }
+  function routeResolution(path = "", isFile = inferFilePath(path)) {
+    return {
+      path,
+      isFile
+    };
+  }
+  function findNavLinkByAttribute(navList, attributeName, value = "") {
+    if (!navList || !value) {
+      return null;
+    }
+    const normalizedValue = normalizeHashAlias(value);
+    for (const link of navList.querySelectorAll(`[${attributeName}]`)) {
+      if (normalizeHashAlias(link.getAttribute(attributeName) || "") === normalizedValue) {
+        return link;
       }
     }
-    async function syncFromLocation(options = {}) {
-      var _a;
-      const { forceRefresh = false } = options;
-      const hashPath = readHashPath();
-      if (hashPath || window.location.hash) {
-        const resolved = await resolveHashPathAsync(hashPath);
-        navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
-          updateHash: false,
-          forceRefresh
-        });
+    return null;
+  }
+  function navTargetPath(link) {
+    if (!link) {
+      return "";
+    }
+    return link.getAttribute("data-layout-path") || link.getAttribute("data-path") || link.getAttribute("data-src") || "";
+  }
+  function navTargetIsFile(link, path = "") {
+    if (!link) {
+      return inferFilePath(path);
+    }
+    if (link.hasAttribute("data-layout-path")) {
+      return false;
+    }
+    if (link.hasAttribute("data-file") || link.hasAttribute("data-src")) {
+      return true;
+    }
+    const href = link.getAttribute("href") || "";
+    if (href.startsWith("?path=")) {
+      return false;
+    }
+    return inferFilePath(path);
+  }
+
+  // src/assets/js/nav/route-resolver.js
+  function createRouteResolver({ navList } = {}) {
+    const slugToPathAliases = /* @__PURE__ */ new Map();
+    const pathToSlugAliases = /* @__PURE__ */ new Map();
+    function rememberSlugPathAlias(detail = {}) {
+      const path = normalizeHashPath((detail == null ? void 0 : detail.routePath) || (detail == null ? void 0 : detail.path) || (detail == null ? void 0 : detail.relativePath) || "");
+      const slug = normalizeHashPath((detail == null ? void 0 : detail.routeSlug) || (detail == null ? void 0 : detail.slug) || "");
+      if (!path || !slug || slug.includes("/")) {
         return;
       }
-      navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
-        updateHash: false,
-        forceRefresh
+      slugToPathAliases.set(normalizeHashAlias(slug), path);
+      pathToSlugAliases.set(normalizeHashAlias(path), slug);
+    }
+    function resolveHashPath(path = "") {
+      const normalizedPath = normalizeHashPath(path);
+      const aliasPath = slugToPathAliases.get(normalizeHashAlias(normalizedPath));
+      if (aliasPath) {
+        return routeResolution(aliasPath);
+      }
+      if (!normalizedPath.includes("/")) {
+        const link = findNavLinkByAttribute(navList, "data-slug", normalizedPath);
+        const targetPath = navTargetPath(link);
+        if (targetPath) {
+          rememberSlugPathAlias({
+            path: targetPath,
+            slug: normalizedPath
+          });
+          return routeResolution(targetPath, navTargetIsFile(link, targetPath));
+        }
+      }
+      return routeResolution(normalizedPath);
+    }
+    async function resolveHashPathAsync(path = "") {
+      const resolved = resolveHashPath(path);
+      const normalizedPath = normalizeHashPath(path);
+      if (!normalizedPath || normalizedPath.includes("/") || normalizedPath === ".layout" || normalizedPath.endsWith("/.layout") || inferFilePath(normalizedPath) || resolved.path !== normalizedPath) {
+        return resolved;
+      }
+      try {
+        const response = await fetch(`?ajax=resolve&slug=${encodeURIComponent(normalizedPath)}`, {
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json"
+          }
+        });
+        if (!response.ok) {
+          return resolved;
+        }
+        const data = await response.json();
+        if (!(data == null ? void 0 : data.resolved) || !data.path) {
+          return resolved;
+        }
+        rememberSlugPathAlias({
+          path: data.path,
+          slug: data.slug || normalizedPath
+        });
+        return routeResolution(data.path, typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder");
+      } catch (err) {
+        return resolved;
+      }
+    }
+    function displayHashPath(path = "") {
+      const normalizedPath = normalizeHashPath(path);
+      if (!normalizedPath || normalizedPath.includes("/.layout") || normalizedPath === ".layout") {
+        return normalizedPath;
+      }
+      const aliasSlug = pathToSlugAliases.get(normalizeHashAlias(normalizedPath));
+      if (aliasSlug) {
+        return aliasSlug;
+      }
+      const link = findNavLinkByAttribute(navList, "data-path", normalizedPath);
+      const slug = (link == null ? void 0 : link.getAttribute("data-slug")) || "";
+      if (slug && !slug.includes("/")) {
+        rememberSlugPathAlias({
+          path: normalizedPath,
+          slug
+        });
+        return slug;
+      }
+      return normalizedPath;
+    }
+    function readHashPath() {
+      const rawHashPath = window.location.hash.replace(/^#\/?/, "");
+      if (!rawHashPath) {
+        return "";
+      }
+      try {
+        return decodeURIComponent(rawHashPath);
+      } catch (err) {
+        return rawHashPath;
+      }
+    }
+    return {
+      displayHashPath,
+      readHashPath,
+      rememberSlugPathAlias,
+      resolveHashPath,
+      resolveHashPathAsync
+    };
+  }
+
+  // src/assets/js/nav/sidebar-controller.js
+  function createSidebarController({
+    navList,
+    sidebarLoading,
+    editQuery: editQuery2,
+    navigateToPath,
+    setLoadingVisible
+  }) {
+    let activeLink = null;
+    function clearActiveLink() {
+      if (activeLink) {
+        activeLink.classList.remove("nav-link-active");
+        activeLink = null;
+      }
+      if (!navList) {
+        return;
+      }
+      navList.querySelectorAll(".nav-link-active").forEach((link) => {
+        if (link !== activeLink) {
+          link.classList.remove("nav-link-active");
+        }
       });
     }
-    function refreshCurrentLocation() {
-      syncFromLocation({ forceRefresh: true });
+    function setActiveFileLink(fileName = "") {
+      clearActiveLink();
+      if (!navList || !fileName) {
+        return;
+      }
+      const fileEls = navList.querySelectorAll("a[data-file]");
+      fileEls.forEach((el) => {
+        if (el.getAttribute("data-file") === fileName) {
+          el.classList.add("nav-link-active");
+          activeLink = el;
+        }
+      });
+    }
+    function setActiveLayoutLink(layoutPath = "") {
+      clearActiveLink();
+      if (!navList || !layoutPath) {
+        return;
+      }
+      const layoutEls = navList.querySelectorAll("a[data-layout-path]");
+      layoutEls.forEach((el) => {
+        if (el.getAttribute("data-layout-path") === layoutPath) {
+          el.classList.add("nav-link-active");
+          activeLink = el;
+        }
+      });
+    }
+    function showNavLoading() {
+      if (!navList) {
+        return;
+      }
+      navList.innerHTML = `
+            <div id="navLoading" class="loading-row flex items-center">
+                <span class="loader"></span>
+                <span class="loader-label">Loading...</span>
+            </div>
+        `;
+    }
+    function loadNav(relPath = "") {
+      if (!navList) {
+        return Promise.resolve("");
+      }
+      showNavLoading();
+      return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
+        const extracted = extractNavHtml(html) || "";
+        if (extracted.trim()) {
+          navList.innerHTML = extracted;
+          navList.dataset.loaded = "1";
+        } else {
+          navList.dataset.stale = "1";
+        }
+        return extracted;
+      }).catch(() => {
+        navList.dataset.error = "1";
+        return "";
+      });
+    }
+    function syncSidebarSelection(path = "", isFile = false, isLayout = false) {
+      if (isLayout) {
+        setActiveLayoutLink(path);
+        return;
+      }
+      if (!isFile) {
+        clearActiveLink();
+        return;
+      }
+      const parts = path.split("/");
+      const fileName = parts[parts.length - 1] || "";
+      setActiveFileLink(fileName);
     }
     function handleNavClick(event) {
       if (!navList) {
@@ -6213,12 +6811,148 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const isFile = target.dataset.layoutPath ? false : !(target.hasAttribute("href") && target.getAttribute("href").startsWith("?path="));
       navigateToPath(relPath, { isFile });
     }
-    if (navList) {
+    function bindNavClick() {
+      if (!navList) {
+        return;
+      }
       navList.addEventListener("click", handleNavClick);
     }
-    if (contentFrame) {
-      bindPreviewNavigation();
+    return {
+      bindNavClick,
+      loadNav,
+      syncSidebarSelection
+    };
+  }
+
+  // src/assets/js/nav/navigation.js
+  function initNavigation({
+    elements: elements2,
+    editQuery: editQuery2,
+    currentPathForIframe: currentPathForIframe2,
+    renderFolderMeta,
+    initEditMode
+  }) {
+    const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
+    let ignoreNextHashSync = false;
+    const initialQueryPath = new URLSearchParams(window.location.search).get("path") || "";
+    const routeResolver = createRouteResolver({ navList });
+    function setLoadingVisible(element, visible) {
+      if (!element) {
+        return;
+      }
+      element.classList.toggle("flex", visible);
+      element.classList.toggle("items-center", visible);
     }
+    function readHashPath() {
+      return routeResolver.readHashPath();
+    }
+    function getCurrentSelection() {
+      return getSelectionFromPath(readHashPath() || initialQueryPath || "");
+    }
+    const previewController = createPreviewController({
+      contentFrame,
+      iframeLoading,
+      initialQueryPath,
+      navigateToPath,
+      setLoadingVisible,
+      getCurrentSelection
+    });
+    const sidebarController2 = createSidebarController({
+      navList,
+      sidebarLoading,
+      editQuery: editQuery2,
+      navigateToPath,
+      setLoadingVisible
+    });
+    function writeHashPath(path = "") {
+      const hashPath = routeResolver.displayHashPath(path);
+      const nextHash = hashPath ? `#/${hashPath.replace(/^\/+/, "")}` : "";
+      if (window.location.hash === nextHash) {
+        return;
+      }
+      if (!nextHash) {
+        const nextUrl = window.location.pathname + window.location.search;
+        ignoreNextHashSync = true;
+        window.history.replaceState(null, "", nextUrl);
+        return;
+      }
+      ignoreNextHashSync = true;
+      window.location.hash = nextHash;
+    }
+    function navigateToPath(path = "", options = {}) {
+      const resolved = routeResolver.resolveHashPath(path);
+      const selection2 = getSelectionFromPath(resolved.path, {
+        isFile: typeof (options == null ? void 0 : options.isFile) === "boolean" ? options.isFile : resolved.isFile
+      });
+      navigateToSelection(selection2, options);
+    }
+    function navigateToSelection(selectionInput, options = {}) {
+      const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
+      const {
+        updateHash = true,
+        forceRefresh = false
+      } = options;
+      const previewPath = selection2.previewPath || "";
+      const previewIsFile = !!selection2.previewIsFile;
+      const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
+      setLoadingVisible(iframeLoading, true);
+      if (contentFrame) {
+        contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
+        previewController.syncPreviewDisabledState(!!selection2.isLayout);
+        previewController.renderPreview(previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
+      }
+      if (updateHash) {
+        writeHashPath(selection2.path || "");
+      }
+      if (navList) {
+        setLoadingVisible(sidebarLoading, true);
+        sidebarController2.loadNav(folderPath).then(() => {
+          sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
+          setLoadingVisible(sidebarLoading, false);
+        }).catch(() => {
+          sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
+          setLoadingVisible(sidebarLoading, false);
+        });
+      }
+      if (initEditMode) {
+        initEditMode();
+      }
+    }
+    function loadCurrentFolderInIframe() {
+      var _a;
+      const selection2 = getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : "");
+      navigateToSelection(selection2, { updateHash: false });
+      if (renderFolderMeta) {
+        renderFolderMeta();
+      }
+    }
+    async function syncFromLocation(options = {}) {
+      var _a;
+      const { forceRefresh = false } = options;
+      const hashPath = readHashPath();
+      if (hashPath || window.location.hash) {
+        const resolved = await routeResolver.resolveHashPathAsync(hashPath);
+        navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
+          updateHash: false,
+          forceRefresh
+        });
+        return;
+      }
+      navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
+        updateHash: false,
+        forceRefresh
+      });
+    }
+    function refreshCurrentLocation() {
+      syncFromLocation({ forceRefresh: true });
+    }
+    if (navList) {
+      sidebarController2.bindNavClick();
+    }
+    if (contentFrame) {
+      previewController.bindPreviewNavigation();
+    }
+    window.POFF_RESOLVE_HASH_PATH = routeResolver.resolveHashPath;
     return {
       consumeHashSync() {
         if (!ignoreNextHashSync) {
@@ -6228,9 +6962,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return true;
       },
       loadCurrentFolderInIframe,
-      syncFromLocation,
       refreshCurrentLocation,
-      rememberSlugPathAlias,
+      rememberSlugPathAlias: routeResolver.rememberSlugPathAlias,
+      syncFromLocation,
       writeHashPath
     };
   }
