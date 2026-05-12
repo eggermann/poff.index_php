@@ -14,6 +14,8 @@ const distDir = path.join(rootDir, 'build', 'assets');
 const unoConfig = require(path.join(rootDir, 'uno.config.js'));
 const srcDir = path.join(rootDir, 'src');
 const contentExtensions = new Set(['.php', '.js', '.hbs']);
+const buildMode = process.env.POFF_BUILD_MODE === 'production' ? 'production' : 'development';
+const isProductionBuild = buildMode === 'production';
 
 function replaceBetween(content, startMarker, endMarker, replacement) {
   const startIndex = content.indexOf(startMarker);
@@ -38,7 +40,7 @@ function buildJs() {
     platform: 'browser',
     target: ['es2018'],
     sourcemap: false,
-    minify: false,
+    minify: isProductionBuild,
   });
   return result.outputFiles[0].text;
 }
@@ -72,7 +74,7 @@ async function buildCss() {
   const contents = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
   const { css: unoCss } = await uno.generate(contents, { preflights: true });
   const scssCss = sass.compile(scssEntry, {
-    style: 'expanded',
+    style: isProductionBuild ? 'compressed' : 'expanded',
     loadPaths: [path.dirname(scssEntry)],
   }).css;
   return [unoCss.trim(), scssCss.trim()].filter(Boolean).join('\n\n').trim();
@@ -114,7 +116,7 @@ async function runBuild() {
   writeDist(js, css);
   updateHeader(css);
   updateScripts(js);
-  console.log('[assets] Built CSS/JS and updated header/scripts placeholders.');
+  console.log(`[assets] Built CSS/JS (${buildMode}) and updated header/scripts placeholders.`);
 }
 
 runBuild().catch((err) => {

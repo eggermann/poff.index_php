@@ -17,6 +17,9 @@ $outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
 $outputFileName = $config['outputFile'];
 $outputFile = $outputDir . $outputFileName;
 $legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileName;
+$buildMode = getenv('POFF_BUILD_MODE') === 'production' ? 'production' : 'development';
+$isProductionBuild = $buildMode === 'production';
+$skipDistributionCopies = getenv('POFF_SKIP_DISTRIBUTION_COPIES') === '1';
 $standaloneCopyTargets = [
     '/Applications/MAMP/htdocs/MAUSMAUS',
 ];
@@ -364,36 +367,55 @@ PHP;
     );
     $buildContent .= trim($content);
 
+    if ($isProductionBuild) {
+        $tempOutputFile = tempnam(sys_get_temp_dir(), 'poff-release-');
+        if ($tempOutputFile === false) {
+            throw new Exception('Failed to allocate temporary file for production build.');
+        }
+        if (file_put_contents($tempOutputFile, $buildContent) === false) {
+            @unlink($tempOutputFile);
+            throw new Exception("Failed to write temporary output file: $tempOutputFile");
+        }
+        $strippedBuildContent = php_strip_whitespace($tempOutputFile);
+        @unlink($tempOutputFile);
+        if ($strippedBuildContent === '') {
+            throw new Exception('Failed to strip PHP whitespace for production build.');
+        }
+        $buildContent = $strippedBuildContent;
+    }
+
     // Write the concatenated content to the output file
     if (file_put_contents($outputFile, $buildContent) === false) {
         throw new Exception("Failed to write output file: $outputFile");
     }
 
-    foreach ($standaloneCopyTargets as $targetDir) {
-        $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
-        if ($resolvedTargetDir === '') {
-            continue;
-        }
-        if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
-            throw new Exception("Failed to create standalone output directory: $resolvedTargetDir");
+    if (!$skipDistributionCopies) {
+        foreach ($standaloneCopyTargets as $targetDir) {
+            $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+            if ($resolvedTargetDir === '') {
+                continue;
+            }
+            if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
+                throw new Exception("Failed to create standalone output directory: $resolvedTargetDir");
+            }
+
+            $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
+            if (!copy($outputFile, $targetFile)) {
+                throw new Exception("Failed to copy standalone build to: $targetFile");
+            }
         }
 
-        $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
-        if (!copy($outputFile, $targetFile)) {
-            throw new Exception("Failed to copy standalone build to: $targetFile");
+        // Copy the built index.php to all directories
+        FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
+
+        // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
+        $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/eggman_profile-image.jpg';
+        if (is_file($layoutAsset)) {
+            FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
         }
     }
 
-    echo "Build completed successfully!\n";
-
-    // Copy the built index.php to all directories
-    FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
-
-    // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
-    $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/eggman_profile-image.jpg';
-    if (is_file($layoutAsset)) {
-        FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
-    }
+    echo "Build completed successfully ($buildMode): $outputFile\n";
 
     // Trigger SSH upload using SSHUploader
     require_once __DIR__ . '/SSHUploader.php';
