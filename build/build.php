@@ -17,6 +17,9 @@ $outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
 $outputFileName = $config['outputFile'];
 $outputFile = $outputDir . $outputFileName;
 $legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileName;
+$standaloneCopyTargets = [
+    '/Applications/MAMP/htdocs/MAUSMAUS',
+];
 // Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
 if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {
     unlink($legacyOutputFile);
@@ -29,6 +32,46 @@ if (!is_dir($outputDir)) {
 
 try {
     $buildContent = "<?php\n";
+
+    // Embed the LightnCandy renderer so the built output can render HBS templates
+    // without depending on the project vendor directory at runtime.
+    $lightnCandyStripPhp = static function (string $content): string {
+        $content = preg_replace('/^\s*<\?php\s*/', '', $content, 1) ?? $content;
+        $content = preg_replace('/\s*\?>\s*$/', '', $content, 1) ?? $content;
+        return preg_replace('/^\s*namespace\s+LightnCandy\s*;\s*/m', '', $content);
+    };
+    $lightnCandyFiles = [
+        '/vendor/zordius/lightncandy/src/Flags.php',
+        '/vendor/zordius/lightncandy/src/Context.php',
+        '/vendor/zordius/lightncandy/src/Token.php',
+        '/vendor/zordius/lightncandy/src/Encoder.php',
+        '/vendor/zordius/lightncandy/src/SafeString.php',
+        '/vendor/zordius/lightncandy/src/Parser.php',
+        '/vendor/zordius/lightncandy/src/Expression.php',
+        '/vendor/zordius/lightncandy/src/Validator.php',
+        '/vendor/zordius/lightncandy/src/Partial.php',
+        '/vendor/zordius/lightncandy/src/Exporter.php',
+        '/vendor/zordius/lightncandy/src/Runtime.php',
+        '/vendor/zordius/lightncandy/src/Compiler.php',
+        '/vendor/zordius/lightncandy/src/LightnCandy.php',
+    ];
+    $embeddedLightnCandySources = [];
+    foreach ($lightnCandyFiles as $lightnCandyRelativePath) {
+        $embeddedLightnCandySources[] = trim($lightnCandyStripPhp(
+            ComponentReader::readComponentFile(__DIR__ . '/..' . $lightnCandyRelativePath)
+        ));
+    }
+    $buildContent .= '$__embeddedLightnCandySources = ' . var_export($embeddedLightnCandySources, true) . ";\n";
+    $buildContent .= <<<'PHP'
+if (!class_exists('\LightnCandy\LightnCandy', false)) {
+    foreach ($__embeddedLightnCandySources as $__lightnCandySource) {
+        eval("namespace LightnCandy {\n" . $__lightnCandySource . "\n}");
+    }
+}
+unset($__embeddedLightnCandySources, $__lightnCandySource);
+
+PHP;
+    $buildContent .= "\n";
 
     // Get the first file header comment only
   
@@ -46,10 +89,23 @@ try {
     $mediaTypeContent = str_replace(['<?php', '?>'], '', $mediaTypeContent);
     $buildContent .= trim($mediaTypeContent) . "\n\n";
 
-    // Add Worktype helper
+    // Add Worktype helper as a standalone class without runtime require_once dependencies.
+    $worktypeState = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/State.php');
+    $worktypeDefinitions = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Definitions.php');
+    $worktypeContext = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Context.php');
+    $worktypeLayout = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Layout.php');
+    $worktypeRender = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Render.php');
     $worktypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype.php');
-    $worktypeContent = str_replace(['<?php', '?>'], '', $worktypeContent);
-    $buildContent .= trim($worktypeContent) . "\n\n";
+    $stripStandalonePhp = static function (string $content): string {
+        $content = str_replace(['<?php', '?>'], '', $content);
+        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
+    };
+    $buildContent .= trim($stripStandalonePhp($worktypeState)) . "\n\n";
+    $buildContent .= trim($stripStandalonePhp($worktypeDefinitions)) . "\n\n";
+    $buildContent .= trim($stripStandalonePhp($worktypeContext)) . "\n\n";
+    $buildContent .= trim($stripStandalonePhp($worktypeLayout)) . "\n\n";
+    $buildContent .= trim($stripStandalonePhp($worktypeRender)) . "\n\n";
+    $buildContent .= trim($stripStandalonePhp($worktypeContent)) . "\n\n";
     // Embed worktype definitions and templates (prefer bundle file)
     $bundlePath = $sourceDir . '/includes/worktypes/worktypes.php';
     $embeddedWorktypes = [];
@@ -304,6 +360,21 @@ PHP;
     // Write the concatenated content to the output file
     if (file_put_contents($outputFile, $buildContent) === false) {
         throw new Exception("Failed to write output file: $outputFile");
+    }
+
+    foreach ($standaloneCopyTargets as $targetDir) {
+        $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+        if ($resolvedTargetDir === '') {
+            continue;
+        }
+        if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
+            throw new Exception("Failed to create standalone output directory: $resolvedTargetDir");
+        }
+
+        $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
+        if (!copy($outputFile, $targetFile)) {
+            throw new Exception("Failed to copy standalone build to: $targetFile");
+        }
     }
 
     echo "Build completed successfully!\n";
