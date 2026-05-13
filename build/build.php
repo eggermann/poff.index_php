@@ -250,6 +250,7 @@ PHP;
         '/includes/viewer/edit/prompt-compact/config.php',
         '/includes/viewer/edit/prompt-compact/context.php',
         '/includes/viewer/edit/prompt-compact/history.php',
+        '/includes/viewer/edit/prompt-refs.php',
         '/includes/viewer/edit/prompt-context/wrapper.php',
         '/includes/viewer/edit/prompt-context/parent.php',
         '/includes/viewer/edit/prompt/context-state.php',

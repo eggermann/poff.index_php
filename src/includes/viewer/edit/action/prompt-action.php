@@ -64,10 +64,23 @@ function cmsHandleEditPromptAction(array $ctx): void
         'gemini' => cmsEditPromptRunGemini($request),
         default => cmsEditPromptRunLocal($request),
     };
+    if (cmsPromptIsSseActive() && trim((string) ($result['template'] ?? '')) === '' && trim((string) ($request['streamTemplate'] ?? '')) !== '') {
+        $result['template'] = (string) $request['streamTemplate'];
+    }
     $parsedResult = cmsParsePromptModelResult((string) ($result['template'] ?? ''), $request['promptIsLayoutTarget']);
     $templateText = trim((string) ($parsedResult['template'] ?? ''));
     if ($templateText === '') {
-        cmsJsonResponse(['allowed' => true, 'error' => ($result['modelReturnedReasoningOnly'] ?? false) ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.' : 'Template was empty.']);
+        $errorPayload = [
+            'allowed' => true,
+            'error' => ($result['modelReturnedReasoningOnly'] ?? false)
+                ? 'Model returned reasoning only and no template text. Disable reasoning/thinking in LM Studio or ask the model to return final template text.'
+                : 'Template was empty.',
+        ];
+        if (cmsPromptIsSseActive()) {
+            cmsPromptSendSseEvent('final', $errorPayload);
+            exit;
+        }
+        cmsJsonResponse($errorPayload);
     }
 
     $responsePayload = [
@@ -83,6 +96,11 @@ function cmsHandleEditPromptAction(array $ctx): void
         if (array_key_exists($key, $parsedResult)) {
             $responsePayload[$key] = $parsedResult[$key];
         }
+    }
+
+    if (cmsPromptIsSseActive()) {
+        cmsPromptSendSseEvent('final', $responsePayload);
+        exit;
     }
 
     cmsJsonResponse($responsePayload);

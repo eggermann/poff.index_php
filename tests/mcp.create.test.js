@@ -568,6 +568,35 @@ function runViewerPrompt(rootDir, relativePath, payload = {}, mockResponse = nul
   });
 }
 
+function runViewerPromptRaw(rootDir, relativePath, payload = {}, mockResponse = null, capturePath = '', mockStreamResponse = null) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_viewer_prompt.php'),
+      rootDir,
+      relativePath,
+      JSON.stringify(payload),
+      mockResponse ? JSON.stringify(mockResponse) : '',
+      capturePath,
+      mockStreamResponse ? JSON.stringify(mockStreamResponse) : '',
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`viewer prompt raw helper failed: ${code} ${stderr}`));
+        return;
+      }
+      resolve(stdout);
+    });
+  });
+}
+
 function runViewerSave(cwd, relativePath, payload = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [
@@ -1490,6 +1519,33 @@ describe('MCP create route helper (CLI)', () => {
     expect(response.allowed).toBe(true);
     expect(response.template).toBe('<div class=card></div>');
     expect(response.error).toBeUndefined();
+  });
+
+  test('viewer prompt stream emits a final SSE payload on success', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'viewer-prompt-stream-final-'));
+    try {
+      const output = await runViewerPromptRaw(tempRoot, '', {
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        apiKey: 'test-key',
+        prompt: 'make it red',
+        stream: true,
+      }, null, '', {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        chunks: [
+          'data: {"choices":[{"delta":{"content":"{\\"template\\":\\"<div class=card></div>\\"}"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ],
+      });
+
+      expect(output).toContain('event: final');
+      expect(output).toContain('"allowed":true');
+      expect(output).toContain('"template":"<div class=card></div>"');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });
 
