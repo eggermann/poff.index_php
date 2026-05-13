@@ -276,6 +276,7 @@ PHP;
         '/includes/viewer/edit/action/prompt/gemini.php',
         '/includes/viewer/edit/action/prompt/local.php',
         '/includes/viewer/edit/action/prompt-action.php',
+        '/includes/viewer/edit/action/models-action.php',
         '/includes/viewer/edit/action/dispatch.php',
         '/includes/viewer/render/entry.php',
         '/includes/viewer/render/file.php',

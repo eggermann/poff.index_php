@@ -1,4 +1,5 @@
 import { requestEditConfig } from '../api/edit.js';
+import { requestLocalPromptModels } from '../api/edit.js';
 import { defaultPromptSettings, getDefaultModelForProvider } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings } from './prompt/storage.js';
 import { bindPromptSettings } from './prompt/settings.js';
@@ -24,8 +25,10 @@ export function bindPromptWindow({
 
     const providerEl = root.querySelector('#prompt-provider');
     const modelEl = root.querySelector('#prompt-model');
+    const modelSelectEl = root.querySelector('#prompt-model-local');
     const endpointRow = root.querySelector('#prompt-endpoint-row');
     const endpointEl = root.querySelector('#prompt-endpoint');
+    const apiKeyRow = root.querySelector('#prompt-api-key-row');
     const apiKeyEl = root.querySelector('#prompt-api-key');
     const systemPromptEl = root.querySelector('#prompt-system');
     const systemResetEl = root.querySelector('#prompt-system-reset');
@@ -187,8 +190,10 @@ export function bindPromptWindow({
     const settingsController = bindPromptSettings({
         providerEl,
         modelEl,
+        modelSelectEl,
         endpointRow,
         endpointEl,
+        apiKeyRow,
         apiKeyEl,
         systemPromptEl,
         systemResetEl,
@@ -199,6 +204,7 @@ export function bindPromptWindow({
         currentPromptMode,
         currentSystemPromptSettingKey,
         getDefaultModelForProvider,
+        requestLocalPromptModels,
         loadPromptSettings,
         savePromptSettings,
         onRenderContext: renderContext,

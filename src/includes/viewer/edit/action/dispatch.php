@@ -6,7 +6,7 @@
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['config', 'save', 'prompt', 'upload', 'delete', 'reset'], true)) {
+    if (!in_array($action, ['config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
         return;
     }
 
@@ -26,6 +26,9 @@ function cmsHandleEditAction(): void
             return;
         case 'save':
             cmsHandleEditSaveAction($ctx);
+            return;
+        case 'models':
+            cmsHandleEditModelsAction($ctx);
             return;
         case 'prompt':
             cmsHandleEditPromptAction($ctx);

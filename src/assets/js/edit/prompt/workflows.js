@@ -181,6 +181,7 @@ export function createPromptWindowWorkflows({
             const userPrompt = promptInputEl.value.trim();
             const providerValue = providerEl ? providerEl.value : 'local';
             const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+            const modelValue = modelEl ? modelEl.value.trim() : '';
             const selection = currentSelection({ path: state.activePath, previewPath: state.activePath, previewIsFile: false, isLayout: false });
             if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
                 setGeneratingState(false);
@@ -205,10 +206,10 @@ export function createPromptWindowWorkflows({
             const systemPromptValue = (systemPromptEl?.value || '').trim();
             const payload = {
                 path: state.activePath,
-                provider: providerEl ? providerEl.value : 'local',
-                model: modelEl ? modelEl.value.trim() : '',
+                provider: providerValue,
+                model: modelValue,
                 endpoint: endpointEl ? endpointEl.value.trim() : '',
-                apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
+                apiKey: providerValue === 'local' ? '' : apiKeyValue,
                 prompt: userPrompt,
                 history: historyForRequest,
                 systemPrompt: systemPromptValue,

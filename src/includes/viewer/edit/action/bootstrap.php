@@ -19,6 +19,7 @@ require_once __DIR__ . '/upload-action.php';
 require_once __DIR__ . '/delete-action.php';
 require_once __DIR__ . '/reset-action.php';
 require_once __DIR__ . '/save-action.php';
+require_once __DIR__ . '/models-action.php';
 require_once __DIR__ . '/prompt-action.php';
 require_once __DIR__ . '/save/helpers.php';
 require_once __DIR__ . '/save/meta.php';

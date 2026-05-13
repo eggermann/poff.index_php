@@ -287,6 +287,107 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
     ];
 }
 
+function cmsHttpGet(string $url, array $headers = []): array
+{
+    $override = $GLOBALS['__poff_prompt_http_get'] ?? null;
+    if (is_callable($override)) {
+        $response = $override($url, $headers);
+        if (is_array($response)) {
+            return $response;
+        }
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
+    }
+
+    $previousSocketTimeout = ini_get('default_socket_timeout');
+    if (function_exists('ini_set')) {
+        @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
+    }
+
+    try {
+        if (function_exists('curl_init')) {
+            $curl = curl_init($url);
+            if ($curl === false) {
+                return [
+                    'ok' => false,
+                    'status' => 0,
+                    'statusLine' => '',
+                    'body' => '',
+                ];
+            }
+
+            $responseBody = '';
+            $status = 0;
+            $statusLine = '';
+            curl_setopt_array($curl, [
+                CURLOPT_HTTPGET => true,
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HEADER => false,
+                CURLOPT_TIMEOUT => CMS_HTTP_TIMEOUT_SECONDS,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HEADERFUNCTION => function ($curlHandle, $headerLine) use (&$status, &$statusLine) {
+                    $trimmed = trim($headerLine);
+                    if ($trimmed !== '' && preg_match('/^HTTP\/\S+\s+(\d{3})\s*(.*)$/i', $trimmed, $matches)) {
+                        $status = (int) $matches[1];
+                        $statusLine = $trimmed;
+                    }
+                    return strlen($headerLine);
+                },
+            ]);
+
+            $result = curl_exec($curl);
+            if (is_string($result)) {
+                $responseBody = $result;
+            }
+            if ($status === 0) {
+                $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+            }
+            if ($statusLine === '') {
+                $statusLine = 'HTTP ' . $status;
+            }
+            $error = curl_error($curl);
+            curl_close($curl);
+
+            return [
+                'ok' => $result !== false && $status >= 200 && $status < 400,
+                'status' => $status,
+                'statusLine' => $statusLine,
+                'body' => $responseBody,
+                'error' => $error,
+            ];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", $headers),
+                'timeout' => CMS_HTTP_TIMEOUT_SECONDS,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $response = @file_get_contents($url, false, $context);
+        $status = 0;
+        $statusLine = '';
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
+            $status = (int) $matches[1];
+            $statusLine = (string) $http_response_header[0];
+        }
+        return [
+            'ok' => $response !== false && $status >= 200 && $status < 400,
+            'status' => $status,
+            'statusLine' => $statusLine,
+            'body' => $response !== false ? $response : '',
+        ];
+    } finally {
+        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
+            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
+        }
+    }
+}
+
 function cmsHttpPostStream(string $url, array $headers, array $payload, ?callable $onChunk = null): array
 {
     $override = $GLOBALS['__poff_prompt_http_post_stream'] ?? null;

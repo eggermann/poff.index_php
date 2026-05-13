@@ -462,6 +462,8 @@ function loadPromptApiHelpers() {
   vm.runInContext(`${source}
 module.exports = {
   buildCmsUrl,
+  buildLocalModelsUrl,
+  requestLocalPromptModels,
   requestPromptTemplateStream,
 };
 `, context);
@@ -1519,6 +1521,52 @@ describe('MCP create route helper (CLI)', () => {
     expect(response.allowed).toBe(true);
     expect(response.template).toBe('<div class=card></div>');
     expect(response.error).toBeUndefined();
+  });
+
+  test('loads LM Studio models from the companion models endpoint and filters embedding models', async () => {
+    const api = loadPromptApiHelpers();
+    let requestUrl = null;
+    let requestOptions = null;
+    api.setFetch(async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          allowed: true,
+          models: ['google/gemma-4-e4b', 'qwen/qwen3-vl-4b'],
+        }),
+      };
+    });
+
+    const response = await api.requestLocalPromptModels('http://127.0.0.1:1234/v1/chat/completions');
+
+    expect(requestUrl.toString()).toBe('http://localhost:8888/dominikeggermann.com/?edit=models');
+    expect(requestOptions.method).toBe('POST');
+    expect(JSON.parse(requestOptions.body)).toEqual({
+      endpoint: 'http://127.0.0.1:1234/v1/chat/completions',
+    });
+    expect(api.buildLocalModelsUrl('http://127.0.0.1:1234/v1/chat/completions')).toBe('http://127.0.0.1:1234/v1/models');
+    expect(response.error).toBeUndefined();
+    expect(response.models).toEqual(['google/gemma-4-e4b', 'qwen/qwen3-vl-4b']);
+  });
+
+  test('local models proxy response tolerates legacy LM Studio shape after proxying', async () => {
+    const api = loadPromptApiHelpers();
+    api.setFetch(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        allowed: true,
+        models: ['google/gemma-4-e4b', 'qwen/qwen3-vl-4b'],
+      }),
+    }));
+
+    const response = await api.requestLocalPromptModels('http://127.0.0.1:1234/v1/chat/completions');
+
+    expect(response.error).toBeUndefined();
+    expect(response.models).toEqual(['google/gemma-4-e4b', 'qwen/qwen3-vl-4b']);
   });
 
   test('viewer prompt stream emits a final SSE payload on success', async () => {

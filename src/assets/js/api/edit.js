@@ -9,6 +9,70 @@ export function buildCmsUrl(action, path) {
     return url.toString();
 }
 
+export function buildLocalModelsUrl(endpoint = '') {
+    const fallback = 'http://127.0.0.1:1234/v1/models';
+    const rawEndpoint = String(endpoint || '').trim();
+    if (rawEndpoint === '') {
+        return fallback;
+    }
+    try {
+        const url = new URL(rawEndpoint);
+        const normalizedPath = url.pathname.replace(/\/+$/, '');
+        if (/\/v1\/chat\/completions$/i.test(normalizedPath)) {
+            url.pathname = normalizedPath.replace(/\/v1\/chat\/completions$/i, '/v1/models');
+        } else if (/\/v1\/responses$/i.test(normalizedPath)) {
+            url.pathname = normalizedPath.replace(/\/v1\/responses$/i, '/v1/models');
+        } else if (!/\/v1\/models$/i.test(normalizedPath)) {
+            url.pathname = '/v1/models';
+        }
+        url.search = '';
+        url.hash = '';
+        return url.toString();
+    } catch (err) {
+        return fallback;
+    }
+}
+
+export async function requestLocalPromptModels(endpoint = '') {
+    const url = buildCmsUrl('models', '');
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                endpoint,
+            }),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return {
+                error: (data && typeof data.error === 'string' ? data.error : '')
+                    || responseText.trim()
+                    || `Local models proxy failed (HTTP ${res.status}).`,
+                models: [],
+            };
+        }
+        return {
+            error: typeof data?.error === 'string' ? data.error : undefined,
+            models: Array.isArray(data?.models) ? data.models : [],
+        };
+    } catch (err) {
+        return {
+            error: err?.message || 'Local models endpoint unavailable.',
+            models: [],
+        };
+    }
+}
+
 export async function requestEditConfig(action, payload) {
     const url = buildCmsUrl(action, payload.path || '');
     try {
