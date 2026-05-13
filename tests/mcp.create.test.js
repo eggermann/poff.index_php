@@ -1605,6 +1605,39 @@ describe('MCP create route helper (CLI)', () => {
     expect(response.models).toEqual(['gpt-4o-mini', 'gpt-4.1-mini']);
   });
 
+  test('loads Gemini models from companion models endpoint with api key payload', async () => {
+    const api = loadPromptApiHelpers();
+    let requestUrl = null;
+    let requestOptions = null;
+    api.setFetch(async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          allowed: true,
+          models: ['gemini-2.5-flash', 'gemini-1.5-flash'],
+        }),
+      };
+    });
+
+    const response = await api.requestPromptModels({
+      provider: 'gemini',
+      apiKey: 'gemini-test',
+    });
+
+    expect(requestUrl.toString()).toBe('http://localhost:8888/dominikeggermann.com/?edit=models');
+    expect(requestOptions.method).toBe('POST');
+    expect(JSON.parse(requestOptions.body)).toEqual({
+      provider: 'gemini',
+      endpoint: '',
+      apiKey: 'gemini-test',
+    });
+    expect(response.error).toBeUndefined();
+    expect(response.models).toEqual(['gemini-2.5-flash', 'gemini-1.5-flash']);
+  });
+
   test('viewer prompt stream emits a final SSE payload on success', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'viewer-prompt-stream-final-'));
     try {

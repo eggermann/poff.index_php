@@ -785,11 +785,21 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       "o4-mini",
       "o3-mini"
     ];
-    const resolvePreferredLocalModel = (models, currentValue) => {
+    const geminiFallbackModels = [
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro"
+    ];
+    const resolvePreferredModel = (provider, models, currentValue) => {
       const list = Array.isArray(models) ? models : [];
       const value = String(currentValue || "").trim();
       if (value && list.includes(value)) {
         return value;
+      }
+      if (provider !== "local") {
+        return list[0] || value || "";
       }
       const aliases = {
         gemma4: ["google/gemma-4-e4b", "google/gemma-4-31b", "google/gemma-4-e2b"],
@@ -812,12 +822,12 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         modelSelectEl.value = value || "";
       }
     };
-    const setPromptModelOptions = (models, selectedValue, placeholder = "No models found") => {
+    const setPromptModelOptions = (provider, models, selectedValue, placeholder = "No models found") => {
       if (!modelSelectEl) {
         return;
       }
       const list = Array.isArray(models) ? models.filter((value) => typeof value === "string" && value.trim() !== "") : [];
-      const resolvedValue = resolvePreferredLocalModel(list, selectedValue);
+      const resolvedValue = resolvePreferredModel(provider, list, selectedValue);
       const currentValue = String(selectedValue || "").trim();
       const options = [];
       if (list.length === 0) {
@@ -830,7 +840,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       modelSelectEl.innerHTML = options.map(({ value, label }) => `<option value="${value}">${label}</option>`).join("");
       syncModelField(resolvedValue || currentValue);
     };
-    const providerUsesRemoteModelList = () => (/* @__PURE__ */ new Set(["local", "openai"])).has((providerEl == null ? void 0 : providerEl.value) || "local");
+    const providerUsesRemoteModelList = () => (/* @__PURE__ */ new Set(["local", "openai", "gemini"])).has((providerEl == null ? void 0 : providerEl.value) || "local");
     const refreshPromptModelOptions = async () => {
       if (!modelSelectEl || !requestPromptModels2 || !providerUsesRemoteModelList()) {
         return;
@@ -840,11 +850,16 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       const provider = (providerEl == null ? void 0 : providerEl.value) || "local";
       const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
       if (provider === "openai" && apiKeyValue === "") {
-        setPromptModelOptions(openAiFallbackModels, currentValue, "OpenAI models");
+        setPromptModelOptions(provider, openAiFallbackModels, currentValue, "OpenAI models");
         persistSettings();
         return;
       }
-      const waitingLabel = provider === "openai" ? "Loading OpenAI models..." : "Loading local models...";
+      if (provider === "gemini" && apiKeyValue === "") {
+        setPromptModelOptions(provider, geminiFallbackModels, currentValue, "Gemini models");
+        persistSettings();
+        return;
+      }
+      const waitingLabel = provider === "openai" ? "Loading OpenAI models..." : provider === "gemini" ? "Loading Gemini models..." : "Loading local models...";
       modelSelectEl.innerHTML = `<option value="${currentValue || ""}">${waitingLabel}</option>`;
       modelSelectEl.value = currentValue || "";
       const result = await requestPromptModels2({
@@ -856,14 +871,21 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         return;
       }
       if (provider === "openai" && (!result.models || result.models.length === 0)) {
-        setPromptModelOptions(openAiFallbackModels, currentValue, result.error || "OpenAI models");
+        setPromptModelOptions(provider, openAiFallbackModels, currentValue, result.error || "OpenAI models");
         if (!result.error) {
           persistSettings();
         }
         return;
       }
-      const emptyLabel = provider === "openai" ? result.error || "No OpenAI models found" : result.error || "No local models found";
-      setPromptModelOptions(result.models || [], currentValue, emptyLabel);
+      if (provider === "gemini" && (!result.models || result.models.length === 0)) {
+        setPromptModelOptions(provider, geminiFallbackModels, currentValue, result.error || "Gemini models");
+        if (!result.error) {
+          persistSettings();
+        }
+        return;
+      }
+      const emptyLabel = provider === "openai" ? result.error || "No OpenAI models found" : provider === "gemini" ? result.error || "No Gemini models found" : result.error || "No local models found";
+      setPromptModelOptions(provider, result.models || [], currentValue, emptyLabel);
       if (!result.error) {
         persistSettings();
       }
@@ -970,7 +992,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     if (apiKeyEl) {
       apiKeyEl.addEventListener("input", () => {
         persistSettings();
-        if ((providerEl == null ? void 0 : providerEl.value) === "openai") {
+        if ((providerEl == null ? void 0 : providerEl.value) === "openai" || (providerEl == null ? void 0 : providerEl.value) === "gemini") {
           void refreshPromptModelOptions();
         }
       });
