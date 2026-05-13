@@ -463,6 +463,7 @@ function loadPromptApiHelpers() {
 module.exports = {
   buildCmsUrl,
   buildLocalModelsUrl,
+  requestPromptModels,
   requestLocalPromptModels,
   requestPromptTemplateStream,
 };
@@ -1545,7 +1546,9 @@ describe('MCP create route helper (CLI)', () => {
     expect(requestUrl.toString()).toBe('http://localhost:8888/dominikeggermann.com/?edit=models');
     expect(requestOptions.method).toBe('POST');
     expect(JSON.parse(requestOptions.body)).toEqual({
+      provider: 'local',
       endpoint: 'http://127.0.0.1:1234/v1/chat/completions',
+      apiKey: '',
     });
     expect(api.buildLocalModelsUrl('http://127.0.0.1:1234/v1/chat/completions')).toBe('http://127.0.0.1:1234/v1/models');
     expect(response.error).toBeUndefined();
@@ -1567,6 +1570,39 @@ describe('MCP create route helper (CLI)', () => {
 
     expect(response.error).toBeUndefined();
     expect(response.models).toEqual(['google/gemma-4-e4b', 'qwen/qwen3-vl-4b']);
+  });
+
+  test('loads OpenAI models from companion models endpoint with api key payload', async () => {
+    const api = loadPromptApiHelpers();
+    let requestUrl = null;
+    let requestOptions = null;
+    api.setFetch(async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          allowed: true,
+          models: ['gpt-4o-mini', 'gpt-4.1-mini'],
+        }),
+      };
+    });
+
+    const response = await api.requestPromptModels({
+      provider: 'openai',
+      apiKey: 'sk-test',
+    });
+
+    expect(requestUrl.toString()).toBe('http://localhost:8888/dominikeggermann.com/?edit=models');
+    expect(requestOptions.method).toBe('POST');
+    expect(JSON.parse(requestOptions.body)).toEqual({
+      provider: 'openai',
+      endpoint: '',
+      apiKey: 'sk-test',
+    });
+    expect(response.error).toBeUndefined();
+    expect(response.models).toEqual(['gpt-4o-mini', 'gpt-4.1-mini']);
   });
 
   test('viewer prompt stream emits a final SSE payload on success', async () => {

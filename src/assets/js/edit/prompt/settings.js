@@ -15,14 +15,22 @@ export function bindPromptSettings({
     currentPromptMode,
     currentSystemPromptSettingKey,
     getDefaultModelForProvider,
-    requestLocalPromptModels,
+    requestPromptModels,
     loadPromptSettings,
     savePromptSettings,
     onRenderContext,
 }) {
     const settings = loadPromptSettings();
     let suppressSave = false;
-    let localModelsRequestId = 0;
+    let promptModelsRequestId = 0;
+    const openAiFallbackModels = [
+        'gpt-4o-mini',
+        'gpt-4o',
+        'gpt-4.1-mini',
+        'gpt-4.1',
+        'o4-mini',
+        'o3-mini',
+    ];
 
     const resolvePreferredLocalModel = (models, currentValue) => {
         const list = Array.isArray(models) ? models : [];
@@ -53,7 +61,7 @@ export function bindPromptSettings({
         }
     };
 
-    const setLocalModelOptions = (models, selectedValue, placeholder = 'No local models found') => {
+    const setPromptModelOptions = (models, selectedValue, placeholder = 'No models found') => {
         if (!modelSelectEl) {
             return;
         }
@@ -74,26 +82,50 @@ export function bindPromptSettings({
         syncModelField(resolvedValue || currentValue);
     };
 
-    const refreshLocalModelOptions = async () => {
-        if (!modelSelectEl || !requestLocalPromptModels) {
+    const providerUsesRemoteModelList = () => new Set(['local', 'openai']).has(providerEl?.value || 'local');
+
+    const refreshPromptModelOptions = async () => {
+        if (!modelSelectEl || !requestPromptModels || !providerUsesRemoteModelList()) {
             return;
         }
-        const requestId = ++localModelsRequestId;
+        const requestId = ++promptModelsRequestId;
         const currentValue = modelEl ? modelEl.value.trim() : '';
-        modelSelectEl.innerHTML = `<option value="${currentValue || ''}">Loading local models...</option>`;
-        modelSelectEl.value = currentValue || '';
-        const result = await requestLocalPromptModels(endpointEl ? endpointEl.value.trim() : '');
-        if (requestId !== localModelsRequestId) {
+        const provider = providerEl?.value || 'local';
+        const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+        if (provider === 'openai' && apiKeyValue === '') {
+            setPromptModelOptions(openAiFallbackModels, currentValue, 'OpenAI models');
+            persistSettings();
             return;
         }
-        setLocalModelOptions(result.models || [], currentValue, result.error || 'No local models found');
+        const waitingLabel = provider === 'openai' ? 'Loading OpenAI models...' : 'Loading local models...';
+        modelSelectEl.innerHTML = `<option value="${currentValue || ''}">${waitingLabel}</option>`;
+        modelSelectEl.value = currentValue || '';
+        const result = await requestPromptModels({
+            provider,
+            endpoint: endpointEl ? endpointEl.value.trim() : '',
+            apiKey: apiKeyValue,
+        });
+        if (requestId !== promptModelsRequestId) {
+            return;
+        }
+        if (provider === 'openai' && (!result.models || result.models.length === 0)) {
+            setPromptModelOptions(openAiFallbackModels, currentValue, result.error || 'OpenAI models');
+            if (!result.error) {
+                persistSettings();
+            }
+            return;
+        }
+        const emptyLabel = provider === 'openai'
+            ? (result.error || 'No OpenAI models found')
+            : (result.error || 'No local models found');
+        setPromptModelOptions(result.models || [], currentValue, emptyLabel);
         if (!result.error) {
             persistSettings();
         }
     };
 
     const readModelValue = () => {
-        if (providerEl?.value === 'local' && modelSelectEl) {
+        if (providerUsesRemoteModelList() && modelSelectEl) {
             return modelSelectEl.value || modelEl?.value || '';
         }
         return modelEl ? modelEl.value : '';
@@ -131,16 +163,16 @@ export function bindPromptSettings({
             apiKeyRow.hidden = provider === 'local';
         }
         if (modelSelectEl) {
-            modelSelectEl.hidden = provider !== 'local';
+            modelSelectEl.hidden = !providerUsesRemoteModelList();
         }
         if (modelEl) {
-            modelEl.hidden = provider === 'local';
+            modelEl.hidden = providerUsesRemoteModelList();
         }
         if (modelEl && resetModel && !modelEl.value.trim()) {
             modelEl.value = getDefaultModelForProvider(provider);
         }
-        if (provider === 'local') {
-            void refreshLocalModelOptions();
+        if (providerUsesRemoteModelList()) {
+            void refreshPromptModelOptions();
         }
         persistSettings();
     };
@@ -197,12 +229,17 @@ export function bindPromptSettings({
         endpointEl.addEventListener('input', () => {
             persistSettings();
             if (providerEl?.value === 'local') {
-                void refreshLocalModelOptions();
+                void refreshPromptModelOptions();
             }
         });
     }
     if (apiKeyEl) {
-        apiKeyEl.addEventListener('input', persistSettings);
+        apiKeyEl.addEventListener('input', () => {
+            persistSettings();
+            if (providerEl?.value === 'openai') {
+                void refreshPromptModelOptions();
+            }
+        });
     }
     if (systemPromptEl) {
         systemPromptEl.addEventListener('input', () => {

@@ -1,5 +1,5 @@
 import { requestEditConfig } from '../api/edit.js';
-import { requestLocalPromptModels } from '../api/edit.js';
+import { requestPromptModels } from '../api/edit.js';
 import { defaultPromptSettings, getDefaultModelForProvider } from './prompt/constants.js';
 import { loadPromptSettings, savePromptSettings } from './prompt/storage.js';
 import { bindPromptSettings } from './prompt/settings.js';
@@ -204,7 +204,7 @@ export function bindPromptWindow({
         currentPromptMode,
         currentSystemPromptSettingKey,
         getDefaultModelForProvider,
-        requestLocalPromptModels,
+        requestPromptModels,
         loadPromptSettings,
         savePromptSettings,
         onRenderContext: renderContext,

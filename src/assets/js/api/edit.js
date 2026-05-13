@@ -33,7 +33,7 @@ export function buildLocalModelsUrl(endpoint = '') {
     }
 }
 
-export async function requestLocalPromptModels(endpoint = '') {
+export async function requestPromptModels({ provider = 'local', endpoint = '', apiKey = '' } = {}) {
     const url = buildCmsUrl('models', '');
     try {
         const res = await fetch(url, {
@@ -43,7 +43,9 @@ export async function requestLocalPromptModels(endpoint = '') {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+                provider,
                 endpoint,
+                apiKey,
             }),
         });
         const responseText = await res.text();
@@ -71,6 +73,10 @@ export async function requestLocalPromptModels(endpoint = '') {
             models: [],
         };
     }
+}
+
+export async function requestLocalPromptModels(endpoint = '') {
+    return requestPromptModels({ provider: 'local', endpoint });
 }
 
 export async function requestEditConfig(action, payload) {

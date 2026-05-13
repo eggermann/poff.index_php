@@ -68,6 +68,45 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     }
     return url.toString();
   }
+  async function requestPromptModels({ provider = "local", endpoint = "", apiKey = "" } = {}) {
+    const url = buildCmsUrl("models", "");
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          provider,
+          endpoint,
+          apiKey
+        })
+      });
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
+      }
+      if (!res.ok) {
+        return {
+          error: (data && typeof data.error === "string" ? data.error : "") || responseText.trim() || `Local models proxy failed (HTTP ${res.status}).`,
+          models: []
+        };
+      }
+      return {
+        error: typeof (data == null ? void 0 : data.error) === "string" ? data.error : void 0,
+        models: Array.isArray(data == null ? void 0 : data.models) ? data.models : []
+      };
+    } catch (err) {
+      return {
+        error: (err == null ? void 0 : err.message) || "Local models endpoint unavailable.",
+        models: []
+      };
+    }
+  }
   async function requestEditConfig(action, payload) {
     const url = buildCmsUrl(action, payload.path || "");
     try {
@@ -716,8 +755,10 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
   function bindPromptSettings({
     providerEl,
     modelEl,
+    modelSelectEl,
     endpointRow,
     endpointEl,
+    apiKeyRow,
     apiKeyEl,
     systemPromptEl,
     systemResetEl,
@@ -728,17 +769,116 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     currentPromptMode,
     currentSystemPromptSettingKey,
     getDefaultModelForProvider: getDefaultModelForProvider2,
+    requestPromptModels: requestPromptModels2,
     loadPromptSettings: loadPromptSettings2,
     savePromptSettings: savePromptSettings2,
     onRenderContext
   }) {
     const settings = loadPromptSettings2();
     let suppressSave = false;
+    let promptModelsRequestId = 0;
+    const openAiFallbackModels = [
+      "gpt-4o-mini",
+      "gpt-4o",
+      "gpt-4.1-mini",
+      "gpt-4.1",
+      "o4-mini",
+      "o3-mini"
+    ];
+    const resolvePreferredLocalModel = (models, currentValue) => {
+      const list = Array.isArray(models) ? models : [];
+      const value = String(currentValue || "").trim();
+      if (value && list.includes(value)) {
+        return value;
+      }
+      const aliases = {
+        gemma4: ["google/gemma-4-e4b", "google/gemma-4-31b", "google/gemma-4-e2b"],
+        qwen3_vl: ["qwen/qwen3-vl-4b", "qwen3-vl-32b-instruct-mlx"],
+        mistral3: ["mistralai/ministral-3-3b", "mistralai/ministral-3-14b-reasoning"]
+      };
+      const aliasMatches = aliases[value] || [];
+      for (const candidate of aliasMatches) {
+        if (list.includes(candidate)) {
+          return candidate;
+        }
+      }
+      return list[0] || value || "";
+    };
+    const syncModelField = (value) => {
+      if (modelEl) {
+        modelEl.value = value || "";
+      }
+      if (modelSelectEl) {
+        modelSelectEl.value = value || "";
+      }
+    };
+    const setPromptModelOptions = (models, selectedValue, placeholder = "No models found") => {
+      if (!modelSelectEl) {
+        return;
+      }
+      const list = Array.isArray(models) ? models.filter((value) => typeof value === "string" && value.trim() !== "") : [];
+      const resolvedValue = resolvePreferredLocalModel(list, selectedValue);
+      const currentValue = String(selectedValue || "").trim();
+      const options = [];
+      if (list.length === 0) {
+        options.push({ value: currentValue, label: currentValue || placeholder });
+      } else {
+        for (const value of list) {
+          options.push({ value, label: value });
+        }
+      }
+      modelSelectEl.innerHTML = options.map(({ value, label }) => `<option value="${value}">${label}</option>`).join("");
+      syncModelField(resolvedValue || currentValue);
+    };
+    const providerUsesRemoteModelList = () => (/* @__PURE__ */ new Set(["local", "openai"])).has((providerEl == null ? void 0 : providerEl.value) || "local");
+    const refreshPromptModelOptions = async () => {
+      if (!modelSelectEl || !requestPromptModels2 || !providerUsesRemoteModelList()) {
+        return;
+      }
+      const requestId = ++promptModelsRequestId;
+      const currentValue = modelEl ? modelEl.value.trim() : "";
+      const provider = (providerEl == null ? void 0 : providerEl.value) || "local";
+      const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
+      if (provider === "openai" && apiKeyValue === "") {
+        setPromptModelOptions(openAiFallbackModels, currentValue, "OpenAI models");
+        persistSettings();
+        return;
+      }
+      const waitingLabel = provider === "openai" ? "Loading OpenAI models..." : "Loading local models...";
+      modelSelectEl.innerHTML = `<option value="${currentValue || ""}">${waitingLabel}</option>`;
+      modelSelectEl.value = currentValue || "";
+      const result = await requestPromptModels2({
+        provider,
+        endpoint: endpointEl ? endpointEl.value.trim() : "",
+        apiKey: apiKeyValue
+      });
+      if (requestId !== promptModelsRequestId) {
+        return;
+      }
+      if (provider === "openai" && (!result.models || result.models.length === 0)) {
+        setPromptModelOptions(openAiFallbackModels, currentValue, result.error || "OpenAI models");
+        if (!result.error) {
+          persistSettings();
+        }
+        return;
+      }
+      const emptyLabel = provider === "openai" ? result.error || "No OpenAI models found" : result.error || "No local models found";
+      setPromptModelOptions(result.models || [], currentValue, emptyLabel);
+      if (!result.error) {
+        persistSettings();
+      }
+    };
+    const readModelValue = () => {
+      if (providerUsesRemoteModelList() && modelSelectEl) {
+        return modelSelectEl.value || (modelEl == null ? void 0 : modelEl.value) || "";
+      }
+      return modelEl ? modelEl.value : "";
+    };
     const readSettings = () => {
       const systemPrompt = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim() || currentDefaultSystemPrompt();
       const nextSettings = {
         provider: providerEl ? providerEl.value : "local",
-        model: modelEl ? modelEl.value : "",
+        model: readModelValue(),
         endpoint: endpointEl ? endpointEl.value : "",
         apiKey: apiKeyEl ? apiKeyEl.value : "",
         systemPrompt,
@@ -760,8 +900,20 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       if (endpointRow) {
         endpointRow.hidden = provider !== "local";
       }
+      if (apiKeyRow) {
+        apiKeyRow.hidden = provider === "local";
+      }
+      if (modelSelectEl) {
+        modelSelectEl.hidden = !providerUsesRemoteModelList();
+      }
+      if (modelEl) {
+        modelEl.hidden = providerUsesRemoteModelList();
+      }
       if (modelEl && resetModel && !modelEl.value.trim()) {
         modelEl.value = getDefaultModelForProvider2(provider);
+      }
+      if (providerUsesRemoteModelList()) {
+        void refreshPromptModelOptions();
       }
       persistSettings();
     };
@@ -769,6 +921,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       suppressSave = true;
       if (providerEl) providerEl.value = nextSettings.provider || defaultPromptSettings2.provider;
       if (modelEl) modelEl.value = nextSettings.model || "";
+      if (modelSelectEl) modelSelectEl.value = nextSettings.model || "";
       if (endpointEl) endpointEl.value = nextSettings.endpoint || "";
       if (apiKeyEl) apiKeyEl.value = nextSettings.apiKey || "";
       if (systemPromptEl) {
@@ -800,11 +953,27 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     if (modelEl) {
       modelEl.addEventListener("input", persistSettings);
     }
+    if (modelSelectEl) {
+      modelSelectEl.addEventListener("change", () => {
+        syncModelField(modelSelectEl.value || "");
+        persistSettings();
+      });
+    }
     if (endpointEl) {
-      endpointEl.addEventListener("input", persistSettings);
+      endpointEl.addEventListener("input", () => {
+        persistSettings();
+        if ((providerEl == null ? void 0 : providerEl.value) === "local") {
+          void refreshPromptModelOptions();
+        }
+      });
     }
     if (apiKeyEl) {
-      apiKeyEl.addEventListener("input", persistSettings);
+      apiKeyEl.addEventListener("input", () => {
+        persistSettings();
+        if ((providerEl == null ? void 0 : providerEl.value) === "openai") {
+          void refreshPromptModelOptions();
+        }
+      });
     }
     if (systemPromptEl) {
       systemPromptEl.addEventListener("input", () => {
@@ -2958,6 +3127,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const userPrompt = promptInputEl.value.trim();
         const providerValue = providerEl ? providerEl.value : "local";
         const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : "";
+        const modelValue = modelEl ? modelEl.value.trim() : "";
         const selection2 = currentSelection({ path: state.activePath, previewPath: state.activePath, previewIsFile: false, isLayout: false });
         if ((providerValue === "openai" || providerValue === "gemini") && apiKeyValue === "") {
           setGeneratingState(false);
@@ -2980,10 +3150,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const systemPromptValue = ((systemPromptEl == null ? void 0 : systemPromptEl.value) || "").trim();
         const payload = {
           path: state.activePath,
-          provider: providerEl ? providerEl.value : "local",
-          model: modelEl ? modelEl.value.trim() : "",
+          provider: providerValue,
+          model: modelValue,
           endpoint: endpointEl ? endpointEl.value.trim() : "",
-          apiKey: apiKeyEl ? apiKeyEl.value.trim() : "",
+          apiKey: providerValue === "local" ? "" : apiKeyValue,
           prompt: userPrompt,
           history: historyForRequest,
           systemPrompt: systemPromptValue
@@ -3274,8 +3444,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     const providerEl = root.querySelector("#prompt-provider");
     const modelEl = root.querySelector("#prompt-model");
+    const modelSelectEl = root.querySelector("#prompt-model-local");
     const endpointRow = root.querySelector("#prompt-endpoint-row");
     const endpointEl = root.querySelector("#prompt-endpoint");
+    const apiKeyRow = root.querySelector("#prompt-api-key-row");
     const apiKeyEl = root.querySelector("#prompt-api-key");
     const systemPromptEl = root.querySelector("#prompt-system");
     const systemResetEl = root.querySelector("#prompt-system-reset");
@@ -3433,8 +3605,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const settingsController = bindPromptSettings({
       providerEl,
       modelEl,
+      modelSelectEl,
       endpointRow,
       endpointEl,
+      apiKeyRow,
       apiKeyEl,
       systemPromptEl,
       systemResetEl,
@@ -3445,6 +3619,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       currentPromptMode,
       currentSystemPromptSettingKey,
       getDefaultModelForProvider,
+      requestPromptModels,
       loadPromptSettings,
       savePromptSettings,
       onRenderContext: renderContext
@@ -3806,9 +3981,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         </div>
                         <div>
                             <label class="edit-label" for="prompt-model">Model</label>
+                            <select class="form-input" id="prompt-model-local" hidden>
+                                <option value="">Loading local models...</option>
+                            </select>
                             <input class="form-input" id="prompt-model" type="text" value="${escapeHtml(settings.model || "")}" placeholder="optional">
                         </div>
-                        <div>
+                        <div id="prompt-api-key-row">
                             <label class="edit-label" for="prompt-api-key">API key (stored in localStorage)</label>
                             <input class="form-input" id="prompt-api-key" type="password" value="${escapeHtml(settings.apiKey || "")}">
                         </div>
