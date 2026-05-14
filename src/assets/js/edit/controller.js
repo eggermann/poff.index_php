@@ -69,7 +69,6 @@ export function createEditController({ elements, context, editRequested }) {
         editAuthForm,
         editAuthPassword,
         editAuthSubmit,
-        editAuthLogout,
         editAuthStatus,
     } = elements;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, 'currentPoffConfig')
@@ -164,15 +163,16 @@ export function createEditController({ elements, context, editRequested }) {
         if (editAuthForm) {
             editAuthForm.hidden = !shouldShow;
         }
+        if (editAuthSubmit) {
+            editAuthSubmit.hidden = !!authState.authenticated;
+            editAuthSubmit.textContent = 'Unlock';
+        }
+        if (editAuthPassword) {
+            editAuthPassword.hidden = !!authState.authenticated;
+        }
         if (!shouldShow && !authState.authenticated) {
             setAuthStatus('');
             return;
-        }
-        if (editAuthLogout) {
-            editAuthLogout.hidden = !authState.authenticated;
-        }
-        if (editAuthSubmit) {
-            editAuthSubmit.hidden = authState.authenticated;
         }
         const message = authStatusMessage(status);
         setAuthStatus(message, false);
@@ -190,6 +190,7 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         const editActive = editRequested && authState.canEdit;
+        editToggle.textContent = authState.authenticated ? 'Disable edit mode' : 'Enable edit mode';
         editToggle.classList.toggle('edit-toggle-on', editActive);
         editToggle.setAttribute('aria-expanded', editAuthDetails?.open ? 'true' : 'false');
     }
@@ -205,6 +206,25 @@ export function createEditController({ elements, context, editRequested }) {
             if (editAuthDetails.open && !authState.authenticated && editAuthPassword) {
                 editAuthPassword.focus();
             }
+        });
+        editToggle?.addEventListener('click', async (event) => {
+            if (!authState.authenticated) {
+                return;
+            }
+            event.preventDefault();
+            const selection = getActiveSelection();
+            const data = await requestEditAuth({
+                path: getEditTargetPath(selection),
+                intent: 'logout',
+            });
+            if (data?.auth) {
+                updateAuthState(data.auth);
+            }
+            authFormVisible = false;
+            syncAuthDisclosure(false, data);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit');
+            window.location.href = url.toString();
         });
     }
 
@@ -235,23 +255,6 @@ export function createEditController({ elements, context, editRequested }) {
             });
         }
 
-        if (editAuthLogout) {
-            editAuthLogout.addEventListener('click', async () => {
-                const selection = getActiveSelection();
-                const data = await requestEditAuth({
-                    path: getEditTargetPath(selection),
-                    intent: 'logout',
-                });
-                if (data?.auth) {
-                    updateAuthState(data.auth);
-                }
-                authFormVisible = false;
-                syncAuthDisclosure(false, data);
-                const url = new URL(window.location.href);
-                url.searchParams.delete('edit');
-                window.location.href = url.toString();
-            });
-        }
     }
 
     async function saveConfig(payload, statusEl) {

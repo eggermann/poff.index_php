@@ -10,7 +10,6 @@ export const APP_ELEMENT_IDS = {
     editAuthForm: 'editAuthForm',
     editAuthPassword: 'editAuthPassword',
     editAuthSubmit: 'editAuthSubmit',
-    editAuthLogout: 'editAuthLogout',
     editAuthStatus: 'editAuthStatus',
     sidebarToggle: 'sidebarToggle',
     iframeLoading: 'iframeLoading',

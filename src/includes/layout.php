@@ -24,10 +24,7 @@
             <form id="editAuthForm" class="edit-form">
                 <label class="edit-label" for="editAuthPassword">Editor password</label>
                 <input id="editAuthPassword" class="form-input" type="password" name="password" autocomplete="current-password">
-                <div class="flex gap-2">
-                    <button id="editAuthSubmit" class="btn" type="submit">Unlock</button>
-                    <button id="editAuthLogout" class="btn btn-secondary" type="button" hidden>Log out</button>
-                </div>
+                <button id="editAuthSubmit" class="btn" type="submit">Unlock</button>
                 <div id="editAuthStatus" class="edit-status" aria-live="polite"></div>
             </form>
         </details>

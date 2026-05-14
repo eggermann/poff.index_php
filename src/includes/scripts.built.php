@@ -6060,7 +6060,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       editAuthForm,
       editAuthPassword,
       editAuthSubmit,
-      editAuthLogout,
       editAuthStatus
     } = elements2;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, "currentPoffConfig") ? context.currentPoffConfig : null;
@@ -6141,15 +6140,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (editAuthForm) {
         editAuthForm.hidden = !shouldShow;
       }
+      if (editAuthSubmit) {
+        editAuthSubmit.hidden = !!authState.authenticated;
+        editAuthSubmit.textContent = "Unlock";
+      }
+      if (editAuthPassword) {
+        editAuthPassword.hidden = !!authState.authenticated;
+      }
       if (!shouldShow && !authState.authenticated) {
         setAuthStatus("");
         return;
-      }
-      if (editAuthLogout) {
-        editAuthLogout.hidden = !authState.authenticated;
-      }
-      if (editAuthSubmit) {
-        editAuthSubmit.hidden = authState.authenticated;
       }
       const message = authStatusMessage(status);
       setAuthStatus(message, false);
@@ -6164,6 +6164,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       const editActive = editRequested2 && authState.canEdit;
+      editToggle.textContent = authState.authenticated ? "Disable edit mode" : "Enable edit mode";
       editToggle.classList.toggle("edit-toggle-on", editActive);
       editToggle.setAttribute("aria-expanded", (editAuthDetails == null ? void 0 : editAuthDetails.open) ? "true" : "false");
     }
@@ -6178,6 +6179,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (editAuthDetails.open && !authState.authenticated && editAuthPassword) {
           editAuthPassword.focus();
         }
+      });
+      editToggle == null ? void 0 : editToggle.addEventListener("click", async (event) => {
+        if (!authState.authenticated) {
+          return;
+        }
+        event.preventDefault();
+        const selection2 = getActiveSelection();
+        const data = await requestEditAuth({
+          path: getEditTargetPath(selection2),
+          intent: "logout"
+        });
+        if (data == null ? void 0 : data.auth) {
+          updateAuthState(data.auth);
+        }
+        authFormVisible = false;
+        syncAuthDisclosure(false, data);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("edit");
+        window.location.href = url.toString();
       });
     }
     function bindAuthForm() {
@@ -6204,23 +6224,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           syncAuthDisclosure(false, data);
           const url = new URL(window.location.href);
           url.searchParams.set("edit", "true");
-          window.location.href = url.toString();
-        });
-      }
-      if (editAuthLogout) {
-        editAuthLogout.addEventListener("click", async () => {
-          const selection2 = getActiveSelection();
-          const data = await requestEditAuth({
-            path: getEditTargetPath(selection2),
-            intent: "logout"
-          });
-          if (data == null ? void 0 : data.auth) {
-            updateAuthState(data.auth);
-          }
-          authFormVisible = false;
-          syncAuthDisclosure(false, data);
-          const url = new URL(window.location.href);
-          url.searchParams.delete("edit");
           window.location.href = url.toString();
         });
       }
@@ -7459,7 +7462,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editAuthForm: "editAuthForm",
     editAuthPassword: "editAuthPassword",
     editAuthSubmit: "editAuthSubmit",
-    editAuthLogout: "editAuthLogout",
     editAuthStatus: "editAuthStatus",
     sidebarToggle: "sidebarToggle",
     iframeLoading: "iframeLoading",

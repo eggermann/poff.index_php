@@ -108,7 +108,7 @@
 #appSidebar .app-edit-toggle-wrap {
     position: relative;
     z-index: 2;
-    margin: 0 0 var(--poff-space-lg-plus);
+    margin: 0 0 var(--poff-space-md);
 }
 
 #appSidebar .edit-auth-details {
@@ -121,12 +121,11 @@
 }
 
 #appSidebar .edit-auth-details > summary {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     list-style: none;
-    width: fit-content;
-    max-width: 100%;
+    width: 100%;
     margin: 0;
 }
 
@@ -135,18 +134,19 @@
 }
 
 #appSidebar .edit-toggle {
-    width: fit-content;
-    max-width: 100%;
+    width: 100%;
     border: 0;
-    border-radius: 18px;
+    min-height: 56px;
+    border-radius: 24px;
     background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
     color: #ffffff;
-    padding: 14px 24px;
+    padding: 14px 20px;
     font-weight: 650;
     letter-spacing: 0.01em;
     box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     cursor: pointer;
     box-sizing: border-box;
+    text-align: center;
 }
 
 #appSidebar .edit-toggle.edit-toggle-on {
@@ -155,7 +155,7 @@
 }
 
 #sidebarLoading {
-    margin: 0 0 10px;
+    margin: 0 0 12px;
     padding: 12px 14px;
     justify-content: flex-start;
     border-radius: 16px;
@@ -194,6 +194,37 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+#appSidebar .edit-form {
+    display: grid;
+    gap: var(--poff-space-xs-plus);
+    margin-top: var(--poff-space-sm);
+}
+
+#appSidebar .edit-form .edit-label {
+    margin-bottom: 0;
+    font-size: var(--poff-font-size-xs);
+    color: var(--app-shell-text);
+}
+
+#appSidebar .edit-form .form-input {
+    width: 100%;
+    min-height: 48px;
+    border: 1px solid rgba(148, 163, 184, 0.44);
+    border-radius: 16px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.92);
+    box-sizing: border-box;
+}
+
+#appSidebar .edit-form .btn {
+    width: 100%;
+    min-height: 48px;
+}
+
+#appSidebar .edit-status {
+    margin-top: 2px;
 }
 
 #appSidebar .nav-link:hover {
