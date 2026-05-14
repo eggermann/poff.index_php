@@ -99,6 +99,45 @@ export async function requestEditConfig(action, payload) {
     }
 }
 
+export async function requestEditAuth(payload = {}) {
+    const url = buildCmsUrl('auth', payload.path || '');
+    const method = payload.method === 'GET' ? 'GET' : 'POST';
+    const bodyPayload = { ...payload };
+    delete bodyPayload.method;
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: {
+                'Accept': 'application/json',
+                ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: method === 'GET' ? undefined : JSON.stringify(bodyPayload),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return data || {
+                allowed: false,
+                error: responseText.trim() || `Auth endpoint failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || {
+            allowed: false,
+            error: responseText.trim() || 'Auth endpoint returned invalid JSON.',
+        };
+    } catch (err) {
+        return {
+            allowed: false,
+            error: err?.message || 'Auth endpoint unavailable.',
+        };
+    }
+}
+
 export async function requestEditUpload(payload) {
     const url = buildCmsUrl('upload', payload.path || '');
     const formData = new FormData();

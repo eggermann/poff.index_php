@@ -16,5 +16,6 @@ function cmsHandleEditConfigAction(array $ctx): void
         'subjectTarget' => $ctx['subjectType'],
         'config' => $config,
         'uploadLimits' => cmsUploadLimits(),
+        'auth' => cmsBuildEditorAuthView($ctx['rootDir'], (bool) ($ctx['editModeAllowed'] ?? true)),
     ]);
 }

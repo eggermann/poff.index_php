@@ -20,7 +20,16 @@
     </button>
     <aside id="appSidebar" class="sidebar" aria-label="Navigation">
         <div class="app-edit-toggle-wrap">
-            <button id="editToggle" class="edit-toggle" type="button">Edit mode</button>
+            <button id="editToggle" class="edit-toggle" type="button">Enable edit mode</button>
+            <form id="editAuthForm" class="edit-form mt-2" hidden>
+                <label class="edit-label" for="editAuthPassword">Editor password</label>
+                <input id="editAuthPassword" class="form-input" type="password" name="password" autocomplete="current-password">
+                <div class="flex gap-2">
+                    <button id="editAuthSubmit" class="btn" type="submit">Unlock</button>
+                    <button id="editAuthLogout" class="btn btn-secondary" type="button" hidden>Log out</button>
+                </div>
+                <div id="editAuthStatus" class="edit-status" aria-live="polite"></div>
+            </form>
         </div>
         <div id="sidebarLoading" class="loading-row">
             <span class="loader"></span>

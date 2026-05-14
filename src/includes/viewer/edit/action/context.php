@@ -17,18 +17,38 @@ function cmsBuildEditActionContext(): array
     }
     $runtimeTarget = cmsResolveTarget($runtimeRootDir, $path);
     $runtimeAllowDir = $runtimeTarget['dir'] ?? $runtimeRootDir;
+    $editModeAllowed = cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir);
 
-    if (!cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir)) {
-        cmsJsonResponse(['allowed' => false, 'error' => 'Edit mode not enabled.']);
+    if ($action === 'auth') {
+        return [
+            'action' => $action,
+            'runtimeRootDir' => $runtimeRootDir,
+            'rootDir' => $runtimeRootDir,
+            'data' => $data,
+            'path' => $path,
+            'target' => $runtimeTarget,
+            'targetDir' => is_array($runtimeTarget) ? (string) ($runtimeTarget['dir'] ?? $runtimeRootDir) : $runtimeRootDir,
+            'editModeAllowed' => $editModeAllowed,
+        ];
     }
 
+    if (!$editModeAllowed) {
+        cmsJsonResponse([
+            'allowed' => false,
+            'error' => 'Edit mode not enabled.',
+            'auth' => cmsBuildEditorAuthView($runtimeRootDir, false),
+        ], 403);
+    }
+
+    cmsRequireEditorAccess($runtimeRootDir, true);
+
     if (!class_exists('PoffConfig')) {
-        cmsJsonResponse(['allowed' => true, 'error' => 'PoffConfig unavailable.']);
+        cmsJsonResponse(['allowed' => true, 'error' => 'PoffConfig unavailable.', 'auth' => cmsBuildEditorAuthView($runtimeRootDir, true)]);
     }
 
     $target = cmsResolveTarget($runtimeRootDir, $path);
     if ($target === null) {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Invalid folder path.']);
+        cmsJsonResponse(['allowed' => true, 'error' => 'Invalid folder path.', 'auth' => cmsBuildEditorAuthView($runtimeRootDir, true)]);
     }
 
     $targetType = (string) $target['type'];
@@ -62,6 +82,7 @@ function cmsBuildEditActionContext(): array
         'data' => $data,
         'path' => $path,
         'target' => $target,
+        'editModeAllowed' => $editModeAllowed,
         'targetType' => $targetType,
         'isLayoutTarget' => $isLayoutTarget,
         'subjectType' => $subjectType,

@@ -115,6 +115,11 @@ function mcp_url_host_is_private(string $host): bool
 function handleCreate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
+    $access = mcpEditorAccessState($rootDir, $opts['dest'] ?? '');
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'create', 'created' => false, 'copied' => false, 'downloaded' => false], $access);
+    }
+
     $dest = $opts['dest'] ?? '';
     $path = $opts['path'] ?? null;
     $url = $opts['url'] ?? null;

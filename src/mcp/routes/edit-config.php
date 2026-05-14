@@ -11,6 +11,13 @@ function handleEditConfig(array $opts): array
     $rootDir = $opts['rootDir'];
     $path = $opts['path'] ?? '';
     $allowFile = $opts['allowFile'] ?? null;
+    $access = mcpEditorAccessState($rootDir, (string) $path);
+    if (is_string($allowFile) && $allowFile !== '' && is_file($allowFile) && !$access['editModeAllowed']) {
+        $access['editModeAllowed'] = true;
+        $access['allowed'] = cmsIsEditorAuthenticated($rootDir);
+        $access['auth'] = cmsBuildEditorAuthView($rootDir, true);
+        $access['error'] = cmsEditorAuthError($rootDir, true);
+    }
 
     if (!class_exists('PoffConfig')) {
         return [
@@ -37,7 +44,11 @@ function handleEditConfig(array $opts): array
             'route' => 'edit-config',
             'allowed' => false,
             'error' => 'Edit mode not enabled.',
+            'auth' => cmsBuildEditorAuthView($rootDir, false),
         ];
+    }
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'edit-config'], $access);
     }
 
     $config = PoffConfig::ensure($targetDir);
@@ -79,5 +90,6 @@ function handleEditConfig(array $opts): array
         'route' => 'edit-config',
         'allowed' => true,
         'config' => $config,
+        'auth' => cmsBuildEditorAuthView($rootDir, true),
     ];
 }

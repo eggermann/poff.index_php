@@ -229,7 +229,10 @@ PHP;
     ]);
     $poffConfigContent = $stripPhp($poffConfigContent);
     $viewerLinkTargets = $stripPhp($viewerLinkTargets);
+    $authHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/auth.php');
+    $authHelpers = $stripPhp($authHelpers);
     $buildContent .= trim($editModeHelpers) . "\n\n";
+    $buildContent .= trim($authHelpers) . "\n\n";
     $buildContent .= trim($projectRootHelpers) . "\n\n";
     $buildContent .= trim($promptTemplateSanitize) . "\n\n";
     $buildContent .= trim($viewerLinkTargets) . "\n\n";
@@ -259,6 +262,7 @@ PHP;
         '/includes/viewer/edit/delete.php',
         '/includes/viewer/edit/reset.php',
         '/includes/viewer/edit/action/context.php',
+        '/includes/viewer/edit/action/auth-action.php',
         '/includes/viewer/edit/action/config.php',
         '/includes/viewer/edit/action/upload-action.php',
         '/includes/viewer/edit/action/delete-action.php',
@@ -365,6 +369,11 @@ PHP;
     $content = str_replace(
         'const currentPathForIframe = /* POFF_IFRAME_PATH */ null;',
         'const currentPathForIframe = <?php echo json_encode($currentRelativePath); ?>;',
+        $content
+    );
+    $content = str_replace(
+        'window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };',
+        'const cmsAuth = <?php $poffAuthScopeDir = is_dir($currentAbsolutePath) ? $currentAbsolutePath : dirname($currentAbsolutePath); echo json_encode(cmsBuildEditorAuthView($baseDir, cmsEditModeAllowedForDirectory($poffAuthScopeDir, $baseDir))); ?>;' . "\n" . 'window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe, cmsAuth };',
         $content
     );
     $buildContent .= trim($content);

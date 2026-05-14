@@ -1,4 +1,4 @@
-import { requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
+import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
@@ -61,15 +61,34 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
 }
 
 export function createEditController({ elements, context, editRequested }) {
-    const { editPanel, editDrawer, editToggle } = elements;
+    const {
+        editPanel,
+        editDrawer,
+        editToggle,
+        editAuthForm,
+        editAuthPassword,
+        editAuthSubmit,
+        editAuthLogout,
+        editAuthStatus,
+    } = elements;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, 'currentPoffConfig')
         ? context.currentPoffConfig
         : null;
+    const initialAuthState = context?.cmsAuth && typeof context.cmsAuth === 'object'
+        ? context.cmsAuth
+        : {};
 
     let folderConfig = currentPoffConfig;
     let editConfig = currentPoffConfig;
     let editTarget = 'folder';
     let drawerOpen = false;
+    let authFormVisible = false;
+    let authState = {
+        configured: !!initialAuthState.configured,
+        authenticated: !!initialAuthState.authenticated,
+        editModeAllowed: initialAuthState.editModeAllowed !== false,
+        canEdit: !!initialAuthState.canEdit,
+    };
 
     function annotateConfigPath(config, selection = getActiveSelection(), status = {}) {
         if (!config || typeof config !== 'object') {
@@ -92,6 +111,69 @@ export function createEditController({ elements, context, editRequested }) {
         return config;
     }
 
+    function updateAuthState(nextAuth) {
+        if (!nextAuth || typeof nextAuth !== 'object') {
+            return;
+        }
+        authState = {
+            ...authState,
+            ...nextAuth,
+            configured: !!nextAuth.configured,
+            authenticated: !!nextAuth.authenticated,
+            editModeAllowed: nextAuth.editModeAllowed !== false,
+            canEdit: !!nextAuth.canEdit,
+        };
+        if (window.POFF_CONTEXT && typeof window.POFF_CONTEXT === 'object') {
+            window.POFF_CONTEXT.cmsAuth = authState;
+        }
+    }
+
+    function authStatusMessage(status) {
+        if (status?.error) {
+            return status.error;
+        }
+        if (!authState.editModeAllowed) {
+            return 'Create .edit.allow in this folder or an ancestor to enable edit mode.';
+        }
+        if (!authState.configured) {
+            return 'Create .poff-auth.php with a password hash to unlock editing.';
+        }
+        if (!authState.authenticated) {
+            return 'Enter the editor password to unlock editing.';
+        }
+        return '';
+    }
+
+    function setAuthStatus(message, success = false) {
+        if (!editAuthStatus) {
+            return;
+        }
+        editAuthStatus.textContent = message || '';
+        editAuthStatus.classList.toggle('edit-status-success', !!success);
+    }
+
+    function syncAuthForm(forceVisible = false, status = null) {
+        if (!editAuthForm) {
+            return;
+        }
+        const shouldShow = forceVisible
+            || authFormVisible
+            || (editRequested && !authState.canEdit);
+        editAuthForm.hidden = !shouldShow;
+        if (!shouldShow) {
+            setAuthStatus('');
+            return;
+        }
+        if (editAuthLogout) {
+            editAuthLogout.hidden = !authState.authenticated;
+        }
+        if (editAuthSubmit) {
+            editAuthSubmit.hidden = authState.authenticated;
+        }
+        const message = authStatusMessage(status);
+        setAuthStatus(message, false);
+    }
+
     annotateConfigPath(folderConfig, getActiveSelection(), { target: 'folder' });
     annotateConfigPath(editConfig, getActiveSelection(), { target: editTarget });
 
@@ -103,9 +185,10 @@ export function createEditController({ elements, context, editRequested }) {
         if (!editToggle) {
             return;
         }
-        editToggle.textContent = editRequested ? 'Exit edit mode' : 'Enable edit mode';
-        editToggle.classList.toggle('edit-toggle-on', editRequested);
-        editToggle.setAttribute('aria-pressed', editRequested ? 'true' : 'false');
+        const editActive = editRequested && authState.canEdit;
+        editToggle.textContent = editActive ? 'Exit edit mode' : 'Enable edit mode';
+        editToggle.classList.toggle('edit-toggle-on', editActive);
+        editToggle.setAttribute('aria-pressed', editActive ? 'true' : 'false');
     }
 
     function bindEditToggle() {
@@ -113,6 +196,14 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         editToggle.addEventListener('click', () => {
+            if (!authState.authenticated) {
+                authFormVisible = !authFormVisible || !authState.canEdit;
+                syncAuthForm(true);
+                if (!editAuthForm.hidden && editAuthPassword) {
+                    editAuthPassword.focus();
+                }
+                return;
+            }
             const url = new URL(window.location.href);
             if (editRequested) {
                 url.searchParams.delete('edit');
@@ -121,6 +212,50 @@ export function createEditController({ elements, context, editRequested }) {
             }
             window.location.href = url.toString();
         });
+    }
+
+    function bindAuthForm() {
+        if (editAuthForm) {
+            editAuthForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const selection = getActiveSelection();
+                const data = await requestEditAuth({
+                    path: getEditTargetPath(selection),
+                    intent: 'login',
+                    password: editAuthPassword?.value || '',
+                });
+                if (data?.auth) {
+                    updateAuthState(data.auth);
+                }
+                if (!data || data.allowed === false || !data.auth?.authenticated) {
+                    syncEditToggle();
+                    syncAuthForm(true, data);
+                    return;
+                }
+                authFormVisible = false;
+                setAuthStatus('Edit mode unlocked.', true);
+                const url = new URL(window.location.href);
+                url.searchParams.set('edit', 'true');
+                window.location.href = url.toString();
+            });
+        }
+
+        if (editAuthLogout) {
+            editAuthLogout.addEventListener('click', async () => {
+                const selection = getActiveSelection();
+                const data = await requestEditAuth({
+                    path: getEditTargetPath(selection),
+                    intent: 'logout',
+                });
+                if (data?.auth) {
+                    updateAuthState(data.auth);
+                }
+                authFormVisible = false;
+                const url = new URL(window.location.href);
+                url.searchParams.delete('edit');
+                window.location.href = url.toString();
+            });
+        }
     }
 
     async function saveConfig(payload, statusEl) {
@@ -158,7 +293,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (!editDrawer) {
             return;
         }
-        if (!editRequested || !drawerOpen) {
+        if (!editRequested || !authState.canEdit || !drawerOpen) {
             editDrawer.classList.remove('edit-drawer-open');
             editDrawer.hidden = true;
             return;
@@ -169,6 +304,9 @@ export function createEditController({ elements, context, editRequested }) {
 
     async function refreshCurrentEditState(selection = getActiveSelection()) {
         const refreshed = await requestEditConfig('config', { path: getEditTargetPath(selection) });
+        if (refreshed?.auth) {
+            updateAuthState(refreshed.auth);
+        }
         if (refreshed?.config) {
             editConfig = annotateConfigPath(refreshed.config, selection, refreshed);
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
@@ -183,14 +321,17 @@ export function createEditController({ elements, context, editRequested }) {
             target: refreshed?.target || editTarget,
             subjectTarget: refreshed?.subjectTarget,
             uploadLimits: refreshed?.uploadLimits,
+            auth: refreshed?.auth || authState,
         });
     }
 
     function renderEditUI(config, status) {
+        syncEditToggle();
+        syncAuthForm(false, status);
         const layoutNameForPreset = createLayoutNameForPreset(editConfig);
         const panelState = renderEditPanel({
             editPanel,
-            editRequested,
+            editRequested: editRequested && authState.canEdit,
             config,
             status,
             contentTargetLabel: getContentTargetPath(),
@@ -253,7 +394,11 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onOpenLayoutPage: () => {
                 const selection = getActiveSelection();
-                const nextPath = buildVirtualLayoutPath(selection.previewPath ?? selection.path);
+                const previewPath = selection.previewPath ?? selection.path ?? '';
+                const layoutRootPath = selection.previewIsFile
+                    ? previewPath.split('/').slice(0, -1).join('/')
+                    : previewPath;
+                const nextPath = buildVirtualLayoutPath(layoutRootPath);
                 drawerOpen = false;
                 syncDrawerVisibility();
                 window.location.hash = `#/${nextPath}`;
@@ -469,7 +614,25 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         const selection = getActiveSelection();
+        const authResponse = await requestEditAuth({ method: 'GET', path: getEditTargetPath(selection) });
+        if (authResponse?.auth) {
+            updateAuthState(authResponse.auth);
+        }
+        if (!authResponse?.auth?.canEdit) {
+            renderEditUI(editConfig, {
+                allowed: false,
+                error: authResponse?.error,
+                target: editTarget,
+                auth: authResponse?.auth || authState,
+            });
+            authFormVisible = true;
+            syncAuthForm(true, authResponse);
+            return;
+        }
         const data = await requestEditConfig('config', { path: getEditTargetPath(selection) });
+        if (data?.auth) {
+            updateAuthState(data.auth);
+        }
         if (data.config) {
             editConfig = annotateConfigPath(data.config, selection, data);
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');
@@ -484,6 +647,7 @@ export function createEditController({ elements, context, editRequested }) {
             target: editTarget,
             subjectTarget: data.subjectTarget,
             uploadLimits: data.uploadLimits,
+            auth: data.auth || authState,
         });
     }
 
@@ -491,6 +655,7 @@ export function createEditController({ elements, context, editRequested }) {
         renderFolderMeta,
         syncEditToggle,
         bindEditToggle,
+        bindAuthForm,
         initEditMode,
     };
 }

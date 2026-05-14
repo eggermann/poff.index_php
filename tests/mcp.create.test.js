@@ -30,6 +30,14 @@ const UPLOAD_TARGET_DIR = path.join(POFF_DIR, 'upload-target');
 const VIRTUAL_LINK_DIR = path.join(POFF_DIR, 'virtual-links');
 const REMOTE_IMPORT_DIR = path.join(POFF_DIR, 'remote-import-links');
 
+function withTestEnv(extra = {}) {
+  return {
+    ...process.env,
+    POFF_TEST_AUTH_BYPASS: '1',
+    ...extra,
+  };
+}
+
 function copyDirSync(src, dest) {
   if (!fs.existsSync(dest)) {
     fs.mkdirSync(dest, { recursive: true });
@@ -49,7 +57,7 @@ function runCreate(args) {
   return new Promise((resolve, reject) => {
     const proc = spawn('php', [path.join(ROOT, 'tests/php_call_create.php'), ...args], {
       cwd: ROOT,
-      env: { ...process.env, POFF_BASE: POFF_DIR },
+      env: withTestEnv({ POFF_BASE: POFF_DIR }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stderr = '';
@@ -69,7 +77,7 @@ function runWorktype(action, kind, payload = null) {
     }
     const proc = spawn('php', args, {
       cwd: ROOT,
-      env: { ...process.env },
+      env: withTestEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -225,7 +233,7 @@ function runRemoteContent(mode, baseDir, relativePath = '', payload = {}) {
     ];
     const proc = spawn('php', args, {
       cwd: ROOT,
-      env: { ...process.env },
+      env: withTestEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -518,7 +526,7 @@ function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockRespons
       capturePath,
     ], {
       cwd: ROOT,
-      env: { ...process.env },
+      env: withTestEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -550,7 +558,7 @@ function runViewerPrompt(rootDir, relativePath, payload = {}, mockResponse = nul
       capturePath,
     ], {
       cwd: ROOT,
-      env: { ...process.env },
+      env: withTestEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -583,7 +591,7 @@ function runViewerPromptRaw(rootDir, relativePath, payload = {}, mockResponse = 
       mockStreamResponse ? JSON.stringify(mockStreamResponse) : '',
     ], {
       cwd: ROOT,
-      env: { ...process.env },
+      env: withTestEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -609,7 +617,7 @@ function runViewerSave(cwd, relativePath, payload = {}) {
       JSON.stringify(payload),
     ], {
       cwd: ROOT,
-      env: { ...process.env },
+      env: withTestEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -630,6 +638,38 @@ function runViewerSave(cwd, relativePath, payload = {}) {
   });
 }
 
+function runEditRequest(cwd, action, relativePath = '', payload = {}, sessionId = '') {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_edit_request.php'),
+      cwd,
+      action,
+      relativePath,
+      JSON.stringify(payload),
+      sessionId,
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`edit request helper failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from edit request helper: ${stdout}`));
+      }
+    });
+  });
+}
+
 async function hasLightnCandy() {
   return new Promise((resolve) => {
     const proc = spawn('php', ['-r', `require ${JSON.stringify(path.join(ROOT, 'vendor/autoload.php'))}; echo class_exists('LightnCandy\\\\LightnCandy') ? 'yes' : 'no';`], {
@@ -640,6 +680,27 @@ async function hasLightnCandy() {
     let stdout = '';
     proc.stdout.on('data', (d) => (stdout += d.toString()));
     proc.on('exit', () => resolve(stdout.trim() === 'yes'));
+  });
+}
+
+async function makePasswordHash(password) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', ['-r', `echo password_hash(${JSON.stringify(password)}, PASSWORD_DEFAULT);`], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`password hash helper failed: ${code} ${stderr}`));
+        return;
+      }
+      resolve(stdout.trim());
+    });
   });
 }
 
@@ -809,6 +870,28 @@ describe('MCP create route helper (CLI)', () => {
         },
       },
     }, null, 2));
+  });
+
+  test('viewer save stays locked until auth login succeeds', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-auth-'));
+    const sessionId = 'poff-auth-session';
+    const hash = await makePasswordHash('secret-pass');
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
+
+    const denied = await runEditRequest(tempDir, 'save', '', { title: 'Blocked title' });
+    expect(denied.allowed).toBe(false);
+    expect(denied.error).toContain('Edit login required');
+
+    const loggedIn = await runEditRequest(tempDir, 'auth', '', { intent: 'login', password: 'secret-pass' }, sessionId);
+    expect(loggedIn.allowed).toBe(true);
+    expect(loggedIn.auth.authenticated).toBe(true);
+
+    const saved = await runEditRequest(tempDir, 'save', '', { title: 'Unlocked title' }, loggedIn.sessionId || sessionId);
+    expect(saved.saved).toBe(true);
+    expect(saved.config.title).toBe('Unlocked title');
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   afterAll(() => {

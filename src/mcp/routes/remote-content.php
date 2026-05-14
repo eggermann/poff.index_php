@@ -314,6 +314,10 @@ function handleExportContent(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = trim((string) ($opts['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'export-content'], $access);
+    }
 
     if (!class_exists('PoffConfig')) {
         return array_merge([
@@ -376,6 +380,11 @@ function handleImportRemote(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = trim((string) ($opts['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'import-remote'], $access);
+    }
+
     $url = trim((string) ($opts['url'] ?? ''));
     $sourceId = trim((string) ($opts['sourceId'] ?? ''));
     $replace = (bool) ($opts['replace'] ?? false);

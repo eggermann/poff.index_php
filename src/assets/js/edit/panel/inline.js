@@ -535,10 +535,13 @@ export function renderEditPanel({
     }
     editPanel.hidden = false;
     if (!config || status?.error) {
+        const authMessage = status?.auth && !status.auth.canEdit
+            ? (status?.error || 'Enter the editor password to unlock editing.')
+            : null;
         const message = status?.error || 'Edit mode is unavailable.';
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">${escapeHtml(message)}</div>
+            <div class="edit-status">${escapeHtml(authMessage || message)}</div>
         `;
         syncPromptDock();
         return { statusEl: null, promptRoot: null };

@@ -6,12 +6,15 @@
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
+    if (!in_array($action, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
         return;
     }
 
     $ctx = cmsBuildEditActionContext();
     switch ((string) ($ctx['action'] ?? '')) {
+        case 'auth':
+            cmsHandleEditAuthAction($ctx);
+            return;
         case 'config':
             cmsHandleEditConfigAction($ctx);
             return;
