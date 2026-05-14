@@ -7,7 +7,7 @@ function cmsBuildEditActionContext(): array
 {
     $action = (string) ($_GET['edit'] ?? '');
     $runtimeRootDir = realpath(getcwd() ?: '.') ?: '.';
-    $data = ($action === 'save' || $action === 'prompt') ? cmsReadJsonBody() : [];
+    $data = cmsReadJsonBody();
     if ($data === []) {
         $data = $_POST;
     }

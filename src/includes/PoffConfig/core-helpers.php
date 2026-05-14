@@ -231,15 +231,8 @@ trait PoffConfigCoreHelpers
             if (
                 $entry === '.' ||
                 $entry === '..' ||
-                $entry === 'poff.config.json' ||
-                $entry === '.works' ||
-                self::isEditOnlyTreeEntry($entry) ||
-                $entry === '.DS_Store' ||
-                $entry === 'Thumbs.db' ||
-                $entry === '.git' ||
-                $entry === '.idea' ||
-                $entry === 'node_modules' ||
-                $entry === '.edit.allow'
+                cmsIsHiddenSystemEntry($entry) ||
+                self::isEditOnlyTreeEntry($entry)
             ) {
                 continue;
             }

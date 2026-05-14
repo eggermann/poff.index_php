@@ -1,5 +1,10 @@
 <?php
 
+function cmsDefaultAuthPassword(): string
+{
+    return 'poff';
+}
+
 function cmsAuthConfigCandidates(string $rootDir): array
 {
     $root = rtrim($rootDir, DIRECTORY_SEPARATOR);
@@ -61,11 +66,40 @@ function cmsLoadAuthConfig(string $rootDir): array
         ];
     }
 
+    $defaultPath = cmsAuthConfigCandidates($rootDir)[0] ?? '';
+    if ($defaultPath !== '') {
+        $hash = password_hash(cmsDefaultAuthPassword(), PASSWORD_DEFAULT);
+        if (is_string($hash) && $hash !== '') {
+            @file_put_contents($defaultPath, cmsAuthConfigContents($hash));
+            if (is_file($defaultPath)) {
+                return [
+                    'configured' => true,
+                    'passwordHash' => $hash,
+                    'path' => $defaultPath,
+                ];
+            }
+        }
+    }
+
     return [
         'configured' => false,
         'passwordHash' => '',
         'path' => null,
     ];
+}
+
+function cmsWriteAuthConfig(string $path, string $hash): bool
+{
+    if ($path === '' || $hash === '') {
+        return false;
+    }
+
+    return @file_put_contents($path, cmsAuthConfigContents($hash)) !== false;
+}
+
+function cmsAuthConfigContents(string $hash): string
+{
+    return '<' . "?php\n\nreturn [\n    'passwordHash' => '" . addslashes($hash) . "',\n];\n";
 }
 
 function cmsIsEditorAuthenticated(string $rootDir): bool
@@ -165,4 +199,31 @@ function cmsAttemptEditorLogin(string $rootDir, string $password): bool
     }
     cmsSetEditorAuthenticated($rootDir, true);
     return true;
+}
+
+function cmsChangeEditorPassword(string $rootDir, string $currentPassword, string $newPassword): array
+{
+    $config = cmsLoadAuthConfig($rootDir);
+    $hash = (string) ($config['passwordHash'] ?? '');
+    $path = (string) ($config['path'] ?? '');
+
+    if ($hash === '' || $path === '') {
+        return ['ok' => false, 'error' => 'CMS auth is not configured.'];
+    }
+    if ($currentPassword === '' || !password_verify($currentPassword, $hash)) {
+        return ['ok' => false, 'error' => 'Current password is incorrect.'];
+    }
+    if (trim($newPassword) === '') {
+        return ['ok' => false, 'error' => 'New password must not be empty.'];
+    }
+
+    $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+    if (!is_string($newHash) || $newHash === '') {
+        return ['ok' => false, 'error' => 'Failed to hash the new password.'];
+    }
+    if (!cmsWriteAuthConfig($path, $newHash)) {
+        return ['ok' => false, 'error' => 'Failed to write .poff-auth.php.'];
+    }
+
+    return ['ok' => true, 'path' => $path];
 }

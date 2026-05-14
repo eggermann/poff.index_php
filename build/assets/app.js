@@ -114,6 +114,44 @@
       return { allowed: false, error: "Edit endpoint unavailable." };
     }
   }
+  async function requestEditAuth(payload = {}) {
+    const url = buildCmsUrl("auth", payload.path || "");
+    const method = payload.method === "GET" ? "GET" : "POST";
+    const bodyPayload = { ...payload };
+    delete bodyPayload.method;
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Accept": "application/json",
+          ...method === "GET" ? {} : { "Content-Type": "application/json" }
+        },
+        body: method === "GET" ? void 0 : JSON.stringify(bodyPayload)
+      });
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
+      }
+      if (!res.ok) {
+        return data || {
+          allowed: false,
+          error: responseText.trim() || `Auth endpoint failed (HTTP ${res.status}).`
+        };
+      }
+      return data || {
+        allowed: false,
+        error: responseText.trim() || "Auth endpoint returned invalid JSON."
+      };
+    } catch (err) {
+      return {
+        allowed: false,
+        error: (err == null ? void 0 : err.message) || "Auth endpoint unavailable."
+      };
+    }
+  }
   async function requestEditUpload(payload) {
     const url = buildCmsUrl("upload", payload.path || "");
     const formData = new FormData();
@@ -4386,7 +4424,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       originalTemplate = layoutState.phpTemplate || "";
     }
     const resolvedDirectory = layoutState.directory || localLayoutDirectory;
-    const wrapperSourceLabel = layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
+    const wrapperSourceLabel = layoutState.mode === "none" || layoutState.storage === "none" ? "No outer layout" : layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
     const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
     const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
     const displayMode = layoutState.mode === "filesystem-layout" ? layoutState.directory === localLayoutDirectory ? "custom-layout" : "inherit-layout" : layoutState.mode;
@@ -5350,6 +5388,41 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         </div>
     `;
   }
+  function renderPasswordChangeSection(status = {}) {
+    var _a, _b;
+    if (!((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit)) {
+      return "";
+    }
+    const configPath = String(((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.configPath) || "").trim();
+    return `
+        <section class="edit-work-fields">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Change password</div>
+                    <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ""}.</div>
+                </div>
+            </div>
+            <form id="editPasswordForm" class="edit-inline">
+                <div>
+                    <label class="edit-label" for="edit-current-password">Current password</label>
+                    <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-new-password">New password</label>
+                    <input class="form-input" id="edit-new-password" type="password" name="newPassword" autocomplete="new-password">
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-confirm-password">Confirm new password</label>
+                    <input class="form-input" id="edit-confirm-password" type="password" name="confirmPassword" autocomplete="new-password">
+                </div>
+                <div class="edit-inline-actions">
+                    <button class="btn btn-secondary" type="submit">Change password</button>
+                </div>
+                <div class="edit-status" id="editPasswordStatus"></div>
+            </form>
+        </section>
+    `;
+  }
   function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
     if (!fields.length) {
       return '<div class="small-note edit-work-fields-empty">No extra work fields yet.</div>';
@@ -5617,7 +5690,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onCreateBlankFile,
     onCreateFolder,
     onResetFolderWork,
-    onDeleteTarget
+    onDeleteTarget,
+    onChangePassword
   }) {
     if (!editPanel) {
       syncPromptDock();
@@ -5630,10 +5704,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     editPanel.hidden = false;
     if (!config || (status == null ? void 0 : status.error)) {
+      const authMessage = (status == null ? void 0 : status.auth) && !status.auth.canEdit ? (status == null ? void 0 : status.error) || "Enter the editor password to unlock editing." : null;
       const message = (status == null ? void 0 : status.error) || "Edit mode is unavailable.";
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">${escapeHtml(message)}</div>
+            <div class="edit-status">${escapeHtml(authMessage || message)}</div>
         `;
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
@@ -5679,6 +5754,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
         <div class="edit-status" id="editInlineStatus"></div>
+        ${renderPasswordChangeSection(status)}
         <form id="inlineEditForm" class="edit-inline">
             <div>
                 <label class="edit-label" for="edit-title">Title</label>
@@ -5732,6 +5808,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
+    const passwordForm = editPanel.querySelector("#editPasswordForm");
+    const passwordStatusEl = editPanel.querySelector("#editPasswordStatus");
     const statusEl = editPanel.querySelector("#editInlineStatus");
     const moreToggle = editPanel.querySelector("#editMoreToggle");
     const deleteTargetButton = editPanel.querySelector("#editDeleteTarget");
@@ -5782,6 +5860,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           elements: form.elements,
           form,
           statusEl
+        });
+      });
+    }
+    if (passwordForm && typeof onChangePassword === "function") {
+      passwordForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await onChangePassword({
+          elements: passwordForm.elements,
+          form: passwordForm,
+          statusEl: passwordStatusEl
         });
       });
     }
@@ -5952,12 +6040,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return nextWork;
   }
   function createEditController({ elements: elements2, context, editRequested: editRequested2 }) {
-    const { editPanel, editDrawer, editToggle } = elements2;
+    const {
+      editPanel,
+      editDrawer,
+      editAuthDetails,
+      editToggle,
+      editAuthForm,
+      editAuthPassword,
+      editAuthSubmit,
+      editAuthLogout,
+      editAuthStatus
+    } = elements2;
     const currentPoffConfig = Object.prototype.hasOwnProperty.call(context, "currentPoffConfig") ? context.currentPoffConfig : null;
+    const initialAuthState = (context == null ? void 0 : context.cmsAuth) && typeof context.cmsAuth === "object" ? context.cmsAuth : {};
     let folderConfig = currentPoffConfig;
     let editConfig = currentPoffConfig;
     let editTarget = "folder";
     let drawerOpen = false;
+    let authFormVisible = false;
+    let authState = {
+      configured: !!initialAuthState.configured,
+      authenticated: !!initialAuthState.authenticated,
+      editModeAllowed: initialAuthState.editModeAllowed !== false,
+      canEdit: !!initialAuthState.canEdit
+    };
     function annotateConfigPath(config, selection2 = getActiveSelection(), status = {}) {
       if (!config || typeof config !== "object") {
         return config;
@@ -5976,6 +6082,66 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
       return config;
     }
+    function updateAuthState(nextAuth) {
+      if (!nextAuth || typeof nextAuth !== "object") {
+        return;
+      }
+      authState = {
+        ...authState,
+        ...nextAuth,
+        configured: !!nextAuth.configured,
+        authenticated: !!nextAuth.authenticated,
+        editModeAllowed: nextAuth.editModeAllowed !== false,
+        canEdit: !!nextAuth.canEdit
+      };
+      if (window.POFF_CONTEXT && typeof window.POFF_CONTEXT === "object") {
+        window.POFF_CONTEXT.cmsAuth = authState;
+      }
+    }
+    function authStatusMessage(status) {
+      if (status == null ? void 0 : status.error) {
+        return status.error;
+      }
+      if (!authState.editModeAllowed) {
+        return "Create .edit.allow in this folder or an ancestor to enable edit mode.";
+      }
+      if (!authState.configured) {
+        return "Create .poff-auth.php with a password hash to unlock editing.";
+      }
+      if (!authState.authenticated) {
+        return "Enter the editor password to unlock editing.";
+      }
+      return "";
+    }
+    function setAuthStatus(message, success = false) {
+      if (!editAuthStatus) {
+        return;
+      }
+      editAuthStatus.textContent = message || "";
+      editAuthStatus.classList.toggle("edit-status-success", !!success);
+    }
+    function syncAuthDisclosure(forceVisible = false, status = null) {
+      if (!editAuthDetails) {
+        return;
+      }
+      const shouldShow = forceVisible || authFormVisible || editRequested2 && !authState.canEdit;
+      editAuthDetails.open = shouldShow;
+      if (editAuthForm) {
+        editAuthForm.hidden = !shouldShow;
+      }
+      if (!shouldShow && !authState.authenticated) {
+        setAuthStatus("");
+        return;
+      }
+      if (editAuthLogout) {
+        editAuthLogout.hidden = !authState.authenticated;
+      }
+      if (editAuthSubmit) {
+        editAuthSubmit.hidden = authState.authenticated;
+      }
+      const message = authStatusMessage(status);
+      setAuthStatus(message, false);
+    }
     annotateConfigPath(folderConfig, getActiveSelection(), { target: "folder" });
     annotateConfigPath(editConfig, getActiveSelection(), { target: editTarget });
     function renderFolderMeta() {
@@ -5985,23 +6151,67 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!editToggle) {
         return;
       }
-      editToggle.textContent = editRequested2 ? "Exit edit mode" : "Enable edit mode";
-      editToggle.classList.toggle("edit-toggle-on", editRequested2);
-      editToggle.setAttribute("aria-pressed", editRequested2 ? "true" : "false");
+      const editActive = editRequested2 && authState.canEdit;
+      editToggle.classList.toggle("edit-toggle-on", editActive);
+      editToggle.setAttribute("aria-expanded", (editAuthDetails == null ? void 0 : editAuthDetails.open) ? "true" : "false");
     }
     function bindEditToggle() {
-      if (!editToggle) {
+      if (!editAuthDetails) {
         return;
       }
-      editToggle.addEventListener("click", () => {
-        const url = new URL(window.location.href);
-        if (editRequested2) {
-          url.searchParams.delete("edit");
-        } else {
-          url.searchParams.set("edit", "true");
+      editAuthDetails.addEventListener("toggle", () => {
+        authFormVisible = !!editAuthDetails.open;
+        syncEditToggle();
+        syncAuthDisclosure(editAuthDetails.open);
+        if (editAuthDetails.open && !authState.authenticated && editAuthPassword) {
+          editAuthPassword.focus();
         }
-        window.location.href = url.toString();
       });
+    }
+    function bindAuthForm() {
+      if (editAuthForm) {
+        editAuthForm.addEventListener("submit", async (event) => {
+          var _a;
+          event.preventDefault();
+          const selection2 = getActiveSelection();
+          const data = await requestEditAuth({
+            path: getEditTargetPath(selection2),
+            intent: "login",
+            password: (editAuthPassword == null ? void 0 : editAuthPassword.value) || ""
+          });
+          if (data == null ? void 0 : data.auth) {
+            updateAuthState(data.auth);
+          }
+          if (!data || data.allowed === false || !((_a = data.auth) == null ? void 0 : _a.authenticated)) {
+            syncEditToggle();
+            syncAuthDisclosure(true, data);
+            return;
+          }
+          authFormVisible = false;
+          setAuthStatus("Edit mode unlocked.", true);
+          syncAuthDisclosure(false, data);
+          const url = new URL(window.location.href);
+          url.searchParams.set("edit", "true");
+          window.location.href = url.toString();
+        });
+      }
+      if (editAuthLogout) {
+        editAuthLogout.addEventListener("click", async () => {
+          const selection2 = getActiveSelection();
+          const data = await requestEditAuth({
+            path: getEditTargetPath(selection2),
+            intent: "logout"
+          });
+          if (data == null ? void 0 : data.auth) {
+            updateAuthState(data.auth);
+          }
+          authFormVisible = false;
+          syncAuthDisclosure(false, data);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("edit");
+          window.location.href = url.toString();
+        });
+      }
     }
     async function saveConfig(payload, statusEl) {
       var _a, _b;
@@ -6038,7 +6248,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!editDrawer) {
         return;
       }
-      if (!editRequested2 || !drawerOpen) {
+      if (!editRequested2 || !authState.canEdit || !drawerOpen) {
         editDrawer.classList.remove("edit-drawer-open");
         editDrawer.hidden = true;
         return;
@@ -6048,6 +6258,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     async function refreshCurrentEditState(selection2 = getActiveSelection()) {
       const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
+      if (refreshed == null ? void 0 : refreshed.auth) {
+        updateAuthState(refreshed.auth);
+      }
       if (refreshed == null ? void 0 : refreshed.config) {
         editConfig = annotateConfigPath(refreshed.config, selection2, refreshed);
         editTarget = refreshed.target || (selection2.isLayout ? "layout" : selection2.previewIsFile ? "file" : "folder");
@@ -6061,14 +6274,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         error: refreshed == null ? void 0 : refreshed.error,
         target: (refreshed == null ? void 0 : refreshed.target) || editTarget,
         subjectTarget: refreshed == null ? void 0 : refreshed.subjectTarget,
-        uploadLimits: refreshed == null ? void 0 : refreshed.uploadLimits
+        uploadLimits: refreshed == null ? void 0 : refreshed.uploadLimits,
+        auth: (refreshed == null ? void 0 : refreshed.auth) || authState
       });
     }
     function renderEditUI(config, status) {
+      syncEditToggle();
+      syncAuthDisclosure(false, status);
       const layoutNameForPreset = createLayoutNameForPreset(editConfig);
       const panelState = renderEditPanel({
         editPanel,
-        editRequested: editRequested2,
+        editRequested: editRequested2 && authState.canEdit,
         config,
         status,
         contentTargetLabel: getContentTargetPath(),
@@ -6131,9 +6347,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           syncDrawerVisibility();
         },
         onOpenLayoutPage: () => {
-          var _a;
+          var _a, _b;
           const selection2 = getActiveSelection();
-          const nextPath = buildVirtualLayoutPath((_a = selection2.previewPath) != null ? _a : selection2.path);
+          const previewPath = (_b = (_a = selection2.previewPath) != null ? _a : selection2.path) != null ? _b : "";
+          const layoutRootPath = selection2.previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
+          const nextPath = buildVirtualLayoutPath(layoutRootPath);
           drawerOpen = false;
           syncDrawerVisibility();
           window.location.hash = `#/${nextPath}`;
@@ -6270,6 +6488,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             setStatusMessage(inlineStatus, `Created folder ${createdName}.`, true);
           }
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        },
+        onChangePassword: async ({ elements: elements3, form, statusEl }) => {
+          var _a, _b, _c;
+          try {
+            setStatusMessage(statusEl, "Changing password...");
+            const selection2 = getActiveSelection();
+            const data = await requestEditAuth({
+              path: getEditTargetPath(selection2),
+              intent: "change-password",
+              currentPassword: (((_a = elements3.currentPassword) == null ? void 0 : _a.value) || "").trim(),
+              newPassword: (((_b = elements3.newPassword) == null ? void 0 : _b.value) || "").trim(),
+              confirmPassword: (((_c = elements3.confirmPassword) == null ? void 0 : _c.value) || "").trim()
+            });
+            if (data == null ? void 0 : data.auth) {
+              updateAuthState(data.auth);
+            }
+            if (!data || data.allowed === false || data.changed !== true) {
+              throw new Error((data == null ? void 0 : data.error) || "Password change failed.");
+            }
+            if (form && typeof form.reset === "function") {
+              form.reset();
+            }
+            setStatusMessage(statusEl, "Password changed.", true);
+          } catch (err) {
+            setStatusMessage(statusEl, err.message || "Password change failed.");
+          }
         }
       });
       const drawerState = renderEditDrawer({
@@ -6335,11 +6579,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncDrawerVisibility();
     }
     async function initEditMode() {
+      var _a;
       if (!editRequested2 || !editPanel) {
         return;
       }
       const selection2 = getActiveSelection();
+      const authResponse = await requestEditAuth({ method: "GET", path: getEditTargetPath(selection2) });
+      if (authResponse == null ? void 0 : authResponse.auth) {
+        updateAuthState(authResponse.auth);
+      }
+      if (!((_a = authResponse == null ? void 0 : authResponse.auth) == null ? void 0 : _a.canEdit)) {
+        renderEditUI(editConfig, {
+          allowed: false,
+          error: authResponse == null ? void 0 : authResponse.error,
+          target: editTarget,
+          auth: (authResponse == null ? void 0 : authResponse.auth) || authState
+        });
+        authFormVisible = true;
+        syncAuthDisclosure(true, authResponse);
+        return;
+      }
       const data = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
+      if (data == null ? void 0 : data.auth) {
+        updateAuthState(data.auth);
+      }
       if (data.config) {
         editConfig = annotateConfigPath(data.config, selection2, data);
         editTarget = data.target || (selection2.isFile ? "file" : "folder");
@@ -6353,13 +6616,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         error: data.error,
         target: editTarget,
         subjectTarget: data.subjectTarget,
-        uploadLimits: data.uploadLimits
+        uploadLimits: data.uploadLimits,
+        auth: data.auth || authState
       });
     }
     return {
       renderFolderMeta,
       syncEditToggle,
       bindEditToggle,
+      bindAuthForm,
       initEditMode
     };
   }
@@ -7177,7 +7442,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     contentFrame: "contentFrame",
     editPanel: "editPanel",
     editDrawer: "editDrawer",
+    editAuthDetails: "editAuthDetails",
     editToggle: "editToggle",
+    editAuthForm: "editAuthForm",
+    editAuthPassword: "editAuthPassword",
+    editAuthSubmit: "editAuthSubmit",
+    editAuthLogout: "editAuthLogout",
+    editAuthStatus: "editAuthStatus",
     sidebarToggle: "sidebarToggle",
     iframeLoading: "iframeLoading",
     sidebarLoading: "sidebarLoading"
@@ -7267,6 +7538,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     editController.syncEditToggle();
     editController.bindEditToggle();
+    editController.bindAuthForm();
     if (isPreviewHashActive()) {
       navigation.loadCurrentFolderInIframe();
       requestAnimationFrame(() => scrollToPreview());

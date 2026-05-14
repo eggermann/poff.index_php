@@ -76,7 +76,7 @@ function mcpBuildFileTree(string $dir, string $base): array
         if ($entry === '.' || $entry === '..') {
             continue;
         }
-        if (in_array($entry, ['.git', '.DS_Store', 'node_modules', '.works', '.layout'], true)) {
+        if (cmsIsHiddenSystemEntry($entry)) {
             continue;
         }
 

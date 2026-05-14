@@ -242,6 +242,42 @@ function renderWorkConfigFieldsSection(config = {}) {
     `;
 }
 
+function renderPasswordChangeSection(status = {}) {
+    if (!status?.auth?.canEdit) {
+        return '';
+    }
+
+    const configPath = String(status?.auth?.configPath || '').trim();
+    return `
+        <section class="edit-work-fields">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Change password</div>
+                    <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ''}.</div>
+                </div>
+            </div>
+            <form id="editPasswordForm" class="edit-inline">
+                <div>
+                    <label class="edit-label" for="edit-current-password">Current password</label>
+                    <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-new-password">New password</label>
+                    <input class="form-input" id="edit-new-password" type="password" name="newPassword" autocomplete="new-password">
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-confirm-password">Confirm new password</label>
+                    <input class="form-input" id="edit-confirm-password" type="password" name="confirmPassword" autocomplete="new-password">
+                </div>
+                <div class="edit-inline-actions">
+                    <button class="btn btn-secondary" type="submit">Change password</button>
+                </div>
+                <div class="edit-status" id="editPasswordStatus"></div>
+            </form>
+        </section>
+    `;
+}
+
 function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
     if (!fields.length) {
         return '<div class="small-note edit-work-fields-empty">No extra work fields yet.</div>';
@@ -523,6 +559,7 @@ export function renderEditPanel({
     onCreateFolder,
     onResetFolderWork,
     onDeleteTarget,
+    onChangePassword,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -590,6 +627,7 @@ export function renderEditPanel({
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
         <div class="edit-status" id="editInlineStatus"></div>
+        ${renderPasswordChangeSection(status)}
         <form id="inlineEditForm" class="edit-inline">
             <div>
                 <label class="edit-label" for="edit-title">Title</label>
@@ -646,6 +684,8 @@ export function renderEditPanel({
     `;
 
     const form = editPanel.querySelector('#inlineEditForm');
+    const passwordForm = editPanel.querySelector('#editPasswordForm');
+    const passwordStatusEl = editPanel.querySelector('#editPasswordStatus');
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
     const deleteTargetButton = editPanel.querySelector('#editDeleteTarget');
@@ -698,6 +738,16 @@ export function renderEditPanel({
                 elements: form.elements,
                 form,
                 statusEl,
+            });
+        });
+    }
+    if (passwordForm && typeof onChangePassword === 'function') {
+        passwordForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await onChangePassword({
+                elements: passwordForm.elements,
+                form: passwordForm,
+                statusEl: passwordStatusEl,
             });
         });
     }

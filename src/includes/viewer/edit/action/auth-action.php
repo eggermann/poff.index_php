@@ -54,6 +54,42 @@ function cmsHandleEditAuthAction(array $ctx): void
         ]);
     }
 
+    if ($intent === 'change-password') {
+        if (!$editModeAllowed || !cmsIsEditorAuthenticated($rootDir)) {
+            cmsJsonResponse([
+                'allowed' => false,
+                'error' => cmsEditorAuthError($rootDir, $editModeAllowed),
+                'auth' => cmsBuildEditorAuthView($rootDir, $editModeAllowed),
+            ], 403);
+        }
+
+        $currentPassword = (string) ($ctx['data']['currentPassword'] ?? $ctx['data']['current_password'] ?? '');
+        $newPassword = (string) ($ctx['data']['newPassword'] ?? $ctx['data']['new_password'] ?? '');
+        $confirmPassword = (string) ($ctx['data']['confirmPassword'] ?? $ctx['data']['confirm_password'] ?? '');
+        if ($newPassword !== $confirmPassword) {
+            cmsJsonResponse([
+                'allowed' => false,
+                'error' => 'New password confirmation does not match.',
+                'auth' => cmsBuildEditorAuthView($rootDir, true),
+            ], 400);
+        }
+
+        $result = cmsChangeEditorPassword($rootDir, $currentPassword, $newPassword);
+        if (empty($result['ok'])) {
+            cmsJsonResponse([
+                'allowed' => false,
+                'error' => (string) ($result['error'] ?? 'Failed to change password.'),
+                'auth' => cmsBuildEditorAuthView($rootDir, true),
+            ], 400);
+        }
+
+        cmsJsonResponse([
+            'allowed' => true,
+            'changed' => true,
+            'auth' => cmsBuildEditorAuthView($rootDir, true),
+        ]);
+    }
+
     cmsJsonResponse([
         'allowed' => $editModeAllowed,
         'auth' => cmsBuildEditorAuthView($rootDir, $editModeAllowed),

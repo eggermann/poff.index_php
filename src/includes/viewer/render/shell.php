@@ -21,36 +21,38 @@ function renderViewerShell(array $payload): void
         $viewerShellCss = is_file($viewerShellCssPath) ? trim((string) file_get_contents($viewerShellCssPath)) : '';
     }
 
-    ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viewer - <?= $safeName ?></title>
-<?php if ($viewerShellCss !== ''): ?>
-    <style data-app-style><?= $viewerShellCss ?></style>
-<?php endif; ?>
-<?php if ($layoutCssHref !== ''): ?>
-    <link rel="stylesheet" href="<?= htmlspecialchars($layoutCssHref, ENT_QUOTES, 'UTF-8') ?>">
-<?php elseif ($layoutCssInline !== ''): ?>
-    <style data-layout-style><?= $layoutCssInline ?></style>
-<?php endif; ?>
-</head>
-<body class="m-0 min-h-full overflow-x-hidden overflow-y-auto bg-slate-950 p-0 text-slate-200">
-    <div class="viewer block min-h-screen w-full overflow-x-hidden overflow-y-auto bg-slate-950">
-        <?= $bodyContent ?>
-    </div>
-<?php if ($layoutJsHref !== ''): ?>
-    <script src="<?= htmlspecialchars($layoutJsHref, ENT_QUOTES, 'UTF-8') ?>" defer></script>
-<?php endif; ?>
-<?php if ($layoutJsHref === '' && $layoutJsInline !== ''): ?>
-    <script><?= $layoutJsInline ?></script>
-<?php endif; ?>
-<?php if ($layoutJsInlineAfterHref !== ''): ?>
-    <script><?= $layoutJsInlineAfterHref ?></script>
-<?php endif; ?>
-</body>
-</html>
-<?php
+    $html = "<!DOCTYPE html>\n";
+    $html .= "<html lang=\"en\">\n";
+    $html .= "<head>\n";
+    $html .= "    <meta charset=\"UTF-8\">\n";
+    $html .= "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+    $html .= "    <title>Viewer - {$safeName}</title>\n";
+    if ($viewerShellCss !== '') {
+        $html .= "    <style data-app-style>{$viewerShellCss}</style>\n";
+    }
+    if ($layoutCssHref !== '') {
+        $safeCssHref = htmlspecialchars($layoutCssHref, ENT_QUOTES, 'UTF-8');
+        $html .= "    <link rel=\"stylesheet\" href=\"{$safeCssHref}\">\n";
+    } elseif ($layoutCssInline !== '') {
+        $html .= "    <style data-layout-style>{$layoutCssInline}</style>\n";
+    }
+    $html .= "</head>\n";
+    $html .= "<body class=\"m-0 min-h-full overflow-x-hidden overflow-y-auto bg-slate-950 p-0 text-slate-200\">\n";
+    $html .= "    <div class=\"viewer block min-h-screen w-full overflow-x-hidden overflow-y-auto bg-slate-950\" data-viewer-type=\"{$safeType}\">\n";
+    $html .= $bodyContent . "\n";
+    $html .= "    </div>\n";
+    if ($layoutJsHref !== '') {
+        $safeJsHref = htmlspecialchars($layoutJsHref, ENT_QUOTES, 'UTF-8');
+        $html .= "    <script src=\"{$safeJsHref}\" defer></script>\n";
+    }
+    if ($layoutJsHref === '' && $layoutJsInline !== '') {
+        $html .= "    <script>{$layoutJsInline}</script>\n";
+    }
+    if ($layoutJsInlineAfterHref !== '') {
+        $html .= "    <script>{$layoutJsInlineAfterHref}</script>\n";
+    }
+    $html .= "</body>\n";
+    $html .= "</html>\n";
+
+    echo $html;
 }

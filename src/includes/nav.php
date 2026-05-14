@@ -125,17 +125,9 @@ if (is_array($tree)) {
         if (
                 $item === '.' ||
                 $item === '..' ||
-                $item === '.works' ||
-                $item === '.layout' ||
                 $item === '.htaccess' ||
-                $item === '.DS_Store' ||
-                $item === 'Thumbs.db' ||
-                $item === '.git' ||
-                $item === '.idea' ||
-                $item === 'node_modules' ||
-                $item === '.edit.allow' ||
-                ($currentRelativePath === '' && $item === $currentScript) ||
-                $item === 'poff.config.json'
+                cmsIsHiddenSystemEntry($item) ||
+                ($currentRelativePath === '' && $item === $currentScript)
             ) {
                 continue;
             }

@@ -721,6 +721,7 @@ describe('MCP create route helper (CLI)', () => {
     fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, 'nested-child'), { recursive: true });
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'child.txt'), 'viewer child');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, 'nested-child', 'nested-video.mp4'), 'fake video');
+    fs.writeFileSync(path.join(POFF_DIR, '.poff-auth.php'), "<?php\nreturn ['passwordHash' => 'fake'];\n");
     fs.mkdirSync(path.join(VIEWER_FOLDER_DIR, '.layout'), { recursive: true });
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'template.hbs'), '<div class="folder-custom" data-layout="{{layout.directory}}">{{title}}|{{#each tree}}{{#if isFolder}}<span class="branch">{{name}}</span>{{#each children}}{{#if (contains name ".mp4")}}<span class="child">{{path}}</span><span class="child-view">{{pageLink}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type "file")}}<span class="entry">{{name}}:{{type}}</span><span class="entry-view">{{pageLink}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class="video">{{path}}</span>{{/each}}{{#each layout.assets}}<span class="asset">{{href}}</span>{{/each}}</div>');
     fs.writeFileSync(path.join(VIEWER_FOLDER_DIR, '.layout', 'style.css'), '.folder-custom{color:#8ec5ff;}');
@@ -890,6 +891,30 @@ describe('MCP create route helper (CLI)', () => {
     const saved = await runEditRequest(tempDir, 'save', '', { title: 'Unlocked title' }, loggedIn.sessionId || sessionId);
     expect(saved.saved).toBe(true);
     expect(saved.config.title).toBe('Unlocked title');
+
+    const changed = await runEditRequest(tempDir, 'auth', '', {
+      intent: 'change-password',
+      currentPassword: 'secret-pass',
+      newPassword: 'new-secret-pass',
+      confirmPassword: 'new-secret-pass',
+    }, loggedIn.sessionId || sessionId);
+    expect(changed.allowed).toBe(true);
+    expect(changed.changed).toBe(true);
+
+    await runEditRequest(tempDir, 'auth', '', { intent: 'logout' }, loggedIn.sessionId || sessionId);
+
+    const oldLoginDenied = await runEditRequest(tempDir, 'auth', '', {
+      intent: 'login',
+      password: 'secret-pass',
+    }, sessionId);
+    expect(oldLoginDenied.allowed).toBe(false);
+
+    const newLogin = await runEditRequest(tempDir, 'auth', '', {
+      intent: 'login',
+      password: 'new-secret-pass',
+    }, sessionId);
+    expect(newLogin.allowed).toBe(true);
+    expect(newLogin.auth.authenticated).toBe(true);
 
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
@@ -2175,6 +2200,16 @@ describe('Worktype HBS renderer', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+
+  test('.poff-auth.php stays hidden in navigation and direct viewer access', async () => {
+    const normalNav = await runNav('', POFF_DIR);
+    const editNav = await runNav('', POFF_DIR, true);
+    const viewerOutput = await runViewer('.poff-auth.php', POFF_DIR);
+
+    expect(normalNav).not.toContain('.poff-auth.php');
+    expect(editNav).not.toContain('.poff-auth.php');
+    expect(viewerOutput).toContain('Path not found.');
   });
 
   test('sanitizes persisted raw chat JSON in section templates on read', async () => {

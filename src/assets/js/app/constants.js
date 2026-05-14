@@ -5,6 +5,7 @@ export const APP_ELEMENT_IDS = {
     contentFrame: 'contentFrame',
     editPanel: 'editPanel',
     editDrawer: 'editDrawer',
+    editAuthDetails: 'editAuthDetails',
     editToggle: 'editToggle',
     editAuthForm: 'editAuthForm',
     editAuthPassword: 'editAuthPassword',

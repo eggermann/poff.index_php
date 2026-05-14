@@ -32,6 +32,26 @@ function cmsIsVirtualLayoutPath(string $relativePath): bool
     return $trimmed === '.layout' || str_ends_with($trimmed, '/.layout');
 }
 
+function cmsIsHiddenSystemEntry(string $entry): bool
+{
+    return in_array($entry, [
+        'poff.config.json',
+        '.poff-auth.php',
+        'auth.config.php',
+        '.works',
+        '.layout',
+        '.DS_Store',
+        'Thumbs.db',
+        '.git',
+        '.idea',
+        'node_modules',
+        '.edit.allow',
+        'edit.allow',
+        '.edit.not-allow',
+        'edit.not-allow',
+    ], true);
+}
+
 function cmsVirtualLayoutSubjectPath(string $relativePath): string
 {
     $trimmed = trim($relativePath, "/\\");

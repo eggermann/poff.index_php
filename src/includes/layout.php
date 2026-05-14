@@ -19,9 +19,9 @@
         </span>
     </button>
     <aside id="appSidebar" class="sidebar" aria-label="Navigation">
-        <div class="app-edit-toggle-wrap">
-            <button id="editToggle" class="edit-toggle" type="button">Enable edit mode</button>
-            <form id="editAuthForm" class="edit-form mt-2" hidden>
+        <details id="editAuthDetails" class="app-edit-toggle-wrap edit-auth-details">
+            <summary id="editToggle" class="edit-toggle">Enable edit mode</summary>
+            <form id="editAuthForm" class="edit-form">
                 <label class="edit-label" for="editAuthPassword">Editor password</label>
                 <input id="editAuthPassword" class="form-input" type="password" name="password" autocomplete="current-password">
                 <div class="flex gap-2">
@@ -30,7 +30,7 @@
                 </div>
                 <div id="editAuthStatus" class="edit-status" aria-live="polite"></div>
             </form>
-        </div>
+        </details>
         <div id="sidebarLoading" class="loading-row">
             <span class="loader"></span>
             <span class="loader-label">Loading navigation...</span>

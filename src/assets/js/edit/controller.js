@@ -64,6 +64,7 @@ export function createEditController({ elements, context, editRequested }) {
     const {
         editPanel,
         editDrawer,
+        editAuthDetails,
         editToggle,
         editAuthForm,
         editAuthPassword,
@@ -152,15 +153,18 @@ export function createEditController({ elements, context, editRequested }) {
         editAuthStatus.classList.toggle('edit-status-success', !!success);
     }
 
-    function syncAuthForm(forceVisible = false, status = null) {
-        if (!editAuthForm) {
+    function syncAuthDisclosure(forceVisible = false, status = null) {
+        if (!editAuthDetails) {
             return;
         }
         const shouldShow = forceVisible
             || authFormVisible
             || (editRequested && !authState.canEdit);
-        editAuthForm.hidden = !shouldShow;
-        if (!shouldShow) {
+        editAuthDetails.open = shouldShow;
+        if (editAuthForm) {
+            editAuthForm.hidden = !shouldShow;
+        }
+        if (!shouldShow && !authState.authenticated) {
             setAuthStatus('');
             return;
         }
@@ -186,31 +190,21 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         const editActive = editRequested && authState.canEdit;
-        editToggle.textContent = editActive ? 'Exit edit mode' : 'Enable edit mode';
         editToggle.classList.toggle('edit-toggle-on', editActive);
-        editToggle.setAttribute('aria-pressed', editActive ? 'true' : 'false');
+        editToggle.setAttribute('aria-expanded', editAuthDetails?.open ? 'true' : 'false');
     }
 
     function bindEditToggle() {
-        if (!editToggle) {
+        if (!editAuthDetails) {
             return;
         }
-        editToggle.addEventListener('click', () => {
-            if (!authState.authenticated) {
-                authFormVisible = !authFormVisible || !authState.canEdit;
-                syncAuthForm(true);
-                if (!editAuthForm.hidden && editAuthPassword) {
-                    editAuthPassword.focus();
-                }
-                return;
+        editAuthDetails.addEventListener('toggle', () => {
+            authFormVisible = !!editAuthDetails.open;
+            syncEditToggle();
+            syncAuthDisclosure(editAuthDetails.open);
+            if (editAuthDetails.open && !authState.authenticated && editAuthPassword) {
+                editAuthPassword.focus();
             }
-            const url = new URL(window.location.href);
-            if (editRequested) {
-                url.searchParams.delete('edit');
-            } else {
-                url.searchParams.set('edit', 'true');
-            }
-            window.location.href = url.toString();
         });
     }
 
@@ -229,11 +223,12 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 if (!data || data.allowed === false || !data.auth?.authenticated) {
                     syncEditToggle();
-                    syncAuthForm(true, data);
+                    syncAuthDisclosure(true, data);
                     return;
                 }
                 authFormVisible = false;
                 setAuthStatus('Edit mode unlocked.', true);
+                syncAuthDisclosure(false, data);
                 const url = new URL(window.location.href);
                 url.searchParams.set('edit', 'true');
                 window.location.href = url.toString();
@@ -251,6 +246,7 @@ export function createEditController({ elements, context, editRequested }) {
                     updateAuthState(data.auth);
                 }
                 authFormVisible = false;
+                syncAuthDisclosure(false, data);
                 const url = new URL(window.location.href);
                 url.searchParams.delete('edit');
                 window.location.href = url.toString();
@@ -327,7 +323,7 @@ export function createEditController({ elements, context, editRequested }) {
 
     function renderEditUI(config, status) {
         syncEditToggle();
-        syncAuthForm(false, status);
+        syncAuthDisclosure(false, status);
         const layoutNameForPreset = createLayoutNameForPreset(editConfig);
         const panelState = renderEditPanel({
             editPanel,
@@ -542,6 +538,31 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
+            onChangePassword: async ({ elements, form, statusEl }) => {
+                try {
+                    setStatusMessage(statusEl, 'Changing password...');
+                    const selection = getActiveSelection();
+                    const data = await requestEditAuth({
+                        path: getEditTargetPath(selection),
+                        intent: 'change-password',
+                        currentPassword: (elements.currentPassword?.value || '').trim(),
+                        newPassword: (elements.newPassword?.value || '').trim(),
+                        confirmPassword: (elements.confirmPassword?.value || '').trim(),
+                    });
+                    if (data?.auth) {
+                        updateAuthState(data.auth);
+                    }
+                    if (!data || data.allowed === false || data.changed !== true) {
+                        throw new Error(data?.error || 'Password change failed.');
+                    }
+                    if (form && typeof form.reset === 'function') {
+                        form.reset();
+                    }
+                    setStatusMessage(statusEl, 'Password changed.', true);
+                } catch (err) {
+                    setStatusMessage(statusEl, err.message || 'Password change failed.');
+                }
+            },
         });
 
         const drawerState = renderEditDrawer({
@@ -626,7 +647,7 @@ export function createEditController({ elements, context, editRequested }) {
                 auth: authResponse?.auth || authState,
             });
             authFormVisible = true;
-            syncAuthForm(true, authResponse);
+            syncAuthDisclosure(true, authResponse);
             return;
         }
         const data = await requestEditConfig('config', { path: getEditTargetPath(selection) });

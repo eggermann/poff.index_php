@@ -1,3 +1,5 @@
+@use 'edit/tokens' as t;
+
 /* -------------- Sidebar -------------- */
 #appShell {
     --app-shell-sidebar-width: 318px;
@@ -15,7 +17,7 @@
 #appSidebar {
     width: var(--app-shell-sidebar-width);
     min-width: var(--app-shell-sidebar-width);
-    padding: 96px 16px 24px;
+    padding: 0 16px 24px;
     border-right: 1px solid var(--app-shell-line);
     background: var(--app-shell-surface);
     box-shadow: var(--app-shell-shadow);
@@ -104,23 +106,47 @@
 }
 
 #appSidebar .app-edit-toggle-wrap {
-    position: absolute;
-    top: 18px;
-    left: 16px;
-    right: 16px;
+    position: relative;
     z-index: 2;
+    margin: 0 0 var(--poff-space-lg-plus);
+}
+
+#appSidebar .edit-auth-details {
+    display: block;
+    width: 100%;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+}
+
+#appSidebar .edit-auth-details > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    list-style: none;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+}
+
+#appSidebar .edit-auth-details > summary::-webkit-details-marker {
+    display: none;
 }
 
 #appSidebar .edit-toggle {
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
     border: 0;
     border-radius: 18px;
     background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
     color: #ffffff;
-    padding: 14px 18px;
+    padding: 14px 24px;
     font-weight: 650;
     letter-spacing: 0.01em;
     box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    box-sizing: border-box;
 }
 
 #appSidebar .edit-toggle.edit-toggle-on {
@@ -209,13 +235,9 @@
     box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.16);
 }
 
-@media (max-width: 720px) {
+@media (max-width: t.$edit-breakpoint-md) {
     #appShell {
         --app-shell-sidebar-width: 286px;
-    }
-
-    #appSidebar {
-        padding: 88px 14px 24px;
     }
 
     .sidebar-toggle {
@@ -223,8 +245,6 @@
     }
 
     #appSidebar .app-edit-toggle-wrap {
-        top: 14px;
-        left: 14px;
-        right: 14px;
+        margin-bottom: 8px;
     }
 }
