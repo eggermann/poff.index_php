@@ -103,7 +103,9 @@ export function layoutOverlayState(config, status) {
     }
 
     const resolvedDirectory = layoutState.directory || localLayoutDirectory;
-    const wrapperSourceLabel = layoutState.storage === 'filesystem'
+    const wrapperSourceLabel = layoutState.mode === 'none' || layoutState.storage === 'none'
+        ? 'No outer layout'
+        : layoutState.storage === 'filesystem'
         ? (isFile && resolvedDirectory !== localLayoutDirectory
             ? `Folder layout: ${resolvedDirectory}`
             : `${isFile ? 'File layout' : 'Folder layout'}: ${resolvedDirectory}`)

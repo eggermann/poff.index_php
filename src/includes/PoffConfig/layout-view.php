@@ -144,6 +144,16 @@ trait PoffConfigLayoutViewHelpers
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
+        $localLayoutDir = $fileName === null
+            ? self::folderLayoutDir($dir)
+            : self::fileLayoutDir($dir, $fileName);
+        $hasLocalWrapperFiles = self::hasWrapperFiles($localLayoutDir);
+        if (self::isImplicitDefaultLayoutValue($layout, $section) && !$hasLocalWrapperFiles) {
+            $inheritedConfiguredLayout = self::resolveInheritedConfiguredLayout($dir, $section, $fileName !== null);
+            if (is_array($inheritedConfiguredLayout)) {
+                $resolved = $inheritedConfiguredLayout;
+            }
+        }
         $mode = trim((string) ($resolved['mode'] ?? ''));
         $name = trim((string) ($resolved['name'] ?? ''));
         $preset = trim((string) ($resolved['preset'] ?? ''));
@@ -220,9 +230,6 @@ trait PoffConfigLayoutViewHelpers
         if ($preset !== 'shared') {
             unset($resolved['source'], $resolved['sharedName']);
         }
-        $localLayoutDir = $fileName === null
-            ? self::folderLayoutDir($dir)
-            : self::fileLayoutDir($dir, $fileName);
         $localRelativeDir = $fileName === null ? '.layout' : '.works/' . $fileName . '.layout';
         $layoutDir = null;
         $resolved['directory'] = $localRelativeDir;
@@ -238,7 +245,6 @@ trait PoffConfigLayoutViewHelpers
         $sectionTemplatePath = null;
         $resolved['sectionDirectory'] = '';
 
-        $hasLocalWrapperFiles = self::hasWrapperFiles($localLayoutDir);
         if ($hasLocalWrapperFiles) {
             $layoutDir = $localLayoutDir;
         } elseif (is_array($inheritedLayout) && self::hasWrapperFiles($inheritedLayout['absolute'])) {

@@ -2812,6 +2812,54 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('inherits explicit none layout from a parent folder into child files and nested folders', async () => {
+    const tempDir = path.join(POFF_DIR, `inherits-none-layout-${Date.now()}`);
+    const nestedDir = path.join(tempDir, 'nested');
+    const fileName = 'poster.png';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'fake image');
+    fs.writeFileSync(path.join(nestedDir, 'child.txt'), 'child');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'works.hbs'), '<div class="local-works">{{title}}</div>');
+    fs.writeFileSync(path.join(tempDir, 'poff.config.json'), JSON.stringify({
+      title: 'Parent none layout',
+      work: {
+        type: 'folder',
+        layout: {
+          mode: 'none',
+          name: 'none',
+          engine: 'lightncandy',
+          section: 'works',
+          preset: 'none',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const ensuredFile = JSON.parse(await runLayoutFilesystem('ensure-file', tempDir, fileName));
+      expect(ensuredFile.work.layout).toMatchObject({
+        name: 'none',
+        mode: 'none',
+        storage: 'none',
+      });
+
+      const ensuredFolder = JSON.parse(await runLayoutFilesystem('ensure-folder', nestedDir));
+      expect(ensuredFolder.work.layout).toMatchObject({
+        name: 'none',
+        mode: 'none',
+        storage: 'none',
+      });
+
+      const relativeFilePath = path.relative(POFF_DIR, path.join(tempDir, fileName)).replace(/\\/g, '/');
+      const rendered = await runViewer(relativeFilePath);
+      expect(rendered).not.toContain('eggman_profile-image.jpg');
+      expect(rendered).toContain(`src="${relativeFilePath}"`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('uses a child folder .layout over an inherited parent .layout and persists the full layout set', async () => {
     const tempDir = path.join(POFF_DIR, `nested-folder-layout-${Date.now()}`);
     const parentDir = path.join(tempDir, 'parent');

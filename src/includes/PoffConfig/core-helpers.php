@@ -148,6 +148,80 @@ trait PoffConfigCoreHelpers
         return $work;
     }
 
+    private static function isImplicitDefaultLayoutValue(mixed $layout, string $section): bool
+    {
+        $normalized = Worktype::normalizeLayout($layout, $section);
+        $preset = trim((string) ($normalized['preset'] ?? ''));
+        $source = trim((string) ($normalized['source'] ?? ''));
+        $sharedName = trim((string) ($normalized['sharedName'] ?? ''));
+        $name = trim((string) ($normalized['name'] ?? Worktype::defaultLayoutName()));
+        $mode = trim((string) ($normalized['mode'] ?? Worktype::defaultLayoutName()));
+
+        if (!in_array($name, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)) {
+            return false;
+        }
+        if (!in_array($mode, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)) {
+            return false;
+        }
+        if ($preset !== '' && $preset !== 'actual') {
+            return false;
+        }
+        if ($source !== '' || $sharedName !== '') {
+            return false;
+        }
+        foreach (['template', 'css', 'js', 'sectionTemplate', 'workTemplate', 'worksTemplate', 'directory', 'inheritedDirectory', 'sectionDirectory', 'storage'] as $key) {
+            if (!array_key_exists($key, $normalized)) {
+                continue;
+            }
+            $value = $normalized[$key];
+            if (is_array($value)) {
+                if ($value !== []) {
+                    return false;
+                }
+                continue;
+            }
+            if (is_string($value) && trim($value) !== '') {
+                return false;
+            }
+            if ($value !== null && !is_string($value) && $value !== [] && $value !== 0 && $value !== false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function resolveInheritedConfiguredLayout(string $dir, string $section, bool $includeCurrentDir = false): ?array
+    {
+        $cursor = $includeCurrentDir ? realpath($dir) : realpath(dirname($dir));
+        $cwd = realpath(getcwd() ?: '.');
+        while (is_string($cursor) && $cursor !== '') {
+            $configPath = self::configPath($cursor);
+            if (is_file($configPath)) {
+                $decoded = json_decode((string) file_get_contents($configPath), true);
+                $candidateLayout = is_array($decoded['work'] ?? null) ? ($decoded['work']['layout'] ?? null) : null;
+                if ($candidateLayout !== null && !self::isImplicitDefaultLayoutValue($candidateLayout, 'works')) {
+                    return Worktype::normalizeLayout($candidateLayout, $section);
+                }
+            }
+
+            if (self::hasWrapperFiles(self::folderLayoutDir($cursor))) {
+                return null;
+            }
+
+            if ($cwd !== false && $cursor === $cwd) {
+                break;
+            }
+            $parent = dirname($cursor);
+            if ($parent === $cursor) {
+                break;
+            }
+            $cursor = realpath($parent);
+        }
+
+        return null;
+    }
+
     public static function buildFirstLevelTree(string $dir): array
     {
         $entries = @scandir($dir) ?: [];
