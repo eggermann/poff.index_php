@@ -2,37 +2,37 @@
 .edit-panel {
     position: relative;
     z-index: 1;
-    border-bottom: 1px solid #e5e7eb;
-    background: #fff7ed;
-    padding: 14px 20px;
+    border-bottom: 1px solid var(--poff-color-border);
+    background: var(--poff-color-surface-warning);
+    padding: var(--poff-space-lg-plus) var(--poff-space-xl);
 }
 .edit-panel h3 {
-    margin: 0 0 6px;
-    font-size: 1.05em;
-    color: #111827;
+    margin: 0 0 var(--poff-space-2xs);
+    font-size: var(--poff-font-size-lg);
+    color: var(--poff-color-text-primary);
 }
 .edit-panel .edit-status {
-    font-size: 0.9em;
-    color: #b91c1c;
-    margin-bottom: 8px;
+    font-size: var(--poff-font-size-sm);
+    color: var(--poff-color-text-danger);
+    margin-bottom: var(--poff-space-xs);
 }
 .edit-panel .edit-status.edit-status-success {
-    color: #166534;
+    color: var(--poff-color-text-success);
 }
 .edit-panel form {
     display: grid;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 .edit-panel .edit-grid {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--poff-space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(var(--poff-layout-grid-width-sm), 1fr));
 }
 .edit-panel label {
-    font-size: 0.85em;
-    color: #374151;
+    font-size: var(--poff-font-size-xs);
+    color: var(--poff-color-text-secondary);
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: var(--poff-space-3xs);
 }
 .edit-panel input[type="text"],
 .edit-panel textarea,
@@ -42,96 +42,96 @@
 .edit-drawer textarea,
 .edit-drawer select {
     width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 0.95em;
+    border: 1px solid var(--poff-color-border-strong);
+    border-radius: var(--poff-control-radius-md);
+    padding: var(--poff-space-xs) var(--poff-space-xs-plus);
+    font-size: var(--poff-font-size-md);
     box-sizing: border-box;
 }
 .edit-panel textarea {
-    min-height: 72px;
+    min-height: var(--poff-control-height-textarea);
     resize: vertical;
 }
 .edit-panel .edit-tree {
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    padding: 10px;
-    background: #ffffff;
-    max-height: 220px;
+    border: 1px solid var(--poff-color-border);
+    border-radius: var(--poff-control-radius-md);
+    padding: var(--poff-space-xs-plus);
+    background: var(--poff-color-surface);
+    max-height: var(--poff-control-height-panel-md);
     overflow: auto;
 }
 .edit-panel .edit-tree-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-    font-size: 0.9em;
-    color: #374151;
+    gap: var(--poff-space-xs);
+    padding: var(--poff-space-3xs) 0;
+    font-size: var(--poff-font-size-sm);
+    color: var(--poff-color-text-secondary);
 }
 .edit-panel .edit-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 .edit-panel button {
-    background: #111827;
-    color: #ffffff;
+    background: var(--poff-color-gray-900);
+    color: var(--poff-color-text-inverse);
     border: none;
-    border-radius: 6px;
-    padding: 8px 14px;
+    border-radius: var(--poff-control-radius-md);
+    padding: var(--poff-space-xs) var(--poff-space-sm);
     cursor: pointer;
-    font-size: 0.95em;
+    font-size: var(--poff-font-size-md);
 }
 .edit-panel button:hover {
-    background: #1f2937;
+    background: var(--poff-color-neutral-800);
 }
 .edit-panel .edit-inline {
     display: grid;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 .edit-panel .edit-inline-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--poff-space-xs-plus);
 }
 .edit-panel .edit-work-fields {
     display: grid;
-    gap: 12px;
-    padding: 14px 16px;
-    border: 1px solid #dbeafe;
-    border-radius: 16px;
-    background: linear-gradient(135deg, #fbfdff 0%, #eef6ff 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 12px 30px rgba(15, 23, 42, 0.03);
+    gap: var(--poff-space-sm);
+    padding: var(--poff-space-lg-plus) var(--poff-space-md);
+    border: 1px solid var(--poff-color-border-primary);
+    border-radius: var(--poff-control-radius-xl);
+    background: linear-gradient(135deg, var(--poff-color-surface) 0%, var(--poff-color-surface-primary) 100%);
+    box-shadow: var(--poff-shadow-inset), var(--poff-shadow-panel-soft);
 }
 .edit-panel .edit-work-fields-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 .edit-panel .edit-work-fields-title {
     font-weight: 700;
-    color: #111827;
-    font-size: 1.02rem;
+    color: var(--poff-color-text-primary);
+    font-size: var(--poff-font-size-lg);
 }
 .edit-panel .edit-work-fields-list {
     display: grid;
-    gap: 14px;
+    gap: var(--poff-space-lg-plus);
 }
 
 .edit-panel .edit-work-config-grid {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--poff-space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(var(--poff-layout-grid-width-sm), 1fr));
 }
 
 .edit-panel .edit-work-config-field {
     display: grid;
-    gap: 6px;
-    padding: 12px 14px;
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    background: #ffffff;
+    gap: var(--poff-space-2xs);
+    padding: var(--poff-space-sm) var(--poff-space-sm-plus);
+    border: 1px solid var(--poff-color-border);
+    border-radius: var(--poff-control-radius-lg);
+    background: var(--poff-color-surface);
 }
 
 .edit-panel .edit-work-config-field .edit-label {
@@ -140,37 +140,37 @@
 
 .edit-panel .edit-work-category-section {
     display: grid;
-    gap: 12px;
-    padding: 12px 14px;
-    border: 1px solid #c7d2fe;
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(238, 242, 255, 0.94));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76), 0 12px 30px rgba(15, 23, 42, 0.03);
+    gap: var(--poff-space-sm);
+    padding: var(--poff-space-sm) var(--poff-space-sm-plus);
+    border: 1px solid var(--poff-color-border-secondary-strong);
+    border-radius: var(--poff-control-radius-lg);
+    background: linear-gradient(135deg, var(--poff-color-surface) 0%, var(--poff-color-surface-secondary) 100%);
+    box-shadow: var(--poff-shadow-inset), var(--poff-shadow-panel-soft);
 }
 
 .edit-panel .edit-work-category-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 
 .edit-panel .edit-work-category-controls {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--poff-space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(var(--poff-layout-grid-width-sm), 1fr));
 }
 
 .edit-panel .edit-work-category-picker,
 .edit-panel .edit-work-category-current {
     display: grid;
-    gap: 8px;
+    gap: var(--poff-space-xs);
 }
 
 .edit-panel .edit-work-category-picker-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--poff-space-xs-plus);
 }
 
 .edit-panel .edit-work-category-picker-row .form-select {
@@ -180,68 +180,68 @@
 .edit-panel .edit-work-category-pills {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    min-height: 42px;
+    gap: var(--poff-space-xs);
+    min-height: var(--poff-control-height-md);
 }
 
 .edit-panel .edit-work-category-pill {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    border: 1px solid #c4b5fd;
-    border-radius: 999px;
-    background: rgba(238, 242, 255, 0.98);
-    color: #4338ca;
-    font-size: 0.9rem;
+    gap: var(--poff-space-xs);
+    padding: var(--poff-space-2xs) var(--poff-space-xs-plus);
+    border: 1px solid var(--poff-color-secondary-300);
+    border-radius: var(--poff-control-radius-xl);
+    background: var(--poff-color-secondary-50);
+    color: var(--poff-color-text-secondary-accent);
+    font-size: var(--poff-font-size-sm);
     line-height: 1;
     cursor: pointer;
 }
 
 .edit-panel .edit-work-category-pill:hover {
-    background: #e0e7ff;
+    background: var(--poff-color-secondary-100);
 }
 
 .edit-panel .edit-work-category-pill span[aria-hidden="true"] {
-    font-size: 1.05em;
+    font-size: var(--poff-font-size-lg);
     font-weight: 700;
     line-height: 1;
 }
 
 .edit-drawer .edit-fieldset {
     display: grid;
-    gap: 10px;
-    padding: 14px 16px;
-    border: 1px solid #dbeafe;
-    border-radius: 16px;
-    background: linear-gradient(135deg, #fbfdff 0%, #eef6ff 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 12px 30px rgba(15, 23, 42, 0.03);
+    gap: var(--poff-space-xs-plus);
+    padding: var(--poff-space-lg-plus) var(--poff-space-md);
+    border: 1px solid var(--poff-color-border-primary);
+    border-radius: var(--poff-control-radius-xl);
+    background: linear-gradient(135deg, var(--poff-color-surface) 0%, var(--poff-color-surface-primary) 100%);
+    box-shadow: var(--poff-shadow-inset), var(--poff-shadow-panel-soft);
 }
 
 .edit-drawer .edit-fieldset-title {
     font-weight: 700;
-    color: #111827;
-    font-size: 1rem;
+    color: var(--poff-color-text-primary);
+    font-size: var(--poff-font-size-md);
 }
 
 .edit-drawer .edit-template-map-list {
     display: grid;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 
 .edit-drawer .edit-template-map-row {
     display: grid;
-    gap: 6px;
-    padding: 12px 14px;
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    background: #ffffff;
+    gap: var(--poff-space-2xs);
+    padding: var(--poff-space-sm) var(--poff-space-sm-plus);
+    border: 1px solid var(--poff-color-border);
+    border-radius: var(--poff-control-radius-lg);
+    background: var(--poff-color-surface);
 }
 
 .edit-drawer .edit-template-map-row .edit-label {
     margin-bottom: 0;
-    color: #111827;
-    font-size: 0.82rem;
+    color: var(--poff-color-text-primary);
+    font-size: var(--poff-font-size-xs);
     font-weight: 700;
 }
 
@@ -250,21 +250,21 @@
 }
 .edit-panel .edit-work-field-row {
     display: grid;
-    gap: 12px;
-    padding: 14px;
-    border: 1px solid #cbd5e1;
-    border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    gap: var(--poff-space-sm);
+    padding: var(--poff-space-lg-plus);
+    border: 1px solid var(--poff-color-border-strong);
+    border-radius: var(--poff-control-radius-xl);
+    background: linear-gradient(180deg, var(--poff-color-surface) 0%, var(--poff-color-surface-soft) 100%);
+    box-shadow: var(--poff-shadow-sm);
 }
 .edit-panel .edit-work-field-main {
     display: grid;
-    gap: 14px;
+    gap: var(--poff-space-lg-plus);
 }
 .edit-panel .edit-work-field-head {
     display: grid;
-    gap: 12px;
-    grid-template-columns: minmax(120px, 150px) minmax(200px, 1fr) auto;
+    gap: var(--poff-space-sm);
+    grid-template-columns: minmax(var(--poff-layout-grid-width-xs), var(--poff-layout-grid-width-mid)) minmax(var(--poff-layout-grid-width-md), 1fr) auto;
     align-items: end;
 }
 .edit-panel .edit-work-field-name-wrap,
@@ -273,86 +273,86 @@
 }
 .edit-panel .edit-work-field-value-row {
     display: grid;
-    gap: 12px;
+    gap: var(--poff-space-sm);
 }
 .edit-panel .edit-work-field-value-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    min-height: 42px;
-    padding: 8px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    background: #ffffff;
+    min-height: var(--poff-control-height-md);
+    padding: var(--poff-space-xs) var(--poff-space-xs-plus);
+    border: 1px solid var(--poff-color-border-strong);
+    border-radius: var(--poff-control-radius-md);
+    background: var(--poff-color-surface);
 }
 .edit-panel .edit-work-field-value-toggle input {
     width: auto;
     margin: 0;
 }
 .edit-panel .edit-work-field-row .small-note {
-    margin-top: 4px;
+    margin-top: var(--poff-space-3xs);
 }
 .edit-panel .edit-work-field-remove {
-    min-width: 42px;
-    padding: 8px 10px;
+    min-width: var(--poff-control-height-md);
+    padding: var(--poff-space-xs) var(--poff-space-xs-plus);
     line-height: 1;
     align-self: end;
 }
 .edit-panel .edit-work-field-advanced {
-    border-top: 1px dashed #dbeafe;
-    padding-top: 12px;
+    border-top: 1px dashed var(--poff-color-border-primary);
+    padding-top: var(--poff-space-sm);
 }
 .edit-panel .edit-work-field-advanced summary {
     cursor: pointer;
     font-weight: 600;
-    color: #334155;
-    margin-bottom: 12px;
+    color: var(--poff-color-text-secondary);
+    margin-bottom: var(--poff-space-sm);
     list-style: none;
 }
 .edit-panel .edit-work-field-advanced-grid {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--poff-space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(var(--poff-layout-grid-width-lg), 1fr));
 }
 .edit-panel .edit-work-field-schema-group {
     display: grid;
-    gap: 10px;
-    padding: 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    background: rgba(248, 250, 252, 0.88);
+    gap: var(--poff-space-xs-plus);
+    padding: var(--poff-space-sm);
+    border: 1px solid var(--poff-color-neutral-200);
+    border-radius: var(--poff-control-radius-lg);
+    background: var(--poff-color-surface-soft-elevated);
 }
 .edit-panel .edit-work-field-schema-group-title {
-    font-size: 0.85rem;
+    font-size: var(--poff-font-size-xs);
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #475569;
+    color: var(--poff-color-text-muted);
 }
 .edit-panel .edit-work-field-schema-group-grid {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--poff-space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(var(--poff-layout-grid-width-md), 1fr));
 }
 .edit-panel .edit-work-field-small-grid {
     display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--poff-space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(var(--poff-layout-grid-width-xs), 1fr));
     grid-column: 1 / -1;
 }
 .edit-panel .edit-work-field-bools {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    padding-top: 4px;
+    gap: var(--poff-space-sm);
+    padding-top: var(--poff-space-3xs);
     align-items: center;
 }
 .edit-panel .edit-work-field-check {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.9em;
-    color: #334155;
+    gap: var(--poff-space-2xs);
+    font-size: var(--poff-font-size-sm);
+    color: var(--poff-color-text-secondary);
     margin: 0;
 }
 .edit-panel .edit-work-field-check input {
@@ -360,47 +360,47 @@
     margin: 0;
 }
 .edit-panel .edit-work-fields-empty {
-    padding: 2px 2px 0;
+    padding: var(--poff-space-3xs) var(--poff-space-3xs) 0;
 }
 .edit-panel .edit-layout-launch {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    margin-top: 12px;
-    border: 1px solid #fed7aa;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    gap: var(--poff-space-sm);
+    padding: var(--poff-space-sm) var(--poff-space-sm-plus);
+    margin-top: var(--poff-space-sm);
+    border: 1px solid var(--poff-color-border-warning);
+    border-radius: var(--poff-control-radius-lg);
+    background: linear-gradient(135deg, var(--poff-color-surface-warning) 0%, var(--poff-color-warning-100) 100%);
 }
 .edit-panel .edit-upload-launch {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    margin-top: 12px;
-    border: 1px solid #cbd5e1;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    gap: var(--poff-space-sm);
+    padding: var(--poff-space-sm) var(--poff-space-sm-plus);
+    margin-top: var(--poff-space-sm);
+    border: 1px solid var(--poff-color-border-strong);
+    border-radius: var(--poff-control-radius-lg);
+    background: linear-gradient(135deg, var(--poff-color-surface-soft) 0%, var(--poff-color-surface-secondary) 100%);
 }
 .edit-panel .edit-upload-launch-empty {
-    border-color: #93c5fd;
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-color: var(--poff-color-border-primary-strong);
+    background: linear-gradient(135deg, var(--poff-color-surface-primary) 0%, var(--poff-color-primary-100) 100%);
 }
 .edit-upload-dialog {
-    width: min(560px, calc(100vw - 32px));
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
+    width: min(var(--poff-dialog-width), calc(100vw - (var(--poff-space-md) * 2)));
+    border: 1px solid var(--poff-color-border);
+    border-radius: var(--poff-control-radius-xl);
     padding: 0;
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+    box-shadow: var(--poff-shadow-dialog);
 }
 .edit-upload-dialog::backdrop {
-    background: rgba(15, 23, 42, 0.35);
+    background: var(--poff-color-backdrop-dim);
 }
 .edit-upload-dialog-form {
     display: grid;
-    gap: 14px;
-    padding: 16px;
-    background: #ffffff;
+    gap: var(--poff-space-lg-plus);
+    padding: var(--poff-space-md);
+    background: var(--poff-color-surface);
 }

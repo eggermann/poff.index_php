@@ -4,8 +4,9 @@ body, html {
     padding: 0;
     height: 100%;
     font-family: 'Inter', sans-serif;
+    font-size: var(--poff-font-size-root, 16px);
     overflow: auto; /* Allow body scroll */
-    background-color: #f0f2f5;
+    background-color: var(--poff-color-page-background);
 }
 
 .container {

@@ -1,3 +1,5 @@
+@use 'edit/tokens' as t;
+
 .prompt-dock .edit-panel-title,
 .prompt-dock .prompt-section summary,
 .prompt-dock .prompt-template-viewer-summary,
@@ -5,7 +7,7 @@
 .prompt-dock .prompt-context-title,
 .prompt-dock .prompt-generation-label,
 .prompt-dock .prompt-attachment-name {
-    color: #0f172a;
+    color: var(--poff-color-text-strong);
 }
 .prompt-dock .small-note,
 .prompt-dock .prompt-summary-body,
@@ -17,17 +19,17 @@
 .prompt-dock .prompt-inline-toggle,
 .prompt-dock .prompt-message,
 .prompt-dock .prompt-message-content {
-    color: #334155;
+    color: var(--poff-color-text-secondary);
 }
 .prompt-dock .prompt-message-user,
 .prompt-dock .prompt-message-assistant {
-    color: #1f2937;
+    color: var(--poff-color-neutral-800);
 }
-@media (max-width: 640px) {
+@media (max-width: t.$edit-breakpoint-sm) {
     .edit-layout-overlay-shell {
         width: 100%;
         min-height: auto;
-        padding: 14px;
+        padding: var(--poff-space-lg-plus);
     }
     .edit-layout-editor-head {
         flex-direction: column;
@@ -37,7 +39,7 @@
     }
     .prompt-attachment-preview-wrap {
         width: 100%;
-        height: 160px;
+        height: var(--poff-control-height-preview);
     }
     .prompt-template-viewer-head {
         align-items: stretch;
@@ -53,15 +55,15 @@
         grid-template-columns: 1fr;
     }
     .prompt-dock {
-        top: 12px;
-        right: 12px;
-        bottom: 12px;
-        width: calc(100% - 24px);
-        max-height: calc(100% - 24px);
+        top: var(--poff-space-sm);
+        right: var(--poff-space-sm);
+        bottom: var(--poff-space-sm);
+        width: calc(100% - (var(--poff-space-sm) * 2));
+        max-height: calc(100% - (var(--poff-space-sm) * 2));
     }
 
     .prompt-layer-collapsed {
-        right: 14px;
-        bottom: 14px;
+        right: var(--poff-space-sm-plus);
+        bottom: var(--poff-space-sm-plus);
     }
 }
