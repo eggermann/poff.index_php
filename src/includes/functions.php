@@ -12,6 +12,10 @@
  */
 function extractLinkFileUrl(string $filePath): ?string {
     $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['webloc', 'url', 'desktop'], true)) {
+        return null;
+    }
+
     $content = @file_get_contents($filePath);
     if (!$content) {
         return null;

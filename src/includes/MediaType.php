@@ -12,6 +12,47 @@ class MediaType
     private const TEXT_EXTS  = ['txt','md','csv','json','log','ini','yml','yaml','xml','html','htm','css','js','rtf','hbs','tpl','mustache'];
     private const INLINE_TEXT_PREVIEW_EXTS = ['rtf','hbs','tpl','mustache'];
 
+    private const MIME_BY_EXT = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'svg' => 'image/svg+xml',
+        'bmp' => 'image/bmp',
+        'tif' => 'image/tiff',
+        'tiff' => 'image/tiff',
+        'heic' => 'image/heic',
+        'mp4' => 'video/mp4',
+        'mov' => 'video/quicktime',
+        'webm' => 'video/webm',
+        'avi' => 'video/x-msvideo',
+        'mkv' => 'video/x-matroska',
+        'm4v' => 'video/x-m4v',
+        'mts' => 'video/MP2T',
+        'mp3' => 'audio/mpeg',
+        'wav' => 'audio/wav',
+        'ogg' => 'audio/ogg',
+        'm4a' => 'audio/mp4',
+        'flac' => 'audio/flac',
+        'aac' => 'audio/aac',
+        'pdf' => 'application/pdf',
+        'txt' => 'text/plain',
+        'md' => 'text/markdown',
+        'csv' => 'text/csv',
+        'json' => 'application/json',
+        'log' => 'text/plain',
+        'ini' => 'text/plain',
+        'yml' => 'text/yaml',
+        'yaml' => 'text/yaml',
+        'xml' => 'application/xml',
+        'html' => 'text/html',
+        'htm' => 'text/html',
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'rtf' => 'application/rtf',
+    ];
+
     public static function classifyExtension(string $fileName): string
     {
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
@@ -38,6 +79,11 @@ class MediaType
 
     public static function detectMimeType(string $fullPath, string $fileName): ?string
     {
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        if (isset(self::MIME_BY_EXT[$ext])) {
+            return self::MIME_BY_EXT[$ext];
+        }
+
         if (function_exists('finfo_open')) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             if ($finfo) {
@@ -49,49 +95,7 @@ class MediaType
             }
         }
 
-        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        $map = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'svg' => 'image/svg+xml',
-            'bmp' => 'image/bmp',
-            'tif' => 'image/tiff',
-            'tiff' => 'image/tiff',
-            'heic' => 'image/heic',
-            'mp4' => 'video/mp4',
-            'mov' => 'video/quicktime',
-            'webm' => 'video/webm',
-            'avi' => 'video/x-msvideo',
-            'mkv' => 'video/x-matroska',
-            'm4v' => 'video/x-m4v',
-            'mts' => 'video/MP2T',
-            'mp3' => 'audio/mpeg',
-            'wav' => 'audio/wav',
-            'ogg' => 'audio/ogg',
-            'm4a' => 'audio/mp4',
-            'flac' => 'audio/flac',
-            'aac' => 'audio/aac',
-            'pdf' => 'application/pdf',
-            'txt' => 'text/plain',
-            'md' => 'text/markdown',
-            'csv' => 'text/csv',
-            'json' => 'application/json',
-            'log' => 'text/plain',
-            'ini' => 'text/plain',
-            'yml' => 'text/yaml',
-            'yaml' => 'text/yaml',
-            'xml' => 'application/xml',
-            'html' => 'text/html',
-            'htm' => 'text/html',
-            'css' => 'text/css',
-            'js' => 'application/javascript',
-            'rtf' => 'application/rtf',
-        ];
-
-        return $map[$ext] ?? null;
+        return null;
     }
 
     public static function shouldUseInlineTextPreview(string $fileName, ?string $mimeType = null): bool
