@@ -12,6 +12,7 @@ test('nav rendering uses folderPoffConfig instead of an undefined config variabl
 
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');
-  expect(result.stdout).toContain('viewer-folder');
+  expect(result.stdout).toContain('Folder Preview');
+  expect(result.stdout).not.toContain('> ./ viewer-folder<');
   expect(result.stdout).toContain('nav-link-up');
 });

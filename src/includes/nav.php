@@ -25,6 +25,7 @@ if (!function_exists('cmsNavEntry')) {
         $slug = (string) ($source['slug'] ?? cmsNavSlug($title));
         $entry = [
             'name' => $name,
+            'title' => $title,
             'path' => $path,
             'slug' => $slug,
             'icon' => $icon,
@@ -77,10 +78,10 @@ if ($navFolder !== '') {
 }
 
 $currentNavConfig = is_array($folderPoffConfig ?? null) ? $folderPoffConfig : [];
-$currentNavName = (string) ($currentNavConfig['folderName'] ?? basename($navFolder));
-$currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavName)));
+$currentNavName = (string) ($currentNavConfig['title'] ?? $currentNavConfig['folderName'] ?? basename($navFolder));
+$currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavConfig['folderName'] ?? $currentNavName)));
 echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-    . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
+    . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '" title="' . htmlspecialchars((string) ($currentNavConfig['folderName'] ?? $currentNavName)) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
     . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($currentNavName) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
     . '</li>';
 
@@ -162,9 +163,9 @@ foreach ($directories as $dir) {
     $hiddenBadge = $isHidden
         ? '<span style="margin-left:auto;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">hidden</span>'
         : '';
-    $copyText = htmlspecialchars((string) ($dir['copyText'] ?? $dir['name']));
+    $displayName = (string) ($dir['title'] ?? $dir['name']);
     echo '<li style="' . $rowStyle . '">'
-        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '"' . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($dir['name']) . $hiddenBadge . '</a>'
+        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '" title="' . htmlspecialchars((string) ($dir['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($displayName) . $hiddenBadge . '</a>'
         . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($dir['copyText'] ?? $dir['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:' . ($isHidden ? '.35' : '.6') . ';">Copy</button>' : '')
         . '</li>';
 }
@@ -203,10 +204,9 @@ foreach ($files as $file) {
     $hiddenBadge = $isHidden
         ? '<span style="margin-left:auto;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">hidden</span>'
         : '';
-    // Keep file rows copy-friendly without changing navigation behavior.
-    $fileCopyText = htmlspecialchars((string) ($file['copyText'] ?? $file['name']));
+    $displayName = (string) ($file['title'] ?? $file['name']);
     echo '<li style="' . $rowStyle . '">'
-        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '"' . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($file['name']) . $hiddenBadge . '</a>'
+        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '" title="' . htmlspecialchars((string) ($file['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($displayName) . $hiddenBadge . '</a>'
         . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($file['copyText'] ?? $file['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:' . ($isHidden ? '.35' : '.6') . ';">Copy</button>' : '')
         . '</li>';
 }
