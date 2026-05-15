@@ -14,8 +14,9 @@ function renderViewerShell(array $payload): void
     $layoutCssInline = $layoutCssHref === '' ? trim((string) ($layout['css'] ?? '')) : '';
     $layoutJsInline = $layoutJsHref === '' ? trim((string) ($layout['js'] ?? '')) : '';
     $layoutJsInlineAfterHref = trim((string) ($layout['jsInlineAfterHref'] ?? ''));
-    $viewerShellCss = trim((string) ($GLOBALS['__embeddedViewerShellCss'] ?? ''));
-    if ($viewerShellCss === '') {
+    $isPreviewFetch = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'fetch-preview';
+    $viewerShellCss = $isPreviewFetch ? '' : trim((string) ($GLOBALS['__embeddedViewerShellCss'] ?? ''));
+    if ($viewerShellCss === '' && !$isPreviewFetch) {
         $projectRootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir() : dirname(__DIR__, 4);
         $viewerShellCssPath = rtrim($projectRootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'build' . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'app.css';
         $viewerShellCss = is_file($viewerShellCssPath) ? trim((string) file_get_contents($viewerShellCssPath)) : '';
