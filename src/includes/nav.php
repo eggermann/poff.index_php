@@ -51,6 +51,37 @@ if (!function_exists('cmsNavCopyPasteAttr')) {
     }
 }
 
+if (!function_exists('cmsNavActionButton')) {
+    function cmsNavActionButton(string $label, string $title, string $class, string $icon, string $extraAttrs = ''): string
+    {
+        return '<button type="button" class="nav-row-action ' . htmlspecialchars($class) . '" title="' . htmlspecialchars($title) . '" aria-label="' . htmlspecialchars($title) . '"' . $extraAttrs . '>'
+            . '<span class="nav-row-action__icon" aria-hidden="true">' . $icon . '</span>'
+            . '<span class="nav-row-action__label">' . htmlspecialchars($label) . '</span>'
+            . '</button>';
+    }
+}
+
+if (!function_exists('cmsNavCopyIcon')) {
+    function cmsNavCopyIcon(): string
+    {
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 2a2 2 0 00-2 2v8h2V4h6V2H7zm3 4a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V8a2 2 0 00-2-2h-6zm0 2h6v8h-6V8z"/></svg>';
+    }
+}
+
+if (!function_exists('cmsNavHideIcon')) {
+    function cmsNavHideIcon(): string
+    {
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4c-4.5 0-8 3.5-8 6 0 1.1.5 2.4 1.4 3.5l1.5-1.5C4.4 11 4 10.2 4 10c0-1.2 2.7-4 6-4 .7 0 1.4.1 2 .3l1.6-1.6C12.5 4.2 11.3 4 10 4zm7.2 2.2-1.5 1.5C16.5 8.8 16 9.6 16 10c0 1.2-2.7 4-6 4-.7 0-1.4-.1-2-.3l-1.6 1.6c1.1.5 2.3.7 3.6.7 4.5 0 8-3.5 8-6 0-1.1-.5-2.4-1.4-3.5zM6.7 8.3l4.9 4.9c.6-.3 1.1-.8 1.4-1.4L8.1 6.9c-.6.3-1.1.8-1.4 1.4z"/></svg>';
+    }
+}
+
+if (!function_exists('cmsNavShowIcon')) {
+    function cmsNavShowIcon(): string
+    {
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4c-4.5 0-8 3.5-8 6s3.5 6 8 6 8-3.5 8-6-3.5-6-8-6zm0 10c-3 0-5.8-2.2-6.9-4 1.1-1.8 3.9-4 6.9-4s5.8 2.2 6.9 4c-1.1 1.8-3.9 4-6.9 4zm0-6a2 2 0 100 4 2 2 0 000-4z"/></svg>';
+    }
+}
+
 $folderIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>';
 $fileIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>';
 
@@ -68,7 +99,7 @@ if (!empty($navFolder)) {
     $goUpCopy = htmlspecialchars($parentRelativePath !== '' ? $parentRelativePath : '..');
     echo '<li style="display:flex;align-items:center;gap:.25rem;">'
         . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a>'
-        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..') . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
+        . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavCopyIcon(), cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..')) : '')
         . '</li>';
 }
 
@@ -82,7 +113,7 @@ $currentNavName = (string) ($currentNavConfig['title'] ?? $currentNavConfig['fol
 $currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavConfig['folderName'] ?? $currentNavName)));
 echo '<li style="display:flex;align-items:center;gap:.25rem;">'
     . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '" title="' . htmlspecialchars((string) ($currentNavConfig['folderName'] ?? $currentNavName)) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
-    . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($currentNavName) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>' : '')
+    . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavCopyIcon(), cmsNavCopyPasteAttr($currentNavName)) : '')
     . '</li>';
 
 
@@ -139,7 +170,7 @@ if (is_array($tree)) {
             $itemRelativePath = $navFolder ? rtrim($navFolder, "/\\") . '/' . $item : $item;
 
             if ($isDir) {
-            $directories[] = cmsNavEntry($item, $itemRelativePath, 'folder', $folderIcon, [], null, $editQuery);
+                $directories[] = cmsNavEntry($item, $itemRelativePath, 'folder', $folderIcon, [], null, $editQuery);
             } else {
                 $files[] = cmsNavEntry($item, $itemRelativePath, 'file', $fileIcon, [], $linkUrl ?? $itemRelativePath, $editQuery);
             }
@@ -165,8 +196,9 @@ foreach ($directories as $dir) {
         : '';
     $displayName = (string) ($dir['title'] ?? $dir['name']);
     echo '<li style="' . $rowStyle . '">'
-        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '" title="' . htmlspecialchars((string) ($dir['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($displayName) . $hiddenBadge . '</a>'
-        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($dir['copyText'] ?? $dir['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:' . ($isHidden ? '.35' : '.6') . ';">Copy</button>' : '')
+        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="' . htmlspecialchars($isHidden ? '#' : $dir['link']) . '" data-tree-item="1" data-path="' . htmlspecialchars($dir['path']) . '" data-slug="' . htmlspecialchars($dir['slug']) . '" title="' . htmlspecialchars((string) ($dir['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>' . $dir['icon'] . htmlspecialchars($displayName) . $hiddenBadge . '</a>'
+        . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavCopyIcon(), cmsNavCopyPasteAttr((string) ($dir['copyText'] ?? $dir['name']))) : '')
+        . ($editMode ? cmsNavActionButton($isHidden ? 'Unhide' : 'Hide', $isHidden ? 'Unhide in sidebar' : 'Hide from sidebar', 'nav-row-action-toggle', $isHidden ? cmsNavShowIcon() : cmsNavHideIcon(), ' data-nav-action="toggle-visibility" data-nav-path="' . htmlspecialchars($dir['path']) . '" data-nav-hidden="' . ($isHidden ? '1' : '0') . '"') : '')
         . '</li>';
 }
 
@@ -206,7 +238,8 @@ foreach ($files as $file) {
         : '';
     $displayName = (string) ($file['title'] ?? $file['name']);
     echo '<li style="' . $rowStyle . '">'
-        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="#" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '" title="' . htmlspecialchars((string) ($file['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($displayName) . $hiddenBadge . '</a>'
-        . ($editMode ? '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr((string) ($file['copyText'] ?? $file['name'])) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:' . ($isHidden ? '.35' : '.6') . ';">Copy</button>' : '')
+        . '<a class="nav-link' . ($isHidden ? ' nav-link-hidden' : '') . '" style="flex:1;" href="#" data-tree-item="1" data-path="' . htmlspecialchars($file['path']) . '" data-src="' . htmlspecialchars($file['data_src']) . '" data-file="' . htmlspecialchars($file['name']) . '" data-slug="' . htmlspecialchars($file['slug']) . '" title="' . htmlspecialchars((string) ($file['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>' . $file['icon'] . htmlspecialchars($displayName) . $hiddenBadge . '</a>'
+        . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavCopyIcon(), cmsNavCopyPasteAttr((string) ($file['copyText'] ?? $file['name']))) : '')
+        . ($editMode ? cmsNavActionButton($isHidden ? 'Unhide' : 'Hide', $isHidden ? 'Unhide in sidebar' : 'Hide from sidebar', 'nav-row-action-toggle', $isHidden ? cmsNavShowIcon() : cmsNavHideIcon(), ' data-nav-action="toggle-visibility" data-nav-path="' . htmlspecialchars($file['path']) . '" data-nav-hidden="' . ($isHidden ? '1' : '0') . '"') : '')
         . '</li>';
 }

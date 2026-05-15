@@ -45,6 +45,7 @@ export function initNavigation({
         sidebarLoading,
         editQuery,
         navigateToPath,
+        getCurrentSelection,
         setLoadingVisible,
     });
 

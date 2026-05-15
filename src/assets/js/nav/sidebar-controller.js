@@ -1,3 +1,4 @@
+import { requestEditConfig } from '../api/edit.js';
 import { extractNavHtml } from '../core/utils.js';
 
 export function createSidebarController({
@@ -5,9 +6,11 @@ export function createSidebarController({
     sidebarLoading,
     editQuery,
     navigateToPath,
+    getCurrentSelection,
     setLoadingVisible,
 }) {
     let activeLink = null;
+    let currentFolderPath = '';
 
     function clearActiveLink() {
         if (activeLink) {
@@ -68,6 +71,7 @@ export function createSidebarController({
         if (!navList) {
             return Promise.resolve('');
         }
+        currentFolderPath = relPath || '';
         showNavLoading();
         return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery}`)
             .then((response) => response.text())
@@ -87,6 +91,56 @@ export function createSidebarController({
             });
     }
 
+    function collectVisibleTreePaths() {
+        if (!navList) {
+            return [];
+        }
+        const visiblePaths = [];
+        navList.querySelectorAll('a[data-tree-item="1"]').forEach((link) => {
+            if (link.hasAttribute('data-hidden')) {
+                return;
+            }
+            const path = link.getAttribute('data-path') || '';
+            if (!path) {
+                return;
+            }
+            visiblePaths.push(path);
+        });
+        return visiblePaths;
+    }
+
+    async function toggleNavEntry(link) {
+        if (!link) {
+            return;
+        }
+        const targetPath = link.getAttribute('data-path') || '';
+        if (!targetPath) {
+            return;
+        }
+        const isHidden = link.hasAttribute('data-hidden');
+        const visiblePaths = collectVisibleTreePaths();
+        const nextVisiblePaths = isHidden
+            ? Array.from(new Set([...visiblePaths, targetPath]))
+            : visiblePaths.filter((path) => path !== targetPath);
+        const response = await requestEditConfig('save', {
+            path: currentFolderPath,
+            treeVisible: nextVisiblePaths,
+        });
+        if (response && response.allowed === false) {
+            return;
+        }
+        const selection = typeof getCurrentSelection === 'function' ? getCurrentSelection() : null;
+        if (typeof navigateToPath === 'function') {
+            navigateToPath(selection?.path || currentFolderPath || '', {
+                isFile: !!selection?.previewIsFile,
+                forceRefresh: true,
+                updateHash: false,
+            });
+        } else {
+            await loadNav(currentFolderPath);
+        }
+    }
+
     function syncSidebarSelection(path = '', isFile = false, isLayout = false) {
         if (isLayout) {
             setActiveLayoutLink(path);
@@ -103,6 +157,14 @@ export function createSidebarController({
 
     function handleNavClick(event) {
         if (!navList) {
+            return;
+        }
+        const fastAction = event.target.closest?.('[data-nav-action="toggle-visibility"]');
+        if (fastAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const rowLink = fastAction.closest('li')?.querySelector('a[data-tree-item="1"]');
+            toggleNavEntry(rowLink).catch(() => {});
             return;
         }
         let target = event.target;
