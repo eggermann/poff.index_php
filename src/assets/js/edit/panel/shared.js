@@ -1,5 +1,76 @@
 import { getLayoutState } from '../../core/utils.js';
 
+const DETAILS_STORAGE_PREFIX = 'poff.edit.details';
+
+function resolveStorage(storage = null) {
+    if (storage) {
+        return storage;
+    }
+    if (typeof localStorage !== 'undefined') {
+        return localStorage;
+    }
+    return null;
+}
+
+function normalizeDetailsStorageKey(storageKey) {
+    const key = String(storageKey || '').trim();
+    if (!key) {
+        return '';
+    }
+    return key.startsWith(DETAILS_STORAGE_PREFIX) ? key : `${DETAILS_STORAGE_PREFIX}:${key}`;
+}
+
+export function readStoredDetailsState(storageKey, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+        return null;
+    }
+    try {
+        const raw = resolvedStorage.getItem(key);
+        if (raw === null) {
+            return null;
+        }
+        const stored = JSON.parse(raw);
+        if (typeof stored === 'boolean') {
+            return stored;
+        }
+        if (stored && typeof stored === 'object' && Object.prototype.hasOwnProperty.call(stored, 'open')) {
+            return !!stored.open;
+        }
+        return null;
+    } catch (err) {
+        return null;
+    }
+}
+
+export function writeStoredDetailsState(storageKey, open, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+        return;
+    }
+    try {
+        resolvedStorage.setItem(key, JSON.stringify({ open: !!open }));
+    } catch (err) {
+        // Ignore storage failures.
+    }
+}
+
+export function bindStoredDetailsState(detailsEl, storageKey, storage = null) {
+    if (!detailsEl) {
+        return () => {};
+    }
+    const key = normalizeDetailsStorageKey(storageKey);
+    const onToggle = () => {
+        writeStoredDetailsState(key, !!detailsEl.open, storage);
+    };
+    detailsEl.addEventListener('toggle', onToggle);
+    return () => {
+        detailsEl.removeEventListener('toggle', onToggle);
+    };
+}
+
 export function formatUploadBytes(value = 0) {
     const bytes = Number(value) || 0;
     if (bytes <= 0) {

@@ -74,7 +74,7 @@
     gap: var(--poff-space-sm);
 }
 .edit-panel button {
-    background: var(--poff-color-gray-900);
+    background: var(--poff-color-neutral-950);
     color: var(--poff-color-text-inverse);
     border: none;
     border-radius: var(--poff-control-radius-md);
@@ -103,6 +103,42 @@
     background: linear-gradient(135deg, var(--poff-color-surface) 0%, var(--poff-color-surface-primary) 100%);
     box-shadow: var(--poff-shadow-inset), var(--poff-shadow-panel-soft);
 }
+
+.edit-panel .edit-password-details {
+    padding-top: var(--poff-space-md);
+}
+
+.edit-panel .edit-password-details > summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--poff-space-sm);
+    list-style: none;
+    cursor: pointer;
+}
+
+.edit-panel .edit-password-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.edit-panel .edit-password-details > summary::after {
+    content: '+';
+    flex: 0 0 auto;
+    color: var(--poff-color-text-secondary);
+    font-size: var(--poff-font-size-xl);
+    font-weight: 700;
+    line-height: 1;
+    padding-top: var(--poff-space-2xs);
+}
+
+.edit-panel .edit-password-details[open] > summary::after {
+    content: '−';
+}
+
+.edit-panel .edit-password-details-body {
+    gap: var(--poff-space-sm);
+}
+
 .edit-panel .edit-work-fields-header {
     display: flex;
     align-items: center;

@@ -300,6 +300,7 @@
 .xl\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr));}
 }
 
+@charset "UTF-8";
 /* -------------- Reset & Layout -------------- */
 body, html {
   margin: 0;
@@ -481,14 +482,11 @@ body, html {
 }
 :root {
   --poff-font-size-root: clamp(15px, 14px + 0.25vw, 17px);
-  --poff-font-size-base: clamp(0.96rem, 0.94rem + 0.18vw, 1.02rem);
   --poff-font-size-xs: clamp(0.72rem, 0.7rem + 0.12vw, 0.8rem);
   --poff-font-size-sm: clamp(0.82rem, 0.8rem + 0.14vw, 0.92rem);
   --poff-font-size-md: clamp(0.92rem, 0.89rem + 0.2vw, 1rem);
   --poff-font-size-lg: clamp(1rem, 0.96rem + 0.26vw, 1.12rem);
   --poff-font-size-xl: clamp(1.08rem, 1.02rem + 0.35vw, 1.24rem);
-  --poff-font-size-2xl: clamp(1.2rem, 1.1rem + 0.52vw, 1.45rem);
-  --poff-font-size-3xl: clamp(1.4rem, 1.24rem + 0.85vw, 1.9rem);
   --poff-color-neutral-0: #ffffff;
   --poff-color-neutral-50: #f8fafc;
   --poff-color-neutral-100: #f1f5f9;
@@ -535,55 +533,6 @@ body, html {
   --poff-color-danger-500: #ef4444;
   --poff-color-danger-600: #dc2626;
   --poff-color-danger-700: #b91c1c;
-  /* Compatibility aliases for older edit SCSS while the UI moves to primary/secondary tokens. */
-  --poff-color-white: var(--poff-color-neutral-0);
-  --poff-color-slate-50: var(--poff-color-neutral-50);
-  --poff-color-slate-100: var(--poff-color-neutral-100);
-  --poff-color-slate-200: var(--poff-color-neutral-200);
-  --poff-color-slate-300: var(--poff-color-neutral-300);
-  --poff-color-slate-400: #94a3b8;
-  --poff-color-slate-500: var(--poff-color-neutral-500);
-  --poff-color-slate-600: #475569;
-  --poff-color-slate-700: var(--poff-color-neutral-700);
-  --poff-color-slate-800: var(--poff-color-neutral-800);
-  --poff-color-slate-900: var(--poff-color-neutral-900);
-  --poff-color-gray-900: var(--poff-color-neutral-950);
-  --poff-color-blue-50: var(--poff-color-primary-50);
-  --poff-color-blue-100: var(--poff-color-primary-100);
-  --poff-color-blue-200: var(--poff-color-primary-200);
-  --poff-color-blue-300: var(--poff-color-primary-300);
-  --poff-color-blue-500: var(--poff-color-primary-500);
-  --poff-color-blue-600: var(--poff-color-primary-600);
-  --poff-color-blue-700: var(--poff-color-primary-700);
-  --poff-color-blue-800: var(--poff-color-primary-800);
-  --poff-color-indigo-50: var(--poff-color-secondary-50);
-  --poff-color-indigo-100: var(--poff-color-secondary-100);
-  --poff-color-indigo-200: var(--poff-color-secondary-200);
-  --poff-color-indigo-300: var(--poff-color-secondary-300);
-  --poff-color-indigo-500: var(--poff-color-secondary-500);
-  --poff-color-indigo-600: var(--poff-color-secondary-600);
-  --poff-color-indigo-700: var(--poff-color-secondary-700);
-  --poff-color-emerald-50: var(--poff-color-success-50);
-  --poff-color-emerald-100: var(--poff-color-success-100);
-  --poff-color-emerald-200: var(--poff-color-success-200);
-  --poff-color-emerald-500: var(--poff-color-success-500);
-  --poff-color-emerald-600: var(--poff-color-success-600);
-  --poff-color-emerald-700: var(--poff-color-success-700);
-  --poff-color-amber-50: var(--poff-color-warning-50);
-  --poff-color-amber-100: var(--poff-color-warning-100);
-  --poff-color-amber-200: var(--poff-color-warning-200);
-  --poff-color-amber-300: var(--poff-color-warning-300);
-  --poff-color-amber-500: var(--poff-color-warning-500);
-  --poff-color-amber-600: var(--poff-color-warning-600);
-  --poff-color-amber-700: var(--poff-color-warning-700);
-  --poff-color-amber-800: var(--poff-color-warning-800);
-  --poff-color-amber-900: var(--poff-color-warning-900);
-  --poff-color-red-50: var(--poff-color-danger-50);
-  --poff-color-red-100: var(--poff-color-danger-100);
-  --poff-color-red-200: var(--poff-color-danger-200);
-  --poff-color-red-500: var(--poff-color-danger-500);
-  --poff-color-red-600: var(--poff-color-danger-600);
-  --poff-color-red-700: var(--poff-color-danger-700);
   --poff-color-page-background: #f0f2f5;
   --poff-color-shell-background: var(--poff-color-neutral-900);
   --poff-color-surface: var(--poff-color-neutral-0);
@@ -595,7 +544,6 @@ body, html {
   --poff-color-surface-secondary: var(--poff-color-secondary-50);
   --poff-color-surface-success: var(--poff-color-success-50);
   --poff-color-surface-warning: var(--poff-color-warning-50);
-  --poff-color-surface-danger: var(--poff-color-danger-50);
   --poff-color-border: var(--poff-color-neutral-200);
   --poff-color-border-strong: var(--poff-color-neutral-300);
   --poff-color-border-subtle: rgba(148, 163, 184, 0.24);
@@ -603,17 +551,14 @@ body, html {
   --poff-color-border-elevated-weak: rgba(255, 255, 255, 0.34);
   --poff-color-border-primary: var(--poff-color-primary-200);
   --poff-color-border-primary-strong: var(--poff-color-primary-300);
-  --poff-color-border-secondary: var(--poff-color-secondary-200);
   --poff-color-border-secondary-strong: var(--poff-color-secondary-300);
   --poff-color-border-success: var(--poff-color-success-200);
   --poff-color-border-warning: var(--poff-color-warning-300);
-  --poff-color-border-danger: var(--poff-color-danger-200);
   --poff-color-text-primary: var(--poff-color-neutral-950);
   --poff-color-text-strong: var(--poff-color-neutral-900);
   --poff-color-text-secondary: var(--poff-color-neutral-700);
   --poff-color-text-muted: var(--poff-color-neutral-500);
   --poff-color-text-inverse: var(--poff-color-neutral-0);
-  --poff-color-text-primary-accent: var(--poff-color-primary-700);
   --poff-color-text-secondary-accent: var(--poff-color-secondary-700);
   --poff-color-text-success: var(--poff-color-success-700);
   --poff-color-text-warning: var(--poff-color-warning-800);
@@ -661,14 +606,12 @@ body, html {
   --poff-space-2xl: 2em;
   --poff-space-3xl: 2.5em;
   --poff-control-label-height: 2.55em;
-  --poff-control-height-sm: 2.25em;
   --poff-control-height-md: 2.625em;
   --poff-control-height-lg: 3em;
   --poff-control-height-textarea: 4.5rem;
   --poff-control-height-preview: 10rem;
   --poff-control-height-panel-sm: 11.25rem;
   --poff-control-height-panel-md: 13.75rem;
-  --poff-control-height-panel-lg: 16rem;
   --poff-control-height-input-sm: 5.625rem;
   --poff-control-size-dot: 0.625rem;
   --poff-control-radius-sm: 0.375em;
@@ -677,7 +620,6 @@ body, html {
   --poff-control-radius-xl: 1em;
   --poff-control-radius-pill: 999px;
   --poff-panel-radius: 1em;
-  --poff-panel-radius-lg: 1.125em;
   --poff-layout-shell-width: 67.5rem;
   --poff-layout-grid-width-sm: 13.75rem;
   --poff-layout-grid-width-md: 12.5rem;
@@ -704,7 +646,7 @@ body, html {
 #appSidebar {
   width: var(--app-shell-sidebar-width);
   min-width: var(--app-shell-sidebar-width);
-  padding: 0 16px 24px;
+  padding: 0 var(--poff-space-md) var(--poff-space-xl);
   border-right: 1px solid var(--app-shell-line);
   background: var(--app-shell-surface);
   box-shadow: var(--app-shell-shadow);
@@ -793,25 +735,139 @@ body, html {
 #appSidebar .app-edit-toggle-wrap {
   position: relative;
   z-index: 2;
-  margin: 0 0 var(--poff-space-md);
+  margin: 0 0 var(--poff-space-lg);
+  overflow: visible;
 }
 
-#appSidebar .edit-auth-details {
+#appSidebar .edit-actions-menu {
+  position: relative;
   display: block;
   width: 100%;
+  min-height: 48px;
   border: 0;
   margin: 0;
   padding: 0;
   background: transparent;
 }
 
-#appSidebar .edit-auth-details > summary {
+#appSidebar .edit-actions-menu > summary {
+  list-style: none;
+}
+
+#appSidebar .edit-actions-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+#appSidebar .edit-actions-menu-toggle {
+  position: relative;
+  z-index: 2;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
+  color: #ffffff;
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle {
+  background: linear-gradient(135deg, #fb923c, #f97316 56%, #fb7185);
+  color: #111827;
+}
+
+#appSidebar .edit-actions-menu-toggle:hover {
+  transform: translateY(-1px);
+}
+
+#appSidebar .edit-actions-menu-toggle__icon {
+  display: inline-grid;
+  gap: 4px;
+  width: 18px;
+}
+
+#appSidebar .edit-actions-menu-toggle__icon span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle__icon span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle__icon span:nth-child(2) {
+  opacity: 0;
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle__icon span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+#appSidebar .edit-actions-menu__panel {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
   display: flex;
+  align-items: center;
+  gap: var(--poff-space-xs);
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding-left: calc(48px + var(--poff-space-xs));
+  transform: translateX(-0.75rem);
+  transform-origin: left center;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.24s ease, filter 0.24s ease;
+  filter: blur(1px);
+  box-sizing: border-box;
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu__panel {
+  opacity: 1;
+  transform: translateX(0);
+  filter: blur(0);
+  pointer-events: auto;
+}
+
+#appSidebar .edit-auth-details {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--poff-space-xs);
+  min-width: 0;
+  width: auto;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#appSidebar .edit-auth-details[open] {
+  z-index: 3;
+}
+
+#appSidebar .edit-auth-details > summary {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   list-style: none;
   width: 100%;
+  min-width: 0;
+  min-height: 48px;
   margin: 0;
+  padding: 12px 18px;
 }
 
 #appSidebar .edit-auth-details > summary::-webkit-details-marker {
@@ -819,24 +875,84 @@ body, html {
 }
 
 #appSidebar .edit-toggle {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
   border: 0;
-  min-height: 56px;
-  border-radius: 24px;
+  min-height: 48px;
+  border-radius: 999px;
   background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
   color: #ffffff;
-  padding: 14px 20px;
+  padding: 12px 14px;
+  font-size: clamp(0.72rem, 0.67rem + 0.22vw, 0.9rem);
   font-weight: 650;
-  letter-spacing: 0.01em;
-  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  letter-spacing: 0;
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   cursor: pointer;
   box-sizing: border-box;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 #appSidebar .edit-toggle.edit-toggle-on {
   background: linear-gradient(135deg, #fb923c, #f97316 56%, #fb7185);
   color: #111827;
+}
+
+#appSidebar .edit-toggle-secondary {
+  border: 0;
+  background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
+  color: #ffffff;
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateX(-0.75rem);
+  opacity: 0;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+#appSidebar .edit-actions-menu[open] .edit-toggle-secondary {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+#appSidebar .edit-toggle-secondary:hover {
+  background: linear-gradient(135deg, #111827, #1f2937 58%, #334155);
+}
+
+#appSidebar .edit-auth-bubble {
+  display: grid;
+  gap: var(--poff-space-xs);
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: var(--poff-control-radius-xl);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+  padding: var(--poff-space-sm);
+  backdrop-filter: blur(12px);
+  transform: translateX(-0.5rem);
+  transform-origin: top left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.2s ease;
+}
+
+#appSidebar .edit-auth-bubble[hidden] {
+  display: none !important;
+}
+
+#appSidebar .edit-actions-menu:has(.edit-auth-details[open]) .edit-toggle-secondary {
+  opacity: 0;
+  transform: translateX(-0.75rem);
+  pointer-events: none;
+}
+
+#appSidebar .edit-auth-details[open] > .edit-auth-bubble:not([hidden]) {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 #sidebarLoading {
@@ -882,9 +998,23 @@ body, html {
 }
 
 #appSidebar .edit-form {
+  clear: both;
   display: grid;
-  gap: var(--poff-space-xs-plus);
-  margin-top: var(--poff-space-sm);
+  gap: var(--poff-space-xs);
+  margin-top: var(--poff-space-xs-plus);
+  max-height: 0;
+  opacity: 0;
+  transform: translateX(var(--poff-space-xs-plus));
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 0.24s ease, opacity 0.18s ease, transform 0.24s ease;
+}
+
+#appSidebar .edit-auth-details[open] .edit-form {
+  max-height: 280px;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 #appSidebar .edit-form .edit-label {
@@ -895,23 +1025,31 @@ body, html {
 
 #appSidebar .edit-form .form-input {
   width: 100%;
-  min-height: 48px;
+  min-height: 42px;
   border: 1px solid rgba(148, 163, 184, 0.44);
-  border-radius: 16px;
-  padding: 12px 14px;
+  border-radius: 14px;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.92);
   box-sizing: border-box;
 }
 
 #appSidebar .edit-form .btn {
   width: 100%;
-  min-height: 48px;
+  min-height: 42px;
+  border-radius: 14px;
+  font-size: var(--poff-font-size-sm);
 }
 
 #appSidebar .edit-status {
   margin-top: 2px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  #appSidebar .edit-form {
+    transition: none;
+    transform: none;
+  }
+}
 #appSidebar .nav-link:hover {
   transform: translateX(3px);
   color: var(--app-shell-text-strong);
@@ -1051,7 +1189,7 @@ body, html {
 }
 
 .edit-panel button {
-  background: var(--poff-color-gray-900);
+  background: var(--poff-color-neutral-950);
   color: var(--poff-color-text-inverse);
   border: none;
   border-radius: var(--poff-control-radius-md);
@@ -1083,6 +1221,41 @@ body, html {
   border-radius: var(--poff-control-radius-xl);
   background: linear-gradient(135deg, var(--poff-color-surface) 0%, var(--poff-color-surface-primary) 100%);
   box-shadow: var(--poff-shadow-inset), var(--poff-shadow-panel-soft);
+}
+
+.edit-panel .edit-password-details {
+  padding-top: var(--poff-space-md);
+}
+
+.edit-panel .edit-password-details > summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--poff-space-sm);
+  list-style: none;
+  cursor: pointer;
+}
+
+.edit-panel .edit-password-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.edit-panel .edit-password-details > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--poff-color-text-secondary);
+  font-size: var(--poff-font-size-xl);
+  font-weight: 700;
+  line-height: 1;
+  padding-top: var(--poff-space-2xs);
+}
+
+.edit-panel .edit-password-details[open] > summary::after {
+  content: "−";
+}
+
+.edit-panel .edit-password-details-body {
+  gap: var(--poff-space-sm);
 }
 
 .edit-panel .edit-work-fields-header {

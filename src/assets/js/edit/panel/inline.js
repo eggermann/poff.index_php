@@ -16,11 +16,17 @@ import {
     normalizeWorkCategories,
     renderWorkCategorySection,
 } from './categories.js';
-import { layoutOverlayState, syncPromptDock } from './shared.js';
+import {
+    bindStoredDetailsState,
+    layoutOverlayState,
+    readStoredDetailsState,
+    syncPromptDock,
+} from './shared.js';
 import { bindUploadDialog, renderUploadSectionHtml } from './upload.js';
 import { renderEditLayoutPanel } from './layout.js';
 
 const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind']);
+const PASSWORD_DETAILS_STORAGE_KEY = 'password-details';
 
 function readRowText(row, selector) {
     const field = row.querySelector(selector);
@@ -248,15 +254,17 @@ function renderPasswordChangeSection(status = {}) {
     }
 
     const configPath = String(status?.auth?.configPath || '').trim();
+    const storedOpen = readStoredDetailsState(PASSWORD_DETAILS_STORAGE_KEY);
+    const detailsOpen = storedOpen === null ? true : storedOpen;
     return `
-        <section class="edit-work-fields">
-            <div class="edit-work-fields-header">
+        <details class="edit-work-fields edit-password-details" id="editPasswordDetails"${detailsOpen ? ' open' : ''}>
+            <summary class="edit-work-fields-header edit-password-details-summary">
                 <div>
                     <div class="edit-work-fields-title">Change password</div>
                     <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ''}.</div>
                 </div>
-            </div>
-            <form id="editPasswordForm" class="edit-inline">
+            </summary>
+            <form id="editPasswordForm" class="edit-inline edit-password-details-body">
                 <div>
                     <label class="edit-label" for="edit-current-password">Current password</label>
                     <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
@@ -274,7 +282,7 @@ function renderPasswordChangeSection(status = {}) {
                 </div>
                 <div class="edit-status" id="editPasswordStatus"></div>
             </form>
-        </section>
+        </details>
     `;
 }
 
@@ -557,6 +565,7 @@ export function renderEditPanel({
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onCreateLink,
     onResetFolderWork,
     onDeleteTarget,
     onChangePassword,
@@ -586,7 +595,7 @@ export function renderEditPanel({
     if (!status?.allowed) {
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">Create <code>.edit.allow</code> in this folder or an ancestor to enable edit mode. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
+            <div class="edit-status">Create <code>.poff-auth.php</code> with a password hash to enable editing. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
         `;
         syncPromptDock();
         return { statusEl: null, promptRoot: null };
@@ -688,6 +697,7 @@ export function renderEditPanel({
     const passwordStatusEl = editPanel.querySelector('#editPasswordStatus');
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
+    const passwordDetailsEl = editPanel.querySelector('#editPasswordDetails');
     const deleteTargetButton = editPanel.querySelector('#editDeleteTarget');
     const resetFolderWorkButton = editPanel.querySelector('#editResetFolderWork');
     const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
@@ -696,6 +706,10 @@ export function renderEditPanel({
     const addWorkFieldButton = editPanel.querySelector('#editWorkFieldAdd');
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
+
+    if (passwordDetailsEl) {
+        bindStoredDetailsState(passwordDetailsEl, PASSWORD_DETAILS_STORAGE_KEY);
+    }
 
     const syncMediaState = () => {
         if (typeof onMediaInput !== 'function' || !form) {
@@ -776,14 +790,15 @@ export function renderEditPanel({
         });
     }
 
-    bindUploadDialog({
-        editPanel,
-        statusEl,
-        uploadLimits: status?.uploadLimits || null,
-        onUploadFiles,
-        onCreateBlankFile,
-        onCreateFolder,
-    });
+        bindUploadDialog({
+            editPanel,
+            statusEl,
+            uploadLimits: status?.uploadLimits || null,
+            onUploadFiles,
+            onCreateBlankFile,
+            onCreateFolder,
+            onCreateLink,
+        });
 
     return { statusEl, promptRoot };
 }

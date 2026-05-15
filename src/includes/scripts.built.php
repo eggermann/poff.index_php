@@ -4359,6 +4359,71 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/panel/shared.js
+  var DETAILS_STORAGE_PREFIX = "poff.edit.details";
+  function resolveStorage(storage = null) {
+    if (storage) {
+      return storage;
+    }
+    if (typeof localStorage !== "undefined") {
+      return localStorage;
+    }
+    return null;
+  }
+  function normalizeDetailsStorageKey(storageKey) {
+    const key = String(storageKey || "").trim();
+    if (!key) {
+      return "";
+    }
+    return key.startsWith(DETAILS_STORAGE_PREFIX) ? key : `${DETAILS_STORAGE_PREFIX}:${key}`;
+  }
+  function readStoredDetailsState(storageKey, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+      return null;
+    }
+    try {
+      const raw = resolvedStorage.getItem(key);
+      if (raw === null) {
+        return null;
+      }
+      const stored = JSON.parse(raw);
+      if (typeof stored === "boolean") {
+        return stored;
+      }
+      if (stored && typeof stored === "object" && Object.prototype.hasOwnProperty.call(stored, "open")) {
+        return !!stored.open;
+      }
+      return null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function writeStoredDetailsState(storageKey, open, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+      return;
+    }
+    try {
+      resolvedStorage.setItem(key, JSON.stringify({ open: !!open }));
+    } catch (err) {
+    }
+  }
+  function bindStoredDetailsState(detailsEl, storageKey, storage = null) {
+    if (!detailsEl) {
+      return () => {
+      };
+    }
+    const key = normalizeDetailsStorageKey(storageKey);
+    const onToggle = () => {
+      writeStoredDetailsState(key, !!detailsEl.open, storage);
+    };
+    detailsEl.addEventListener("toggle", onToggle);
+    return () => {
+      detailsEl.removeEventListener("toggle", onToggle);
+    };
+  }
   function formatUploadBytes(value = 0) {
     const bytes = Number(value) || 0;
     if (bytes <= 0) {
@@ -4475,7 +4540,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Add work</div>
-                <div class="small-note">${isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, or create a folder to start." : "Upload files, create a blank file, or create a folder in this folder."}</div>
+                <div class="small-note">${isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder."}</div>
             </div>
             <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
@@ -4492,7 +4557,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
-                            <option value="url" disabled>From URL (disabled)</option>
+                            <option value="url">Poff link</option>
                         </select>
                     </div>
                     <div id="editUploadFilesWrap">
@@ -4502,6 +4567,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <div id="editBlankFileWrap" hidden>
                         <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
                         <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
+                    </div>
+                    <div id="editLinkWrap" hidden>
+                        <label class="edit-label" for="edit-link-url">Link URL</label>
+                        <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/index.php?view=1&path=folder">
                     </div>
                 </div>
                 <div class="small-note" id="editUploadSummary">No files selected.</div>
@@ -4519,7 +4588,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     uploadLimits,
     onUploadFiles,
     onCreateBlankFile,
-    onCreateFolder
+    onCreateFolder,
+    onCreateLink
   }) {
     const uploadDialog = editPanel.querySelector("#editUploadDialog");
     const openUploadDialogButton = editPanel.querySelector("#editOpenUploadDialog");
@@ -4532,17 +4602,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const uploadFilesWrapEl = editPanel.querySelector("#editUploadFilesWrap");
     const blankFileWrapEl = editPanel.querySelector("#editBlankFileWrap");
     const blankFileNameEl = editPanel.querySelector("#edit-blank-file-name");
+    const linkWrapEl = editPanel.querySelector("#editLinkWrap");
+    const linkUrlEl = editPanel.querySelector("#edit-link-url");
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector("label") : null;
     const uploadNameDrafts = {
       blank: "",
-      folder: ""
+      folder: "",
+      url: ""
+    };
+    const uploadUrlDrafts = {
+      url: ""
     };
     let uploadMode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
-    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== "function" || typeof onCreateBlankFile !== "function" || typeof onCreateFolder !== "function") {
+    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== "function" || typeof onCreateBlankFile !== "function" || typeof onCreateFolder !== "function" || typeof onCreateLink !== "function") {
       return;
     }
     const setUploadSummary = () => {
-      var _a;
+      var _a, _b, _c;
       const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
       if (!uploadSummaryEl) {
         return;
@@ -4551,6 +4627,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (mode === "blank" || mode === "folder") {
         const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
         uploadSummaryEl.textContent = name ? `Will create: ${name}` : mode === "folder" ? "Enter a folder name." : "Enter a file name.";
+        return;
+      }
+      if (mode === "url") {
+        const linkName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
+        const linkUrl = ((_c = linkUrlEl == null ? void 0 : linkUrlEl.value) == null ? void 0 : _c.trim()) || "";
+        uploadSummaryEl.textContent = linkUrl ? `Will add link: ${linkName || linkUrl}` : "Enter a link URL.";
         return;
       }
       const validationError = uploadValidationError(files, uploadLimits);
@@ -4565,24 +4647,36 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if ((uploadMode === "blank" || uploadMode === "folder") && blankFileNameEl) {
         uploadNameDrafts[uploadMode] = blankFileNameEl.value || "";
       }
+      if (uploadMode === "url" && blankFileNameEl) {
+        uploadNameDrafts.url = blankFileNameEl.value || "";
+      }
+      if (uploadMode === "url" && linkUrlEl) {
+        uploadUrlDrafts.url = linkUrlEl.value || "";
+      }
       uploadMode = mode;
       if (uploadFilesWrapEl) {
         uploadFilesWrapEl.hidden = mode !== "upload";
       }
       if (blankFileWrapEl) {
-        blankFileWrapEl.hidden = mode !== "blank" && mode !== "folder";
+        blankFileWrapEl.hidden = mode !== "blank" && mode !== "folder" && mode !== "url";
+      }
+      if (linkWrapEl) {
+        linkWrapEl.hidden = mode !== "url";
       }
       if (blankFileLabelEl) {
-        blankFileLabelEl.textContent = mode === "folder" ? "Folder name" : "Blank file name";
+        blankFileLabelEl.textContent = mode === "folder" ? "Folder name" : mode === "url" ? "Link label" : "Blank file name";
       }
       if (blankFileNameEl) {
-        blankFileNameEl.placeholder = mode === "folder" ? "new-folder" : "notes.txt";
-        if (mode === "blank" || mode === "folder") {
+        blankFileNameEl.placeholder = mode === "folder" ? "new-folder" : mode === "url" ? "my-link" : "notes.txt";
+        if (mode === "blank" || mode === "folder" || mode === "url") {
           blankFileNameEl.value = uploadNameDrafts[mode] || "";
         }
       }
+      if (linkUrlEl) {
+        linkUrlEl.value = mode === "url" ? uploadUrlDrafts.url || linkUrlEl.value || "" : linkUrlEl.value || "";
+      }
       if (uploadSubmitButton) {
-        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : "Upload";
+        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? "Add link" : "Upload";
       }
       setUploadSummary();
     };
@@ -4620,7 +4714,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     if (uploadSubmitButton) {
       uploadSubmitButton.addEventListener("click", async () => {
-        var _a, _b;
+        var _a, _b, _c, _d;
         const source = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
         try {
           uploadSubmitButton.disabled = true;
@@ -4644,6 +4738,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             await onCreateFolder({
               source,
               folderName,
+              statusEl
+            });
+          } else if (source === "url") {
+            const linkName = ((_c = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _c.trim()) || "";
+            const linkUrl = ((_d = linkUrlEl == null ? void 0 : linkUrlEl.value) == null ? void 0 : _d.trim()) || "";
+            if (!linkUrl) {
+              setStatusMessage(statusEl, "Enter a link URL.");
+              return;
+            }
+            await onCreateLink({
+              source,
+              linkName,
+              linkUrl,
               statusEl
             });
           } else {
@@ -4941,6 +5048,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onCreateLink,
     onResetFolderWork
   }) {
     const settings = loadPromptSettings();
@@ -5199,6 +5307,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       onUploadFiles,
       onCreateBlankFile,
       onCreateFolder,
+      onCreateLink,
       onResetFolderWork
     });
     return { statusEl, promptRoot };
@@ -5206,6 +5315,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
 
   // src/assets/js/edit/panel/inline.js
   var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind"]);
+  var PASSWORD_DETAILS_STORAGE_KEY = "password-details";
   function readRowText(row, selector) {
     const field = row.querySelector(selector);
     return field && typeof field.value === "string" ? field.value : "";
@@ -5406,15 +5516,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return "";
     }
     const configPath = String(((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.configPath) || "").trim();
+    const storedOpen = readStoredDetailsState(PASSWORD_DETAILS_STORAGE_KEY);
+    const detailsOpen = storedOpen === null ? true : storedOpen;
     return `
-        <section class="edit-work-fields">
-            <div class="edit-work-fields-header">
+        <details class="edit-work-fields edit-password-details" id="editPasswordDetails"${detailsOpen ? " open" : ""}>
+            <summary class="edit-work-fields-header edit-password-details-summary">
                 <div>
                     <div class="edit-work-fields-title">Change password</div>
                     <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ""}.</div>
                 </div>
-            </div>
-            <form id="editPasswordForm" class="edit-inline">
+            </summary>
+            <form id="editPasswordForm" class="edit-inline edit-password-details-body">
                 <div>
                     <label class="edit-label" for="edit-current-password">Current password</label>
                     <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
@@ -5432,7 +5544,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
                 <div class="edit-status" id="editPasswordStatus"></div>
             </form>
-        </section>
+        </details>
     `;
   }
   function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
@@ -5701,6 +5813,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onCreateLink,
     onResetFolderWork,
     onDeleteTarget,
     onChangePassword
@@ -5728,7 +5841,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (!(status == null ? void 0 : status.allowed)) {
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
-            <div class="edit-status">Create <code>.edit.allow</code> in this folder or an ancestor to enable edit mode. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
+            <div class="edit-status">Create <code>.poff-auth.php</code> with a password hash to enable editing. Add <code>edit.not-allow</code> to stop inheritance in a subtree.</div>
         `;
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
@@ -5824,6 +5937,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const passwordStatusEl = editPanel.querySelector("#editPasswordStatus");
     const statusEl = editPanel.querySelector("#editInlineStatus");
     const moreToggle = editPanel.querySelector("#editMoreToggle");
+    const passwordDetailsEl = editPanel.querySelector("#editPasswordDetails");
     const deleteTargetButton = editPanel.querySelector("#editDeleteTarget");
     const resetFolderWorkButton = editPanel.querySelector("#editResetFolderWork");
     const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
@@ -5832,6 +5946,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const addWorkFieldButton = editPanel.querySelector("#editWorkFieldAdd");
     const promptRoot = editPanel.querySelector("#promptLayer");
     syncPromptDock(promptRoot);
+    if (passwordDetailsEl) {
+      bindStoredDetailsState(passwordDetailsEl, PASSWORD_DETAILS_STORAGE_KEY);
+    }
     const syncMediaState = () => {
       if (typeof onMediaInput !== "function" || !form) {
         return;
@@ -5915,7 +6032,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
       onUploadFiles,
       onCreateBlankFile,
-      onCreateFolder
+      onCreateFolder,
+      onCreateLink
     });
     return { statusEl, promptRoot };
   }
@@ -6057,6 +6175,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       editDrawer,
       editAuthDetails,
       editToggle,
+      editAddWork,
       editAuthForm,
       editAuthPassword,
       editAuthSubmit,
@@ -6114,10 +6233,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return status.error;
       }
       if (!authState.editModeAllowed) {
-        return "Create .edit.allow in this folder or an ancestor to enable edit mode.";
+        return "Editing is disabled in this folder.";
       }
       if (!authState.configured) {
-        return "Create .poff-auth.php with a password hash to unlock editing.";
+        return "Create .poff-auth.php with a password hash to enable editing.";
       }
       if (!authState.authenticated) {
         return "Enter the editor password to unlock editing.";
@@ -6135,7 +6254,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!editAuthDetails) {
         return;
       }
-      const shouldShow = forceVisible || authFormVisible || editRequested2 && !authState.canEdit;
+      const shouldShow = forceVisible || authFormVisible;
       editAuthDetails.open = shouldShow;
       if (editAuthForm) {
         editAuthForm.hidden = !shouldShow;
@@ -6164,6 +6283,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       const editActive = editRequested2 && authState.canEdit;
+      editAuthDetails == null ? void 0 : editAuthDetails.classList.toggle("edit-auth-details-authenticated", !!authState.authenticated);
       editToggle.textContent = authState.authenticated ? "Disable edit mode" : "Enable edit mode";
       editToggle.classList.toggle("edit-toggle-on", editActive);
       editToggle.setAttribute("aria-expanded", (editAuthDetails == null ? void 0 : editAuthDetails.open) ? "true" : "false");
@@ -6197,6 +6317,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         syncAuthDisclosure(false, data);
         const url = new URL(window.location.href);
         url.searchParams.delete("edit");
+        window.location.href = url.toString();
+      });
+    }
+    function bindAddWorkButton() {
+      if (!editAddWork) {
+        return;
+      }
+      editAddWork.addEventListener("click", () => {
+        const addWorkFieldButton = document.getElementById("editWorkFieldAdd");
+        if (addWorkFieldButton instanceof HTMLButtonElement) {
+          addWorkFieldButton.click();
+          return;
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.set("edit", "true");
         window.location.href = url.toString();
       });
     }
@@ -6504,6 +6639,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
         },
+        onCreateLink: async ({ source, linkName, linkUrl }) => {
+          var _a;
+          const selection2 = getActiveSelection();
+          const data = await requestEditUpload({
+            path: getContentTargetPath(selection2),
+            source,
+            fileName: linkName,
+            linkUrl,
+            files: []
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Create link failed.");
+          }
+          await refreshCurrentEditState(selection2);
+          const inlineStatus = document.getElementById("editInlineStatus");
+          if (inlineStatus) {
+            const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : linkName || linkUrl;
+            setStatusMessage(inlineStatus, `Created link ${createdName}.`, true);
+          }
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        },
         onChangePassword: async ({ elements: elements3, form, statusEl }) => {
           var _a, _b, _c;
           try {
@@ -6639,6 +6795,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       renderFolderMeta,
       syncEditToggle,
       bindEditToggle,
+      bindAddWorkButton,
       bindAuthForm,
       initEditMode
     };
@@ -7459,6 +7616,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editDrawer: "editDrawer",
     editAuthDetails: "editAuthDetails",
     editToggle: "editToggle",
+    editAddWork: "editAddWork",
     editAuthForm: "editAuthForm",
     editAuthPassword: "editAuthPassword",
     editAuthSubmit: "editAuthSubmit",
@@ -7552,6 +7710,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     editController.syncEditToggle();
     editController.bindEditToggle();
+    editController.bindAddWorkButton();
     editController.bindAuthForm();
     if (isPreviewHashActive()) {
       navigation.loadCurrentFolderInIframe();
