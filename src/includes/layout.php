@@ -19,15 +19,29 @@
         </span>
     </button>
     <aside id="appSidebar" class="sidebar" aria-label="Navigation">
-        <details id="editAuthDetails" class="app-edit-toggle-wrap edit-auth-details">
-            <summary id="editToggle" class="edit-toggle">Enable edit mode</summary>
-            <form id="editAuthForm" class="edit-form">
-                <label class="edit-label" for="editAuthPassword">Editor password</label>
-                <input id="editAuthPassword" class="form-input" type="password" name="password" autocomplete="current-password">
-                <button id="editAuthSubmit" class="btn" type="submit">Unlock</button>
-                <div id="editAuthStatus" class="edit-status" aria-live="polite"></div>
-            </form>
-        </details>
+        <div class="app-edit-toggle-wrap">
+            <details id="editActionsMenu" class="edit-actions-menu">
+                <summary id="editActionsMenuToggle" class="edit-actions-menu-toggle" aria-label="Toggle edit actions">
+                    <span class="edit-actions-menu-toggle__icon" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </summary>
+                <div class="edit-actions-menu__panel">
+                    <details id="editAuthDetails" class="edit-auth-details">
+                        <summary id="editToggle" class="edit-toggle">Enable edit mode</summary>
+                        <form id="editAuthForm" class="edit-form edit-auth-bubble">
+                            <label class="edit-label" for="editAuthPassword">Editor password</label>
+                            <input id="editAuthPassword" class="form-input" type="password" name="password" autocomplete="current-password">
+                            <button id="editAuthSubmit" class="btn" type="submit">Unlock</button>
+                            <div id="editAuthStatus" class="edit-status" aria-live="polite"></div>
+                        </form>
+                    </details>
+                    <button id="editAddWork" class="edit-toggle edit-toggle-secondary" type="button">Add work</button>
+                </div>
+            </details>
+        </div>
         <div id="sidebarLoading" class="loading-row">
             <span class="loader"></span>
             <span class="loader-label">Loading navigation...</span>

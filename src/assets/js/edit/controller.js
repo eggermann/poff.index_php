@@ -66,6 +66,7 @@ export function createEditController({ elements, context, editRequested }) {
         editDrawer,
         editAuthDetails,
         editToggle,
+        editAddWork,
         editAuthForm,
         editAuthPassword,
         editAuthSubmit,
@@ -159,7 +160,9 @@ export function createEditController({ elements, context, editRequested }) {
         const shouldShow = forceVisible
             || authFormVisible
             || (editRequested && !authState.canEdit);
-        editAuthDetails.open = shouldShow;
+        if (shouldShow || !authState.authenticated) {
+            editAuthDetails.open = shouldShow;
+        }
         if (editAuthForm) {
             editAuthForm.hidden = !shouldShow;
         }
@@ -190,6 +193,7 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         const editActive = editRequested && authState.canEdit;
+        editAuthDetails?.classList.toggle('edit-auth-details-authenticated', !!authState.authenticated);
         editToggle.textContent = authState.authenticated ? 'Disable edit mode' : 'Enable edit mode';
         editToggle.classList.toggle('edit-toggle-on', editActive);
         editToggle.setAttribute('aria-expanded', editAuthDetails?.open ? 'true' : 'false');
@@ -224,6 +228,23 @@ export function createEditController({ elements, context, editRequested }) {
             syncAuthDisclosure(false, data);
             const url = new URL(window.location.href);
             url.searchParams.delete('edit');
+            window.location.href = url.toString();
+        });
+    }
+
+    function bindAddWorkButton() {
+        if (!editAddWork) {
+            return;
+        }
+        editAddWork.addEventListener('click', () => {
+            const addWorkFieldButton = document.getElementById('editWorkFieldAdd');
+            if (addWorkFieldButton instanceof HTMLButtonElement) {
+                addWorkFieldButton.click();
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('edit', 'true');
             window.location.href = url.toString();
         });
     }
@@ -679,6 +700,7 @@ export function createEditController({ elements, context, editRequested }) {
         renderFolderMeta,
         syncEditToggle,
         bindEditToggle,
+        bindAddWorkButton,
         bindAuthForm,
         initEditMode,
     };

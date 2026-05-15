@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     editController.syncEditToggle();
     editController.bindEditToggle();
+    editController.bindAddWorkButton();
     editController.bindAuthForm();
 
     if (isPreviewHashActive()) {
