@@ -758,12 +758,12 @@ describe('MCP create route helper (CLI)', () => {
       },
     }, null, 2));
     fs.mkdirSync(path.join(POFF_DIR, '.layout'), { recursive: true });
-    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.baseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'template.hbs'), '<div class="default-fs-layout"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.baseHref}}/poff.profile.jpg" alt="profile"></footer></div>');
     fs.writeFileSync(path.join(POFF_DIR, '.layout', 'works.hbs'), '{{#each items}}<span class="item">{{name}}</span>{{/each}}');
     fs.writeFileSync(path.join(POFF_DIR, '.layout', 'work.hbs'), '<span class="file-name">{{name}}</span>');
     fs.writeFileSync(path.join(POFF_DIR, '.layout', 'style.css'), '.default-fs-layout{display:block;}');
     fs.writeFileSync(path.join(POFF_DIR, '.layout', 'script.js'), 'window.__defaultFsLayout = true;');
-    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'eggman_profile-image.jpg'), 'fake image bytes');
+    fs.writeFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), 'fake image bytes');
     fs.mkdirSync(INHERITED_DEFAULT_DIR, { recursive: true });
     fs.writeFileSync(path.join(INHERITED_DEFAULT_DIR, 'child.txt'), 'child');
     fs.mkdirSync(INHERITED_SECTION_DIR, { recursive: true });
@@ -877,7 +877,6 @@ describe('MCP create route helper (CLI)', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-auth-'));
     const sessionId = 'poff-auth-session';
     const hash = await makePasswordHash('secret-pass');
-    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
     fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
 
     const denied = await runEditRequest(tempDir, 'save', '', { title: 'Blocked title' });
@@ -2474,7 +2473,7 @@ describe('Worktype HBS renderer', () => {
     expect(config.work.layout.template).toContain('default-fs-layout');
     expect(config.work.layout.assets).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ path: 'eggman_profile-image.jpg' }),
+        expect.objectContaining({ path: 'poff.profile.jpg' }),
       ]),
     );
 
@@ -2483,7 +2482,7 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('tests/poff-tests/.layout/style.css');
     expect(rendered).toContain('tests/poff-tests/.layout/script.js');
     expect(rendered).toContain('const initDefaultLayout = () => {');
-    expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
+    expect(rendered).toContain('tests/poff-tests/.layout/poff.profile.jpg');
     expect(rendered).toContain('<span class="item">child.txt</span>');
   });
 
@@ -2539,7 +2538,7 @@ describe('Worktype HBS renderer', () => {
   test('can persist edits back into the inherited original filesystem layout source', async () => {
     const originalTarget = path.relative(ROOT, path.join(POFF_DIR, '.layout'));
     await runLayoutFilesystem('persist-original', originalTarget, '', {
-      template: '<div class="default-fs-layout default-fs-layout--edited"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.baseHref}}/eggman_profile-image.jpg" alt="profile"></footer></div>',
+      template: '<div class="default-fs-layout default-fs-layout--edited"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src="{{layout.baseHref}}/poff.profile.jpg" alt="profile"></footer></div>',
       css: '.default-fs-layout--edited{color:#ff5f5f;}',
       js: 'window.__editedDefaultFsLayout = true;',
     });
@@ -2634,7 +2633,7 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('class="default-fs-layout');
     expect(rendered).toContain('<div class="local-works">');
     expect(rendered).toContain('<span class="local-item">hero.txt</span>');
-    expect(rendered).toContain('tests/poff-tests/.layout/eggman_profile-image.jpg');
+    expect(rendered).toContain('tests/poff-tests/.layout/poff.profile.jpg');
   });
 
   test('renders folder previews through the typed viewer route', async () => {
@@ -2871,7 +2870,7 @@ describe('Worktype HBS renderer', () => {
     fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, '.works'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, fileName), 'fake image');
-    fs.writeFileSync(path.join(tempDir, '.layout', 'eggman_profile-image.jpg'), 'fake profile image');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'poff.profile.jpg'), 'fake profile image');
     fs.writeFileSync(path.join(tempDir, '.works', `${fileName}.config.json`), JSON.stringify({
       title: 'Poster',
       description: '',
@@ -2889,8 +2888,8 @@ describe('Worktype HBS renderer', () => {
     try {
       const output = await runViewer(`default-file-layout-assets/${fileName}`);
 
-      expect(output).toContain('default-file-layout-assets/.layout/eggman_profile-image.jpg');
-      expect(output).not.toContain(`default-file-layout-assets/.works/${fileName}.layout/eggman_profile-image.jpg`);
+      expect(output).toContain('default-file-layout-assets/.layout/poff.profile.jpg');
+      expect(output).not.toContain(`default-file-layout-assets/.works/${fileName}.layout/poff.profile.jpg`);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -2904,7 +2903,7 @@ describe('Worktype HBS renderer', () => {
     fs.mkdirSync(path.join(tempDir, '.layout'), { recursive: true });
     fs.mkdirSync(path.join(childDir, '.works'), { recursive: true });
     fs.writeFileSync(path.join(childDir, fileName), 'fake image');
-    fs.writeFileSync(path.join(tempDir, '.layout', 'eggman_profile-image.jpg'), 'fake profile image');
+    fs.writeFileSync(path.join(tempDir, '.layout', 'poff.profile.jpg'), 'fake profile image');
     fs.writeFileSync(path.join(childDir, '.works', `${fileName}.config.json`), JSON.stringify({
       title: 'Poster',
       description: '',
@@ -2922,9 +2921,9 @@ describe('Worktype HBS renderer', () => {
     try {
       const output = await runViewer(`default-file-layout-inherited-assets/child/${fileName}`);
 
-      expect(output).toContain('default-file-layout-inherited-assets/.layout/eggman_profile-image.jpg');
-      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.layout/eggman_profile-image.jpg`);
-      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.works/${fileName}.layout/eggman_profile-image.jpg`);
+      expect(output).toContain('default-file-layout-inherited-assets/.layout/poff.profile.jpg');
+      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.layout/poff.profile.jpg`);
+      expect(output).not.toContain(`default-file-layout-inherited-assets/child/.works/${fileName}.layout/poff.profile.jpg`);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -2971,7 +2970,7 @@ describe('Worktype HBS renderer', () => {
 
       const relativeFilePath = path.relative(POFF_DIR, path.join(tempDir, fileName)).replace(/\\/g, '/');
       const rendered = await runViewer(relativeFilePath);
-      expect(rendered).not.toContain('eggman_profile-image.jpg');
+      expect(rendered).not.toContain('poff.profile.jpg');
       expect(rendered).toContain(`src="${relativeFilePath}"`);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });

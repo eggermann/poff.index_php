@@ -346,6 +346,7 @@ PHP;
     // Add HTML structure from header.php without PHP tags
     $content = ComponentReader::readComponentFile($sourceDir . '/includes/header.built.php');
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
+    $content = str_replace('<html lang="en">', '<html lang="de">', $content);
     $buildContent .= trim($content) . "\n";
 
     // Add layout.php content and inject nav placeholder from includes/nav.php
@@ -420,7 +421,7 @@ PHP;
         FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
 
         // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
-        $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/eggman_profile-image.jpg';
+        $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
         if (is_file($layoutAsset)) {
             FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
         }
