@@ -2272,6 +2272,9 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="poff-default-layout poff-default-layout--image">');
     expect(output).toContain('src="assets/photo.png" alt="Project Photo"');
     expect(output).toContain('Inline description');
+    expect(output).toContain('class="poff-default-layout__download"');
+    expect(output).toContain('href="assets/photo.png"');
+    expect(output).toContain('download="photo.png"');
     expect(fs.readFileSync(path.join(ROOT, 'src/includes/worktypes/templates/layout/default/script.js'), 'utf8'))
       .toContain('DOMContentLoaded');
   });
@@ -2360,6 +2363,7 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('<div class="custom-shell">');
     expect(output).toContain('href="?view&#x3D;1&amp;path&#x3D;projects"');
     expect(output).toContain('<div class="poff-default-layout poff-default-layout--folder">');
+    expect(output).not.toContain('poff-default-layout__download');
     expect(output).toContain('<span class="entry">notes.txt</span>');
     expect(output).toContain('projects');
     expect(output).toContain('alpha');
