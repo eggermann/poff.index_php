@@ -157,12 +157,8 @@ export function createEditController({ elements, context, editRequested }) {
         if (!editAuthDetails) {
             return;
         }
-        const shouldShow = forceVisible
-            || authFormVisible
-            || (editRequested && !authState.canEdit);
-        if (shouldShow || !authState.authenticated) {
-            editAuthDetails.open = shouldShow;
-        }
+        const shouldShow = forceVisible || authFormVisible;
+        editAuthDetails.open = shouldShow;
         if (editAuthForm) {
             editAuthForm.hidden = !shouldShow;
         }
