@@ -9,7 +9,7 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
         <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Add work</div>
-                <div class="small-note">${isEmptyFolder ? 'This folder is empty. Upload a file, create a blank file, or create a folder to start.' : 'Upload files, create a blank file, or create a folder in this folder.'}</div>
+                <div class="small-note">${isEmptyFolder ? 'This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start.' : 'Upload files, create a blank file, create a folder, or add a link in this folder.'}</div>
             </div>
             <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
         </div>
@@ -26,7 +26,7 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
-                            <option value="url" disabled>From URL (disabled)</option>
+                            <option value="url">Poff link</option>
                         </select>
                     </div>
                     <div id="editUploadFilesWrap">
@@ -36,6 +36,10 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
                     <div id="editBlankFileWrap" hidden>
                         <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
                         <input class="form-input" id="edit-blank-file-name" type="text" name="blank_file_name" placeholder="notes.txt">
+                    </div>
+                    <div id="editLinkWrap" hidden>
+                        <label class="edit-label" for="edit-link-url">Link URL</label>
+                        <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/index.php?view=1&path=folder">
                     </div>
                 </div>
                 <div class="small-note" id="editUploadSummary">No files selected.</div>
@@ -55,6 +59,7 @@ export function bindUploadDialog({
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
+    onCreateLink,
 }) {
     const uploadDialog = editPanel.querySelector('#editUploadDialog');
     const openUploadDialogButton = editPanel.querySelector('#editOpenUploadDialog');
@@ -67,14 +72,20 @@ export function bindUploadDialog({
     const uploadFilesWrapEl = editPanel.querySelector('#editUploadFilesWrap');
     const blankFileWrapEl = editPanel.querySelector('#editBlankFileWrap');
     const blankFileNameEl = editPanel.querySelector('#edit-blank-file-name');
+    const linkWrapEl = editPanel.querySelector('#editLinkWrap');
+    const linkUrlEl = editPanel.querySelector('#edit-link-url');
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
     const uploadNameDrafts = {
         blank: '',
         folder: '',
+        url: '',
+    };
+    const uploadUrlDrafts = {
+        url: '',
     };
     let uploadMode = uploadSourceEl?.value || 'upload';
 
-    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== 'function' || typeof onCreateBlankFile !== 'function' || typeof onCreateFolder !== 'function') {
+    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== 'function' || typeof onCreateBlankFile !== 'function' || typeof onCreateFolder !== 'function' || typeof onCreateLink !== 'function') {
         return;
     }
 
@@ -87,6 +98,14 @@ export function bindUploadDialog({
         if (mode === 'blank' || mode === 'folder') {
             const name = blankFileNameEl?.value?.trim() || '';
             uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
+            return;
+        }
+        if (mode === 'url') {
+            const linkName = blankFileNameEl?.value?.trim() || '';
+            const linkUrl = linkUrlEl?.value?.trim() || '';
+            uploadSummaryEl.textContent = linkUrl
+                ? `Will add link: ${linkName || linkUrl}`
+                : 'Enter a link URL.';
             return;
         }
         const validationError = uploadValidationError(files, uploadLimits);
@@ -102,33 +121,56 @@ export function bindUploadDialog({
         if ((uploadMode === 'blank' || uploadMode === 'folder') && blankFileNameEl) {
             uploadNameDrafts[uploadMode] = blankFileNameEl.value || '';
         }
+        if (uploadMode === 'url' && blankFileNameEl) {
+            uploadNameDrafts.url = blankFileNameEl.value || '';
+        }
+        if (uploadMode === 'url' && linkUrlEl) {
+            uploadUrlDrafts.url = linkUrlEl.value || '';
+        }
         uploadMode = mode;
         if (uploadFilesWrapEl) {
             uploadFilesWrapEl.hidden = mode !== 'upload';
         }
         if (blankFileWrapEl) {
-            blankFileWrapEl.hidden = mode !== 'blank' && mode !== 'folder';
+            blankFileWrapEl.hidden = mode !== 'blank' && mode !== 'folder' && mode !== 'url';
+        }
+        if (linkWrapEl) {
+            linkWrapEl.hidden = mode !== 'url';
         }
         if (blankFileLabelEl) {
-            blankFileLabelEl.textContent = mode === 'folder' ? 'Folder name' : 'Blank file name';
+            blankFileLabelEl.textContent = mode === 'folder'
+                ? 'Folder name'
+                : mode === 'url'
+                    ? 'Link label'
+                    : 'Blank file name';
         }
         if (blankFileNameEl) {
-            blankFileNameEl.placeholder = mode === 'folder' ? 'new-folder' : 'notes.txt';
-            if (mode === 'blank' || mode === 'folder') {
+            blankFileNameEl.placeholder = mode === 'folder'
+                ? 'new-folder'
+                : mode === 'url'
+                    ? 'my-link'
+                    : 'notes.txt';
+            if (mode === 'blank' || mode === 'folder' || mode === 'url') {
                 blankFileNameEl.value = uploadNameDrafts[mode] || '';
             }
+        }
+        if (linkUrlEl) {
+            linkUrlEl.value = mode === 'url' ? (uploadUrlDrafts.url || linkUrlEl.value || '') : linkUrlEl.value || '';
         }
         if (uploadSubmitButton) {
             uploadSubmitButton.textContent = mode === 'blank'
                 ? 'Create blank file'
                 : mode === 'folder'
                     ? 'Create folder'
+                    : mode === 'url'
+                        ? 'Add link'
                     : 'Upload';
         }
         setUploadSummary();
     };
 
     const closeUploadDialog = () => {
+        uploadDialog.classList.remove('edit-upload-dialog-open');
         if (typeof uploadDialog.close === 'function') {
             uploadDialog.close();
         } else {
@@ -143,6 +185,11 @@ export function bindUploadDialog({
             uploadDialog.showModal();
         } else {
             uploadDialog.setAttribute('open', 'open');
+        }
+        uploadDialog.classList.add('edit-upload-dialog-open');
+        const firstFocusable = uploadDialog.querySelector('select, input, button');
+        if (firstFocusable && typeof firstFocusable.focus === 'function') {
+            firstFocusable.focus();
         }
     };
 
@@ -187,6 +234,19 @@ export function bindUploadDialog({
                     await onCreateFolder({
                         source,
                         folderName,
+                        statusEl,
+                    });
+                } else if (source === 'url') {
+                        const linkName = blankFileNameEl?.value?.trim() || '';
+                        const linkUrl = linkUrlEl?.value?.trim() || '';
+                        if (!linkUrl) {
+                            setStatusMessage(statusEl, 'Enter a link URL.');
+                            return;
+                        }
+                    await onCreateLink({
+                        source,
+                        linkName,
+                        linkUrl,
                         statusEl,
                     });
                 } else {

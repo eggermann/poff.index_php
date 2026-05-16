@@ -159,6 +159,9 @@
     if (typeof payload.fileName === "string") {
       formData.set("fileName", payload.fileName);
     }
+    if (typeof payload.linkUrl === "string") {
+      formData.set("linkUrl", payload.linkUrl);
+    }
     if (typeof payload.contents === "string") {
       formData.set("contents", payload.contents);
     }
@@ -4669,6 +4672,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setUploadSummary();
     };
     const closeUploadDialog = () => {
+      uploadDialog.classList.remove("edit-upload-dialog-open");
       if (typeof uploadDialog.close === "function") {
         uploadDialog.close();
       } else {
@@ -4682,6 +4686,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         uploadDialog.showModal();
       } else {
         uploadDialog.setAttribute("open", "open");
+      }
+      uploadDialog.classList.add("edit-upload-dialog-open");
+      const firstFocusable = uploadDialog.querySelector("select, input, button");
+      if (firstFocusable && typeof firstFocusable.focus === "function") {
+        firstFocusable.focus();
       }
     };
     openUploadDialogButton.addEventListener("click", openUploadDialog);
@@ -6313,9 +6322,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       editAddWork.addEventListener("click", () => {
-        const addWorkFieldButton = document.getElementById("editWorkFieldAdd");
-        if (addWorkFieldButton instanceof HTMLButtonElement) {
-          addWorkFieldButton.click();
+        const openUploadDialogButton = document.getElementById("editOpenUploadDialog");
+        if (openUploadDialogButton instanceof HTMLButtonElement) {
+          openUploadDialogButton.click();
           return;
         }
         const url = new URL(window.location.href);
@@ -7311,9 +7320,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     sidebarLoading,
     editQuery: editQuery2,
     navigateToPath,
+    getCurrentSelection,
     setLoadingVisible
   }) {
     let activeLink = null;
+    let currentFolderPath = "";
     function clearActiveLink() {
       if (activeLink) {
         activeLink.classList.remove("nav-link-active");
@@ -7369,6 +7380,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!navList) {
         return Promise.resolve("");
       }
+      currentFolderPath = relPath || "";
       showNavLoading();
       return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
         const extracted = extractNavHtml(html) || "";
@@ -7384,6 +7396,52 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return "";
       });
     }
+    function collectVisibleTreePaths() {
+      if (!navList) {
+        return [];
+      }
+      const visiblePaths = [];
+      navList.querySelectorAll('a[data-tree-item="1"]').forEach((link) => {
+        if (link.hasAttribute("data-hidden")) {
+          return;
+        }
+        const path = link.getAttribute("data-path") || "";
+        if (!path) {
+          return;
+        }
+        visiblePaths.push(path);
+      });
+      return visiblePaths;
+    }
+    async function toggleNavEntry(link) {
+      if (!link) {
+        return;
+      }
+      const targetPath = link.getAttribute("data-path") || "";
+      if (!targetPath) {
+        return;
+      }
+      const isHidden = link.hasAttribute("data-hidden");
+      const visiblePaths = collectVisibleTreePaths();
+      const nextVisiblePaths = isHidden ? Array.from(/* @__PURE__ */ new Set([...visiblePaths, targetPath])) : visiblePaths.filter((path) => path !== targetPath);
+      const response = await requestEditConfig("save", {
+        path: currentFolderPath,
+        treeVisible: nextVisiblePaths
+      });
+      if (response && response.allowed === false) {
+        return;
+      }
+      const selection2 = typeof getCurrentSelection === "function" ? getCurrentSelection() : null;
+      if (typeof navigateToPath === "function") {
+        navigateToPath((selection2 == null ? void 0 : selection2.path) || currentFolderPath || "", {
+          isFile: !!(selection2 == null ? void 0 : selection2.previewIsFile),
+          forceRefresh: true,
+          updateHash: false
+        });
+      } else {
+        await loadNav(currentFolderPath);
+      }
+    }
     function syncSidebarSelection(path = "", isFile = false, isLayout = false) {
       if (isLayout) {
         setActiveLayoutLink(path);
@@ -7398,7 +7456,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setActiveFileLink(fileName);
     }
     function handleNavClick(event) {
+      var _a, _b, _c;
       if (!navList) {
+        return;
+      }
+      const fastAction = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, '[data-nav-action="toggle-visibility"]');
+      if (fastAction) {
+        event.preventDefault();
+        event.stopPropagation();
+        const rowLink = (_c = fastAction.closest("li")) == null ? void 0 : _c.querySelector('a[data-tree-item="1"]');
+        toggleNavEntry(rowLink).catch(() => {
+        });
         return;
       }
       let target = event.target;
@@ -7406,6 +7474,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         target = target.parentElement;
       }
       if (!target || target.tagName !== "A") {
+        return;
+      }
+      const externalLinkUrl = (target.getAttribute("data-link-url") || "").trim();
+      if (externalLinkUrl && /^https?:\/\//i.test(externalLinkUrl)) {
+        event.preventDefault();
+        window.open(externalLinkUrl, "_blank", "noopener,noreferrer");
         return;
       }
       let relPath = "";
@@ -7487,6 +7561,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       sidebarLoading,
       editQuery: editQuery2,
       navigateToPath,
+      getCurrentSelection,
       setLoadingVisible
     });
     function writeHashPath(path = "") {

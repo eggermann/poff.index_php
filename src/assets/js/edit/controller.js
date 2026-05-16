@@ -134,10 +134,10 @@ export function createEditController({ elements, context, editRequested }) {
             return status.error;
         }
         if (!authState.editModeAllowed) {
-            return 'Create .edit.allow in this folder or an ancestor to enable edit mode.';
+            return 'Editing is disabled in this folder.';
         }
         if (!authState.configured) {
-            return 'Create .poff-auth.php with a password hash to unlock editing.';
+            return 'Create .poff-auth.php with a password hash to enable editing.';
         }
         if (!authState.authenticated) {
             return 'Enter the editor password to unlock editing.';
@@ -233,9 +233,9 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         editAddWork.addEventListener('click', () => {
-            const addWorkFieldButton = document.getElementById('editWorkFieldAdd');
-            if (addWorkFieldButton instanceof HTMLButtonElement) {
-                addWorkFieldButton.click();
+            const openUploadDialogButton = document.getElementById('editOpenUploadDialog');
+            if (openUploadDialogButton instanceof HTMLButtonElement) {
+                openUploadDialogButton.click();
                 return;
             }
 
@@ -555,6 +555,28 @@ export function createEditController({ elements, context, editRequested }) {
                         ? data.uploaded[0].name
                         : folderName;
                     setStatusMessage(inlineStatus, `Created folder ${createdName}.`, true);
+                }
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            },
+            onCreateLink: async ({ source, linkName, linkUrl }) => {
+                const selection = getActiveSelection();
+                const data = await requestEditUpload({
+                    path: getContentTargetPath(selection),
+                    source,
+                    fileName: linkName,
+                    linkUrl,
+                    files: [],
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Create link failed.');
+                }
+                await refreshCurrentEditState(selection);
+                const inlineStatus = document.getElementById('editInlineStatus');
+                if (inlineStatus) {
+                    const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
+                        ? data.uploaded[0].name
+                        : (linkName || linkUrl);
+                    setStatusMessage(inlineStatus, `Created link ${createdName}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },

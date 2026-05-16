@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const HTMLButtonElement = function HTMLButtonElement() {};
 
 function createClassList() {
   const classes = new Set();
@@ -50,7 +51,7 @@ function createElementMock() {
   };
 }
 
-function loadEditController() {
+function loadEditController(documentMock = null) {
   const filePath = path.join(__dirname, '..', 'src/assets/js/edit/controller.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/^import .*$/gm, '')
@@ -69,7 +70,7 @@ function loadEditController() {
       replaceState() {},
     },
   };
-  const document = {
+  const document = documentMock || {
     getElementById() {
       return null;
     },
@@ -86,7 +87,7 @@ function loadEditController() {
     document,
     URL,
     CustomEvent,
-    HTMLButtonElement: function HTMLButtonElement() {},
+    HTMLButtonElement,
     HTMLInputElement: function HTMLInputElement() {},
     HTMLTextAreaElement: function HTMLTextAreaElement() {},
     HTMLSelectElement: function HTMLSelectElement() {},
@@ -135,12 +136,15 @@ module.exports = {
 };
 `, context);
 
-  return module.exports.createEditController;
+  return {
+    createEditController: module.exports.createEditController,
+    HTMLButtonElement,
+  };
 }
 
 describe('edit auth disclosure', () => {
   test('can be closed after opening when edit mode is unavailable', () => {
-    const createEditController = loadEditController();
+    const { createEditController } = loadEditController();
     const editAuthDetails = createElementMock();
     const editToggle = createElementMock();
     const editAuthForm = createElementMock();
@@ -190,5 +194,65 @@ describe('edit auth disclosure', () => {
     expect(editAuthDetails.open).toBe(false);
     expect(editAuthForm.hidden).toBe(true);
     expect(editAuthStatus.textContent).toBe('');
+  });
+
+  test('edit add work button opens the upload dialog trigger', () => {
+    const openUploadDialogButton = Object.assign(Object.create(HTMLButtonElement.prototype), {
+      clickCalled: false,
+      addEventListener() {},
+      click() {
+        this.clickCalled = true;
+      },
+    });
+    const documentMock = {
+      getElementById(id) {
+        if (id === 'editOpenUploadDialog') {
+          return openUploadDialogButton;
+        }
+        return null;
+      },
+      querySelector() {
+        return null;
+      },
+    };
+    const { createEditController } = loadEditController(documentMock);
+    const editAddWork = Object.assign(Object.create(HTMLButtonElement.prototype), {
+      addEventListener(type, handler) {
+        this.listener = handler;
+      },
+      clickCalled: false,
+      click() {
+        this.clickCalled = true;
+      },
+    });
+
+    const controller = createEditController({
+      elements: {
+        editPanel: null,
+        editDrawer: null,
+        editAuthDetails: null,
+        editToggle: null,
+        editAddWork,
+        editAuthForm: null,
+        editAuthPassword: null,
+        editAuthSubmit: null,
+        editAuthStatus: null,
+      },
+      context: {
+        currentPoffConfig: null,
+        cmsAuth: {
+          configured: true,
+          authenticated: true,
+          editModeAllowed: true,
+          canEdit: true,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindAddWorkButton();
+    expect(typeof editAddWork.listener).toBe('function');
+    editAddWork.listener();
+    expect(openUploadDialogButton.clickCalled).toBe(true);
   });
 });

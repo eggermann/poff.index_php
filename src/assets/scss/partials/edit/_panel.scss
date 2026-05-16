@@ -426,13 +426,22 @@
 }
 .edit-upload-dialog {
     width: min(var(--poff-dialog-width), calc(100vw - (var(--poff-space-md) * 2)));
+    max-height: min(calc(100vh - var(--poff-space-lg)), 56rem);
+    margin: 0;
     border: 1px solid var(--poff-color-border);
     border-radius: var(--poff-control-radius-xl);
     padding: 0;
     box-shadow: var(--poff-shadow-dialog);
+    overflow: auto;
 }
 .edit-upload-dialog::backdrop {
     background: var(--poff-color-backdrop-dim);
+}
+.edit-upload-dialog[open],
+.edit-upload-dialog.edit-upload-dialog-open {
+    position: fixed;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
 }
 .edit-upload-dialog-form {
     display: grid;
