@@ -2,8 +2,15 @@
 
 trait WorktypeStateTrait
 {
-    private const DEFAULT_LAYOUT_NAME = 'poff-layout';
-    private const FILESYSTEM_LAYOUT_NAME = 'filesystem-layout';
+    private static function defaultLayoutNameValue(): string
+    {
+        return 'poff-layout';
+    }
+
+    private static function filesystemLayoutNameValue(): string
+    {
+        return 'filesystem-layout';
+    }
 
     private static array $embedded = [];
     private static array $embeddedTemplates = [];

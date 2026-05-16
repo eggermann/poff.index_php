@@ -90,7 +90,7 @@ trait WorktypeLayoutTrait
             return $namedTemplate;
         }
 
-        $defaultTemplate = self::template(self::DEFAULT_LAYOUT_NAME);
+        $defaultTemplate = self::template(self::defaultLayoutName());
         if (is_string($defaultTemplate) && $defaultTemplate !== '') {
             return $defaultTemplate;
         }
@@ -109,7 +109,7 @@ trait WorktypeLayoutTrait
             }
             $package = self::sharedLayoutPackage($section, $name);
             if (is_array($package)) {
-                $package['source'] = in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)
+                $package['source'] = in_array($name, [self::defaultLayoutName(), self::filesystemLayoutName()], true)
                     ? 'bundled'
                     : 'shared';
                 $choices[] = $package;
@@ -159,7 +159,7 @@ trait WorktypeLayoutTrait
             return null;
         }
 
-        if (in_array($name, [self::DEFAULT_LAYOUT_NAME, self::FILESYSTEM_LAYOUT_NAME], true)) {
+        if (in_array($name, [self::defaultLayoutName(), self::filesystemLayoutName()], true)) {
             return self::layoutBundleDirectory($name);
         }
 
@@ -222,16 +222,16 @@ trait WorktypeLayoutTrait
         $base = __DIR__ . '/../worktypes/templates/layout';
 
         return [
-            self::DEFAULT_LAYOUT_NAME => $base . '/default/template.' . $extension,
-            self::FILESYSTEM_LAYOUT_NAME => $base . '/file-system/template.' . $extension,
+            self::defaultLayoutName() => $base . '/default/template.' . $extension,
+            self::filesystemLayoutName() => $base . '/file-system/template.' . $extension,
         ];
     }
 
     private static function layoutBundleDirectory(string $name): ?string
     {
         return match (self::canonicalLayoutName($name)) {
-            self::DEFAULT_LAYOUT_NAME => __DIR__ . '/../worktypes/templates/layout/default',
-            self::FILESYSTEM_LAYOUT_NAME => __DIR__ . '/../worktypes/templates/layout/file-system',
+            self::defaultLayoutName() => __DIR__ . '/../worktypes/templates/layout/default',
+            self::filesystemLayoutName() => __DIR__ . '/../worktypes/templates/layout/file-system',
             default => null,
         };
     }

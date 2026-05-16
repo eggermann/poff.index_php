@@ -29,8 +29,8 @@ trait WorktypeRenderTrait
         }
 
         $fallbackLayout = self::normalizeLayout([
-            'mode' => self::DEFAULT_LAYOUT_NAME,
-            'name' => self::DEFAULT_LAYOUT_NAME,
+            'mode' => self::defaultLayoutName(),
+            'name' => self::defaultLayoutName(),
             'engine' => 'lightncandy',
             'section' => $kind === 'folder' ? 'works' : 'work',
         ], $kind === 'folder' ? 'works' : 'work');

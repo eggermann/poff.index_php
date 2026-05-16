@@ -235,8 +235,8 @@ trait WorktypeDefinitionsTrait
     public static function normalizeLayout(mixed $value, string $section = 'work'): array
     {
         $layout = [
-            'mode' => self::DEFAULT_LAYOUT_NAME,
-            'name' => self::DEFAULT_LAYOUT_NAME,
+            'mode' => self::defaultLayoutName(),
+            'name' => self::defaultLayoutName(),
             'engine' => 'lightncandy',
             'section' => $section,
         ];
@@ -566,12 +566,12 @@ trait WorktypeDefinitionsTrait
 
     public static function defaultLayoutName(): string
     {
-        return self::DEFAULT_LAYOUT_NAME;
+        return self::defaultLayoutNameValue();
     }
 
     public static function filesystemLayoutName(): string
     {
-        return self::FILESYSTEM_LAYOUT_NAME;
+        return self::filesystemLayoutNameValue();
     }
 
     private static function loadFilePair(string $kind): void
@@ -638,12 +638,12 @@ trait WorktypeDefinitionsTrait
     {
         $candidate = trim($mode);
         if ($candidate === '') {
-            return self::DEFAULT_LAYOUT_NAME;
+            return self::defaultLayoutName();
         }
 
         return match ($candidate) {
-            'poff' => self::DEFAULT_LAYOUT_NAME,
-            'filesystem' => self::FILESYSTEM_LAYOUT_NAME,
+            'poff' => self::defaultLayoutName(),
+            'filesystem' => self::filesystemLayoutName(),
             default => $candidate,
         };
     }
@@ -652,12 +652,12 @@ trait WorktypeDefinitionsTrait
     {
         $candidate = trim((string) $name);
         if ($candidate === '') {
-            return self::DEFAULT_LAYOUT_NAME;
+            return self::defaultLayoutName();
         }
 
         return match ($candidate) {
-            'poff', self::DEFAULT_LAYOUT_NAME => self::DEFAULT_LAYOUT_NAME,
-            'filesystem', self::FILESYSTEM_LAYOUT_NAME => self::FILESYSTEM_LAYOUT_NAME,
+            'poff', self::defaultLayoutName() => self::defaultLayoutName(),
+            'filesystem', self::filesystemLayoutName() => self::filesystemLayoutName(),
             default => $candidate,
         };
     }
