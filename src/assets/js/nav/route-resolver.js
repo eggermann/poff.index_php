@@ -30,12 +30,13 @@ export function createRouteResolver({ navList } = {}) {
             return routeResolution(aliasPath);
         }
         if (!normalizedPath.includes('/')) {
-            const link = findNavLinkByAttribute(navList, 'data-slug', normalizedPath);
+            const link = findNavLinkByAttribute(navList, 'data-route-slug', normalizedPath)
+                || findNavLinkByAttribute(navList, 'data-slug', normalizedPath);
             const targetPath = navTargetPath(link);
             if (targetPath) {
                 rememberSlugPathAlias({
                     path: targetPath,
-                    slug: normalizedPath,
+                    slug: link?.getAttribute('data-route-slug') || normalizedPath,
                 });
                 return routeResolution(targetPath, navTargetIsFile(link, targetPath));
             }
@@ -90,8 +91,9 @@ export function createRouteResolver({ navList } = {}) {
         if (aliasSlug) {
             return aliasSlug;
         }
-        const link = findNavLinkByAttribute(navList, 'data-path', normalizedPath);
-        const slug = link?.getAttribute('data-slug') || '';
+        const link = findNavLinkByAttribute(navList, 'data-path', normalizedPath)
+            || findNavLinkByAttribute(navList, 'data-route-path', normalizedPath);
+        const slug = link?.getAttribute('data-route-slug') || link?.getAttribute('data-slug') || '';
         if (slug && !slug.includes('/')) {
             rememberSlugPathAlias({
                 path: normalizedPath,

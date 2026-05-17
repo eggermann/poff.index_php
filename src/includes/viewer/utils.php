@@ -141,9 +141,475 @@ function cmsResolveTarget(string $rootDir, string $relativePath): ?array
     return cmsResolvePhysicalTarget($rootDir, $trimmed);
 }
 
+function cmsNormalizeRelativeViewerPath(string $relativePath): string
+{
+    return trim(str_replace('\\', '/', $relativePath), '/');
+}
+
+function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, string $prefix = ''): ?array
+{
+    $normalizedTarget = cmsNormalizeRelativeViewerPath($targetPath);
+    if ($normalizedTarget === '') {
+        return null;
+    }
+
+    foreach ($tree as $item) {
+        if (!is_array($item) || (($item['visible'] ?? true) === false)) {
+            continue;
+        }
+
+        $name = trim((string) ($item['name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+
+        $rawPath = trim((string) ($item['path'] ?? $item['relativePath'] ?? $name), "/\\");
+        $resolvedPath = cmsJoinBaseRelativePath($prefix, $rawPath);
+        $candidates = array_values(array_unique(array_filter([
+            cmsNormalizeRelativeViewerPath($resolvedPath),
+            cmsNormalizeRelativeViewerPath($rawPath),
+            cmsNormalizeRelativeViewerPath($name),
+            cmsNormalizeRelativeViewerPath(basename($rawPath)),
+        ])));
+
+        if (in_array($normalizedTarget, $candidates, true)) {
+            $item['resolvedPath'] = cmsNormalizeRelativeViewerPath($resolvedPath);
+            return $item;
+        }
+
+        if (is_array($item['children'] ?? null)) {
+            $found = cmsResolveConfiguredTreeItemInList($item['children'], $normalizedTarget, $resolvedPath);
+            if (is_array($found)) {
+                return $found;
+            }
+        }
+    }
+
+    return null;
+}
+
+function cmsResolveConfiguredTreeItem(string $rootDir, string $relativePath): ?array
+{
+    if (!class_exists('PoffConfig')) {
+        return null;
+    }
+
+    $config = PoffConfig::ensure($rootDir);
+    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    $resolved = cmsResolveConfiguredTreeItemInList($tree, $relativePath);
+    if (!is_array($resolved)) {
+        return null;
+    }
+
+    $resolved['rootConfig'] = $config;
+    return $resolved;
+}
+
+function cmsExtractHtmlBodyFragment(string $html): string
+{
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+
+    if (preg_match('/<body\b[^>]*>(.*)<\/body>/is', $html, $matches) === 1) {
+        $body = trim((string) ($matches[1] ?? ''));
+        if ($body !== '') {
+            return $body;
+        }
+    }
+
+    return $html;
+}
+
+function cmsExtractPreferredRemoteRenderedHtml(string $html): string
+{
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+
+    $needsWrapperParsing = stripos($html, 'poff-default-layout') !== false
+        || stripos($html, 'appShell') !== false
+        || stripos($html, 'contentFrame') !== false
+        || stripos($html, 'viewer') !== false;
+    if (!$needsWrapperParsing) {
+        return $html;
+    }
+
+    if (!class_exists('DOMDocument') || !class_exists('DOMXPath')) {
+        return $html;
+    }
+
+    $previous = libxml_use_internal_errors(true);
+    try {
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $loaded = $document->loadHTML('<?xml encoding="UTF-8">' . $html);
+        if (!$loaded) {
+            return $html;
+        }
+
+        $xpath = new DOMXPath($document);
+        $contentFrameNodes = $xpath->query('//*[@id="contentFrame"]');
+        if ($contentFrameNodes instanceof DOMNodeList && $contentFrameNodes->length > 0) {
+            $node = $contentFrameNodes->item(0);
+            if ($node instanceof DOMNode) {
+                $viewer = $xpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " viewer ")]', $node);
+                if ($viewer instanceof DOMNodeList && $viewer->length > 0) {
+                    $viewerNode = $viewer->item(0);
+                    if ($viewerNode instanceof DOMNode) {
+                        $preferred = cmsDomNodeInnerHtml($viewerNode, $document);
+                        if ($preferred !== '') {
+                            return $preferred;
+                        }
+                    }
+                }
+
+                $preferred = cmsDomNodeInnerHtml($node, $document);
+                if ($preferred !== '') {
+                    return $preferred;
+                }
+            }
+        }
+
+        $mainNodes = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " poff-default-layout__main ")]');
+        if ($mainNodes instanceof DOMNodeList && $mainNodes->length > 0) {
+            $node = $mainNodes->item(0);
+            if ($node instanceof DOMNode) {
+                $preferred = cmsDomNodeInnerHtml($node, $document);
+                if ($preferred !== '') {
+                    return $preferred;
+                }
+            }
+        }
+
+        $nodes = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " poff-default-layout ")]');
+        if ($nodes instanceof DOMNodeList && $nodes->length > 0) {
+            $node = $nodes->item(0);
+            if ($node instanceof DOMNode) {
+                $main = $xpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " poff-default-layout__main ")]', $node);
+                if ($main instanceof DOMNodeList && $main->length > 0) {
+                    $mainNode = $main->item(0);
+                    if ($mainNode instanceof DOMNode) {
+                        $preferred = cmsDomNodeInnerHtml($mainNode, $document);
+                        if ($preferred !== '') {
+                            return $preferred;
+                        }
+                    }
+                }
+                $preferred = cmsDomNodeInnerHtml($node, $document);
+                if ($preferred !== '') {
+                    return $preferred;
+                }
+            }
+        }
+    } finally {
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+    }
+
+    return $html;
+}
+
+function cmsDomNodeInnerHtml(DOMNode $node, DOMDocument $document): string
+{
+    $html = '';
+    foreach ($node->childNodes as $child) {
+        $fragment = $document->saveHTML($child);
+        if (is_string($fragment) && $fragment !== '') {
+            $html .= $fragment;
+        }
+    }
+
+    return trim($html);
+}
+
+function cmsStripRemoteAppChrome(string $html): string
+{
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+
+    if (!class_exists('DOMDocument') || !class_exists('DOMXPath')) {
+        return $html;
+    }
+
+    $previous = libxml_use_internal_errors(true);
+    try {
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $loaded = $document->loadHTML('<?xml encoding="UTF-8">' . $html);
+        if (!$loaded) {
+            return $html;
+        }
+
+        $xpath = new DOMXPath($document);
+        $selectors = [
+            '//*[@id="appSidebar"]',
+            '//*[@id="sidebarToggle"]',
+            '//*[@id="editPanel"]',
+            '//*[@id="editDrawer"]',
+            '//*[@id="promptDock"]',
+            '//*[@id="iframeLoading"]',
+            '//*[@id="sidebarLoading"]',
+            '//*[@id="editActionsMenu"]',
+            '//*[@class and contains(concat(" ", normalize-space(@class), " "), " app-edit-toggle-wrap ")]',
+        ];
+
+        foreach ($selectors as $query) {
+            $nodes = $xpath->query($query);
+            if (!($nodes instanceof DOMNodeList)) {
+                continue;
+            }
+            for ($index = $nodes->length - 1; $index >= 0; $index--) {
+                $node = $nodes->item($index);
+                if ($node instanceof DOMNode && $node->parentNode instanceof DOMNode) {
+                    $node->parentNode->removeChild($node);
+                }
+            }
+        }
+
+        $body = $document->getElementsByTagName('body')->item(0);
+        if ($body instanceof DOMNode) {
+            $html = cmsDomNodeInnerHtml($body, $document);
+        } else {
+            $html = trim($document->saveHTML());
+        }
+    } finally {
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+    }
+
+    return $html !== '' ? $html : '';
+}
+
+function cmsResolveRemoteRenderedHtml(array $item): string
+{
+    $renderedHtml = trim((string) ($item['renderedHtml'] ?? ''));
+    $baseUrl = trim((string) ($item['baseUrl'] ?? ($item['linkUrl'] ?? ($item['pageLink'] ?? ($item['pageUrl'] ?? '')))));
+    if ($renderedHtml !== '') {
+        return cmsNormalizeRenderedHtmlBaseUrl(
+            cmsStripRemoteAppChrome(cmsExtractPreferredRemoteRenderedHtml($renderedHtml)),
+            $baseUrl
+        );
+    }
+
+    $sourceUrl = cmsResolveRemoteRenderedSourceUrl($baseUrl, $item);
+    if ($sourceUrl === '' || !cmsIsExternalLinkTarget($sourceUrl)) {
+        return '';
+    }
+
+    $response = cmsHttpGet($sourceUrl);
+    if (!($response['ok'] ?? false)) {
+        return '';
+    }
+
+    return cmsNormalizeRenderedHtmlBaseUrl(
+        cmsStripRemoteAppChrome(cmsExtractPreferredRemoteRenderedHtml(cmsExtractHtmlBodyFragment((string) ($response['body'] ?? '')))),
+        $baseUrl
+    );
+}
+
+function cmsResolveRemoteRenderedSourceUrl(string $sourceUrl, array $item): string
+{
+    $trimmed = trim($sourceUrl);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        return $trimmed;
+    }
+
+    $fragment = trim((string) ($parts['fragment'] ?? ''));
+    if ($fragment === '' || !str_starts_with($fragment, '/')) {
+        return $trimmed;
+    }
+
+    $targetPath = trim(ltrim($fragment, '/'), "/\\");
+    if ($targetPath === '') {
+        return $trimmed;
+    }
+
+    $isFolder = (($item['isFolder'] ?? false) === true)
+        || trim((string) ($item['type'] ?? '')) === 'folder';
+    $viewerQuery = $isFolder
+        ? '?view=1&path=' . rawurlencode($targetPath)
+        : '?view=1&file=' . rawurlencode($targetPath);
+
+    return $parts['scheme'] . '://' . $parts['host']
+        . (isset($parts['port']) ? ':' . $parts['port'] : '')
+        . ($parts['path'] ?? '/')
+        . $viewerQuery;
+}
+
+function cmsNormalizeRenderedHtmlBaseUrl(string $html, string $baseUrl): string
+{
+    $html = trim($html);
+    if ($html === '' || $baseUrl === '') {
+        return $html;
+    }
+
+    $previousUseErrors = libxml_use_internal_errors(true);
+    $document = new DOMDocument();
+    try {
+        $loaded = @$document->loadHTML(
+            '<?xml encoding="utf-8" ?><!doctype html><html><body>' . $html . '</body></html>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+        );
+        if (!$loaded) {
+            return $html;
+        }
+
+        $xpath = new DOMXPath($document);
+        $absoluteBase = rtrim($baseUrl, "/\\");
+        $attributes = [
+            'a' => 'href',
+            'link' => 'href',
+            'img' => 'src',
+            'script' => 'src',
+            'iframe' => 'src',
+            'source' => 'src',
+            'video' => 'src',
+            'audio' => 'src',
+            'form' => 'action',
+            'object' => 'data',
+        ];
+
+        foreach ($attributes as $tagName => $attributeName) {
+            foreach ($xpath->query('//' . $tagName . '[@' . $attributeName . ']') as $node) {
+                if (!($node instanceof DOMElement)) {
+                    continue;
+                }
+                $value = trim((string) $node->getAttribute($attributeName));
+                if ($value === '' || cmsShouldKeepRelativeRemoteUrl($value)) {
+                    continue;
+                }
+                $node->setAttribute($attributeName, cmsRemoteAbsoluteUrl($absoluteBase, $value));
+            }
+        }
+
+        foreach ($xpath->query('//*[@style]') as $node) {
+            if (!($node instanceof DOMElement)) {
+                continue;
+            }
+            $style = trim((string) $node->getAttribute('style'));
+            if ($style === '') {
+                continue;
+            }
+            $rewrittenStyle = preg_replace_callback(
+                '/url\\((["\']?)([^"\')]+)\\1\\)/i',
+                static function (array $matches) use ($absoluteBase): string {
+                    $url = trim((string) $matches[2]);
+                    if ($url === '' || cmsShouldKeepRelativeRemoteUrl($url)) {
+                        return $matches[0];
+                    }
+                    return 'url("' . cmsRemoteAbsoluteUrl($absoluteBase, $url) . '")';
+                },
+                $style
+            );
+            if (is_string($rewrittenStyle) && $rewrittenStyle !== '') {
+                $node->setAttribute('style', $rewrittenStyle);
+            }
+        }
+
+        $body = $document->getElementsByTagName('body')->item(0);
+        if ($body instanceof DOMNode) {
+            $html = cmsDomNodeInnerHtml($body, $document);
+        }
+    } finally {
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousUseErrors);
+    }
+
+    return $html;
+}
+
+function cmsShouldKeepRelativeRemoteUrl(string $value): bool
+{
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return true;
+    }
+    return str_starts_with($trimmed, '#')
+        || str_starts_with($trimmed, 'data:')
+        || str_starts_with($trimmed, 'mailto:')
+        || str_starts_with($trimmed, 'tel:')
+        || preg_match('/^[a-z][a-z0-9+.-]*:/i', $trimmed) === 1;
+}
+
+function cmsRemoteAbsoluteUrl(string $baseUrl, string $value): string
+{
+    $trimmedBase = trim($baseUrl);
+    $trimmedValue = trim($value);
+    if ($trimmedValue === '') {
+        return '';
+    }
+    if ($trimmedBase === '' || cmsShouldKeepRelativeRemoteUrl($trimmedValue)) {
+        return $trimmedValue;
+    }
+
+    $baseParts = parse_url($trimmedBase);
+    if (!is_array($baseParts) || empty($baseParts['scheme']) || empty($baseParts['host'])) {
+        return $trimmedValue;
+    }
+
+    if (str_starts_with($trimmedValue, '//')) {
+        return $baseParts['scheme'] . ':' . $trimmedValue;
+    }
+    if (str_starts_with($trimmedValue, '/')) {
+        return $baseParts['scheme'] . '://' . $baseParts['host']
+            . (isset($baseParts['port']) ? ':' . $baseParts['port'] : '')
+            . $trimmedValue;
+    }
+    if (str_starts_with($trimmedValue, '?')) {
+        $path = $baseParts['path'] ?? '';
+        return $baseParts['scheme'] . '://' . $baseParts['host']
+            . (isset($baseParts['port']) ? ':' . $baseParts['port'] : '')
+            . ($path !== '' ? $path : '/')
+            . $trimmedValue;
+    }
+
+    $basePath = $baseParts['path'] ?? '';
+    $directory = $basePath !== '' ? preg_replace('~/[^/]*$~', '/', $basePath) : '/';
+    if (!is_string($directory) || $directory === '') {
+        $directory = '/';
+    }
+    $resolvedPath = preg_replace('~/{2,}~', '/', $directory . $trimmedValue);
+    $segments = [];
+    foreach (explode('/', (string) $resolvedPath) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            array_pop($segments);
+            continue;
+        }
+        $segments[] = $segment;
+    }
+    $normalizedPath = '/' . implode('/', $segments);
+
+    return $baseParts['scheme'] . '://' . $baseParts['host']
+        . (isset($baseParts['port']) ? ':' . $baseParts['port'] : '')
+        . $normalizedPath;
+}
+
 function cmsNormalizeRouteSlug(string $value): string
 {
     return strtolower(trim(str_replace('\\', '/', $value), "/ \t\n\r\0\x0B"));
+}
+
+function cmsRouteSlugFromPath(string $value): string
+{
+    $path = trim(str_replace('\\', '/', $value), "/ \t\n\r\0\x0B");
+    if ($path === '') {
+        return '';
+    }
+
+    return class_exists('PoffConfig')
+        ? PoffConfig::slugify(basename($path))
+        : cmsNormalizeRouteSlug(basename($path));
 }
 
 function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string $slug, int $depth = 0): ?array
@@ -171,19 +637,27 @@ function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string 
         if ($name === '') {
             continue;
         }
+        $routePath = trim((string) ($item['routePath'] ?? $item['path'] ?? $name), "/\\");
+        $routeSlug = trim((string) ($item['routeSlug'] ?? ''));
+        if ($routeSlug === '') {
+            $routeSlug = cmsRouteSlugFromPath($routePath !== '' ? $routePath : $name);
+        }
         $itemSlug = cmsNormalizeRouteSlug((string) ($item['slug'] ?? PoffConfig::slugify((string) ($item['title'] ?? $name))));
         $itemPath = trim((string) ($item['path'] ?? $name), "/\\");
+        $itemRouteSlug = cmsRouteSlugFromPath($itemPath);
         $relativePath = $relativeDir !== ''
             ? trim($relativeDir, "/\\") . '/' . $itemPath
             : $itemPath;
         $type = (string) ($item['type'] ?? 'file');
 
-        if ($itemSlug === $slug || cmsNormalizeRouteSlug($itemPath) === $slug) {
+        if ($routeSlug === $slug || $itemSlug === $slug || $itemRouteSlug === $slug) {
             return [
                 'path' => $relativePath,
                 'type' => $type === 'folder' ? 'folder' : 'file',
                 'isFile' => $type !== 'folder',
                 'slug' => (string) ($item['slug'] ?? $itemSlug),
+                'routeSlug' => $routeSlug,
+                'routePath' => $routePath,
             ];
         }
 

@@ -4,7 +4,7 @@ function cmsEditSaveApplyBasicFields(array &$config, array $data): void
 {
     if (array_key_exists('title', $data)) {
         $config['title'] = trim((string) $data['title']);
-        if ($config['title'] !== '') {
+        if ($config['title'] !== '' && trim((string) ($config['slug'] ?? '')) === '') {
             $config['slug'] = PoffConfig::slugify((string) $config['title']);
         }
     }
