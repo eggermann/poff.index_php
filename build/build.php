@@ -415,6 +415,13 @@ PHP;
             if (!copy($outputFile, $targetFile)) {
                 throw new Exception("Failed to copy standalone build to: $targetFile");
             }
+
+            FileCopier::copyFileToAllDirectories($outputFile, $resolvedTargetDir);
+
+            $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
+            if (is_file($layoutAsset)) {
+                FileCopier::copyFileToLayoutDirectories($layoutAsset, $resolvedTargetDir);
+            }
         }
 
         // Copy the built index.php to all directories

@@ -153,6 +153,9 @@ function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, str
         return null;
     }
 
+    $bestMatch = null;
+    $bestScore = PHP_INT_MIN;
+
     foreach ($tree as $item) {
         if (!is_array($item) || (($item['visible'] ?? true) === false)) {
             continue;
@@ -174,18 +177,51 @@ function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, str
 
         if (in_array($normalizedTarget, $candidates, true)) {
             $item['resolvedPath'] = cmsNormalizeRelativeViewerPath($resolvedPath);
-            return $item;
+            $score = cmsConfiguredTreeItemScore($item);
+            if ($score > $bestScore) {
+                $bestMatch = $item;
+                $bestScore = $score;
+            }
         }
 
         if (is_array($item['children'] ?? null)) {
             $found = cmsResolveConfiguredTreeItemInList($item['children'], $normalizedTarget, $resolvedPath);
             if (is_array($found)) {
-                return $found;
+                $score = cmsConfiguredTreeItemScore($found);
+                if ($score > $bestScore) {
+                    $bestMatch = $found;
+                    $bestScore = $score;
+                }
             }
         }
     }
 
-    return null;
+    return $bestMatch;
+}
+
+function cmsConfiguredTreeItemScore(array $item): int
+{
+    $score = 0;
+
+    foreach (['title', 'description', 'kind', 'pageLink', 'pageUrl', 'linkUrl', 'baseUrl', 'renderedHtml', 'template', 'work', 'routeSlug', 'routePath'] as $key) {
+        if (!array_key_exists($key, $item)) {
+            continue;
+        }
+        $value = $item[$key];
+        if (is_array($value)) {
+            $score += $value === [] ? 0 : 4;
+            continue;
+        }
+        if (is_string($value)) {
+            $score += trim($value) === '' ? 0 : 4;
+            continue;
+        }
+        if ($value !== null) {
+            $score += 2;
+        }
+    }
+
+    return $score;
 }
 
 function cmsResolveConfiguredTreeItem(string $rootDir, string $relativePath): ?array

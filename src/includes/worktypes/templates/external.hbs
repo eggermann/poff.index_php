@@ -1,0 +1,12 @@
+{{#if renderedHtml}}
+    {{{renderedHtml}}}
+{{else}}
+    {{#if previewUrl}}
+        <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}"></iframe>
+    {{else}}
+        <div class="message">
+            <div class="mb-3">External link</div>
+            <a href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a>
+        </div>
+    {{/if}}
+{{/if}}

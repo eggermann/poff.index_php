@@ -101,21 +101,23 @@ export function createPreviewController({
         }
 
         if (typeof candidateRoot.querySelector === 'function') {
+            const layout = candidateRoot.querySelector('.poff-default-layout');
+            if (layout && typeof layout.outerHTML === 'string') {
+                return layout.outerHTML.trim();
+            }
+
             const main = candidateRoot.querySelector('.poff-default-layout__main');
             if (main && typeof main.innerHTML === 'string') {
                 return main.innerHTML.trim();
             }
 
-            const layout = candidateRoot.querySelector('.poff-default-layout');
-            if (layout && typeof layout.querySelector === 'function') {
-                const layoutMain = layout.querySelector('.poff-default-layout__main');
-                if (layoutMain && typeof layoutMain.innerHTML === 'string') {
-                    return layoutMain.innerHTML.trim();
-                }
-            }
-
             const appShell = candidateRoot.querySelector('#appShell');
             if (appShell && typeof appShell.querySelector === 'function') {
+                const appShellLayout = appShell.querySelector('.poff-default-layout');
+                if (appShellLayout && typeof appShellLayout.outerHTML === 'string') {
+                    return appShellLayout.outerHTML.trim();
+                }
+
                 const appShellMain = appShell.querySelector('.poff-default-layout__main');
                 if (appShellMain && typeof appShellMain.innerHTML === 'string') {
                     return appShellMain.innerHTML.trim();

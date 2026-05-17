@@ -2891,10 +2891,11 @@ describe('Worktype HBS renderer', () => {
     expect(leafEntry.template).toBeUndefined();
   });
 
-  test('strips the outer poff layout and keeps only the remote main content', async () => {
+  test('keeps the active wrapper and strips only the remote shell chrome', async () => {
     const remoteRenderDir = path.join(POFF_DIR, 'remote-rendered-layout');
     fs.rmSync(remoteRenderDir, { recursive: true, force: true });
     fs.mkdirSync(remoteRenderDir, { recursive: true });
+    fs.writeFileSync(path.join(remoteRenderDir, 'flux-preview'), 'remote snapshot stub');
     fs.writeFileSync(path.join(remoteRenderDir, 'poff.config.json'), JSON.stringify({
       folderName: 'remote-rendered-layout',
       slug: 'remote-rendered-layout',
@@ -2926,13 +2927,12 @@ describe('Worktype HBS renderer', () => {
     try {
       const rendered = await runViewer('flux-preview', remoteRenderDir, true);
 
-      expect(rendered).not.toContain('<main class="poff-default-layout__main">');
+      expect(rendered).toContain('poff.profile.jpg');
       expect(rendered).toContain('remote-snapshot--file');
       expect(rendered).toContain('Flux snapshot');
-      expect(rendered).not.toContain('<header class="poff-default-layout__header">');
-      expect(rendered).not.toContain('<footer class="poff-default-layout__footer">');
       expect(rendered).not.toContain('id="appShell"');
       expect(rendered).not.toContain('id="sidebarToggle"');
+      expect(rendered).not.toContain('<footer class="poff-default-layout__footer">done</footer>');
     } finally {
       fs.rmSync(remoteRenderDir, { recursive: true, force: true });
     }
@@ -2942,6 +2942,7 @@ describe('Worktype HBS renderer', () => {
     const remoteRenderDir = path.join(POFF_DIR, 'remote-rendered-viewer');
     fs.rmSync(remoteRenderDir, { recursive: true, force: true });
     fs.mkdirSync(remoteRenderDir, { recursive: true });
+    fs.writeFileSync(path.join(remoteRenderDir, 'flux-preview'), 'remote viewer stub');
     fs.writeFileSync(path.join(remoteRenderDir, 'poff.config.json'), JSON.stringify({
       folderName: 'remote-rendered-viewer',
       slug: 'remote-rendered-viewer',

@@ -35,6 +35,7 @@ function renderFileViewer(string $relativePath, string $fullPath): void
     $linkUrl = null;
     $configuredLinkUrl = trim((string) ($treeConfig['linkUrl'] ?? ($treeConfig['pageLink'] ?? ($treeConfig['pageUrl'] ?? ''))));
     $configuredBaseUrl = trim((string) ($treeConfig['baseUrl'] ?? ''));
+    $configuredRenderedHtml = trim((string) ($treeConfig['renderedHtml'] ?? ''));
     if ($type === 'link') {
         $linkUrl = extractLinkFileUrl($fullPath);
     }
@@ -46,23 +47,12 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'pageLink' => $fileConfig['pageLink'] ?? '',
         'pageUrl' => $fileConfig['pageUrl'] ?? '',
         'baseUrl' => $configuredBaseUrl !== '' ? $configuredBaseUrl : ($fileConfig['baseUrl'] ?? ($linkUrl ?? '')),
-        'renderedHtml' => trim((string) ($fileConfig['renderedHtml'] ?? '')),
+        'renderedHtml' => $configuredRenderedHtml !== '' ? $configuredRenderedHtml : trim((string) ($fileConfig['renderedHtml'] ?? '')),
     ]);
     if ($renderedHtml !== '') {
         $work['template'] = 'external';
-        if (!isset($work['layout']) || !is_array($work['layout'])) {
-            $work['layout'] = [];
-        }
-        $externalTemplate = Worktype::template('external');
-        if (is_string($externalTemplate) && trim($externalTemplate) !== '') {
-            $work['layout']['template'] = $externalTemplate;
-        }
+        $work['layout']['section'] = 'work';
         $work['layout']['sectionTemplate'] = '';
-        $work['layout']['css'] = '';
-        $work['layout']['cssHref'] = '';
-        $work['layout']['js'] = '';
-        $work['layout']['jsHref'] = '';
-        $work['layout']['jsInlineAfterHref'] = '';
     }
     $previewUrl = '';
     if ($linkUrl !== null) {
