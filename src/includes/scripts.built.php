@@ -171,6 +171,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     if (typeof payload.fileName === "string") {
       formData.set("fileName", payload.fileName);
     }
+    if (typeof payload.linkUrl === "string") {
+      formData.set("linkUrl", payload.linkUrl);
+    }
     if (typeof payload.contents === "string") {
       formData.set("contents", payload.contents);
     }
@@ -4681,6 +4684,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setUploadSummary();
     };
     const closeUploadDialog = () => {
+      uploadDialog.classList.remove("edit-upload-dialog-open");
       if (typeof uploadDialog.close === "function") {
         uploadDialog.close();
       } else {
@@ -4694,6 +4698,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         uploadDialog.showModal();
       } else {
         uploadDialog.setAttribute("open", "open");
+      }
+      uploadDialog.classList.add("edit-upload-dialog-open");
+      const firstFocusable = uploadDialog.querySelector("select, input, button");
+      if (firstFocusable && typeof firstFocusable.focus === "function") {
+        firstFocusable.focus();
       }
     };
     openUploadDialogButton.addEventListener("click", openUploadDialog);
@@ -6325,9 +6334,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       editAddWork.addEventListener("click", () => {
-        const addWorkFieldButton = document.getElementById("editWorkFieldAdd");
-        if (addWorkFieldButton instanceof HTMLButtonElement) {
-          addWorkFieldButton.click();
+        const openUploadDialogButton = document.getElementById("editOpenUploadDialog");
+        if (openUploadDialogButton instanceof HTMLButtonElement) {
+          openUploadDialogButton.click();
           return;
         }
         const url = new URL(window.location.href);
@@ -6927,6 +6936,96 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let previewClickBound = false;
     let previewDisabled = false;
     let lastPreviewKey = "";
+    let previewMountRoot = null;
+    function stripPreviewChrome(root) {
+      if (!root || typeof root.querySelectorAll !== "function") {
+        return root;
+      }
+      root.querySelectorAll("script, #appShell, #preview, #appSidebar, #sidebarToggle, #editPanel, #editDrawer, #promptDock, #iframeLoading, #sidebarLoading, #editActionsMenu, .app-edit-toggle-wrap").forEach((node) => {
+        if (node && typeof node.remove === "function") {
+          node.remove();
+        }
+      });
+      return root;
+    }
+    function escapePreviewMarkup(value) {
+      return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function rewritePreviewMarkupUrls(markup, baseUrl) {
+      const html = String(markup || "");
+      const trimmedBaseUrl = String(baseUrl || "").trim();
+      if (html === "" || trimmedBaseUrl === "") {
+        return html;
+      }
+      let base;
+      try {
+        base = new URL(trimmedBaseUrl);
+      } catch (err) {
+        return html;
+      }
+      const isKeepRelative = (value) => {
+        const trimmed = String(value || "").trim();
+        return trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith("//") || /^(?:data|blob|mailto|tel|javascript):/i.test(trimmed) || /^[a-z][a-z0-9+.-]*:/i.test(trimmed);
+      };
+      const resolveUrl = (value) => {
+        const trimmed = String(value || "").trim();
+        if (isKeepRelative(trimmed)) {
+          return trimmed;
+        }
+        try {
+          return new URL(trimmed, base).href;
+        } catch (err) {
+          return trimmed;
+        }
+      };
+      let rewritten = html.replace(/\b(src|href|poster|action|data)=("|')([^"']+)\2/gi, (match, attribute, quote, value) => {
+        const nextValue = resolveUrl(value);
+        return nextValue === value ? match : `${attribute}=${quote}${nextValue}${quote}`;
+      });
+      rewritten = rewritten.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, quote, value) => {
+        const nextValue = resolveUrl(value);
+        return nextValue === value ? match : `url("${nextValue}")`;
+      });
+      return rewritten;
+    }
+    function extractPreferredPreviewMarkup(previewDocument, previewRoot) {
+      const candidateRoot = previewRoot && typeof previewRoot.cloneNode === "function" ? previewRoot.cloneNode(true) : previewDocument.body;
+      if (!candidateRoot) {
+        return "";
+      }
+      if (typeof candidateRoot.querySelector === "function") {
+        const main = candidateRoot.querySelector(".poff-default-layout__main");
+        if (main && typeof main.innerHTML === "string") {
+          return main.innerHTML.trim();
+        }
+        const layout = candidateRoot.querySelector(".poff-default-layout");
+        if (layout && typeof layout.querySelector === "function") {
+          const layoutMain = layout.querySelector(".poff-default-layout__main");
+          if (layoutMain && typeof layoutMain.innerHTML === "string") {
+            return layoutMain.innerHTML.trim();
+          }
+        }
+        const appShell = candidateRoot.querySelector("#appShell");
+        if (appShell && typeof appShell.querySelector === "function") {
+          const appShellMain = appShell.querySelector(".poff-default-layout__main");
+          if (appShellMain && typeof appShellMain.innerHTML === "string") {
+            return appShellMain.innerHTML.trim();
+          }
+        }
+      }
+      stripPreviewChrome(candidateRoot);
+      const renderedHtml = typeof candidateRoot.innerHTML === "string" ? candidateRoot.innerHTML.trim() : "";
+      if (renderedHtml === "" || renderedHtml.includes("currentPoffConfig") || renderedHtml.includes("POFF_CONTEXT")) {
+        return "";
+      }
+      if (renderedHtml !== "") {
+        return renderedHtml;
+      }
+      if (typeof candidateRoot.outerHTML === "string") {
+        return candidateRoot.outerHTML.trim();
+      }
+      return "";
+    }
     function buildViewerUrl(path, isFile = false, forceRefresh = false) {
       const url = new URL(window.location.href);
       url.search = "";
@@ -6948,7 +7047,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!previewDisabled) {
         return;
       }
-      contentFrame.querySelectorAll('a, button, input, select, textarea, summary, iframe, video, audio, [contenteditable="true"], [tabindex]').forEach((node) => {
+      const previewRoot = previewMountRoot || contentFrame;
+      previewRoot.querySelectorAll('a, button, input, select, textarea, summary, iframe, video, audio, [contenteditable="true"], [tabindex]').forEach((node) => {
         if (node instanceof HTMLElement) {
           node.setAttribute("tabindex", "-1");
           node.setAttribute("aria-disabled", "true");
@@ -7078,7 +7178,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
           return;
         }
-        let target = event.target;
+        const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+        let target = path.find((node) => node && node.tagName === "A") || event.target;
         while (target && target.tagName !== "A") {
           target = target.parentElement;
         }
@@ -7094,7 +7195,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
     }
     async function renderPreview(url) {
-      var _a;
       if (!contentFrame) {
         return;
       }
@@ -7104,37 +7204,48 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const preservedScrollTop = shouldPreserveScroll ? contentFrame.scrollTop : 0;
       const preservedScrollLeft = shouldPreserveScroll ? contentFrame.scrollLeft : 0;
       try {
+        previewMountRoot = null;
         const response = await fetch(url, {
           credentials: "same-origin",
           headers: {
+            "Accept": "text/html,application/xhtml+xml",
             "X-Requested-With": "fetch-preview"
           }
         });
-        const html = await response.text();
-        if (requestId !== previewRequestId) {
-          return;
+        if (!response.ok) {
+          throw new Error(`Preview request failed: ${response.status}`);
         }
+        const html = await response.text();
         const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-        const fragments = [];
-        const scripts = Array.from(doc.querySelectorAll("script"));
-        doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-          fragments.push(normalizePreviewStyleNode(node));
-        });
-        (_a = doc.body) == null ? void 0 : _a.querySelectorAll("style").forEach((node) => {
-          node.textContent = scopePreviewStyleText(node.textContent || "");
-        });
-        scripts.forEach((node) => node.remove());
-        const bodyHtml = doc.body ? doc.body.innerHTML : html;
-        contentFrame.innerHTML = `${fragments.join("")}${bodyHtml}`;
-        scripts.forEach((oldScript) => {
-          const script = document.createElement("script");
-          for (const attribute of oldScript.attributes) {
-            script.setAttribute(attribute.name, attribute.value);
+        const previewDocument = parser.parseFromString(html, "text/html");
+        const previewRoot = previewDocument.querySelector("#contentFrame > .viewer") || previewDocument.querySelector(".viewer") || previewDocument.body;
+        const previewContainer = contentFrame.shadowRoot || contentFrame;
+        previewMountRoot = previewContainer;
+        previewContainer.innerHTML = "";
+        const headNodes = previewDocument.head ? Array.from(previewDocument.head.children) : [];
+        const previewStyles = headNodes.filter((node) => node instanceof HTMLStyleElement || node instanceof HTMLLinkElement && (node.getAttribute("rel") || "").toLowerCase() === "stylesheet").map((node) => {
+          if (node instanceof HTMLStyleElement) {
+            return normalizePreviewStyleNode(node);
           }
-          script.textContent = oldScript.textContent || "";
-          contentFrame.appendChild(script);
-        });
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          const href = node.getAttribute("href") || "";
+          if (!href) {
+            return "";
+          }
+          try {
+            link.href = new URL(href, response.url).href;
+          } catch (err) {
+            return "";
+          }
+          return link.outerHTML;
+        }).filter(Boolean).join("");
+        const previewMarkup = rewritePreviewMarkupUrls(
+          extractPreferredPreviewMarkup(previewDocument, previewRoot),
+          response.url
+        );
+        const fallbackMarkup = previewMarkup || `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`;
+        previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
         syncPreviewDisabledState(previewDisabled);
         bindPreviewNavigation();
         lastPreviewKey = nextPreview.key;
@@ -7153,6 +7264,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (requestId !== previewRequestId) {
           return;
         }
+        previewMountRoot = null;
         contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
       } finally {
         if (requestId === previewRequestId) {
@@ -7323,9 +7435,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     sidebarLoading,
     editQuery: editQuery2,
     navigateToPath,
+    getCurrentSelection,
     setLoadingVisible
   }) {
     let activeLink = null;
+    let currentFolderPath = "";
     function clearActiveLink() {
       if (activeLink) {
         activeLink.classList.remove("nav-link-active");
@@ -7381,6 +7495,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!navList) {
         return Promise.resolve("");
       }
+      currentFolderPath = relPath || "";
       showNavLoading();
       return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
         const extracted = extractNavHtml(html) || "";
@@ -7396,6 +7511,52 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return "";
       });
     }
+    function collectVisibleTreePaths() {
+      if (!navList) {
+        return [];
+      }
+      const visiblePaths = [];
+      navList.querySelectorAll('a[data-tree-item="1"]').forEach((link) => {
+        if (link.hasAttribute("data-hidden")) {
+          return;
+        }
+        const path = link.getAttribute("data-path") || "";
+        if (!path) {
+          return;
+        }
+        visiblePaths.push(path);
+      });
+      return visiblePaths;
+    }
+    async function toggleNavEntry(link) {
+      if (!link) {
+        return;
+      }
+      const targetPath = link.getAttribute("data-path") || "";
+      if (!targetPath) {
+        return;
+      }
+      const isHidden = link.hasAttribute("data-hidden");
+      const visiblePaths = collectVisibleTreePaths();
+      const nextVisiblePaths = isHidden ? Array.from(/* @__PURE__ */ new Set([...visiblePaths, targetPath])) : visiblePaths.filter((path) => path !== targetPath);
+      const response = await requestEditConfig("save", {
+        path: currentFolderPath,
+        treeVisible: nextVisiblePaths
+      });
+      if (response && response.allowed === false) {
+        return;
+      }
+      const selection2 = typeof getCurrentSelection === "function" ? getCurrentSelection() : null;
+      if (typeof navigateToPath === "function") {
+        navigateToPath((selection2 == null ? void 0 : selection2.path) || currentFolderPath || "", {
+          isFile: !!(selection2 == null ? void 0 : selection2.previewIsFile),
+          forceRefresh: true,
+          updateHash: false
+        });
+      } else {
+        await loadNav(currentFolderPath);
+      }
+    }
     function syncSidebarSelection(path = "", isFile = false, isLayout = false) {
       if (isLayout) {
         setActiveLayoutLink(path);
@@ -7410,7 +7571,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setActiveFileLink(fileName);
     }
     function handleNavClick(event) {
+      var _a, _b, _c;
       if (!navList) {
+        return;
+      }
+      const fastAction = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, '[data-nav-action="toggle-visibility"]');
+      if (fastAction) {
+        event.preventDefault();
+        event.stopPropagation();
+        const rowLink = (_c = fastAction.closest("li")) == null ? void 0 : _c.querySelector('a[data-tree-item="1"]');
+        toggleNavEntry(rowLink).catch(() => {
+        });
         return;
       }
       let target = event.target;
@@ -7467,7 +7638,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editQuery: editQuery2,
     currentPathForIframe: currentPathForIframe2,
     renderFolderMeta,
-    initEditMode
+    initEditMode,
+    setSidebarCollapsed
   }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
     let ignoreNextHashSync = false;
@@ -7499,8 +7671,134 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       sidebarLoading,
       editQuery: editQuery2,
       navigateToPath,
+      getCurrentSelection,
       setLoadingVisible
     });
+    function shouldCollapseSidebarForSelection(selection2 = null) {
+      if (!navList || !(selection2 == null ? void 0 : selection2.previewPath)) {
+        return false;
+      }
+      const normalizedTargetPath = normalizeHashAlias(selection2.previewPath);
+      const targetName = normalizeHashAlias(selection2.previewPath.split("/").pop() || selection2.previewPath);
+      const remoteLinks = navList.querySelectorAll('a[data-tree-item="1"][data-remote-rendered="1"]');
+      for (const link of remoteLinks) {
+        const linkPath = normalizeHashAlias(link.getAttribute("data-path") || "");
+        const linkFile = normalizeHashAlias(link.getAttribute("data-file") || "");
+        if (linkPath === normalizedTargetPath || linkFile === targetName) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function findNavLinkForSelection(selection2 = null) {
+      if (!navList || !(selection2 == null ? void 0 : selection2.previewPath)) {
+        return null;
+      }
+      const normalizedTargetPath = normalizeHashAlias(selection2.previewPath);
+      const targetName = normalizeHashAlias(selection2.previewPath.split("/").pop() || selection2.previewPath);
+      const links = navList.querySelectorAll('a[data-tree-item="1"]');
+      for (const link of links) {
+        const linkPath = normalizeHashAlias(link.getAttribute("data-path") || "");
+        const linkFile = normalizeHashAlias(link.getAttribute("data-file") || "");
+        if (linkPath === normalizedTargetPath || linkFile === targetName) {
+          return link;
+        }
+      }
+      return null;
+    }
+    async function resolvePreviewUrlForSelection(selection2, previewPath, previewIsFile, forceRefresh = false) {
+      const localPreviewUrl = previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh);
+      const link = findNavLinkForSelection(selection2);
+      if ((link == null ? void 0 : link.getAttribute("data-remote-rendered")) === "1") {
+        return localPreviewUrl;
+      }
+      const previewUrl = trimLinkUrl((link == null ? void 0 : link.getAttribute("data-preview-url")) || "");
+      if (previewUrl) {
+        try {
+          const resolvedPreview = new URL(previewUrl, window.location.href);
+          const hashSlug = resolvedPreview.hash.replace(/^#\/+/, "").trim();
+          if (hashSlug && resolvedPreview.origin === window.location.origin && resolvedPreview.pathname.includes("/dominikeggermann.com")) {
+            const ajaxUrl = new URL(resolvedPreview.pathname, resolvedPreview.origin);
+            ajaxUrl.searchParams.set("ajax", "resolve");
+            ajaxUrl.searchParams.set("slug", hashSlug);
+            const response = await fetch(ajaxUrl.href, {
+              credentials: "same-origin",
+              headers: {
+                "Accept": "application/json"
+              }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if ((data == null ? void 0 : data.resolved) && data.path) {
+                return buildPreviewUrlAtPath(
+                  resolvedPreview.pathname,
+                  data.path,
+                  typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder",
+                  forceRefresh
+                );
+              }
+            }
+          }
+          if (!previewUrl.includes("#/")) {
+            return resolvedPreview.href;
+          }
+        } catch (err) {
+        }
+      }
+      const linkUrl = trimLinkUrl((link == null ? void 0 : link.getAttribute("data-link-url")) || "");
+      if (!linkUrl) {
+        return localPreviewUrl;
+      }
+      try {
+        const resolved = new URL(linkUrl, window.location.href);
+        const hashSlug = resolved.hash.replace(/^#\/+/, "").trim();
+        if (hashSlug && resolved.origin === window.location.origin && resolved.pathname.includes("/dominikeggermann.com")) {
+          try {
+            const ajaxUrl = new URL(resolved.pathname, resolved.origin);
+            ajaxUrl.searchParams.set("ajax", "resolve");
+            ajaxUrl.searchParams.set("slug", hashSlug);
+            const response = await fetch(ajaxUrl.href, {
+              credentials: "same-origin",
+              headers: {
+                "Accept": "application/json"
+              }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if ((data == null ? void 0 : data.resolved) && data.path) {
+                return buildPreviewUrlAtPath(
+                  resolved.pathname,
+                  data.path,
+                  typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder",
+                  forceRefresh
+                );
+              }
+            }
+          } catch (err) {
+          }
+        }
+        if (resolved.origin === window.location.origin) {
+          return resolved.href;
+        }
+      } catch (err) {
+        return localPreviewUrl;
+      }
+      return localPreviewUrl;
+    }
+    function trimLinkUrl(value = "") {
+      return String(value || "").trim();
+    }
+    function buildPreviewUrlAtPath(viewerPath, targetPath, isFile = false, forceRefresh = false) {
+      const url = new URL(viewerPath, window.location.origin);
+      url.search = "";
+      url.hash = "";
+      url.searchParams.set("view", "1");
+      url.searchParams.set(isFile ? "file" : "path", targetPath);
+      if (forceRefresh) {
+        url.searchParams.set("_refresh", String(Date.now()));
+      }
+      return url.pathname + url.search;
+    }
     function writeHashPath(path = "") {
       const hashPath = routeResolver.displayHashPath(path);
       const nextHash = hashPath ? `#/${hashPath.replace(/^\/+/, "")}` : "";
@@ -7521,9 +7819,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const selection2 = getSelectionFromPath(resolved.path, {
         isFile: typeof (options == null ? void 0 : options.isFile) === "boolean" ? options.isFile : resolved.isFile
       });
-      navigateToSelection(selection2, options);
+      return navigateToSelection(selection2, options);
     }
-    function navigateToSelection(selectionInput, options = {}) {
+    async function navigateToSelection(selectionInput, options = {}) {
       const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
       const {
         updateHash = true,
@@ -7532,11 +7830,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const previewPath = selection2.previewPath || "";
       const previewIsFile = !!selection2.previewIsFile;
       const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
+      const previewUrl = await resolvePreviewUrlForSelection(selection2, previewPath, previewIsFile, forceRefresh);
       setLoadingVisible(iframeLoading, true);
       if (contentFrame) {
         contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
         previewController.syncPreviewDisabledState(!!selection2.isLayout);
-        previewController.renderPreview(previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
+        previewController.renderPreview(previewUrl);
       }
       if (updateHash) {
         writeHashPath(selection2.path || "");
@@ -7545,9 +7844,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setLoadingVisible(sidebarLoading, true);
         sidebarController2.loadNav(folderPath).then(() => {
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
+          if (typeof setSidebarCollapsed === "function") {
+            setSidebarCollapsed(!shouldCollapseSidebarForSelection(selection2));
+          }
           setLoadingVisible(sidebarLoading, false);
         }).catch(() => {
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
+          if (typeof setSidebarCollapsed === "function") {
+            setSidebarCollapsed(!shouldCollapseSidebarForSelection(selection2));
+          }
           setLoadingVisible(sidebarLoading, false);
         });
       }
@@ -7558,7 +7863,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     function loadCurrentFolderInIframe() {
       var _a;
       const selection2 = getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : "");
-      navigateToSelection(selection2, { updateHash: false });
+      return navigateToSelection(selection2, { updateHash: false });
       if (renderFolderMeta) {
         renderFolderMeta();
       }
@@ -7569,13 +7874,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const hashPath = readHashPath();
       if (hashPath || window.location.hash) {
         const resolved = await routeResolver.resolveHashPathAsync(hashPath);
-        navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
+        return navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
           updateHash: false,
           forceRefresh
         });
-        return;
       }
-      navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
+      return navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
         updateHash: false,
         forceRefresh
       });
@@ -7696,14 +8000,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     context: poffContext,
     editRequested
   });
+  var sidebarController = bindSidebarToggle(elements);
   var navigation = initNavigation({
     elements,
     editQuery,
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
-    initEditMode: editController.initEditMode
+    initEditMode: editController.initEditMode,
+    setSidebarCollapsed: (sidebarController == null ? void 0 : sidebarController.syncSidebarState) || null
   });
-  var sidebarController = bindSidebarToggle(elements);
   document.addEventListener("DOMContentLoaded", async () => {
     if (sidebarController) {
       sidebarController.syncSidebarState(true);

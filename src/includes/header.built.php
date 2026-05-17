@@ -125,6 +125,7 @@
 .mt-2{margin-top:0.5rem;}
 .mt-3{margin-top:0.75rem;}
 .mt-3\.5{margin-top:0.875rem;}
+.mt-4{margin-top:1rem;}
 .inline{display:inline;}
 .block{display:block;}
 .inline-block{display:inline-block;}
@@ -394,6 +395,15 @@ body, html {
   min-height: 100%;
   box-sizing: border-box;
   width: 100%;
+}
+
+.content-frame > iframe.preview-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  border: 0;
+  background: transparent;
 }
 
 .content-frame > .viewer .poff-default-layout__main {
@@ -1070,6 +1080,102 @@ body, html {
   box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.14), 0 14px 24px rgba(148, 163, 184, 0.16);
 }
 
+#appSidebar .nav-link-remote {
+  background: linear-gradient(135deg, rgba(255, 228, 230, 0.92), rgba(253, 242, 248, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.12);
+}
+
+#appSidebar .nav-link-remote:hover {
+  background: linear-gradient(135deg, rgba(255, 226, 229, 0.98), rgba(254, 242, 248, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.18), 0 14px 24px rgba(244, 63, 94, 0.08);
+}
+
+#appSidebar .nav-entry-label {
+  min-width: 0;
+}
+
+#appSidebar .nav-entry-url {
+  display: block;
+  margin-top: 4px;
+  margin-left: 36px;
+  font-size: 0.64rem;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: rgba(71, 85, 105, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#appSidebar .nav-entry-badge {
+  margin-left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#appSidebar .nav-entry-badge--remote {
+  color: #9f1239;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.18);
+}
+
+#appSidebar .nav-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  min-width: 36px;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--app-shell-text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  opacity: 0.72;
+  transition: color 0.18s ease, background 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+#appSidebar .nav-row-action:hover {
+  color: var(--app-shell-text-strong);
+  background: rgba(255, 255, 255, 0.82);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+#appSidebar .nav-row-action__icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+#appSidebar .nav-row-action__icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: currentColor;
+}
+
+#appSidebar .nav-row-action__label {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
 #appSidebar .nav-link-up {
   color: #0f766e;
   background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), rgba(13, 148, 136, 0.04));
@@ -1097,6 +1203,15 @@ body, html {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
+@media (max-width: 900px) {
+  #appSidebar .nav-row-action {
+    padding: 6px;
+    min-width: 30px;
+  }
+  #appSidebar .nav-row-action__label {
+    display: none;
+  }
+}
 #appSidebar .nav-link-up .item-icon {
   background: rgba(16, 185, 129, 0.12);
   box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.16);
@@ -1584,14 +1699,24 @@ body, html {
 
 .edit-upload-dialog {
   width: min(var(--poff-dialog-width), 100vw - var(--poff-space-md) * 2);
+  max-height: min(100vh - var(--poff-space-lg), 56rem);
+  margin: 0;
   border: 1px solid var(--poff-color-border);
   border-radius: var(--poff-control-radius-xl);
   padding: 0;
   box-shadow: var(--poff-shadow-dialog);
+  overflow: auto;
 }
 
 .edit-upload-dialog::backdrop {
   background: var(--poff-color-backdrop-dim);
+}
+
+.edit-upload-dialog[open],
+.edit-upload-dialog.edit-upload-dialog-open {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
 }
 
 .edit-upload-dialog-form {
