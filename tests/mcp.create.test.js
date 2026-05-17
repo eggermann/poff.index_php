@@ -141,6 +141,53 @@ function runViewer(relativePath, baseDir = POFF_DIR, editMode = false) {
   });
 }
 
+function runViewerWithMock(relativePath, baseDir = POFF_DIR, editMode = false, mockResponse = null) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath];
+    if (editMode) {
+      args.push('edit');
+    }
+    if (mockResponse !== null) {
+      args.push(JSON.stringify({ mockResponse }));
+    }
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`viewer helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runResolveRemoteRenderedHtml(item, mockResponse = null) {
+  return new Promise((resolve, reject) => {
+    const payload = { item };
+    if (mockResponse !== null) {
+      payload.mockResponse = mockResponse;
+    }
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_resolve_remote_rendered_html.php'), JSON.stringify(payload)], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`remote html helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runNav(relativePath, baseDir = POFF_DIR, editMode = false) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_render_nav.php'), baseDir, relativePath];
@@ -2664,6 +2711,67 @@ describe('Worktype HBS renderer', () => {
     expect(output).not.toContain('%3Fview%3D1%26path%3Dlinkone');
   });
 
+  test('renders link files with an embedded preview for same-origin targets', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-link-preview-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'sample.url'), '[InternetShortcut]\nURL=http://localhost:8888/dominikeggermann.com/#/1749825166559-flux-jpeg\n');
+
+      const renderedHtml = await runResolveRemoteRenderedHtml({
+        linkUrl: 'http://localhost:8888/dominikeggermann.com/#/1749825166559-flux-jpeg',
+        pageLink: 'http://localhost:8888/dominikeggermann.com/#/1749825166559-flux-jpeg',
+        baseUrl: 'http://localhost:8888/dominikeggermann.com/#/1749825166559-flux-jpeg',
+      }, {
+        status: 200,
+        body: '<html><body><article class="remote-snapshot">Remote Snapshot</article></body></html>',
+      });
+
+      expect(renderedHtml).toContain('remote-snapshot');
+      expect(renderedHtml).toContain('Remote Snapshot');
+      expect(renderedHtml).not.toContain('appShell');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('renders virtual configured items with external snapshots on the local host', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-virtual-external-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+        folderName: 'virtual-external',
+        slug: 'virtual-external',
+        title: 'Virtual External',
+        description: '',
+        type: 'folder',
+        tree: [
+          {
+            name: 'dominikeggermann.com',
+            title: 'dominikeggermann.com',
+            slug: 'dominikeggermann-com',
+            type: 'file',
+            path: 'dominikeggermann.com',
+            linkUrl: 'https://dominikeggermann.com/',
+            visible: true,
+          },
+        ],
+      }, null, 2));
+
+      const renderedHtml = await runResolveRemoteRenderedHtml({
+        path: 'dominikeggermann.com',
+        title: 'dominikeggermann.com',
+        linkUrl: 'https://dominikeggermann.com/',
+        pageLink: 'https://dominikeggermann.com/',
+      }, {
+        status: 200,
+        body: '<html><body><article class="remote-snapshot">Remote Snapshot</article></body></html>',
+      });
+
+      expect(renderedHtml).toContain('remote-snapshot');
+      expect(renderedHtml).toContain('Remote Snapshot');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('exports normalized remote content with absolute viewer and asset links', async () => {
     const result = await runRemoteContent('export', POFF_DIR, 'viewer-folder', {
       baseUrl: 'https://origin.example/index.php',
@@ -2682,11 +2790,15 @@ describe('Worktype HBS renderer', () => {
         name: 'child.txt',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
         srcUrl: 'https://origin.example/viewer-folder/child.txt',
+        routeSlug: 'child-txt',
+        routePath: 'viewer-folder/child.txt',
       }),
       expect.objectContaining({
         name: 'nested-child',
         isFolder: true,
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+        routeSlug: 'nested-child',
+        routePath: 'viewer-folder/nested-child',
       }),
     ]));
   });
@@ -2699,33 +2811,39 @@ describe('Worktype HBS renderer', () => {
         path: 'viewer-folder',
       },
       items: [
-        {
-          name: 'Portfolio',
-          title: 'Portfolio',
-          type: 'folder',
-          kind: 'folder',
-          path: 'viewer-folder/nested-child',
-          relativePath: 'viewer-folder/nested-child',
-          pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
-          srcUrl: 'https://origin.example/index.php?path=viewer-folder%2Fnested-child',
-          visible: true,
-          isFolder: true,
-          isFile: false,
-        },
-        {
+      {
+        name: 'Portfolio',
+        title: 'Portfolio',
+        type: 'folder',
+        kind: 'folder',
+        path: 'viewer-folder/nested-child',
+        relativePath: 'viewer-folder/nested-child',
+        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+        srcUrl: 'https://origin.example/index.php?path=viewer-folder%2Fnested-child',
+        routeSlug: 'nested-child',
+        routePath: 'viewer-folder/nested-child',
+        renderedHtml: '<article class="remote-snapshot remote-snapshot--folder">Portfolio snapshot</article>',
+        visible: true,
+        isFolder: true,
+        isFile: false,
+      },
+      {
           name: 'Leaf Note',
           title: 'Leaf Note',
           type: 'file',
-          kind: 'text',
-          path: 'viewer-folder/child.txt',
-          relativePath: 'viewer-folder/child.txt',
-          pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
-          srcUrl: 'https://origin.example/viewer-folder/child.txt',
-          visible: true,
-          isFolder: false,
-          isFile: true,
-        },
-      ],
+        kind: 'text',
+        path: 'viewer-folder/child.txt',
+        relativePath: 'viewer-folder/child.txt',
+        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+        srcUrl: 'https://origin.example/viewer-folder/child.txt',
+        routeSlug: 'child-txt',
+        routePath: 'viewer-folder/child.txt',
+        renderedHtml: '<article class="remote-snapshot remote-snapshot--file">Leaf Note snapshot</article>',
+        visible: true,
+        isFolder: false,
+        isFile: true,
+      },
+    ],
     };
 
     const result = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
@@ -2754,18 +2872,107 @@ describe('Worktype HBS renderer', () => {
         type: 'folder',
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
         remoteSource: 'origin-example',
+        routeSlug: 'nested-child',
+        routePath: 'viewer-folder/nested-child',
       }),
       expect.objectContaining({
         name: 'Leaf Note',
         type: 'file',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
         remoteSource: 'origin-example',
+        routeSlug: 'child-txt',
+        routePath: 'viewer-folder/child.txt',
       }),
     ]));
 
-    const output = await runViewer('remote-import-links');
-    expect(output).toMatch(/href="https:\/\/origin\.example\/index\.php\?view(?:=|&#x3D;)1&amp;path(?:=|&#x3D;)viewer-folder%2Fnested-child"/);
-    expect(output).toMatch(/href="https:\/\/origin\.example\/index\.php\?view(?:=|&#x3D;)1&amp;file(?:=|&#x3D;)viewer-folder%2Fchild\.txt"/);
+    const leafEntry = storedConfig.tree.find((item) => item.name === 'Leaf Note');
+    expect(leafEntry).toBeTruthy();
+    expect(leafEntry.renderedHtml).toBeUndefined();
+    expect(leafEntry.template).toBeUndefined();
+  });
+
+  test('strips the outer poff layout and keeps only the remote main content', async () => {
+    const remoteRenderDir = path.join(POFF_DIR, 'remote-rendered-layout');
+    fs.rmSync(remoteRenderDir, { recursive: true, force: true });
+    fs.mkdirSync(remoteRenderDir, { recursive: true });
+    fs.writeFileSync(path.join(remoteRenderDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'remote-rendered-layout',
+      slug: 'remote-rendered-layout',
+      title: 'Remote Rendered Layout',
+      description: 'Folder with a remote rendered layout snapshot',
+      tree: [
+        {
+          name: 'Flux Preview',
+          title: 'Flux Preview',
+          type: 'file',
+          kind: 'link',
+          path: 'flux-preview',
+          pageLink: 'https://origin.example/index.php?view=1&file=flux-preview',
+          renderedHtml: '<div id="appShell" class="container"><button id="sidebarToggle">menu</button><div class="poff-default-layout poff-default-layout--file"><header class="poff-default-layout__header"><h1>Flux Preview</h1></header><main class="poff-default-layout__main"><article class="remote-snapshot remote-snapshot--file">Flux snapshot</article></main><footer class="poff-default-layout__footer">done</footer></div></div>',
+          template: 'external',
+          visible: true,
+        },
+      ],
+      work: {
+        type: 'folder',
+        layout: {
+          name: 'filesystem-folder-layout',
+          engine: 'lightncandy',
+          section: 'works',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const rendered = await runViewer('flux-preview', remoteRenderDir, true);
+
+      expect(rendered).not.toContain('<main class="poff-default-layout__main">');
+      expect(rendered).toContain('remote-snapshot--file');
+      expect(rendered).toContain('Flux snapshot');
+      expect(rendered).not.toContain('<header class="poff-default-layout__header">');
+      expect(rendered).not.toContain('<footer class="poff-default-layout__footer">');
+      expect(rendered).not.toContain('id="appShell"');
+      expect(rendered).not.toContain('id="sidebarToggle"');
+    } finally {
+      fs.rmSync(remoteRenderDir, { recursive: true, force: true });
+    }
+  });
+
+  test('strips remote app shell wrappers and keeps only the remote viewer body', async () => {
+    const remoteRenderDir = path.join(POFF_DIR, 'remote-rendered-viewer');
+    fs.rmSync(remoteRenderDir, { recursive: true, force: true });
+    fs.mkdirSync(remoteRenderDir, { recursive: true });
+    fs.writeFileSync(path.join(remoteRenderDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'remote-rendered-viewer',
+      slug: 'remote-rendered-viewer',
+      title: 'Remote Rendered Viewer',
+      description: 'Folder with a remote viewer snapshot',
+      tree: [
+        {
+          name: 'Flux Preview',
+          title: 'Flux Preview',
+          type: 'file',
+          kind: 'link',
+          path: 'flux-preview',
+          pageLink: 'https://origin.example/index.php?view=1&file=flux-preview',
+          renderedHtml: '<div id="appShell" class="container"><div id="contentFrame"><div class="viewer"><article class="remote-snapshot remote-snapshot--file">Flux snapshot</article></div></div></div>',
+          template: 'external',
+          visible: true,
+        },
+      ],
+    }, null, 2));
+
+    try {
+      const rendered = await runViewer('flux-preview', remoteRenderDir, true);
+
+      expect(rendered).toContain('remote-snapshot--file');
+      expect(rendered).toContain('Flux snapshot');
+      expect(rendered).not.toContain('id=\"appShell\"');
+      expect(rendered).not.toContain('id=\"contentFrame\"');
+      expect(rendered).not.toContain('class=\"viewer\"');
+    } finally {
+      fs.rmSync(remoteRenderDir, { recursive: true, force: true });
+    }
   });
 
   test('normalizes duplicated viewer urls in custom layout links', async () => {

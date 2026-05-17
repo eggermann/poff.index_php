@@ -164,6 +164,99 @@ function cmsCreateFolder(string $targetDir, string $folderName): array
     ];
 }
 
+function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): array
+{
+    $target = trim($linkUrl);
+    if ($target === '') {
+        return [
+            'stored' => [],
+            'errors' => ['Enter a link URL.'],
+        ];
+    }
+
+    $scheme = strtolower((string) parse_url($target, PHP_URL_SCHEME));
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return [
+            'stored' => [],
+            'errors' => ['Link URLs must start with http:// or https://.'],
+        ];
+    }
+
+    $config = PoffConfig::ensure($targetDir);
+    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    $baseName = cmsUploadSafeName($label);
+    if ($baseName === '') {
+        $host = (string) (parse_url($target, PHP_URL_HOST) ?? '');
+        $path = (string) (parse_url($target, PHP_URL_PATH) ?? '');
+        $baseName = cmsUploadSafeName(trim($host . ' ' . basename($path)));
+    }
+    if ($baseName === '') {
+        $baseName = 'poff-link';
+    }
+
+    $existingNames = [];
+    foreach ($tree as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $name = trim((string) ($item['name'] ?? ''));
+        if ($name !== '') {
+            $existingNames[$name] = true;
+        }
+    }
+
+    $name = $baseName;
+    $suffix = 2;
+    while (isset($existingNames[$name])) {
+        $name = $baseName . '-' . $suffix;
+        $suffix++;
+    }
+
+    $now = date('c');
+    $tree[] = [
+        'name' => $name,
+        'title' => trim($label) !== '' ? trim($label) : $name,
+        'slug' => class_exists('PoffConfig') ? PoffConfig::slugify($name) : $name,
+        'type' => 'link',
+        'kind' => 'link',
+        'path' => $name,
+        'linkUrl' => $target,
+        'baseUrl' => $target,
+        'visible' => true,
+        'modifiedAt' => $now,
+    ];
+
+    $config['tree'] = $tree;
+    $config['treeHash'] = hash('sha256', json_encode($tree));
+    $config['updatedAt'] = $now;
+
+    $configPath = PoffConfig::configPath($targetDir);
+    $dirPath = dirname($configPath);
+    if (!is_dir($dirPath) && !mkdir($dirPath, 0755, true) && !is_dir($dirPath)) {
+        return [
+            'stored' => [],
+            'errors' => ['Failed to create config directory.'],
+        ];
+    }
+
+    $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encoded === false || file_put_contents($configPath, $encoded) === false) {
+        return [
+            'stored' => [],
+            'errors' => ['Failed to write config file.'],
+        ];
+    }
+
+    return [
+        'stored' => [[
+            'name' => $name,
+            'path' => $name,
+            'linkUrl' => $target,
+        ]],
+        'errors' => [],
+    ];
+}
+
 function cmsUploadSafeName(string $name): string
 {
     $name = trim($name);

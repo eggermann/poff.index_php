@@ -385,8 +385,23 @@ function cmsStripRemoteAppChrome(string $html): string
 
 function cmsResolveRemoteRenderedHtml(array $item): string
 {
-    $renderedHtml = trim((string) ($item['renderedHtml'] ?? ''));
     $baseUrl = trim((string) ($item['baseUrl'] ?? ($item['linkUrl'] ?? ($item['pageLink'] ?? ($item['pageUrl'] ?? '')))));
+
+    $sourceUrl = cmsResolveRemoteRenderedSourceUrl($baseUrl, $item);
+    if ($sourceUrl !== '' && cmsIsExternalLinkTarget($sourceUrl)) {
+        $response = cmsHttpGet($sourceUrl);
+        if (is_array($response) && ($response['ok'] ?? false)) {
+            $liveHtml = cmsNormalizeRenderedHtmlBaseUrl(
+                cmsStripRemoteAppChrome(cmsExtractPreferredRemoteRenderedHtml(cmsExtractHtmlBodyFragment((string) ($response['body'] ?? '')))),
+                $baseUrl
+            );
+            if ($liveHtml !== '') {
+                return $liveHtml;
+            }
+        }
+    }
+
+    $renderedHtml = trim((string) ($item['renderedHtml'] ?? ''));
     if ($renderedHtml !== '') {
         return cmsNormalizeRenderedHtmlBaseUrl(
             cmsStripRemoteAppChrome(cmsExtractPreferredRemoteRenderedHtml($renderedHtml)),
@@ -394,20 +409,7 @@ function cmsResolveRemoteRenderedHtml(array $item): string
         );
     }
 
-    $sourceUrl = cmsResolveRemoteRenderedSourceUrl($baseUrl, $item);
-    if ($sourceUrl === '' || !cmsIsExternalLinkTarget($sourceUrl)) {
-        return '';
-    }
-
-    $response = cmsHttpGet($sourceUrl);
-    if (!($response['ok'] ?? false)) {
-        return '';
-    }
-
-    return cmsNormalizeRenderedHtmlBaseUrl(
-        cmsStripRemoteAppChrome(cmsExtractPreferredRemoteRenderedHtml(cmsExtractHtmlBodyFragment((string) ($response['body'] ?? '')))),
-        $baseUrl
-    );
+    return '';
 }
 
 function cmsResolveRemoteRenderedSourceUrl(string $sourceUrl, array $item): string

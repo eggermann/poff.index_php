@@ -321,7 +321,6 @@ function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $s
             'pageLink' => $pageLink,
             'linkUrl' => trim((string) ($item['linkUrl'] ?? '')),
             'srcUrl' => trim((string) ($item['srcUrl'] ?? '')),
-            'renderedHtml' => trim((string) ($item['renderedHtml'] ?? '')),
             'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
             'remoteSource' => $sourceId,
             'remoteFeedUrl' => $sourceUrl,
@@ -329,9 +328,6 @@ function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $s
             'remoteKind' => trim((string) ($item['kind'] ?? $type)),
             'importedAt' => date('c'),
         ];
-        if ($entry['renderedHtml'] !== '') {
-            $entry['template'] = 'external';
-        }
         $entries[] = $entry;
     }
 
