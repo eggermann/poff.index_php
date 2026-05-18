@@ -85,6 +85,7 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
     renderViewerShell([
         'type' => 'folder',
         'name' => $rawName,
+        'title' => $folderConfig['title'] ?? $rawName,
         'path' => $relativePath,
         'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,

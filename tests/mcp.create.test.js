@@ -2690,7 +2690,7 @@ describe('Worktype HBS renderer', () => {
   test('renders folder previews through the typed viewer route', async () => {
     const output = await runViewer('viewer-folder');
 
-    expect(output).toContain('<title>Viewer - viewer-folder</title>');
+    expect(output).toContain('<title>Folder Preview</title>');
     expect(output).toContain('.layout/style.css');
     expect(output).toContain('.layout/script.js');
     expect(output).toContain('<div class="folder-custom"');
@@ -3127,7 +3127,7 @@ describe('Worktype HBS renderer', () => {
   test('renders file previews from .works/<file>.layout', async () => {
     const output = await runViewer(VIEWER_FILE_NAME);
 
-    expect(output).toContain('<title>Viewer - viewer-file.txt</title>');
+    expect(output).toContain('<title>Viewer File</title>');
     expect(output).toContain('.works/viewer-file.txt.layout/style.css');
     expect(output).toContain('.works/viewer-file.txt.layout/script.js');
     expect(output).toContain('<div class="file-custom">');

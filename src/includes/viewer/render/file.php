@@ -113,6 +113,7 @@ function renderFileViewer(string $relativePath, string $fullPath, ?array $fileCo
     renderViewerShell([
         'type' => $type,
         'name' => $rawName,
+        'title' => $treeConfig['title'] ?? ($fileConfig['title'] ?? $rawName),
         'path' => $relativePath,
         'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,

@@ -4,11 +4,14 @@ function renderViewerShell(array $payload): void
 {
     $rawType = (string) ($payload['type'] ?? 'file');
     $rawName = (string) ($payload['name'] ?? '');
+    $rawTitle = trim((string) ($payload['title'] ?? ''));
     $bodyContent = (string) ($payload['bodyContent'] ?? '');
     $layout = isset($payload['layout']) && is_array($payload['layout']) ? $payload['layout'] : [];
 
     $safeName = htmlspecialchars($rawName, ENT_QUOTES, 'UTF-8');
     $safeType = htmlspecialchars($rawType, ENT_QUOTES, 'UTF-8');
+    $documentTitle = $rawTitle !== '' ? $rawTitle : ($rawName !== '' ? $rawName : 'poff.io');
+    $safeDocumentTitle = htmlspecialchars($documentTitle, ENT_QUOTES, 'UTF-8');
     $layoutCssHref = trim((string) ($layout['cssHref'] ?? ''));
     $layoutJsHref = trim((string) ($layout['jsHref'] ?? ''));
     $layoutCssInline = $layoutCssHref === '' ? trim((string) ($layout['css'] ?? '')) : '';
@@ -27,7 +30,7 @@ function renderViewerShell(array $payload): void
     $html .= "<head>\n";
     $html .= "    <meta charset=\"UTF-8\">\n";
     $html .= "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
-    $html .= "    <title>Viewer - {$safeName}</title>\n";
+    $html .= "    <title>{$safeDocumentTitle}</title>\n";
     if ($viewerShellCss !== '') {
         $html .= "    <style data-app-style>{$viewerShellCss}</style>\n";
     }
