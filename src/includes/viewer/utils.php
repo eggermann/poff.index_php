@@ -300,8 +300,6 @@ function cmsExtractPreferredRemoteRenderedHtml(string $html): string
                         }
                     }
                 }
-
-                return '';
             }
         }
 

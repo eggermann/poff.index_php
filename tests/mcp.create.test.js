@@ -3123,6 +3123,7 @@ describe('Worktype HBS renderer', () => {
 
       expect(renderedHtml).toContain('remote-snapshot');
       expect(renderedHtml).toContain('Remote Snapshot');
+      expect(renderedHtml).not.toContain('external-work--embedded');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

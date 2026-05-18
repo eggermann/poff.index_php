@@ -1,12 +1,34 @@
-{{#if renderedHtml}}
-    {{{renderedHtml}}}
-{{else}}
-    {{#if previewUrl}}
-        <iframe class="min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}"></iframe>
-    {{else}}
-        <div class="message">
-            <div class="mb-3">External link</div>
-            <a href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a>
+<div class="external-work external-work--embedded" style="border: 2px solid #dc2626; border-radius: 16px; padding: 16px; background: rgba(220, 38, 38, 0.04);">
+    <style>
+        .external-work--embedded .external-work__body--rendered {
+            background: #0f172a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .external-work--embedded .external-work__body--rendered #appShell,
+        .external-work--embedded .external-work__body--rendered .main-content,
+        .external-work--embedded .external-work__body--rendered #preview {
+            background: transparent !important;
+        }
+
+        .external-work--embedded .external-work__body--rendered #contentFrame {
+            background: #0b1220 !important;
+            min-height: 65vh;
+        }
+    </style>
+    {{#if renderedHtml}}
+        <div class="external-work__body external-work__body--rendered">
+            {{{renderedHtml}}}
         </div>
+    {{else}}
+        {{#if previewUrl}}
+            <iframe class="external-work__body external-work__body--iframe min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}"></iframe>
+        {{else}}
+            <div class="external-work__body external-work__body--message message">
+                <div class="mb-3">External link</div>
+                <a href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a>
+            </div>
+        {{/if}}
     {{/if}}
-{{/if}}
+</div>
