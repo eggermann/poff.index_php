@@ -8,6 +8,12 @@ trait WorktypeLayoutTrait
 
     public static function templates(): array
     {
+        static $cache = null;
+
+        if (is_array($cache)) {
+            return $cache;
+        }
+
         self::loadBundle();
 
         $templates = self::$embeddedTemplates;
@@ -32,29 +38,39 @@ trait WorktypeLayoutTrait
             $templates[$key] = $template;
         }
 
+        $cache = $templates;
+
         return $templates;
     }
 
     public static function template(string $name): ?string
     {
+        static $cache = [];
+
+        if (array_key_exists($name, $cache)) {
+            return $cache[$name];
+        }
+
         self::loadBundle();
         self::loadFilePair($name);
 
         if (isset(self::$fileTemplates[$name])) {
-            return self::$fileTemplates[$name];
+            return $cache[$name] = self::$fileTemplates[$name];
         }
         if (isset(self::$bundleTemplates[$name])) {
-            return self::$bundleTemplates[$name];
+            return $cache[$name] = self::$bundleTemplates[$name];
         }
         foreach (['.hbs', '.tpl'] as $extension) {
             $entryMap = self::templateEntries(ltrim($extension, '.'), $name);
             if (isset($entryMap[$name]) && file_exists($entryMap[$name])) {
-                return (string) file_get_contents($entryMap[$name]);
+                return $cache[$name] = (string) file_get_contents($entryMap[$name]);
             }
         }
         if (isset(self::$embeddedTemplates[$name])) {
-            return self::$embeddedTemplates[$name];
+            return $cache[$name] = self::$embeddedTemplates[$name];
         }
+
+        $cache[$name] = null;
 
         return null;
     }
@@ -123,17 +139,26 @@ trait WorktypeLayoutTrait
 
     public static function sharedLayoutPackage(string $section, string $name): ?array
     {
+        static $cache = [];
+
+        $cacheKey = $section . '|' . $name;
+        if (array_key_exists($cacheKey, $cache)) {
+            return $cache[$cacheKey];
+        }
+
         $directory = self::sharedLayoutDirectory($section, $name);
         if ($directory === null) {
+            $cache[$cacheKey] = null;
             return null;
         }
 
         $template = self::readLayoutPackageFile($directory, 'template.hbs');
         if (!is_string($template) || trim($template) === '') {
+            $cache[$cacheKey] = null;
             return null;
         }
 
-        return [
+        $cache[$cacheKey] = [
             'name' => $name,
             'folderName' => self::sharedLayoutFolderName($directory),
             'label' => self::sharedLayoutFolderName($directory),
@@ -144,6 +169,8 @@ trait WorktypeLayoutTrait
             'js' => self::readLayoutPackageFile($directory, 'script.js') ?? '',
             'sectionTemplate' => self::readLayoutPackageFile($directory, $section === 'works' ? 'works.hbs' : 'work.hbs') ?? '',
         ];
+
+        return $cache[$cacheKey];
     }
 
     private static function sharedLayoutFolderName(string $directory): string
@@ -180,18 +207,29 @@ trait WorktypeLayoutTrait
 
     public static function layoutBundleAsset(string $name, string $file): ?string
     {
+        static $cache = [];
+
+        $cacheKey = self::canonicalLayoutName($name) . '|' . $file;
+        if (array_key_exists($cacheKey, $cache)) {
+            return $cache[$cacheKey];
+        }
+
         $path = self::layoutBundleAssetPath($name, $file);
         if ($path === null || !is_file($path)) {
             $layoutName = self::canonicalLayoutName($name);
             if (isset(self::$embeddedLayoutAssets[$layoutName][$file]) && is_string(self::$embeddedLayoutAssets[$layoutName][$file])) {
                 $embedded = trim(self::$embeddedLayoutAssets[$layoutName][$file]);
-                return $embedded !== '' ? self::$embeddedLayoutAssets[$layoutName][$file] : null;
+                $cache[$cacheKey] = $embedded !== '' ? self::$embeddedLayoutAssets[$layoutName][$file] : null;
+                return $cache[$cacheKey];
             }
 
+            $cache[$cacheKey] = null;
             return null;
         }
 
-        return (string) file_get_contents($path);
+        $cache[$cacheKey] = (string) file_get_contents($path);
+
+        return $cache[$cacheKey];
     }
 
     private static function templateEntries(string $extension, ?string $name = null): array

@@ -79,9 +79,24 @@ class MediaType
 
     public static function detectMimeType(string $fullPath, string $fileName): ?string
     {
+        static $cache = [];
+
+        $resolvedPath = realpath($fullPath);
+        $normalizedPath = is_string($resolvedPath) && $resolvedPath !== '' ? $resolvedPath : $fullPath;
+        $cacheKey = $normalizedPath
+            . '|'
+            . (string) (@filemtime($normalizedPath) ?: 0)
+            . '|'
+            . (string) (@filesize($normalizedPath) ?: 0)
+            . '|'
+            . strtolower($fileName);
+        if (array_key_exists($cacheKey, $cache)) {
+            return $cache[$cacheKey];
+        }
+
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         if (isset(self::MIME_BY_EXT[$ext])) {
-            return self::MIME_BY_EXT[$ext];
+            return $cache[$cacheKey] = self::MIME_BY_EXT[$ext];
         }
 
         if (function_exists('finfo_open')) {
@@ -90,10 +105,12 @@ class MediaType
                 $mime = finfo_file($finfo, $fullPath);
                 finfo_close($finfo);
                 if ($mime !== false) {
-                    return $mime;
+                    return $cache[$cacheKey] = $mime;
                 }
             }
         }
+
+        $cache[$cacheKey] = null;
 
         return null;
     }

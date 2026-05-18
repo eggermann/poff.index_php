@@ -368,6 +368,10 @@ trait PoffConfigCoreHelpers
 
     public static function ensure(string $dir): array
     {
+        $resolvedDir = realpath($dir);
+        $normalizedDir = is_string($resolvedDir) && $resolvedDir !== ''
+            ? $resolvedDir
+            : rtrim($dir, DIRECTORY_SEPARATOR);
         $configPath = self::configPath($dir);
         $defaults = self::defaultConfig($dir);
         $existing = null;
@@ -375,6 +379,30 @@ trait PoffConfigCoreHelpers
 
         if (file_exists($configPath)) {
             $existing = json_decode((string) file_get_contents($configPath), true);
+            if (
+                is_array($existing)
+                && is_dir($normalizedDir)
+                && is_file($configPath)
+                && (($existing['work'] ?? null) === null || is_array($existing['work']))
+            ) {
+                $configMtime = @filemtime($configPath);
+                $dirMtime = @filemtime($normalizedDir);
+                if ($configMtime !== false && $dirMtime !== false && $dirMtime < $configMtime) {
+                    $fastData = $existing;
+                    $fastData['folderName'] = $fastData['folderName'] ?? basename(rtrim($dir, DIRECTORY_SEPARATOR));
+                    $fastData['slug'] = trim((string) ($fastData['slug'] ?? self::slugify((string) $fastData['folderName'])), '-') ?: 'untitled';
+                    $fastData['title'] = $fastData['title'] ?? '';
+                    $fastData['description'] = $fastData['description'] ?? '';
+                    if (empty($fastData['id'])) {
+                        $fastData['id'] = self::generateId();
+                    }
+                    $existingWork = (isset($fastData['work']) && is_array($fastData['work'])) ? $fastData['work'] : [];
+                    $fastData['work'] = array_merge(self::defaultWork('folder'), $existingWork);
+                    $fastData['work']['layout'] = Worktype::normalizeLayout($fastData['work']['layout'] ?? null, 'works');
+
+                    return self::hydrateConfigLayout($fastData, $dir);
+                }
+            }
         }
 
         $mergedTree = $defaults['tree'];
@@ -528,11 +556,55 @@ trait PoffConfigCoreHelpers
     public static function ensureFileConfig(string $dir, string $fileName): array
     {
         $configPath = self::fileConfigPath($dir, $fileName);
+        $sourcePath = rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $fileName;
+        $resolvedSourcePath = realpath($sourcePath);
+        $normalizedSourcePath = is_string($resolvedSourcePath) && $resolvedSourcePath !== ''
+            ? $resolvedSourcePath
+            : $sourcePath;
         $defaults = self::defaultFileConfig($dir, $fileName);
         $existing = null;
 
         if (file_exists($configPath)) {
             $existing = json_decode((string) file_get_contents($configPath), true);
+            if (
+                is_array($existing)
+                && is_file($normalizedSourcePath)
+                && (($existing['work'] ?? null) === null || is_array($existing['work']))
+            ) {
+                $configMtime = @filemtime($configPath);
+                $sourceMtime = @filemtime($normalizedSourcePath);
+                $sourceSize = @filesize($normalizedSourcePath);
+                $existingSize = $existing['size'] ?? null;
+                if (
+                    $configMtime !== false
+                    && $sourceMtime !== false
+                    && $sourceMtime < $configMtime
+                    && ($existingSize === null || $sourceSize === false || (int) $existingSize === (int) $sourceSize)
+                ) {
+                    $fastData = $existing;
+                    $kind = (string) ($fastData['kind'] ?? MediaType::classifyExtension($fileName));
+                    $mime = isset($fastData['mimeType']) && is_string($fastData['mimeType']) ? $fastData['mimeType'] : null;
+                    $fastData['name'] = $fastData['name'] ?? $fileName;
+                    $fastData['slug'] = trim((string) ($fastData['slug'] ?? self::slugify($fileName)), '-') ?: 'untitled';
+                    $fastData['type'] = $fastData['type'] ?? 'file';
+                    $fastData['kind'] = $kind;
+                    $fastData['path'] = $fastData['path'] ?? $fileName;
+                    $fastData['visible'] = array_key_exists('visible', $fastData) ? (bool) $fastData['visible'] : true;
+                    $fastData['title'] = $fastData['title'] ?? '';
+                    $fastData['description'] = $fastData['description'] ?? '';
+                    if (!isset($fastData['mimeType']) && $mime !== null) {
+                        $fastData['mimeType'] = $mime;
+                    }
+                    if (empty($fastData['id'])) {
+                        $fastData['id'] = self::generateId();
+                    }
+                    $existingWork = (isset($fastData['work']) && is_array($fastData['work'])) ? $fastData['work'] : [];
+                    $fastData['work'] = array_merge(self::defaultWork($kind, $mime, $fileName), $existingWork);
+                    $fastData['work']['layout'] = Worktype::normalizeLayout($fastData['work']['layout'] ?? null, 'work');
+
+                    return self::hydrateConfigLayout($fastData, $dir, $fileName);
+                }
+            }
         }
 
         $data = $defaults;

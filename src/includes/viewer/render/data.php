@@ -63,6 +63,7 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         $entryRelativePath = cmsConfiguredTreeDisplayPath($relativePath, $entry, $entryName);
         $filesystemRelativePath = cmsConfiguredTreeFilesystemRelativePath($relativePath, $entry, $entryName);
         $entryTarget = cmsConfiguredTreeLinkTarget($entry);
+        $directLinkTarget = cmsConfiguredTreeDirectLinkTarget($entry);
         $entryLinkUrl = cmsConfiguredTreeExternalLinkUrl($entry);
         $entryStoredPath = trim((string) ($entry['path'] ?? $entry['relativePath'] ?? ''));
         $entryFullPath = '';
@@ -82,7 +83,7 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         $entryKind = $isFolder
             ? 'folder'
             : (($configuredType === 'link' || (!$hasPhysicalTarget && $entryTarget !== '')) ? 'link' : detectFileType($entryFullPath));
-        $preferLocalViewer = !$isFolder && ($hasPhysicalTarget || $entryTarget !== '');
+        $preferLocalViewer = !$isFolder && ($hasPhysicalTarget || ($entryTarget !== '' && $directLinkTarget === ''));
         $viewerHref = $preferLocalViewer
             ? cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, true)
             : ($entryTarget !== ''
@@ -188,6 +189,8 @@ function resolveFolderViewerTree(string $fullPath, ?array $folderConfig): array
 
 function readExistingFolderViewerConfig(string $dir): ?array
 {
+    static $cache = [];
+
     if (!class_exists('PoffConfig')) {
         return null;
     }
@@ -197,13 +200,22 @@ function readExistingFolderViewerConfig(string $dir): ?array
         return null;
     }
 
+    $cacheKey = $configPath . '|' . (string) (@filemtime($configPath) ?: 0);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
     $decoded = json_decode((string) file_get_contents($configPath), true);
 
-    return is_array($decoded) ? $decoded : null;
+    $cache[$cacheKey] = is_array($decoded) ? $decoded : null;
+
+    return $cache[$cacheKey];
 }
 
 function readExistingFolderViewerFileConfig(string $dir, string $fileName): ?array
 {
+    static $cache = [];
+
     if (!class_exists('PoffConfig')) {
         return null;
     }
@@ -213,9 +225,16 @@ function readExistingFolderViewerFileConfig(string $dir, string $fileName): ?arr
         return null;
     }
 
+    $cacheKey = $configPath . '|' . (string) (@filemtime($configPath) ?: 0);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
     $decoded = json_decode((string) file_get_contents($configPath), true);
 
-    return is_array($decoded) ? $decoded : null;
+    $cache[$cacheKey] = is_array($decoded) ? $decoded : null;
+
+    return $cache[$cacheKey];
 }
 
 function filterFolderViewerItemsByKind(array $items, string $kind): array

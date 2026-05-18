@@ -242,8 +242,21 @@ PHP;
     $stripRequires = static function (string $content): string {
         return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
     };
-    $viewerEditParts = [
+    $viewerSharedParts = [
         '/includes/viewer/utils.php',
+        '/includes/viewer/render/entry.php',
+        '/includes/viewer/render/file.php',
+        '/includes/viewer/render/folder.php',
+        '/includes/viewer/render/data.php',
+        '/includes/viewer/render/shell.php',
+    ];
+    foreach ($viewerSharedParts as $relativePath) {
+        $content = ComponentReader::readComponentFile($sourceDir . $relativePath);
+        $content = $stripRequires($content);
+        $buildContent .= trim($content) . "\n\n";
+    }
+
+    $viewerEditParts = [
         '/includes/viewer/edit/core/config.php',
         '/includes/viewer/edit/core/parent.php',
         '/includes/viewer/edit/core/transport.php',
@@ -282,11 +295,6 @@ PHP;
         '/includes/viewer/edit/action/prompt-action.php',
         '/includes/viewer/edit/action/models-action.php',
         '/includes/viewer/edit/action/dispatch.php',
-        '/includes/viewer/render/entry.php',
-        '/includes/viewer/render/file.php',
-        '/includes/viewer/render/folder.php',
-        '/includes/viewer/render/data.php',
-        '/includes/viewer/render/shell.php',
     ];
     foreach ($viewerEditParts as $relativePath) {
         $content = ComponentReader::readComponentFile($sourceDir . $relativePath);
@@ -354,6 +362,7 @@ PHP;
     $layout = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $layout);
     $nav = ComponentReader::readComponentFile($sourceDir . '/includes/nav.php');
     $nav = preg_replace('/<\?php\s*|\?>/s', '', $nav); // strip PHP tags before inlining
+    $nav = preg_replace('/^\s*require_once[^\n]*\n/m', '', $nav);
     $layout = str_replace('<!-- NAV_PLACEHOLDER -->', '<?php ' . trim($nav) . ' ?>', $layout);
     $buildContent .= trim($layout) . "\n";
 
