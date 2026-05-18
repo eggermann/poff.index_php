@@ -166,13 +166,75 @@ function runViewerWithMock(relativePath, baseDir = POFF_DIR, editMode = false, m
   });
 }
 
-function runResolveRemoteRenderedHtml(item, mockResponse = null) {
+function runViewerWithQuery(relativePath, baseDir = POFF_DIR, editMode = false, query = {}) {
   return new Promise((resolve, reject) => {
-    const payload = { item };
-    if (mockResponse !== null) {
-      payload.mockResponse = mockResponse;
+    const args = [path.join(ROOT, 'tests/php_render_viewer.php'), baseDir, relativePath];
+    if (editMode) {
+      args.push('edit');
+    }
+    args.push(JSON.stringify({ query }));
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`viewer helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runLayoutWithQuery(query = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_render_layout.php'), JSON.stringify({ query })], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`layout helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runResolveRemoteRenderedHtml(item, mockResponse = null) {
+    return new Promise((resolve, reject) => {
+      const payload = { item };
+      if (mockResponse !== null) {
+        payload.mockResponse = mockResponse;
     }
     const proc = spawn('php', [path.join(ROOT, 'tests/php_resolve_remote_rendered_html.php'), JSON.stringify(payload)], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`remote html helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runResolveRemoteRenderedHtmlWithMap(item, mockResponsesByUrl) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_resolve_remote_rendered_html.php'), JSON.stringify({
+      item,
+      mockResponsesByUrl,
+    })], {
       cwd: ROOT,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -924,6 +986,7 @@ describe('MCP create route helper (CLI)', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-auth-'));
     const sessionId = 'poff-auth-session';
     const hash = await makePasswordHash('secret-pass');
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
     fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
 
     const denied = await runEditRequest(tempDir, 'save', '', { title: 'Blocked title' });
@@ -961,6 +1024,109 @@ describe('MCP create route helper (CLI)', () => {
     }, sessionId);
     expect(newLogin.allowed).toBe(true);
     expect(newLogin.auth.authenticated).toBe(true);
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('guest poff links stay pending until an authenticated editor approves them', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-link-'));
+    const sessionId = 'poff-pending-link-session';
+    const hash = await makePasswordHash('secret-pass');
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
+
+    const submitted = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'remote-link',
+      linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+    }, sessionId);
+    expect(submitted.allowed).toBe(true);
+    expect(submitted.pendingApproval).toBe(true);
+    expect(submitted.uploaded[0].pendingApproval).toBe(true);
+
+    const guestConfig = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
+    expect(guestConfig.tree[0].visible).toBe(false);
+    expect(guestConfig.tree[0].approvalStatus).toBe('pending');
+
+    const login = await runEditRequest(tempDir, 'auth', '', {
+      intent: 'login',
+      password: 'secret-pass',
+    }, sessionId);
+    expect(login.auth.authenticated).toBe(true);
+
+    const approved = await runEditRequest(tempDir, 'save', '', {
+      treeVisible: ['remote-link'],
+    }, login.sessionId || sessionId);
+    expect(approved.allowed).toBe(true);
+    expect(approved.config.tree[0].visible).toBe(true);
+    expect(approved.config.tree[0].approvalStatus).toBe('approved');
+    expect(typeof approved.config.tree[0].approvedAt).toBe('string');
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('guest external submissions reject non-poff urls and enforce the pending limit', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-limit-'));
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+
+    const invalid = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'not-poff',
+      linkUrl: 'https://example.com/plain-page',
+    });
+    expect(invalid.allowed).toBe(true);
+    expect(invalid.error).toContain('Only links from another Poff system are allowed');
+
+    const tree = [];
+    for (let index = 0; index < 5; index += 1) {
+      tree.push({
+        name: `pending-${index}`,
+        slug: `pending-${index}`,
+        type: 'link',
+        kind: 'link',
+        path: `pending-${index}`,
+        linkUrl: `https://remote.example/index.php?view=1&path=item-${index}`,
+        baseUrl: 'https://remote.example/index.php',
+        visible: false,
+        externalSubmission: true,
+        approvalStatus: 'pending',
+      });
+    }
+    fs.writeFileSync(path.join(tempDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'pending-limit',
+      slug: 'pending-limit',
+      type: 'folder',
+      tree,
+    }, null, 2));
+
+    const overLimit = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'remote-overflow',
+      linkUrl: 'https://remote.example/index.php?view=1&path=overflow',
+    });
+    expect(overLimit.allowed).toBe(true);
+    expect(overLimit.error).toContain('Too many external links are waiting for approval');
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('guest external submissions accept poff hash routes', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-hash-link-'));
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+
+    const submitted = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'joined-test-1762176567798-mp4',
+      linkUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
+    });
+    expect(submitted.allowed).toBe(true);
+    expect(submitted.pendingApproval).toBe(true);
+    expect(submitted.uploaded[0].linkUrl).toBe('https://dominikeggermann.com/#/joined-test-1762176567798-mp4');
+
+    const config = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
+    expect(config.tree[0].visible).toBe(false);
+    expect(config.tree[0].approvalStatus).toBe('pending');
+    expect(config.tree[0].linkUrl).toBe('https://dominikeggermann.com/#/joined-test-1762176567798-mp4');
 
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
@@ -2733,6 +2899,15 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('injects the standalone shell toggle when shell=0 is requested', async () => {
+    const rendered = await runLayoutWithQuery({ shell: '0' });
+
+    expect(rendered).toContain('poff-shell-standalone');
+    expect(rendered).toContain('id="appShell"');
+    expect(rendered).toContain('id="appSidebar"');
+    expect(rendered).toContain('id="contentFrame"');
+  });
+
   test('routes add-work poff links through the upload action again', async () => {
     const result = await runPhpJson('php_upload_link_action.php');
 
@@ -2826,6 +3001,92 @@ describe('Worktype HBS renderer', () => {
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  test('renders hash-route virtual link items through the original external url when iframe fallback is used', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-virtual-hash-link-viewer-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+        folderName: 'virtual-hash-link-viewer',
+        slug: 'virtual-hash-link-viewer',
+        title: 'Virtual Hash Link Viewer',
+        description: '',
+        type: 'folder',
+        tree: [
+          {
+            name: 'dominikeggermann.com-2',
+            title: 'dominikeggermann.com-2',
+            type: 'link',
+            kind: 'link',
+            path: 'dominikeggermann.com-2',
+            linkUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
+            visible: true,
+          },
+        ],
+      }, null, 2));
+
+      const fileRendered = await runViewerWithMock('dominikeggermann.com-2', tempRoot, false, {
+        ok: false,
+        status: 502,
+        statusLine: 'HTTP/1.1 502 Bad Gateway',
+        body: '',
+      });
+
+      expect(fileRendered).toContain('poff-default-layout');
+      expect(fileRendered).toContain('<iframe');
+      expect(fileRendered).toContain('src="https://dominikeggermann.com/#/joined-test-1762176567798-mp4"');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('resolves remote hash routes through ajax before extracting rendered html', async () => {
+    const rendered = await runResolveRemoteRenderedHtmlWithMap({
+      linkUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
+      baseUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
+    }, {
+      'https://dominikeggermann.com/?ajax=resolve&slug=joined-test-1762176567798-mp4': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          path: 'ai-movs/joined-test-1762176567798.mp4',
+          type: 'file',
+          isFile: true,
+          slug: 'joined-test-1762176567798-mp4',
+        }),
+      },
+      'https://dominikeggermann.com/?ajax=snapshot&file=ai-movs%2Fjoined-test-1762176567798.mp4': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          kind: 'video',
+          context: {
+            baseUrl: 'https://dominikeggermann.com',
+            srcUrl: 'https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4',
+            work: {
+              template: 'video',
+              type: 'video',
+              autoplay: true,
+              controls: true,
+              loop: false,
+              muted: false,
+              layout: {
+                section: 'work',
+                sectionTemplate: '',
+              },
+            },
+          },
+        }),
+      },
+    });
+
+    expect(rendered).toContain('<video');
+    expect(rendered).toContain('https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4');
+    expect(rendered).not.toContain('appShell');
   });
 
   test('renders virtual configured items with external snapshots on the local host', async () => {

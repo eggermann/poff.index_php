@@ -3,6 +3,32 @@
  * HTML layout structure for the file browser
  */
 ?>
+<script>
+(function () {
+    try {
+        var shellValue = new URLSearchParams(window.location.search).get('shell');
+        if (['0', 'false', 'off', 'no'].indexOf(String(shellValue || '').toLowerCase()) !== -1) {
+            document.documentElement.classList.add('poff-shell-standalone');
+        }
+    } catch (error) {
+        // Ignore malformed URLs and keep the default shell.
+    }
+})();
+</script>
+<style>
+    html.poff-shell-standalone #appShell {
+        display: none !important;
+    }
+
+    html.poff-shell-standalone .preview-shell {
+        width: 100%;
+    }
+
+    html.poff-shell-standalone .main-content {
+        width: 100%;
+        margin-left: 0;
+    }
+</style>
 <div id="appShell" class="container">
     <button
         id="sidebarToggle"

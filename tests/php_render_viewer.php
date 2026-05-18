@@ -27,6 +27,16 @@ if ($payloadRaw !== '') {
             ];
         };
     }
+    if (is_array($payload) && isset($payload['query']) && is_array($payload['query'])) {
+        foreach ($payload['query'] as $key => $value) {
+            if (!is_string($key) || $key === '') {
+                continue;
+            }
+            if (is_scalar($value) || $value === null) {
+                $_GET[$key] = (string) $value;
+            }
+        }
+    }
 }
 
 if ($editMode) {

@@ -301,10 +301,7 @@ function cmsExtractPreferredRemoteRenderedHtml(string $html): string
                     }
                 }
 
-                $preferred = cmsDomNodeInnerHtml($node, $document);
-                if ($preferred !== '') {
-                    return $preferred;
-                }
+                return '';
             }
         }
 
@@ -423,6 +420,18 @@ function cmsResolveRemoteRenderedHtml(array $item): string
 {
     $baseUrl = trim((string) ($item['baseUrl'] ?? ($item['linkUrl'] ?? ($item['pageLink'] ?? ($item['pageUrl'] ?? '')))));
 
+    $snapshotUrl = cmsResolveRemoteRenderedSnapshotSourceUrl($baseUrl, $item);
+    if ($snapshotUrl !== '' && cmsIsExternalLinkTarget($snapshotUrl)) {
+        $response = cmsHttpGet($snapshotUrl, ['Accept: application/json']);
+        if (is_array($response) && ($response['ok'] ?? false)) {
+            $decoded = json_decode((string) ($response['body'] ?? ''), true);
+            $renderedSnapshot = cmsRenderRemoteSnapshotHtml(is_array($decoded) ? $decoded : []);
+            if ($renderedSnapshot !== '') {
+                return $renderedSnapshot;
+            }
+        }
+    }
+
     $sourceUrl = cmsResolveRemoteRenderedSourceUrl($baseUrl, $item);
     if ($sourceUrl !== '' && cmsIsExternalLinkTarget($sourceUrl)) {
         $response = cmsHttpGet($sourceUrl);
@@ -448,6 +457,128 @@ function cmsResolveRemoteRenderedHtml(array $item): string
     return '';
 }
 
+function cmsRenderRemoteSnapshotHtml(array $snapshot): string
+{
+    $context = is_array($snapshot['context'] ?? null) ? $snapshot['context'] : [];
+    if ($context === []) {
+        return '';
+    }
+
+    $kind = trim((string) ($snapshot['kind'] ?? ($context['kind'] ?? ($context['work']['type'] ?? ''))));
+    if ($kind === '') {
+        return '';
+    }
+
+    $renderedHtml = Worktype::render($kind, $context);
+    if ($renderedHtml === '') {
+        return '';
+    }
+
+    $baseUrl = trim((string) ($context['baseUrl'] ?? ($snapshot['baseUrl'] ?? '')));
+    if ($baseUrl !== '') {
+        $renderedHtml = cmsNormalizeRenderedHtmlBaseUrl($renderedHtml, $baseUrl);
+    }
+
+    return cmsStripRemoteAppChrome($renderedHtml);
+}
+
+function cmsParseExternalCmsViewerUrl(string $url): ?array
+{
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+        return null;
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts)) {
+        return null;
+    }
+
+    $query = trim((string) ($parts['query'] ?? ''));
+    if ($query === '') {
+        return null;
+    }
+
+    parse_str($query, $params);
+    $isFile = array_key_exists('file', $params);
+    $path = $isFile ? ($params['file'] ?? '') : ($params['path'] ?? '');
+    if (!is_scalar($path)) {
+        $path = '';
+    }
+    $path = trim((string) $path, "/\\");
+    if ($path === '') {
+        return null;
+    }
+
+    if (!array_key_exists('view', $params) && !$isFile) {
+        return null;
+    }
+
+    return [
+        'path' => $path,
+        'isFile' => $isFile,
+    ];
+}
+
+function cmsResolveRemoteRenderedSnapshotSourceUrl(string $sourceUrl, array $item): string
+{
+    $trimmed = trim($sourceUrl);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        return '';
+    }
+
+    $scheme = (string) $parts['scheme'];
+    $host = (string) $parts['host'];
+    $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+    $basePath = trim((string) ($parts['path'] ?? '/'));
+    if ($basePath === '') {
+        $basePath = '/';
+    }
+    $basePath = preg_replace('~/index\.php$~i', '/', $basePath);
+    if (!is_string($basePath) || $basePath === '') {
+        $basePath = '/';
+    }
+
+    $fragment = trim((string) ($parts['fragment'] ?? ''));
+    if ($fragment !== '' && str_starts_with($fragment, '/')) {
+        $slug = trim(ltrim($fragment, '/'), "/\\");
+        if ($slug !== '') {
+            $origin = $scheme . '://' . $host . $port;
+            $resolveUrl = $origin . $basePath . '?ajax=resolve&slug=' . rawurlencode($slug);
+            $response = cmsHttpGet($resolveUrl);
+            if (is_array($response) && ($response['ok'] ?? false)) {
+                $payload = json_decode((string) ($response['body'] ?? ''), true);
+                if (is_array($payload) && ($payload['resolved'] ?? false)) {
+                    $resolvedPath = trim((string) ($payload['path'] ?? ''), "/\\");
+                    if ($resolvedPath !== '') {
+                        $isFile = array_key_exists('isFile', $payload)
+                            ? (bool) $payload['isFile']
+                            : trim((string) ($payload['type'] ?? 'file')) !== 'folder';
+                        $query = $isFile
+                            ? '?ajax=snapshot&file=' . rawurlencode($resolvedPath)
+                            : '?ajax=snapshot&path=' . rawurlencode($resolvedPath);
+
+                        return $origin . $basePath . $query;
+                    }
+                }
+            }
+        }
+    }
+
+    $cmsQuery = cmsParseExternalCmsViewerUrl($trimmed);
+    if (is_array($cmsQuery)) {
+        $query = '?ajax=snapshot' . ($cmsQuery['isFile'] ? '&file=' : '&path=') . rawurlencode((string) $cmsQuery['path']);
+        return $scheme . '://' . $host . $port . $basePath . $query;
+    }
+
+    return '';
+}
+
 function cmsResolveRemoteRenderedSourceUrl(string $sourceUrl, array $item): string
 {
     $trimmed = trim($sourceUrl);
@@ -465,6 +596,11 @@ function cmsResolveRemoteRenderedSourceUrl(string $sourceUrl, array $item): stri
         return $trimmed;
     }
 
+    $resolvedHashRoute = cmsResolveRemoteHashRouteSourceUrl($parts, $fragment);
+    if ($resolvedHashRoute !== '') {
+        return $resolvedHashRoute;
+    }
+
     $targetPath = trim(ltrim($fragment, '/'), "/\\");
     if ($targetPath === '') {
         return $trimmed;
@@ -476,10 +612,57 @@ function cmsResolveRemoteRenderedSourceUrl(string $sourceUrl, array $item): stri
         ? '?view=1&path=' . rawurlencode($targetPath)
         : '?view=1&file=' . rawurlencode($targetPath);
 
-    return $parts['scheme'] . '://' . $parts['host']
+    $resolved = $parts['scheme'] . '://' . $parts['host']
         . (isset($parts['port']) ? ':' . $parts['port'] : '')
         . ($parts['path'] ?? '/')
         . $viewerQuery;
+
+    return $resolved;
+}
+
+function cmsResolveRemoteHashRouteSourceUrl(array $parts, string $fragment): string
+{
+    $slug = trim(ltrim($fragment, '/'), "/\\");
+    $scheme = trim((string) ($parts['scheme'] ?? ''));
+    $host = trim((string) ($parts['host'] ?? ''));
+    if ($slug === '' || $scheme === '' || $host === '') {
+        return '';
+    }
+
+    $basePath = trim((string) ($parts['path'] ?? '/'));
+    if ($basePath === '') {
+        $basePath = '/';
+    }
+    $basePath = preg_replace('~/index\.php$~i', '/', $basePath);
+    if (!is_string($basePath) || $basePath === '') {
+        $basePath = '/';
+    }
+
+    $origin = $scheme . '://' . $host . (isset($parts['port']) ? ':' . $parts['port'] : '');
+    $resolveUrl = $origin . $basePath . '?ajax=resolve&slug=' . rawurlencode($slug);
+    $response = cmsHttpGet($resolveUrl);
+    if (!is_array($response) || !($response['ok'] ?? false)) {
+        return '';
+    }
+
+    $payload = json_decode((string) ($response['body'] ?? ''), true);
+    if (!is_array($payload) || !($payload['resolved'] ?? false)) {
+        return '';
+    }
+
+    $resolvedPath = trim((string) ($payload['path'] ?? ''), "/\\");
+    if ($resolvedPath === '') {
+        return '';
+    }
+
+    $isFile = array_key_exists('isFile', $payload)
+        ? (bool) $payload['isFile']
+        : trim((string) ($payload['type'] ?? 'file')) !== 'folder';
+    $query = $isFile
+        ? '?view=1&file=' . rawurlencode($resolvedPath)
+        : '?view=1&path=' . rawurlencode($resolvedPath);
+
+    return $origin . $basePath . $query;
 }
 
 function cmsNormalizeRenderedHtmlBaseUrl(string $html, string $baseUrl): string
@@ -731,6 +914,33 @@ function cmsHandleResolveRoute(string $rootDir): void
     cmsJsonResponse([
         'resolved' => true,
     ] + $resolved);
+}
+
+function cmsHandleSnapshotRoute(string $rootDir): void
+{
+    $requestedPath = trim((string) ($_GET['file'] ?? $_GET['path'] ?? ''));
+    if ($requestedPath === '' || str_contains($requestedPath, '..')) {
+        cmsJsonResponse([
+            'resolved' => false,
+            'error' => 'Invalid path.',
+        ], 400);
+    }
+
+    $resolved = cmsResolveTarget($rootDir, $requestedPath);
+    if (!is_array($resolved) || ($resolved['type'] ?? '') !== 'file' || empty($resolved['path'])) {
+        cmsJsonResponse([
+            'resolved' => false,
+            'error' => 'Snapshot not available.',
+        ], 404);
+    }
+
+    $relativePath = trim((string) ($requestedPath !== '' ? $requestedPath : ($resolved['path'] ?? '')), "/\\");
+    $snapshot = buildFileViewerSnapshotPayload($relativePath, (string) $resolved['path'], null, class_exists('PoffConfig') ? cmsResolveConfiguredTreeItem($rootDir, $relativePath) : null);
+    cmsJsonResponse([
+        'resolved' => true,
+        'kind' => $snapshot['type'],
+        'context' => $snapshot['snapshotContext'],
+    ]);
 }
 
 function cmsLoadEnv(string $rootDir): array
