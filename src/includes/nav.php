@@ -140,14 +140,17 @@ if (is_array($tree)) {
             continue;
         }
         $itemType = $item['type'] ?? 'file';
-        $relativePath = $navFolder ? rtrim($navFolder, "/\\") . '/' . $itemName : $itemName;
-        $fullPath = $navAbsolutePath . DIRECTORY_SEPARATOR . $itemName;
+        $itemStoredPath = trim((string) ($item['path'] ?? $itemName), "/\\");
+        $relativePath = $navFolder
+            ? rtrim($navFolder, "/\\") . '/' . ($itemStoredPath !== '' ? $itemStoredPath : $itemName)
+            : ($itemStoredPath !== '' ? $itemStoredPath : $itemName);
+        $fullPath = $navAbsolutePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $itemStoredPath !== '' ? $itemStoredPath : $itemName);
         $linkUrl = ($itemType === 'folder') ? null : extractLinkFileUrl($fullPath);
 
         if ($itemType === 'folder') {
             $directories[] = cmsNavEntry($itemName, $relativePath, 'folder', $folderIcon, $item, null, $editQuery) + ['hidden' => $isHidden];
         } else {
-            $files[] = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $linkUrl ?? $relativePath, $editQuery) + ['hidden' => $isHidden];
+            $files[] = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $relativePath, $editQuery) + ['hidden' => $isHidden];
         }
     }
 } else {
@@ -172,7 +175,7 @@ if (is_array($tree)) {
             if ($isDir) {
                 $directories[] = cmsNavEntry($item, $itemRelativePath, 'folder', $folderIcon, [], null, $editQuery);
             } else {
-                $files[] = cmsNavEntry($item, $itemRelativePath, 'file', $fileIcon, [], $linkUrl ?? $itemRelativePath, $editQuery);
+                $files[] = cmsNavEntry($item, $itemRelativePath, 'file', $fileIcon, [], $itemRelativePath, $editQuery);
             }
         }
     } else {

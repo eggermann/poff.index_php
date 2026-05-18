@@ -181,6 +181,7 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
             'errors' => ['Link URLs must start with http:// or https://.'],
         ];
     }
+    $baseUrl = cmsNormalizeRemoteBaseUrl($target);
 
     $config = PoffConfig::ensure($targetDir);
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
@@ -221,7 +222,7 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
         'kind' => 'link',
         'path' => $name,
         'linkUrl' => $target,
-        'baseUrl' => $target,
+        'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
         'visible' => true,
         'modifiedAt' => $now,
     ];
@@ -252,9 +253,34 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
             'name' => $name,
             'path' => $name,
             'linkUrl' => $target,
+            'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
         ]],
         'errors' => [],
     ];
+}
+
+function cmsNormalizeRemoteBaseUrl(string $url): string
+{
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        return rtrim($trimmed, '/');
+    }
+
+    $normalized = $parts['scheme'] . '://' . $parts['host'];
+    if (isset($parts['port'])) {
+        $normalized .= ':' . $parts['port'];
+    }
+    $path = trim((string) ($parts['path'] ?? ''), '/');
+    if ($path !== '') {
+        $normalized .= '/' . $path;
+    }
+
+    return rtrim($normalized, '/');
 }
 
 function cmsUploadSafeName(string $name): string

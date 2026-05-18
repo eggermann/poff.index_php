@@ -82,12 +82,19 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         $entryKind = $isFolder
             ? 'folder'
             : (($configuredType === 'link' || (!$hasPhysicalTarget && $entryTarget !== '')) ? 'link' : detectFileType($entryFullPath));
-        $viewerHref = $entryTarget !== ''
-            ? $entryTarget
-            : cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, !$isFolder);
-        $rawHref = $entryTarget !== ''
-            ? $entryTarget
-            : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, !$isFolder);
+        $preferLocalViewer = !$isFolder && ($hasPhysicalTarget || $entryTarget !== '');
+        $viewerHref = $preferLocalViewer
+            ? cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, true)
+            : ($entryTarget !== ''
+                ? $entryTarget
+                : cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, !$isFolder));
+        $rawHref = $preferLocalViewer
+            ? ($hasPhysicalTarget
+                ? cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, true)
+                : ($entryTarget !== '' ? $entryTarget : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, true)))
+            : ($entryTarget !== ''
+                ? $entryTarget
+                : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, !$isFolder));
         $item = array_merge($entry, [
             'name' => $entryName,
             'title' => $entry['title'] ?? $entryName,

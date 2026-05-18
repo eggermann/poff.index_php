@@ -25,6 +25,16 @@ function renderViewer(string $baseDir, string $requestedPath): void
         $fullPath .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
     }
     if (!file_exists($fullPath)) {
+        $virtualConfig = class_exists('PoffConfig')
+            ? cmsResolveConfiguredTreeItem($baseDir, $relativePath)
+            : null;
+        $virtualType = strtolower(trim((string) (($virtualConfig['kind'] ?? ($virtualConfig['type'] ?? '')))));
+        $virtualTarget = is_array($virtualConfig) ? cmsConfiguredTreeLinkTarget($virtualConfig) : '';
+        $virtualRenderedHtml = is_array($virtualConfig) ? trim((string) ($virtualConfig['renderedHtml'] ?? '')) : '';
+        if (is_array($virtualConfig) && $virtualType !== 'folder' && ($virtualTarget !== '' || $virtualRenderedHtml !== '')) {
+            renderFileViewer($relativePath, $fullPath, null, $virtualConfig);
+            return;
+        }
         http_response_code(404);
         echo 'Path not found.';
         return;

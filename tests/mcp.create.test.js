@@ -2733,6 +2733,101 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('routes add-work poff links through the upload action again', async () => {
+    const result = await runPhpJson('php_upload_link_action.php');
+
+    expect(result.allowed).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(result.uploaded).toEqual([
+      expect.objectContaining({
+        name: 'my-link',
+        linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+      }),
+    ]);
+    expect(result.config.tree).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'my-link',
+        type: 'link',
+        linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+      }),
+    ]));
+  });
+
+  test('renders remote links through external.hbs even when only the fallback target is available', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-link-fallback-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'sample.url'), '[InternetShortcut]\nURL=https://remote.example/portfolio\n');
+
+      const rendered = await runViewerWithMock('sample.url', tempRoot, false, {
+        ok: false,
+        status: 502,
+        statusLine: 'HTTP/1.1 502 Bad Gateway',
+        body: '',
+      });
+
+      expect(rendered).toContain('poff-default-layout');
+      expect(rendered).toContain('<iframe');
+      expect(rendered).toContain('src="https://remote.example/portfolio"');
+      expect(rendered).not.toContain('<div class="message">');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('keeps local viewer routes for link files inside folder previews', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-link-folder-preview-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'sample.url'), '[InternetShortcut]\nURL=https://remote.example/portfolio\n');
+
+      const rendered = await runViewer('', tempRoot, false);
+
+      expect(rendered).toContain('?view&#x3D;1&amp;file&#x3D;sample.url');
+      expect(rendered).not.toContain('href="https://remote.example/portfolio"');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('renders virtual remote link items through the local host viewer wrapper', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-virtual-link-viewer-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+        folderName: 'virtual-link-viewer',
+        slug: 'virtual-link-viewer',
+        title: 'Virtual Link Viewer',
+        description: '',
+        type: 'folder',
+        tree: [
+          {
+            name: 'dominikeggermann.com',
+            title: 'dominikeggermann.com',
+            type: 'link',
+            kind: 'link',
+            path: 'dominikeggermann.com',
+            linkUrl: 'https://dominikeggermann.com/',
+            visible: true,
+          },
+        ],
+      }, null, 2));
+
+      const folderRendered = await runViewer('', tempRoot, false);
+      expect(folderRendered).toContain('?view&#x3D;1&amp;file&#x3D;dominikeggermann.com');
+
+      const fileRendered = await runViewerWithMock('dominikeggermann.com', tempRoot, false, {
+        ok: false,
+        status: 502,
+        statusLine: 'HTTP/1.1 502 Bad Gateway',
+        body: '',
+      });
+
+      expect(fileRendered).toContain('poff-default-layout');
+      expect(fileRendered).toContain('<iframe');
+      expect(fileRendered).toContain('src="https://dominikeggermann.com/"');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('renders virtual configured items with external snapshots on the local host', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-virtual-external-'));
     try {

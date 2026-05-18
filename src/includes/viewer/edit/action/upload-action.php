@@ -16,13 +16,18 @@ function cmsHandleEditUploadAction(array $ctx): void
             : PoffConfig::folderLayoutDir($ctx['targetDir']))
         : $ctx['targetDir'];
     $source = trim((string) ($data['source'] ?? 'upload'));
-    if (!in_array($source, ['upload', 'blank', 'folder'], true)) {
+    if (!in_array($source, ['upload', 'blank', 'folder', 'url'], true)) {
         cmsJsonResponse(['allowed' => true, 'error' => 'Unsupported add-content source.'], 400);
     }
 
     $result = match ($source) {
         'blank' => cmsCreateBlankFile($targetDir, (string) ($data['fileName'] ?? $data['filename'] ?? ''), (string) ($data['contents'] ?? '')),
         'folder' => cmsCreateFolder($targetDir, (string) ($data['fileName'] ?? $data['folderName'] ?? $data['filename'] ?? '')),
+        'url' => cmsCreateLinkEntry(
+            $targetDir,
+            (string) ($data['linkName'] ?? $data['fileName'] ?? $data['filename'] ?? ''),
+            (string) ($data['linkUrl'] ?? $data['url'] ?? '')
+        ),
         default => function () use ($targetDir): array {
             $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
             if ($entries === []) {

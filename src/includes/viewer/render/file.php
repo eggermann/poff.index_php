@@ -1,19 +1,25 @@
 <?php
 
-function renderFileViewer(string $relativePath, string $fullPath): void
+function renderFileViewer(string $relativePath, string $fullPath, ?array $fileConfigOverride = null, ?array $treeConfigOverride = null): void
 {
-    $fileConfig = null;
-    if (class_exists('PoffConfig')) {
+    $hasPhysicalFile = is_file($fullPath);
+    $fileConfig = $fileConfigOverride;
+    if ($fileConfig === null && $hasPhysicalFile && class_exists('PoffConfig')) {
         $fileConfig = PoffConfig::ensureFileConfig(dirname($fullPath), basename($fullPath));
     }
-    $treeConfig = null;
-    if (class_exists('PoffConfig')) {
+    $treeConfig = $treeConfigOverride;
+    if ($treeConfig === null && class_exists('PoffConfig')) {
         $treeConfig = cmsResolveConfiguredTreeItem(dirname($fullPath), $relativePath);
     }
 
-    $type = detectFileType($fullPath);
-    $mimeType = MediaType::detectMimeType($fullPath, basename($fullPath));
+    $detectedType = detectFileType($fullPath);
+    $configuredType = strtolower(trim((string) ($treeConfig['kind'] ?? ($treeConfig['type'] ?? ($fileConfig['kind'] ?? ($fileConfig['type'] ?? ''))))));
+    $type = $configuredType === 'link' ? 'link' : $detectedType;
+    $mimeType = $hasPhysicalFile ? MediaType::detectMimeType($fullPath, basename($fullPath)) : null;
     $workData = (isset($fileConfig['work']) && is_array($fileConfig['work'])) ? $fileConfig['work'] : [];
+    if ($workData === [] && isset($treeConfig['work']) && is_array($treeConfig['work'])) {
+        $workData = $treeConfig['work'];
+    }
     $workTemplateKey = trim((string) ($workData['template'] ?? ''));
     $workDefinitionKey = $workTemplateKey !== '' ? $workTemplateKey : $type;
     $workDefaults = Worktype::definition($workDefinitionKey, $mimeType);
@@ -36,7 +42,7 @@ function renderFileViewer(string $relativePath, string $fullPath): void
     $configuredLinkUrl = trim((string) ($treeConfig['linkUrl'] ?? ($treeConfig['pageLink'] ?? ($treeConfig['pageUrl'] ?? ''))));
     $configuredBaseUrl = trim((string) ($treeConfig['baseUrl'] ?? ''));
     $configuredRenderedHtml = trim((string) ($treeConfig['renderedHtml'] ?? ''));
-    if ($type === 'link') {
+    if ($type === 'link' && $hasPhysicalFile) {
         $linkUrl = extractLinkFileUrl($fullPath);
     }
     if ($linkUrl === null && $configuredLinkUrl !== '') {
@@ -49,11 +55,6 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'baseUrl' => $configuredBaseUrl !== '' ? $configuredBaseUrl : ($fileConfig['baseUrl'] ?? ($linkUrl ?? '')),
         'renderedHtml' => $configuredRenderedHtml !== '' ? $configuredRenderedHtml : trim((string) ($fileConfig['renderedHtml'] ?? '')),
     ]);
-    if ($renderedHtml !== '') {
-        $work['template'] = 'external';
-        $work['layout']['section'] = 'work';
-        $work['layout']['sectionTemplate'] = '';
-    }
     $previewUrl = '';
     if ($linkUrl !== null) {
         $trimmedLinkUrl = trim($linkUrl);
@@ -61,9 +62,14 @@ function renderFileViewer(string $relativePath, string $fullPath): void
             $previewUrl = $trimmedLinkUrl;
         }
     }
+    if ($renderedHtml !== '' || $previewUrl !== '' || ($type === 'link' && trim((string) ($linkUrl ?? '')) !== '')) {
+        $work['template'] = 'external';
+        $work['layout']['section'] = 'work';
+        $work['layout']['sectionTemplate'] = '';
+    }
     $showInlineTextPreview = false;
     $textContent = '';
-    if ($type === 'text') {
+    if ($type === 'text' && $hasPhysicalFile) {
         $showInlineTextPreview = MediaType::shouldUseInlineTextPreview(basename($fullPath), $mimeType);
         if ($showInlineTextPreview) {
             $contents = @file_get_contents($fullPath);
@@ -91,8 +97,8 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'assetUrl' => viewerAssetHref($relativePath),
         'mimeType' => $mimeType ?? '',
         'name' => $rawName,
-        'title' => $fileConfig['title'] ?? $rawName,
-        'description' => $fileConfig['description'] ?? '',
+        'title' => $treeConfig['title'] ?? ($fileConfig['title'] ?? $rawName),
+        'description' => $treeConfig['description'] ?? ($fileConfig['description'] ?? ''),
         'descriptionHtml' => $descriptionHtml,
         'linkUrl' => $linkUrl ?? '',
         'previewUrl' => $previewUrl,
@@ -110,7 +116,7 @@ function renderFileViewer(string $relativePath, string $fullPath): void
         'path' => $relativePath,
         'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,
-        'openHref' => viewerAssetHref($relativePath),
-        'openLabel' => 'Open Raw',
+        'openHref' => ($linkUrl !== null && trim($linkUrl) !== '') ? $linkUrl : viewerAssetHref($relativePath),
+        'openLabel' => ($linkUrl !== null && trim($linkUrl) !== '') ? 'Open Source' : 'Open Raw',
     ]);
 }

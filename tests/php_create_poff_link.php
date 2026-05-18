@@ -37,8 +37,18 @@ if (($result['stored'][0]['linkUrl'] ?? '') !== $linkUrl) {
     exit(1);
 }
 
+if (($result['stored'][0]['baseUrl'] ?? '') !== 'https://remote.example/index.php') {
+    fwrite(STDERR, "Expected link helper to store the normalized base URL.\n");
+    exit(1);
+}
+
 if (($linkItems[0]['linkUrl'] ?? '') !== $linkUrl) {
     fwrite(STDERR, "Expected config tree to contain the remote URL.\n");
+    exit(1);
+}
+
+if (($linkItems[0]['baseUrl'] ?? '') !== 'https://remote.example/index.php') {
+    fwrite(STDERR, "Expected config tree to contain the normalized base URL.\n");
     exit(1);
 }
 
