@@ -46,5 +46,26 @@ export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubm
         });
     }
 
-    return { drawerForm, drawerStatus };
+    function focusTreeItem(path = '') {
+        if (!path) {
+            return false;
+        }
+        const row = Array.from(editDrawer.querySelectorAll('[data-tree-item-path]'))
+            .find((candidate) => candidate.getAttribute('data-tree-item-path') === path);
+        if (!row) {
+            return false;
+        }
+        row.classList.add('edit-tree-item-focused');
+        window.setTimeout(() => {
+            row.classList.remove('edit-tree-item-focused');
+        }, 1800);
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const checkbox = row.querySelector('input[name="tree_visible"]');
+        if (checkbox && typeof checkbox.focus === 'function') {
+            checkbox.focus({ preventScroll: true });
+        }
+        return true;
+    }
+
+    return { drawerForm, drawerStatus, focusTreeItem };
 }

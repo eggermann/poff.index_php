@@ -159,6 +159,19 @@ export function createSidebarController({
         if (!navList) {
             return;
         }
+        const reviewAction = event.target.closest?.('[data-nav-action="review-external"]');
+        if (reviewAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const reviewPath = reviewAction.getAttribute('data-nav-path') || '';
+            window.dispatchEvent(new CustomEvent('poff:review-external-link', {
+                detail: {
+                    path: reviewPath,
+                    folderPath: currentFolderPath,
+                },
+            }));
+            return;
+        }
         const fastAction = event.target.closest?.('[data-nav-action="toggle-visibility"]');
         if (fastAction) {
             event.preventDefault();

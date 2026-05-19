@@ -241,6 +241,7 @@ export function createEditController({ elements, context, editRequested }) {
 
             const url = new URL(window.location.href);
             url.searchParams.set('edit', 'true');
+            url.searchParams.set('add', authState.canEdit ? 'work' : 'url');
             window.location.href = url.toString();
         });
     }
@@ -347,7 +348,7 @@ export function createEditController({ elements, context, editRequested }) {
         const layoutNameForPreset = createLayoutNameForPreset(editConfig);
         const panelState = renderEditPanel({
             editPanel,
-            editRequested: editRequested && authState.canEdit,
+            editRequested,
             config,
             status,
             contentTargetLabel: getContentTargetPath(),
@@ -563,22 +564,31 @@ export function createEditController({ elements, context, editRequested }) {
                 const data = await requestEditUpload({
                     path: getContentTargetPath(selection),
                     source,
+                    linkName,
                     fileName: linkName,
                     linkUrl,
                     files: [],
                 });
+                if (data?.auth) {
+                    updateAuthState(data.auth);
+                }
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create link failed.');
                 }
-                await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : (linkName || linkUrl);
-                    setStatusMessage(inlineStatus, `Created link ${createdName}.`, true);
+                    const message = data.pendingApproval
+                        ? `Submitted ${createdName} for approval.`
+                        : `Created link ${createdName}.`;
+                    setStatusMessage(inlineStatus, message, true);
                 }
-                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                if (!(data.pendingApproval && !authState.canEdit)) {
+                    await refreshCurrentEditState(selection);
+                    window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                }
             },
             onChangePassword: async ({ elements, form, statusEl }) => {
                 try {
@@ -670,6 +680,24 @@ export function createEditController({ elements, context, editRequested }) {
             });
         }
         syncDrawerVisibility();
+
+        window.POFF_REVIEW_PENDING_LINK = ({ path = '' } = {}) => {
+            drawerOpen = true;
+            syncDrawerVisibility();
+            if (!path || typeof drawerState.focusTreeItem !== 'function') {
+                return;
+            }
+            window.setTimeout(() => {
+                drawerState.focusTreeItem(path);
+            }, 30);
+        };
+        const reviewPath = new URL(window.location.href).searchParams.get('review') || '';
+        if (reviewPath) {
+            window.POFF_REVIEW_PENDING_LINK({ path: reviewPath });
+            const url = new URL(window.location.href);
+            url.searchParams.delete('review');
+            window.history.replaceState(null, '', url.toString());
+        }
     }
 
     async function initEditMode() {
@@ -713,6 +741,20 @@ export function createEditController({ elements, context, editRequested }) {
             auth: data.auth || authState,
         });
     }
+
+    window.addEventListener('poff:review-external-link', (event) => {
+        const reviewPath = event?.detail?.path || '';
+        if (!editRequested || !authState.canEdit) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('edit', 'true');
+            url.searchParams.set('review', reviewPath);
+            window.location.href = url.toString();
+            return;
+        }
+        if (typeof window.POFF_REVIEW_PENDING_LINK === 'function') {
+            window.POFF_REVIEW_PENDING_LINK({ path: reviewPath });
+        }
+    });
 
     return {
         renderFolderMeta,

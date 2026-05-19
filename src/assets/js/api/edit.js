@@ -145,6 +145,12 @@ export async function requestEditUpload(payload) {
     if (typeof payload.fileName === 'string') {
         formData.set('fileName', payload.fileName);
     }
+    if (typeof payload.linkName === 'string') {
+        formData.set('linkName', payload.linkName);
+    }
+    if (typeof payload.linkUrl === 'string') {
+        formData.set('linkUrl', payload.linkUrl);
+    }
     if (typeof payload.contents === 'string') {
         formData.set('contents', payload.contents);
     }

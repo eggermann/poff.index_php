@@ -1,25 +1,18 @@
 import { uploadValidationError } from './shared.js';
 import { setStatusMessage } from '../status.js';
 
-export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
+export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false }) {
     if (isFileTarget) {
         return '';
     }
-    return `
-        <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add work</div>
-                <div class="small-note">${isEmptyFolder ? 'This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start.' : 'Upload files, create a blank file, create a folder, or add a link in this folder.'}</div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
-        </div>
-        <dialog class="edit-upload-dialog" id="editUploadDialog">
-            <form method="dialog" class="edit-upload-dialog-form">
-                <div class="drawer-header">
-                    <h4 class="drawer-title">Add work</h4>
-                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
-                </div>
-                <div class="edit-grid">
+    const launcherCopy = externalOnly
+        ? 'Submit a Poff link from another system. It stays hidden until an editor confirms it.'
+        : (isEmptyFolder
+            ? 'This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start.'
+            : 'Upload files, create a blank file, create a folder, or add a link in this folder.');
+    const sourceFieldHtml = externalOnly
+        ? '<input type="hidden" name="upload_source" value="url">'
+        : `
                     <div>
                         <label class="edit-label" for="edit-upload-source">Source</label>
                         <select class="form-select" id="edit-upload-source" name="upload_source">
@@ -29,6 +22,23 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
                             <option value="url">Poff link</option>
                         </select>
                     </div>
+        `;
+    return `
+        <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">${launcherCopy}</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">${externalOnly ? 'Submit link' : 'Add work'}</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">${externalOnly ? 'Submit external link' : 'Add work'}</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                </div>
+                <div class="edit-grid">
+                    ${sourceFieldHtml}
                     <div id="editUploadFilesWrap">
                         <label class="edit-label" for="edit-upload-files">Files</label>
                         <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
@@ -42,9 +52,9 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
                         <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/index.php?view=1&path=folder">
                     </div>
                 </div>
-                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="small-note" id="editUploadSummary">${externalOnly ? 'Use a Poff viewer URL from another system. Max 5 pending links per folder.' : 'No files selected.'}</div>
                 <div class="edit-inline-actions">
-                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn" type="button" id="editUploadSubmit">${externalOnly ? 'Submit for review' : 'Add'}</button>
                     <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
                 </div>
             </form>
@@ -56,6 +66,7 @@ export function bindUploadDialog({
     editPanel,
     statusEl,
     uploadLimits,
+    externalOnly = false,
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
@@ -83,7 +94,8 @@ export function bindUploadDialog({
     const uploadUrlDrafts = {
         url: '',
     };
-    let uploadMode = uploadSourceEl?.value || 'upload';
+    const readUploadMode = () => (externalOnly ? 'url' : (uploadSourceEl?.value || 'upload'));
+    let uploadMode = readUploadMode();
 
     if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== 'function' || typeof onCreateBlankFile !== 'function' || typeof onCreateFolder !== 'function' || typeof onCreateLink !== 'function') {
         return;
@@ -94,7 +106,7 @@ export function bindUploadDialog({
         if (!uploadSummaryEl) {
             return;
         }
-        const mode = uploadSourceEl?.value || 'upload';
+        const mode = readUploadMode();
         if (mode === 'blank' || mode === 'folder') {
             const name = blankFileNameEl?.value?.trim() || '';
             uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
@@ -104,7 +116,7 @@ export function bindUploadDialog({
             const linkName = blankFileNameEl?.value?.trim() || '';
             const linkUrl = linkUrlEl?.value?.trim() || '';
             uploadSummaryEl.textContent = linkUrl
-                ? `Will add link: ${linkName || linkUrl}`
+                ? (externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}`)
                 : 'Enter a link URL.';
             return;
         }
@@ -117,7 +129,7 @@ export function bindUploadDialog({
     };
 
     const syncUploadMode = () => {
-        const mode = uploadSourceEl?.value || 'upload';
+        const mode = readUploadMode();
         if ((uploadMode === 'blank' || uploadMode === 'folder') && blankFileNameEl) {
             uploadNameDrafts[uploadMode] = blankFileNameEl.value || '';
         }
@@ -163,7 +175,7 @@ export function bindUploadDialog({
                 : mode === 'folder'
                     ? 'Create folder'
                     : mode === 'url'
-                        ? 'Add link'
+                        ? (externalOnly ? 'Submit for review' : 'Add link')
                     : 'Upload';
         }
         setUploadSummary();
@@ -179,11 +191,18 @@ export function bindUploadDialog({
     };
 
     const openUploadDialog = () => {
+        if (!uploadDialog.isConnected) {
+            return false;
+        }
         syncUploadMode();
         setUploadSummary();
-        if (typeof uploadDialog.showModal === 'function') {
-            uploadDialog.showModal();
-        } else {
+        try {
+            if (typeof uploadDialog.showModal === 'function') {
+                uploadDialog.showModal();
+            } else {
+                uploadDialog.setAttribute('open', 'open');
+            }
+        } catch (err) {
             uploadDialog.setAttribute('open', 'open');
         }
         uploadDialog.classList.add('edit-upload-dialog-open');
@@ -191,6 +210,7 @@ export function bindUploadDialog({
         if (firstFocusable && typeof firstFocusable.focus === 'function') {
             firstFocusable.focus();
         }
+        return true;
     };
 
     openUploadDialogButton.addEventListener('click', openUploadDialog);
@@ -211,7 +231,7 @@ export function bindUploadDialog({
     }
     if (uploadSubmitButton) {
         uploadSubmitButton.addEventListener('click', async () => {
-            const source = uploadSourceEl?.value || 'upload';
+            const source = readUploadMode();
             try {
                 uploadSubmitButton.disabled = true;
                 if (source === 'blank') {
@@ -275,4 +295,20 @@ export function bindUploadDialog({
         });
     }
     syncUploadMode();
+    const addIntent = new URL(window.location.href).searchParams.get('add') || '';
+    if ((externalOnly && addIntent === 'url') || (!externalOnly && addIntent === 'work')) {
+        const openWhenReady = () => {
+            if (!uploadDialog.isConnected) {
+                window.requestAnimationFrame(openWhenReady);
+                return;
+            }
+            if (!openUploadDialog()) {
+                return;
+            }
+            const url = new URL(window.location.href);
+            url.searchParams.delete('add');
+            window.history.replaceState(null, '', url.toString());
+        };
+        window.requestAnimationFrame(openWhenReady);
+    }
 }

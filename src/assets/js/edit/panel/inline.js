@@ -579,7 +579,36 @@ export function renderEditPanel({
         syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
+    const canRenderPublicExternalSubmission = !status?.auth?.canEdit
+        && status?.auth?.editModeAllowed !== false
+        && status?.target !== 'file';
     editPanel.hidden = false;
+    if (canRenderPublicExternalSubmission) {
+        const treeItems = Array.isArray(config?.tree) ? config.tree : [];
+        const uploadSectionHtml = renderUploadSectionHtml({
+            isFileTarget: false,
+            isEmptyFolder: treeItems.length === 0,
+            externalOnly: true,
+        });
+        editPanel.innerHTML = `
+            <h3 class="edit-panel-title">Submit external link</h3>
+            <div class="edit-status" id="editInlineStatus">${escapeHtml(status?.error || 'External links stay hidden until an editor confirms them.')}</div>
+            ${uploadSectionHtml}
+        `;
+        const statusEl = editPanel.querySelector('#editInlineStatus');
+        bindUploadDialog({
+            editPanel,
+            statusEl,
+            uploadLimits: status?.uploadLimits || null,
+            externalOnly: true,
+            onUploadFiles,
+            onCreateBlankFile,
+            onCreateFolder,
+            onCreateLink,
+        });
+        syncPromptDock();
+        return { statusEl, promptRoot: null };
+    }
     if (!config || status?.error) {
         const authMessage = status?.auth && !status.auth.canEdit
             ? (status?.error || 'Enter the editor password to unlock editing.')
@@ -631,6 +660,7 @@ export function renderEditPanel({
     const uploadSectionHtml = renderUploadSectionHtml({
         isFileTarget,
         isEmptyFolder,
+        externalOnly: false,
     });
 
     editPanel.innerHTML = `
@@ -790,15 +820,16 @@ export function renderEditPanel({
         });
     }
 
-        bindUploadDialog({
-            editPanel,
-            statusEl,
-            uploadLimits: status?.uploadLimits || null,
-            onUploadFiles,
-            onCreateBlankFile,
-            onCreateFolder,
-            onCreateLink,
-        });
+    bindUploadDialog({
+        editPanel,
+        statusEl,
+        uploadLimits: status?.uploadLimits || null,
+        externalOnly: false,
+        onUploadFiles,
+        onCreateBlankFile,
+        onCreateFolder,
+        onCreateLink,
+    });
 
     return { statusEl, promptRoot };
 }

@@ -104,6 +104,23 @@ function cmsConfiguredTreeExternalLinkUrl(array $item): string
     return cmsIsExternalLinkTarget($target) ? $target : '';
 }
 
+function cmsConfiguredTreeDirectLinkTarget(array $item): string
+{
+    foreach (['link', 'url'] as $key) {
+        $value = trim((string) ($item[$key] ?? ''));
+        if ($value !== '') {
+            return $value;
+        }
+    }
+
+    $rawPath = trim((string) ($item['path'] ?? $item['relativePath'] ?? ''));
+    if ($rawPath !== '' && (cmsIsExternalLinkTarget($rawPath) || cmsIsCmsQueryLinkTarget($rawPath) || cmsIsHashLinkTarget($rawPath))) {
+        return $rawPath;
+    }
+
+    return '';
+}
+
 function cmsConfiguredTreeFilesystemRelativePath(string $basePath, array $item, string $fallbackName = ''): string
 {
     $rawPath = trim((string) ($item['path'] ?? $item['relativePath'] ?? ''), "/\\");

@@ -164,7 +164,66 @@ function cmsCreateFolder(string $targetDir, string $folderName): array
     ];
 }
 
-function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): array
+function cmsPendingExternalLinkLimit(): int
+{
+    return 5;
+}
+
+function cmsCountPendingExternalLinks(array $tree): int
+{
+    $count = 0;
+    foreach ($tree as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        if (($item['type'] ?? '') !== 'link') {
+            continue;
+        }
+        if ((string) ($item['approvalStatus'] ?? '') !== 'pending') {
+            continue;
+        }
+        $count++;
+    }
+
+    return $count;
+}
+
+function cmsIsAllowedExternalPoffLink(string $url): bool
+{
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+        return false;
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts)) {
+        return false;
+    }
+
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return false;
+    }
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+    $view = (string) ($query['view'] ?? '');
+    $path = trim((string) ($query['path'] ?? ''));
+    $file = trim((string) ($query['file'] ?? ''));
+
+    if ($view === '1' && ($path !== '' || $file !== '')) {
+        return true;
+    }
+
+    $fragment = trim((string) ($parts['fragment'] ?? ''));
+    if ($fragment === '') {
+        return false;
+    }
+
+    $hashPath = trim(preg_replace('/^[!\\/]+/', '', $fragment) ?? '', "/\\ \t\n\r\0\x0B");
+    return $hashPath !== '';
+}
+
+function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, array $options = []): array
 {
     $target = trim($linkUrl);
     if ($target === '') {
@@ -181,10 +240,26 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
             'errors' => ['Link URLs must start with http:// or https://.'],
         ];
     }
+
+    $pendingApproval = !empty($options['pendingApproval']);
+    if ($pendingApproval && !cmsIsAllowedExternalPoffLink($target)) {
+        return [
+            'stored' => [],
+            'errors' => ['Only links from another Poff system are allowed. Use a viewer URL with ?view=1&path=..., ?view=1&file=..., or a hash route like #/work-name.'],
+        ];
+    }
+
     $baseUrl = cmsNormalizeRemoteBaseUrl($target);
 
     $config = PoffConfig::ensure($targetDir);
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
+    if ($pendingApproval && cmsCountPendingExternalLinks($tree) >= cmsPendingExternalLinkLimit()) {
+        return [
+            'stored' => [],
+            'errors' => ['Too many external links are waiting for approval in this folder.'],
+        ];
+    }
+
     $baseName = cmsUploadSafeName($label);
     if ($baseName === '') {
         $host = (string) (parse_url($target, PHP_URL_HOST) ?? '');
@@ -214,7 +289,7 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
     }
 
     $now = date('c');
-    $tree[] = [
+    $treeItem = [
         'name' => $name,
         'title' => trim($label) !== '' ? trim($label) : $name,
         'slug' => class_exists('PoffConfig') ? PoffConfig::slugify($name) : $name,
@@ -223,9 +298,15 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
         'path' => $name,
         'linkUrl' => $target,
         'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
-        'visible' => true,
+        'visible' => !$pendingApproval,
         'modifiedAt' => $now,
     ];
+    if ($pendingApproval) {
+        $treeItem['externalSubmission'] = true;
+        $treeItem['approvalStatus'] = 'pending';
+        $treeItem['submittedAt'] = $now;
+    }
+    $tree[] = $treeItem;
 
     $config['tree'] = $tree;
     $config['treeHash'] = hash('sha256', json_encode($tree));
@@ -254,6 +335,7 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl): 
             'path' => $name,
             'linkUrl' => $target,
             'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
+            'pendingApproval' => $pendingApproval,
         ]],
         'errors' => [],
     ];

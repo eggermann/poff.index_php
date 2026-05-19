@@ -100,10 +100,16 @@ export function renderDrawerTreeHtml(config, status) {
             const key = escapeHtml(item.path || item.name || '');
             const visible = item.visible !== false ? 'checked' : '';
             const type = escapeHtml(item.type || 'item');
+            const approvalStatus = String(item?.approvalStatus || '').trim();
+            const pendingApproval = approvalStatus === 'pending';
+            const approvedExternal = !!item?.externalSubmission && approvalStatus === 'approved';
+            const badge = pendingApproval
+                ? '<span class="edit-tree-badge edit-tree-badge-pending">new approval</span>'
+                : (approvedExternal ? '<span class="edit-tree-badge edit-tree-badge-approved">approved external</span>' : '');
             return `
-                <label class="edit-tree-item">
+                <label class="edit-tree-item${pendingApproval ? ' edit-tree-item-pending' : ''}${approvedExternal ? ' edit-tree-item-approved' : ''}" data-tree-item-path="${key}">
                     <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
-                    <span>${label} <span class="opacity-60">(${type})</span></span>
+                    <span>${label} <span class="opacity-60">(${type})</span>${badge}</span>
                 </label>
             `;
         }).join('')

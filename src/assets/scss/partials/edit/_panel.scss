@@ -68,6 +68,39 @@
     font-size: var(--poff-font-size-sm);
     color: var(--poff-color-text-secondary);
 }
+.edit-panel .edit-tree-item span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--poff-space-2xs);
+    flex-wrap: wrap;
+}
+.edit-panel .edit-tree-item-pending {
+    color: #991b1b;
+}
+.edit-panel .edit-tree-item-approved {
+    color: #0f766e;
+}
+.edit-panel .edit-tree-item-focused {
+    border-radius: var(--poff-control-radius-sm);
+    background: rgba(59, 130, 246, 0.08);
+}
+.edit-panel .edit-tree-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.14rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.edit-panel .edit-tree-badge-pending {
+    background: rgba(254, 226, 226, 1);
+    color: #b91c1c;
+}
+.edit-panel .edit-tree-badge-approved {
+    background: rgba(209, 250, 229, 1);
+    color: #0f766e;
+}
 .edit-panel .edit-actions {
     display: flex;
     align-items: center;

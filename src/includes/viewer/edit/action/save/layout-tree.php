@@ -25,7 +25,12 @@ function cmsEditSaveApplyLayoutTreeVisibility(array &$config, array $data, strin
         if ($key === null) {
             continue;
         }
-        $item['visible'] = isset($visibleKeys[$key]);
+        $nextVisible = isset($visibleKeys[$key]);
+        $item['visible'] = $nextVisible;
+        if ($nextVisible && (string) ($item['approvalStatus'] ?? '') === 'pending') {
+            $item['approvalStatus'] = 'approved';
+            $item['approvedAt'] = date('c');
+        }
     }
     unset($item);
 }

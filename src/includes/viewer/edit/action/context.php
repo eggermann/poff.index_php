@@ -18,6 +18,8 @@ function cmsBuildEditActionContext(): array
     $runtimeTarget = cmsResolveTarget($runtimeRootDir, $path);
     $runtimeAllowDir = $runtimeTarget['dir'] ?? $runtimeRootDir;
     $editModeAllowed = cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir);
+    $editorAuthenticated = cmsAuthBypassEnabled() || cmsIsEditorAuthenticated($runtimeRootDir);
+    $publicExternalLinkSubmission = $action === 'upload' && trim((string) ($data['source'] ?? '')) === 'url';
 
     if ($action === 'auth') {
         return [
@@ -40,7 +42,9 @@ function cmsBuildEditActionContext(): array
         ], 403);
     }
 
-    cmsRequireEditorAccess($runtimeRootDir, true);
+    if (!$editorAuthenticated && !$publicExternalLinkSubmission) {
+        cmsRequireEditorAccess($runtimeRootDir, true);
+    }
 
     if (!class_exists('PoffConfig')) {
         cmsJsonResponse(['allowed' => true, 'error' => 'PoffConfig unavailable.', 'auth' => cmsBuildEditorAuthView($runtimeRootDir, true)]);
@@ -91,5 +95,7 @@ function cmsBuildEditActionContext(): array
         'targetFile' => $targetFile,
         'config' => $config,
         'folderViewData' => $folderViewData,
+        'editorAuthenticated' => $editorAuthenticated,
+        'publicExternalLinkSubmission' => $publicExternalLinkSubmission,
     ];
 }

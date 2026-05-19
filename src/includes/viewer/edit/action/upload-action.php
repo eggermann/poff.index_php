@@ -10,6 +10,7 @@ function cmsHandleEditUploadAction(array $ctx): void
     }
 
     $data = $ctx['data'];
+    $rootDir = (string) ($ctx['rootDir'] ?? $ctx['targetDir'] ?? getcwd() ?: '.');
     $targetDir = $ctx['isLayoutTarget']
         ? ($ctx['subjectType'] === 'file'
             ? PoffConfig::fileLayoutDir($ctx['targetDir'], (string) $ctx['targetFile'])
@@ -20,13 +21,22 @@ function cmsHandleEditUploadAction(array $ctx): void
         cmsJsonResponse(['allowed' => true, 'error' => 'Unsupported add-content source.'], 400);
     }
 
+    $editorAuthenticated = !empty($ctx['editorAuthenticated']);
+    $publicExternalLinkSubmission = !empty($ctx['publicExternalLinkSubmission']);
+    if ($publicExternalLinkSubmission && ($ctx['isLayoutTarget'] || $ctx['subjectType'] !== 'folder' || $source !== 'url')) {
+        cmsJsonResponse(['allowed' => false, 'error' => 'External link submissions are only supported for folders.', 'auth' => cmsBuildEditorAuthView($rootDir, (bool) ($ctx['editModeAllowed'] ?? true))], 403);
+    }
+
     $result = match ($source) {
         'blank' => cmsCreateBlankFile($targetDir, (string) ($data['fileName'] ?? $data['filename'] ?? ''), (string) ($data['contents'] ?? '')),
         'folder' => cmsCreateFolder($targetDir, (string) ($data['fileName'] ?? $data['folderName'] ?? $data['filename'] ?? '')),
         'url' => cmsCreateLinkEntry(
             $targetDir,
             (string) ($data['linkName'] ?? $data['fileName'] ?? $data['filename'] ?? ''),
-            (string) ($data['linkUrl'] ?? $data['url'] ?? '')
+            (string) ($data['linkUrl'] ?? $data['url'] ?? ''),
+            [
+                'pendingApproval' => !$editorAuthenticated,
+            ]
         ),
         default => function () use ($targetDir): array {
             $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
@@ -56,5 +66,7 @@ function cmsHandleEditUploadAction(array $ctx): void
         'errors' => $result['errors'],
         'config' => $updatedConfig,
         'uploadLimits' => cmsUploadLimits(),
+        'pendingApproval' => !empty($result['stored'][0]['pendingApproval']),
+        'auth' => cmsBuildEditorAuthView($rootDir, (bool) ($ctx['editModeAllowed'] ?? true)),
     ]);
 }

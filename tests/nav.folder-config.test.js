@@ -68,3 +68,47 @@ test('hidden tree items render an unhide toggle', () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('pending external links stay hidden from visitors and show review state for authenticated editors', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-pending-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'remote-link',
+          slug: 'remote-link',
+          type: 'link',
+          path: 'remote-link',
+          linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+          visible: false,
+          externalSubmission: true,
+          approvalStatus: 'pending',
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const publicResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    expect(publicResult.status).toBe(0);
+    expect(publicResult.stdout).not.toContain('remote-link');
+
+    const editorResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, POFF_TEST_AUTH_BYPASS: '1' },
+    });
+    expect(editorResult.status).toBe(0);
+    expect(editorResult.stdout).toContain('nav-link-pending-approval');
+    expect(editorResult.stdout).toContain('data-nav-action="review-external"');
+    expect(editorResult.stdout).toContain('new</span>');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
