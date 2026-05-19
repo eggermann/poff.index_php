@@ -2949,6 +2949,74 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('extracts direct work content from shell-wrapped remote html instead of returning the outer shell', async () => {
+    const rendered = await runResolveRemoteRenderedHtml({
+      linkUrl: 'https://remote.example/portfolio',
+      baseUrl: 'https://remote.example/portfolio',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: `
+        <html>
+          <body>
+            <script>const currentPoffConfig = {"tree":[]};</script>
+            <div id="appShell" class="container">
+              <div id="contentFrame">
+                <div class="media-shell">
+                  <video controls>
+                    <source src="/assets/example.mp4">
+                    Fallback text
+                  </video>
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    expect(rendered).toContain('<video');
+    expect(rendered).toContain('/assets/example.mp4');
+    expect(rendered).not.toContain('currentPoffConfig');
+    expect(rendered).not.toContain('appShell');
+    expect(rendered).not.toContain('contentFrame');
+  });
+
+  test('prefers the nested layout main over a generic shell main when extracting remote work html', async () => {
+    const rendered = await runResolveRemoteRenderedHtml({
+      linkUrl: 'https://remote.example/portfolio',
+      baseUrl: 'https://remote.example/portfolio',
+    }, {
+      ok: true,
+      status: 200,
+      statusLine: 'HTTP/1.1 200 OK',
+      body: `
+        <html>
+          <body>
+            <main class="main-content">
+              <script>const currentPoffConfig = {"tree":[]};</script>
+              <div id="appShell" class="container">
+                <div id="contentFrame">
+                  <div class="viewer">
+                    <div class="poff-default-layout__main">
+                      <article class="remote-snapshot">Remote Snapshot</article>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </body>
+        </html>
+      `,
+    });
+
+    expect(rendered).toContain('remote-snapshot');
+    expect(rendered).toContain('Remote Snapshot');
+    expect(rendered).not.toContain('currentPoffConfig');
+    expect(rendered).not.toContain('main-content');
+  });
+
   test('keeps local viewer routes for link files inside folder previews', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-link-folder-preview-'));
     try {
@@ -3040,7 +3108,7 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
-  test('resolves remote hash routes through ajax before extracting rendered html', async () => {
+  test('resolves remote hash routes through ajax and consumes snapshot rendered html', async () => {
     const rendered = await runResolveRemoteRenderedHtmlWithMap({
       linkUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
       baseUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
@@ -3064,6 +3132,8 @@ describe('Worktype HBS renderer', () => {
         body: JSON.stringify({
           resolved: true,
           kind: 'video',
+          renderedHtml: '<video controls><source src="/ai-movs/joined-test-1762176567798.mp4"></video>',
+          assetsBaseUrl: 'https://dominikeggermann.com',
           context: {
             baseUrl: 'https://dominikeggermann.com',
             srcUrl: 'https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4',
@@ -3087,6 +3157,132 @@ describe('Worktype HBS renderer', () => {
     expect(rendered).toContain('<video');
     expect(rendered).toContain('https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4');
     expect(rendered).not.toContain('appShell');
+  });
+
+  test('keeps the original hash route when baseUrl has already been normalized', async () => {
+    const rendered = await runResolveRemoteRenderedHtmlWithMap({
+      linkUrl: 'https://dominikeggermann.com/#/joined-test-1762176567798-mp4',
+      baseUrl: 'https://dominikeggermann.com',
+    }, {
+      'https://dominikeggermann.com/?ajax=resolve&slug=joined-test-1762176567798-mp4': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          path: 'ai-movs/joined-test-1762176567798.mp4',
+          type: 'file',
+          isFile: true,
+          slug: 'joined-test-1762176567798-mp4',
+        }),
+      },
+      'https://dominikeggermann.com/?ajax=snapshot&file=ai-movs%2Fjoined-test-1762176567798.mp4': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          kind: 'video',
+          renderedHtml: '<video controls><source src="/ai-movs/joined-test-1762176567798.mp4"></video>',
+          assetsBaseUrl: 'https://dominikeggermann.com',
+          context: {
+            baseUrl: 'https://dominikeggermann.com',
+            srcUrl: 'https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4',
+            work: {
+              template: 'video',
+              type: 'video',
+            },
+          },
+        }),
+      },
+    });
+
+    expect(rendered).toContain('<video');
+    expect(rendered).toContain('https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4');
+    expect(rendered).not.toContain('appShell');
+  });
+
+  test('does not render remote snapshot context locally when rendered html is missing', async () => {
+    const rendered = await runResolveRemoteRenderedHtmlWithMap({
+      linkUrl: 'https://dominikeggermann.com/#/context-only-work',
+      baseUrl: 'https://dominikeggermann.com/#/context-only-work',
+    }, {
+      'https://dominikeggermann.com/?ajax=resolve&slug=context-only-work': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          path: 'works/context-only-work.mp4',
+          type: 'file',
+          isFile: true,
+          slug: 'context-only-work',
+        }),
+      },
+      'https://dominikeggermann.com/?ajax=snapshot&file=works%2Fcontext-only-work.mp4': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          kind: 'video',
+          context: {
+            baseUrl: 'https://dominikeggermann.com',
+            srcUrl: 'https://dominikeggermann.com/works/context-only-work.mp4',
+            work: {
+              template: 'video',
+              type: 'video',
+            },
+          },
+        }),
+      },
+    });
+
+    expect(rendered).toBe('');
+  });
+
+  test('prefers remote snapshot rendered html over local type rendering', async () => {
+    const rendered = await runResolveRemoteRenderedHtmlWithMap({
+      linkUrl: 'https://dominikeggermann.com/#/custom-work',
+      baseUrl: 'https://dominikeggermann.com/#/custom-work',
+    }, {
+      'https://dominikeggermann.com/?ajax=resolve&slug=custom-work': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          path: 'works/custom-work.mp4',
+          type: 'file',
+          isFile: true,
+          slug: 'custom-work',
+        }),
+      },
+      'https://dominikeggermann.com/?ajax=snapshot&file=works%2Fcustom-work.mp4': {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          kind: 'video',
+          renderedHtml: '<article class="remote-custom-template"><video onclick="bad()"><source src="/works/custom-work.mp4"></video><script>alert(1)</script></article>',
+          assetsBaseUrl: 'https://dominikeggermann.com',
+          context: {
+            baseUrl: 'https://dominikeggermann.com',
+            work: {
+              template: 'missing-remote-custom-template',
+              type: 'video',
+            },
+          },
+        }),
+      },
+    });
+
+    expect(rendered).toContain('remote-custom-template');
+    expect(rendered).toContain('https://dominikeggermann.com/works/custom-work.mp4');
+    expect(rendered).not.toContain('missing-remote-custom-template');
+    expect(rendered).not.toContain('<script');
+    expect(rendered).not.toContain('onclick=');
   });
 
   test('renders virtual configured items with external snapshots on the local host', async () => {
@@ -3124,6 +3320,43 @@ describe('Worktype HBS renderer', () => {
       expect(renderedHtml).toContain('remote-snapshot');
       expect(renderedHtml).toContain('Remote Snapshot');
       expect(renderedHtml).not.toContain('external-work--embedded');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('adds a direct link toolbar and full-width media rules to embedded external renders', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-external-toolbar-'));
+    try {
+      fs.writeFileSync(
+        path.join(tempRoot, 'sample.url'),
+        '[InternetShortcut]\nURL=https://dominikeggermann.com/#/joined-test-1762176567798-mp4\n',
+      );
+
+      const rendered = await runViewerWithMock('sample.url', tempRoot, false, {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: JSON.stringify({
+          resolved: true,
+          kind: 'video',
+          renderedHtml: '<video controls><source src="/ai-movs/joined-test-1762176567798.mp4"></video>',
+          assetsBaseUrl: 'https://dominikeggermann.com',
+          context: {
+            baseUrl: 'https://dominikeggermann.com',
+            srcUrl: 'https://dominikeggermann.com/ai-movs/joined-test-1762176567798.mp4',
+            work: {
+              template: 'video',
+              type: 'video',
+            },
+          },
+        }),
+      });
+
+      expect(rendered).toContain('external-work--embedded__toolbar');
+      expect(rendered).toContain('Direct link');
+      expect(rendered).toContain('href="https://dominikeggermann.com/#/joined-test-1762176567798-mp4"');
+      expect(rendered).toContain('width: 100%');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
