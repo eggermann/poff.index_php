@@ -1,3 +1,5 @@
+import { bindStoredDetailsState } from '../panel/shared.js';
+
 export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubmit }) {
     const drawerClose = editDrawer.querySelector('#editDrawerClose');
     if (drawerClose && typeof onClose === 'function') {
@@ -6,7 +8,11 @@ export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubm
 
     const drawerStatus = editDrawer.querySelector('#editDrawerStatus');
     const drawerForm = editDrawer.querySelector('#editDrawerForm');
+    const templateDefaultsDetails = editDrawer.querySelector('#editTemplateDefaultsDetails');
     const treeBulkToggle = editDrawer.querySelector('#editTreeVisibleAll');
+    if (templateDefaultsDetails) {
+        bindStoredDetailsState(templateDefaultsDetails, 'template-defaults-details');
+    }
     const treeVisibleInputs = () => Array.from(editDrawer.querySelectorAll('input[name="tree_visible"]'));
     const syncTreeBulkToggle = () => {
         if (!treeBulkToggle) {

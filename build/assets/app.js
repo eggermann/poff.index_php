@@ -3719,6 +3719,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/drawer/render.js
+  var TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY = "template-defaults-details";
   function groupWorktypeChoices(choices = []) {
     return Array.isArray(choices) ? choices.reduce((groups, choice) => {
       const group = String((choice == null ? void 0 : choice.kind) || "other").trim() || "other";
@@ -3825,6 +3826,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
   function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
     var _a;
+    const templateDefaultsBody = Array.isArray((_a = config == null ? void 0 : config.workTemplateMapCatalog) == null ? void 0 : _a.rows) && config.workTemplateMapCatalog.rows.length ? `
+            <div class="edit-template-map-list">
+                ${config.workTemplateMapCatalog.rows.map((row) => `
+                    <div class="edit-template-map-row">
+                        ${renderTemplateMapSelect(row)}
+                    </div>
+                `).join("")}
+            </div>
+        ` : "";
     return `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -3849,19 +3859,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
                 <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
-            ${Array.isArray((_a = config == null ? void 0 : config.workTemplateMapCatalog) == null ? void 0 : _a.rows) && config.workTemplateMapCatalog.rows.length ? `
-            <div class="edit-fieldset">
-                <div class="edit-fieldset-title">Template defaults by MIME</div>
-                <div class="small-note">Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.</div>
-                <div class="edit-template-map-list">
-                    ${config.workTemplateMapCatalog.rows.map((row) => `
-                        <div class="edit-template-map-row">
-                            ${renderTemplateMapSelect(row)}
-                        </div>
-                    `).join("")}
-                </div>
-            </div>
-            ` : ""}
+            ${templateDefaultsBody ? renderPersistentDetailsSection({
+      storageKey: TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY,
+      defaultOpen: true,
+      id: "editTemplateDefaultsDetails",
+      className: "edit-fieldset edit-template-default-details",
+      summaryClassName: "edit-template-default-details-summary",
+      bodyClassName: "edit-template-default-details-body",
+      titleHtml: "Template defaults by MIME",
+      noteHtml: "Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.",
+      bodyHtml: templateDefaultsBody
+    }) : ""}
             ${(status == null ? void 0 : status.target) !== "file" ? `
             <div>
                 <label class="edit-label">Visible items</label>
@@ -3884,6 +3892,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     const drawerStatus = editDrawer.querySelector("#editDrawerStatus");
     const drawerForm = editDrawer.querySelector("#editDrawerForm");
+    const templateDefaultsDetails = editDrawer.querySelector("#editTemplateDefaultsDetails");
+    if (templateDefaultsDetails) {
+      bindStoredDetailsState(templateDefaultsDetails, "template-defaults-details");
+    }
     const treeBulkToggle = editDrawer.querySelector("#editTreeVisibleAll");
     const treeVisibleInputs = () => Array.from(editDrawer.querySelectorAll('input[name="tree_visible"]'));
     const syncTreeBulkToggle = () => {
@@ -4414,6 +4426,36 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return () => {
       detailsEl.removeEventListener("toggle", onToggle);
     };
+  }
+  function renderPersistentDetailsSection({
+    storageKey = "",
+    defaultOpen = true,
+    id = "",
+    className = "",
+    summaryClassName = "",
+    bodyClassName = "",
+    titleHtml = "",
+    noteHtml = "",
+    bodyHtml = ""
+  } = {}) {
+    const storedOpen = readStoredDetailsState(storageKey);
+    const detailsOpen = storedOpen === null ? defaultOpen : storedOpen;
+    const detailsClasses = ["edit-collapsible-details", className].filter(Boolean).join(" ");
+    const summaryClasses = ["edit-work-fields-header", "edit-collapsible-summary", summaryClassName].filter(Boolean).join(" ");
+    const bodyClasses = ["edit-collapsible-details-body", bodyClassName].filter(Boolean).join(" ");
+    return `
+        <details class="${detailsClasses}"${id ? ` id="${id}"` : ""}${detailsOpen ? " open" : ""}>
+            <summary class="${summaryClasses}">
+                <div>
+                    ${titleHtml ? `<div class="edit-work-fields-title">${titleHtml}</div>` : ""}
+                    ${noteHtml ? `<div class="small-note">${noteHtml}</div>` : ""}
+                </div>
+            </summary>
+            <div class="${bodyClasses}">
+                ${bodyHtml}
+            </div>
+        </details>
+    `;
   }
   function formatUploadBytes(value = 0) {
     const bytes = Number(value) || 0;
@@ -5513,17 +5555,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return "";
     }
     const configPath = String(((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.configPath) || "").trim();
-    const storedOpen = readStoredDetailsState(PASSWORD_DETAILS_STORAGE_KEY);
-    const detailsOpen = storedOpen === null ? true : storedOpen;
-    return `
-        <details class="edit-work-fields edit-password-details" id="editPasswordDetails"${detailsOpen ? " open" : ""}>
-            <summary class="edit-work-fields-header edit-password-details-summary">
-                <div>
-                    <div class="edit-work-fields-title">Change password</div>
-                    <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ""}.</div>
-                </div>
-            </summary>
-            <form id="editPasswordForm" class="edit-inline edit-password-details-body">
+    return renderPersistentDetailsSection({
+      storageKey: PASSWORD_DETAILS_STORAGE_KEY,
+      defaultOpen: true,
+      id: "editPasswordDetails",
+      className: "edit-work-fields edit-password-details",
+      summaryClassName: "edit-password-details-summary",
+      bodyClassName: "edit-inline edit-password-details-body",
+      titleHtml: "Change password",
+      noteHtml: `Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ""}.`,
+      bodyHtml: `
+            <form id="editPasswordForm" class="edit-inline">
                 <div>
                     <label class="edit-label" for="edit-current-password">Current password</label>
                     <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
@@ -5541,8 +5583,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
                 <div class="edit-status" id="editPasswordStatus"></div>
             </form>
-        </details>
-    `;
+        `
+    });
   }
   function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
     if (!fields.length) {

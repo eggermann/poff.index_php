@@ -1,4 +1,7 @@
 import { escapeHtml } from '../../core/utils.js';
+import { renderPersistentDetailsSection } from '../panel/shared.js';
+
+const TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY = 'template-defaults-details';
 
 function groupWorktypeChoices(choices = []) {
     return Array.isArray(choices)
@@ -133,6 +136,17 @@ function renderDrawerTreeBulkToggle(treeItems = [], status) {
 }
 
 export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
+    const templateDefaultsBody = Array.isArray(config?.workTemplateMapCatalog?.rows) && config.workTemplateMapCatalog.rows.length
+        ? `
+            <div class="edit-template-map-list">
+                ${config.workTemplateMapCatalog.rows.map((row) => `
+                    <div class="edit-template-map-row">
+                        ${renderTemplateMapSelect(row)}
+                    </div>
+                `).join('')}
+            </div>
+        `
+        : '';
     return `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -157,19 +171,19 @@ export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) 
                 </div>
                 <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
-            ${Array.isArray(config?.workTemplateMapCatalog?.rows) && config.workTemplateMapCatalog.rows.length ? `
-            <div class="edit-fieldset">
-                <div class="edit-fieldset-title">Template defaults by MIME</div>
-                <div class="small-note">Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.</div>
-                <div class="edit-template-map-list">
-                    ${config.workTemplateMapCatalog.rows.map((row) => `
-                        <div class="edit-template-map-row">
-                            ${renderTemplateMapSelect(row)}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ` : ''}
+            ${templateDefaultsBody
+        ? renderPersistentDetailsSection({
+            storageKey: TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY,
+            defaultOpen: true,
+            id: 'editTemplateDefaultsDetails',
+            className: 'edit-fieldset edit-template-default-details',
+            summaryClassName: 'edit-template-default-details-summary',
+            bodyClassName: 'edit-template-default-details-body',
+            titleHtml: 'Template defaults by MIME',
+            noteHtml: 'Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.',
+            bodyHtml: templateDefaultsBody,
+        })
+        : ''}
             ${status?.target !== 'file' ? `
             <div>
                 <label class="edit-label">Visible items</label>

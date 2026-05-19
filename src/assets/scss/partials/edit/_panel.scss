@@ -141,7 +141,7 @@
     padding-top: var(--poff-space-md);
 }
 
-.edit-panel .edit-password-details > summary {
+.edit-collapsible-details > summary {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -150,11 +150,11 @@
     cursor: pointer;
 }
 
-.edit-panel .edit-password-details > summary::-webkit-details-marker {
+.edit-collapsible-details > summary::-webkit-details-marker {
     display: none;
 }
 
-.edit-panel .edit-password-details > summary::after {
+.edit-collapsible-details > summary::after {
     content: '+';
     flex: 0 0 auto;
     color: var(--poff-color-text-secondary);
@@ -164,11 +164,12 @@
     padding-top: var(--poff-space-2xs);
 }
 
-.edit-panel .edit-password-details[open] > summary::after {
+.edit-collapsible-details[open] > summary::after {
     content: '−';
 }
 
-.edit-panel .edit-password-details-body {
+.edit-collapsible-details-body {
+    display: grid;
     gap: var(--poff-space-sm);
 }
 
@@ -178,6 +179,17 @@
     justify-content: space-between;
     gap: var(--poff-space-sm);
 }
+
+.edit-collapsible-summary > div {
+    min-width: 0;
+}
+
+.edit-collapsible-summary .small-note,
+.edit-collapsible-summary code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .edit-panel .edit-work-fields-title {
     font-weight: 700;
     color: var(--poff-color-text-primary);

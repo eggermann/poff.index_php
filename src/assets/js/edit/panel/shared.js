@@ -71,6 +71,38 @@ export function bindStoredDetailsState(detailsEl, storageKey, storage = null) {
     };
 }
 
+export function renderPersistentDetailsSection({
+    storageKey = '',
+    defaultOpen = true,
+    id = '',
+    className = '',
+    summaryClassName = '',
+    bodyClassName = '',
+    titleHtml = '',
+    noteHtml = '',
+    bodyHtml = '',
+} = {}) {
+    const storedOpen = readStoredDetailsState(storageKey);
+    const detailsOpen = storedOpen === null ? defaultOpen : storedOpen;
+    const detailsClasses = ['edit-collapsible-details', className].filter(Boolean).join(' ');
+    const summaryClasses = ['edit-work-fields-header', 'edit-collapsible-summary', summaryClassName].filter(Boolean).join(' ');
+    const bodyClasses = ['edit-collapsible-details-body', bodyClassName].filter(Boolean).join(' ');
+
+    return `
+        <details class="${detailsClasses}"${id ? ` id="${id}"` : ''}${detailsOpen ? ' open' : ''}>
+            <summary class="${summaryClasses}">
+                <div>
+                    ${titleHtml ? `<div class="edit-work-fields-title">${titleHtml}</div>` : ''}
+                    ${noteHtml ? `<div class="small-note">${noteHtml}</div>` : ''}
+                </div>
+            </summary>
+            <div class="${bodyClasses}">
+                ${bodyHtml}
+            </div>
+        </details>
+    `;
+}
+
 export function formatUploadBytes(value = 0) {
     const bytes = Number(value) || 0;
     if (bytes <= 0) {

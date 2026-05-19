@@ -19,7 +19,7 @@ import {
 import {
     bindStoredDetailsState,
     layoutOverlayState,
-    readStoredDetailsState,
+    renderPersistentDetailsSection,
     syncPromptDock,
 } from './shared.js';
 import { bindUploadDialog, renderUploadSectionHtml } from './upload.js';
@@ -254,17 +254,17 @@ function renderPasswordChangeSection(status = {}) {
     }
 
     const configPath = String(status?.auth?.configPath || '').trim();
-    const storedOpen = readStoredDetailsState(PASSWORD_DETAILS_STORAGE_KEY);
-    const detailsOpen = storedOpen === null ? true : storedOpen;
-    return `
-        <details class="edit-work-fields edit-password-details" id="editPasswordDetails"${detailsOpen ? ' open' : ''}>
-            <summary class="edit-work-fields-header edit-password-details-summary">
-                <div>
-                    <div class="edit-work-fields-title">Change password</div>
-                    <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ''}.</div>
-                </div>
-            </summary>
-            <form id="editPasswordForm" class="edit-inline edit-password-details-body">
+    return renderPersistentDetailsSection({
+        storageKey: PASSWORD_DETAILS_STORAGE_KEY,
+        defaultOpen: true,
+        id: 'editPasswordDetails',
+        className: 'edit-work-fields edit-password-details',
+        summaryClassName: 'edit-password-details-summary',
+        bodyClassName: 'edit-inline edit-password-details-body',
+        titleHtml: 'Change password',
+        noteHtml: `Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ''}.`,
+        bodyHtml: `
+            <form id="editPasswordForm" class="edit-inline">
                 <div>
                     <label class="edit-label" for="edit-current-password">Current password</label>
                     <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
@@ -282,8 +282,8 @@ function renderPasswordChangeSection(status = {}) {
                 </div>
                 <div class="edit-status" id="editPasswordStatus"></div>
             </form>
-        </details>
-    `;
+        `,
+    });
 }
 
 function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
