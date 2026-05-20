@@ -18,9 +18,7 @@ function cmsHandleEditModelsAction(array $ctx): void
         'gemini-1.5-pro',
     ];
 
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Models requires POST.'], 405);
-    }
+    cmsEditRequirePost('Models');
 
     $provider = trim((string) ($ctx['data']['provider'] ?? 'local'));
     $endpoint = trim((string) ($ctx['data']['endpoint'] ?? ''));

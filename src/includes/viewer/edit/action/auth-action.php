@@ -2,7 +2,7 @@
 
 function cmsHandleEditAuthAction(array $ctx): void
 {
-    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+    $method = cmsEditRequestMethod();
     $rootDir = (string) ($ctx['rootDir'] ?? getcwd() ?: '.');
     $editModeAllowed = (bool) ($ctx['editModeAllowed'] ?? false);
 

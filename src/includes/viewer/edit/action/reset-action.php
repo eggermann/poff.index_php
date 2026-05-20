@@ -2,9 +2,7 @@
 
 function cmsHandleEditResetAction(array $ctx): void
 {
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Reset requires POST.'], 405);
-    }
+    cmsEditRequirePost('Reset');
 
     $resetResult = cmsResetFolderTarget($ctx['rootDir'], $ctx['path']);
     if (($resetResult['errors'] ?? []) !== []) {

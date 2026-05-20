@@ -2,9 +2,7 @@
 
 function cmsHandleEditUploadAction(array $ctx): void
 {
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Upload requires POST.'], 405);
-    }
+    cmsEditRequirePost('Upload');
     if (!$ctx['isLayoutTarget'] && $ctx['subjectType'] !== 'folder') {
         cmsJsonResponse(['allowed' => true, 'error' => 'Uploads are only supported for folders.'], 400);
     }

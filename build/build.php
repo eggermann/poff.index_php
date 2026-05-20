@@ -246,7 +246,11 @@ PHP;
         return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
     };
     $viewerSharedParts = [
-        '/includes/viewer/utils.php',
+        '/includes/viewer/utils/core.php',
+        '/includes/viewer/utils/targets.php',
+        '/includes/viewer/utils/remote-html.php',
+        '/includes/viewer/utils/remote-links.php',
+        '/includes/viewer/utils/http.php',
         '/includes/viewer/render/entry.php',
         '/includes/viewer/render/file.php',
         '/includes/viewer/render/folder.php',

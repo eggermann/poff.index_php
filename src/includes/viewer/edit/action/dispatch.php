@@ -3,6 +3,18 @@
  * Edit action dispatcher.
  */
 
+function cmsEditRequestMethod(): string
+{
+    return strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+}
+
+function cmsEditRequirePost(string $actionLabel): void
+{
+    if (cmsEditRequestMethod() !== 'POST') {
+        cmsJsonResponse(['allowed' => true, 'error' => $actionLabel . ' requires POST.'], 405);
+    }
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';

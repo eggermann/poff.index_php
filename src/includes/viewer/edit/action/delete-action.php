@@ -2,9 +2,7 @@
 
 function cmsHandleEditDeleteAction(array $ctx): void
 {
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Delete requires POST.'], 405);
-    }
+    cmsEditRequirePost('Delete');
 
     $deleteResult = cmsDeleteTarget($ctx['rootDir'], $ctx['path']);
     if (($deleteResult['errors'] ?? []) !== []) {

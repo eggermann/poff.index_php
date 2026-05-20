@@ -260,24 +260,9 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         ]);
 
         if ($isFolder && $hasPhysicalTarget) {
-            $childConfig = readExistingFolderViewerConfig($entryFullPath);
-            if (is_array($childConfig)) {
-                if (class_exists('PoffConfig')) {
-                    $childConfigPath = PoffConfig::configPath($entryFullPath);
-                    if (is_file($childConfigPath)) {
-                        cmsFolderViewerTrackDependency($dependencies, $childConfigPath);
-                    }
-                }
-                if (isset($childConfig['title']) && is_string($childConfig['title']) && trim($childConfig['title']) !== '') {
-                    $item['title'] = $childConfig['title'];
-                }
-                if (isset($childConfig['slug']) && is_string($childConfig['slug']) && trim($childConfig['slug']) !== '') {
-                    $item['slug'] = $childConfig['slug'];
-                }
-                if (isset($childConfig['description']) && is_string($childConfig['description'])) {
-                    $item['description'] = $childConfig['description'];
-                }
-            }
+            $childConfig = cmsReadFolderViewerConfig($entryFullPath);
+            cmsApplyFolderViewerConfigMeta($item, $childConfig);
+            cmsTrackFolderViewerConfigPath($dependencies, class_exists('PoffConfig') ? PoffConfig::configPath($entryFullPath) : null);
             $children = [];
             $realChildPath = realpath($entryFullPath);
             if (!is_string($realChildPath) || $realChildPath === '' || !isset($visited[$realChildPath])) {
@@ -296,24 +281,9 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             if ($hasPhysicalTarget) {
                 cmsFolderViewerTrackDependency($dependencies, $entryFullPath);
                 $item['mimeType'] = MediaType::detectMimeType($entryFullPath, $entryName) ?? '';
-                $fileConfig = readExistingFolderViewerFileConfig($fullPath, $entryName);
-                if (is_array($fileConfig)) {
-                    if (class_exists('PoffConfig')) {
-                        $fileConfigPath = PoffConfig::fileConfigPath($fullPath, $entryName);
-                        if (is_file($fileConfigPath)) {
-                            cmsFolderViewerTrackDependency($dependencies, $fileConfigPath);
-                        }
-                    }
-                    if (isset($fileConfig['title']) && is_string($fileConfig['title']) && trim($fileConfig['title']) !== '') {
-                        $item['title'] = $fileConfig['title'];
-                    }
-                    if (isset($fileConfig['slug']) && is_string($fileConfig['slug']) && trim($fileConfig['slug']) !== '') {
-                        $item['slug'] = $fileConfig['slug'];
-                    }
-                    if (isset($fileConfig['description']) && is_string($fileConfig['description'])) {
-                        $item['description'] = $fileConfig['description'];
-                    }
-                }
+                $fileConfig = cmsReadFolderViewerFileConfig($fullPath, $entryName);
+                cmsApplyFolderViewerConfigMeta($item, $fileConfig);
+                cmsTrackFolderViewerConfigPath($dependencies, class_exists('PoffConfig') ? PoffConfig::fileConfigPath($fullPath, $entryName) : null);
             }
         }
 
@@ -338,15 +308,8 @@ function resolveFolderViewerTree(string $fullPath, ?array $folderConfig): array
     return [];
 }
 
-function readExistingFolderViewerConfig(string $dir): ?array
+function cmsReadFolderViewerConfigFile(string $configPath, array &$cache): ?array
 {
-    static $cache = [];
-
-    if (!class_exists('PoffConfig')) {
-        return null;
-    }
-
-    $configPath = PoffConfig::configPath($dir);
     if (!is_file($configPath)) {
         return null;
     }
@@ -357,13 +320,37 @@ function readExistingFolderViewerConfig(string $dir): ?array
     }
 
     $decoded = json_decode((string) file_get_contents($configPath), true);
-
     $cache[$cacheKey] = is_array($decoded) ? $decoded : null;
 
     return $cache[$cacheKey];
 }
 
-function readExistingFolderViewerFileConfig(string $dir, string $fileName): ?array
+function cmsApplyFolderViewerConfigMeta(array &$item, ?array $config): void
+{
+    if (!is_array($config)) {
+        return;
+    }
+
+    foreach (['title', 'slug', 'description'] as $field) {
+        if (!isset($config[$field]) || !is_string($config[$field])) {
+            continue;
+        }
+        if (($field === 'title' || $field === 'slug') && trim($config[$field]) === '') {
+            continue;
+        }
+        $item[$field] = $config[$field];
+    }
+}
+
+function cmsTrackFolderViewerConfigPath(array &$dependencies, ?string $configPath): void
+{
+    if (!is_string($configPath) || $configPath === '' || !is_file($configPath)) {
+        return;
+    }
+    cmsFolderViewerTrackDependency($dependencies, $configPath);
+}
+
+function cmsReadFolderViewerConfig(string $dir): ?array
 {
     static $cache = [];
 
@@ -371,21 +358,18 @@ function readExistingFolderViewerFileConfig(string $dir, string $fileName): ?arr
         return null;
     }
 
-    $configPath = PoffConfig::fileConfigPath($dir, $fileName);
-    if (!is_file($configPath)) {
+    return cmsReadFolderViewerConfigFile(PoffConfig::configPath($dir), $cache);
+}
+
+function cmsReadFolderViewerFileConfig(string $dir, string $fileName): ?array
+{
+    static $cache = [];
+
+    if (!class_exists('PoffConfig')) {
         return null;
     }
 
-    $cacheKey = $configPath . '|' . (string) (@filemtime($configPath) ?: 0);
-    if (array_key_exists($cacheKey, $cache)) {
-        return $cache[$cacheKey];
-    }
-
-    $decoded = json_decode((string) file_get_contents($configPath), true);
-
-    $cache[$cacheKey] = is_array($decoded) ? $decoded : null;
-
-    return $cache[$cacheKey];
+    return cmsReadFolderViewerConfigFile(PoffConfig::fileConfigPath($dir, $fileName), $cache);
 }
 
 function filterFolderViewerItemsByKind(array $items, string $kind): array

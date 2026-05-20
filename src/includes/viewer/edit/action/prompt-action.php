@@ -2,9 +2,7 @@
 
 function cmsHandleEditPromptAction(array $ctx): void
 {
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Prompt requires POST.'], 405);
-    }
+    cmsEditRequirePost('Prompt');
 
     $request = cmsBuildEditPromptRequest($ctx);
     if ($request['prompt'] === '' && !$request['image']) {

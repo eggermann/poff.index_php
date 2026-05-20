@@ -36,48 +36,9 @@ function cmsPromptLayoutTemplateTarget(string $relativePath, bool $isFile): stri
     return PoffConfig::relativeLayoutPath($relativePath, $isFile) . '/template.hbs';
 }
 
-function cmsPromptRefKind(string $name, string $type): string
+function cmsPromptRefUrls(string $pageLink, string $assetUrl): array
 {
-    if ($type === 'folder') {
-        return 'folder';
-    }
-
-    return MediaType::classifyExtension($name);
-}
-
-function cmsBuildPromptRef(string $basePath, array $item): ?array
-{
-    $name = trim((string) ($item['name'] ?? $item['path'] ?? ''));
-    if ($name === '') {
-        return null;
-    }
-
-    $configuredType = strtolower(trim((string) ($item['type'] ?? 'file')));
-    $explicitLinkTarget = cmsConfiguredTreeLinkTarget($item);
-    $relativePath = cmsConfiguredTreeDisplayPath($basePath, $item, $name);
-    if ($relativePath === '') {
-        $relativePath = cmsConfiguredTreeFilesystemRelativePath($basePath, $item, $name);
-    }
-
-    $isFolder = $configuredType === 'folder';
-    $kind = $isFolder
-        ? 'folder'
-        : (($configuredType === 'link' || $explicitLinkTarget !== '') ? 'link' : cmsPromptRefKind($name, $configuredType));
-    $pageLink = $explicitLinkTarget !== ''
-        ? $explicitLinkTarget
-        : cmsPromptViewerUrl($relativePath, !$isFolder);
-    $assetUrl = $explicitLinkTarget !== ''
-        ? $explicitLinkTarget
-        : cmsPromptAssetUrl($relativePath, !$isFolder);
-    $linkUrl = cmsConfiguredTreeExternalLinkUrl($item);
-
-    $result = [
-        'name' => $name,
-        'title' => (string) ($item['title'] ?? $name),
-        'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
-        'type' => $isFolder ? 'folder' : 'file',
-        'kind' => $kind,
-        'path' => $relativePath,
+    return [
         'pageLink' => $pageLink,
         'pageUrl' => $pageLink,
         'workUrl' => $pageLink,
@@ -88,10 +49,46 @@ function cmsBuildPromptRef(string $basePath, array $item): ?array
         'rawHref' => $assetUrl,
         'srcUrl' => $assetUrl,
         'sourceUrl' => $assetUrl,
+    ];
+}
+
+function cmsBuildPromptRef(string $basePath, array $item): ?array
+{
+    $name = trim((string) ($item['name'] ?? $item['path'] ?? ''));
+    if ($name === '') {
+        return null;
+    }
+
+    $configuredType = strtolower(trim((string) ($item['type'] ?? 'file')));
+    $explicitLinkTarget = cmsConfiguredTreeDirectLinkTarget($item);
+    $relativePath = cmsConfiguredTreeDisplayPath($basePath, $item, $name);
+    if ($relativePath === '') {
+        $relativePath = cmsConfiguredTreeFilesystemRelativePath($basePath, $item, $name);
+    }
+
+    $isFolder = $configuredType === 'folder';
+    $kind = $isFolder
+        ? 'folder'
+        : (($configuredType === 'link' || $explicitLinkTarget !== '') ? 'link' : MediaType::classifyExtension($name));
+    $pageLink = $explicitLinkTarget !== ''
+        ? $explicitLinkTarget
+        : cmsBuildViewerHrefFromRelativePath($relativePath, !$isFolder);
+    $assetUrl = $explicitLinkTarget !== ''
+        ? $explicitLinkTarget
+        : cmsBuildAssetHrefFromRelativePath($relativePath, !$isFolder);
+    $linkUrl = cmsConfiguredTreeExternalLinkUrl($item);
+
+    $result = array_merge([
+        'name' => $name,
+        'title' => (string) ($item['title'] ?? $name),
+        'slug' => (string) ($item['slug'] ?? PoffConfig::slugify($name)),
+        'type' => $isFolder ? 'folder' : 'file',
+        'kind' => $kind,
+        'path' => $relativePath,
         'isFolder' => $isFolder,
         'isFile' => !$isFolder,
         'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
-    ];
+    ], cmsPromptRefUrls($pageLink, $assetUrl));
 
     if ($linkUrl !== '') {
         $result['linkUrl'] = $linkUrl;
