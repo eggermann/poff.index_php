@@ -9,7 +9,6 @@ require_once __DIR__ . '/../src/includes/Worktype.php';
 require_once __DIR__ . '/../src/includes/PoffConfig.php';
 require_once __DIR__ . '/../src/includes/viewer/utils.php';
 require_once __DIR__ . '/../src/includes/auth.php';
-require_once __DIR__ . '/../src/includes/nav-render.php';
 
 $baseDir = $argv[1] ?? '';
 $relativePath = $argv[2] ?? '';
