@@ -33,13 +33,9 @@ trait WorktypeDefinitionsTrait
             $append((string) $defaultCategory);
         }
 
-        $sourceValues = [];
-        if (is_array($value)) {
-            $sourceValues = $value;
-        } elseif (is_string($value) && trim($value) !== '') {
-            $sourceValues = preg_split('/\r?\n|,/', $value) ?: [];
-        }
-
+        $sourceValues = is_array($value)
+            ? $value
+            : ((is_string($value) && trim($value) !== '') ? (preg_split('/\r?\n|,/', $value) ?: []) : []);
         foreach ($sourceValues as $candidate) {
             if (is_string($candidate) || is_scalar($candidate)) {
                 $append((string) $candidate);
@@ -49,14 +45,46 @@ trait WorktypeDefinitionsTrait
         return $categories;
     }
 
+    private static function collectSharedCategories(): array
+    {
+        $rootDir = trim((string) (function_exists('cmsProjectRootDir') ? cmsProjectRootDir() : ''));
+        if ($rootDir === '' || !is_dir($rootDir)) {
+            return [];
+        }
+        $categories = [];
+        $excluded = ['build', 'pages', 'scripts', 'src', 'tests', 'vendor', 'node_modules', '.git'];
+        $iterator = new RecursiveIteratorIterator(new RecursiveCallbackFilterIterator(
+            new RecursiveDirectoryIterator($rootDir, FilesystemIterator::SKIP_DOTS),
+            static fn($current): bool => $current instanceof SplFileInfo
+                && ($current->isDir()
+                    ? !in_array($current->getFilename(), $excluded, true)
+                    : ($current->getFilename() === 'poff.config.json'
+                        || (str_ends_with($current->getFilename(), '.config.json') && basename($current->getPath()) === '.works')))
+        ));
+        foreach ($iterator as $fileInfo) {
+            $decoded = json_decode((string) file_get_contents($fileInfo->getPathname()), true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            foreach (self::normalizeChoiceList($decoded['categories'] ?? null) as $category) {
+                if (!in_array($category, $categories, true)) {
+                    $categories[] = $category;
+                }
+            }
+            foreach (self::normalizeChoiceList($decoded['work']['categories'] ?? ($decoded['work']['category'] ?? null)) as $category) {
+                if (!in_array($category, $categories, true)) {
+                    $categories[] = $category;
+                }
+            }
+        }
+
+        return $categories;
+    }
+
     public static function isKnownWorktypeKey(string $key): bool
     {
         $normalized = strtolower(trim($key));
-        if ($normalized === '') {
-            return false;
-        }
-
-        return in_array($normalized, self::availableKinds(), true);
+        return $normalized !== '' && in_array($normalized, self::availableKinds(), true);
     }
 
     public static function normalizeTemplateKey(?string $value): string
@@ -187,20 +215,9 @@ trait WorktypeDefinitionsTrait
 
     public static function shouldAutoplayByDefault(string $template, string $kind, ?string $mime = null, ?string $fileName = null): bool
     {
-        if ($template !== 'video') {
-            return false;
-        }
-
-        $normalizedMime = strtolower(trim((string) $mime));
-        if ($normalizedMime === 'video/quicktime') {
-            return true;
-        }
-
-        if ($fileName !== null && strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) === 'mov') {
-            return true;
-        }
-
-        return false;
+        return $template === 'video'
+            && (strtolower(trim((string) $mime)) === 'video/quicktime'
+                || ($fileName !== null && strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) === 'mov'));
     }
 
     public static function resolveTemplateSelection(string $kind, ?string $mime = null, ?string $fileName = null, mixed $templateMap = null): array
@@ -361,7 +378,6 @@ trait WorktypeDefinitionsTrait
     public static function availableCategories(): array
     {
         self::loadBundle();
-
         $categories = [];
         foreach (self::availableKinds() as $kind) {
             foreach (self::defaultCategoriesForKind($kind) as $category) {
@@ -369,15 +385,17 @@ trait WorktypeDefinitionsTrait
                 if ($normalized === '' || in_array($normalized, $categories, true)) {
                     continue;
                 }
-
                 $categories[] = $normalized;
             }
         }
-
         if ($categories === []) {
             $categories = ['other'];
         }
-
+        foreach (self::collectSharedCategories() as $category) {
+            if (!in_array($category, $categories, true)) {
+                $categories[] = $category;
+            }
+        }
         sort($categories, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $categories;
@@ -423,7 +441,6 @@ trait WorktypeDefinitionsTrait
             }
 
             $score = 0;
-
             if ($selected !== '' && $selected === $key) {
                 $score += 1000;
             }
@@ -457,10 +474,6 @@ trait WorktypeDefinitionsTrait
         if ($mime !== '') {
             $mimeMatches = array_values(array_filter($choices, static function (array $choice) use ($mime): bool {
                 $choiceMimes = is_array($choice['mimes'] ?? null) ? $choice['mimes'] : [];
-                if ($choiceMimes === []) {
-                    return false;
-                }
-
                 foreach ($choiceMimes as $choiceMime) {
                     if (is_string($choiceMime) && self::mimeMatchesPattern($mime, $choiceMime)) {
                         return true;
@@ -549,30 +562,11 @@ trait WorktypeDefinitionsTrait
         ];
     }
 
-    public static function setEmbedded(array $map): void
-    {
-        self::$embedded = $map;
-    }
-
-    public static function setEmbeddedTemplates(array $map): void
-    {
-        self::$embeddedTemplates = $map;
-    }
-
-    public static function setEmbeddedLayoutAssets(array $map): void
-    {
-        self::$embeddedLayoutAssets = $map;
-    }
-
-    public static function defaultLayoutName(): string
-    {
-        return self::defaultLayoutNameValue();
-    }
-
-    public static function filesystemLayoutName(): string
-    {
-        return self::filesystemLayoutNameValue();
-    }
+    public static function setEmbedded(array $map): void { self::$embedded = $map; }
+    public static function setEmbeddedTemplates(array $map): void { self::$embeddedTemplates = $map; }
+    public static function setEmbeddedLayoutAssets(array $map): void { self::$embeddedLayoutAssets = $map; }
+    public static function defaultLayoutName(): string { return self::defaultLayoutNameValue(); }
+    public static function filesystemLayoutName(): string { return self::filesystemLayoutNameValue(); }
 
     private static function loadFilePair(string $kind): void
     {
@@ -665,11 +659,7 @@ trait WorktypeDefinitionsTrait
     private static function normalizeChoiceList(mixed $value): array
     {
         if (!is_array($value)) {
-            if (is_string($value) && trim($value) !== '') {
-                $value = preg_split('/\r?\n|,/', $value) ?: [];
-            } else {
-                $value = [];
-            }
+            $value = is_string($value) && trim($value) !== '' ? (preg_split('/\r?\n|,/', $value) ?: []) : [];
         }
 
         $choices = [];

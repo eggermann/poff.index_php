@@ -35,6 +35,34 @@ if (!is_dir($outputDir)) {
 
 try {
     $buildContent = "<?php\n";
+    $stripPhp = static function (string $content): string {
+        $content = str_replace(['<?php', '?>'], '', $content);
+        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
+    };
+    $stripRequires = static function (string $content): string {
+        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
+    };
+    $appendPhpBlock = static function (string &$buffer, string $content): void {
+        $buffer .= trim($content) . "\n\n";
+    };
+    $readSourceFile = static function (string $relativePath) use ($sourceDir): string {
+        return ComponentReader::readComponentFile($sourceDir . $relativePath);
+    };
+    $appendSourceParts = static function (string &$buffer, array $relativePaths, ?callable $transform = null) use ($readSourceFile, $appendPhpBlock): void {
+        foreach ($relativePaths as $relativePath) {
+            $content = $readSourceFile($relativePath);
+            if ($transform !== null) {
+                $content = $transform($content);
+            }
+            $appendPhpBlock($buffer, $content);
+        }
+    };
+    $appendExportAssignment = static function (string &$buffer, string $variable, mixed $value, ?string $setter = null) use ($appendPhpBlock): void {
+        $appendPhpBlock($buffer, $variable . ' = ' . var_export($value, true) . ';');
+        if ($setter !== null) {
+            $appendPhpBlock($buffer, $setter);
+        }
+    };
 
     // Embed the LightnCandy renderer so the built output can render HBS templates
     // without depending on the project vendor directory at runtime.
@@ -64,8 +92,8 @@ try {
             ComponentReader::readComponentFile(__DIR__ . '/..' . $lightnCandyRelativePath)
         ));
     }
-    $buildContent .= '$__embeddedLightnCandySources = ' . var_export($embeddedLightnCandySources, true) . ";\n";
-    $buildContent .= <<<'PHP'
+    $appendPhpBlock($buildContent, '$__embeddedLightnCandySources = ' . var_export($embeddedLightnCandySources, true) . ';');
+    $appendPhpBlock($buildContent, <<<'PHP'
 if (!class_exists('\LightnCandy\LightnCandy', false)) {
     foreach ($__embeddedLightnCandySources as $__lightnCandySource) {
         eval("namespace LightnCandy {\n" . $__lightnCandySource . "\n}");
@@ -73,8 +101,8 @@ if (!class_exists('\LightnCandy\LightnCandy', false)) {
 }
 unset($__embeddedLightnCandySources, $__lightnCandySource);
 
-PHP;
-    $buildContent .= "\n";
+PHP
+    );
 
     // Get the first file header comment only
   
@@ -82,33 +110,25 @@ PHP;
 
 
     // Add function definition without its doc comment
-    $functionsContent = ComponentReader::readComponentFile($sourceDir . '/includes/functions.php');
+    $functionsContent = $readSourceFile('/includes/functions.php');
     if (preg_match('/function\s+extractLinkFileUrl.*?^}/ms', $functionsContent, $matches)) {
-        $buildContent .= $matches[0] . "\n\n";
+        $appendPhpBlock($buildContent, $matches[0]);
     }
 
     // Add MediaType helper
-    $mediaTypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/MediaType.php');
-    $mediaTypeContent = str_replace(['<?php', '?>'], '', $mediaTypeContent);
-    $buildContent .= trim($mediaTypeContent) . "\n\n";
+    $appendSourceParts($buildContent, ['/includes/MediaType.php'], static function (string $content): string {
+        return str_replace(['<?php', '?>'], '', $content);
+    });
 
     // Add Worktype helper as a standalone class without runtime require_once dependencies.
-    $worktypeState = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/State.php');
-    $worktypeDefinitions = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Definitions.php');
-    $worktypeContext = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Context.php');
-    $worktypeLayout = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Layout.php');
-    $worktypeRender = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Render.php');
-    $worktypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype.php');
-    $stripStandalonePhp = static function (string $content): string {
-        $content = str_replace(['<?php', '?>'], '', $content);
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
-    };
-    $buildContent .= trim($stripStandalonePhp($worktypeState)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeDefinitions)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeContext)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeLayout)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeRender)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeContent)) . "\n\n";
+    $appendSourceParts($buildContent, [
+        '/includes/Worktype/State.php',
+        '/includes/Worktype/Definitions.php',
+        '/includes/Worktype/Context.php',
+        '/includes/Worktype/Layout.php',
+        '/includes/Worktype/Render.php',
+        '/includes/Worktype.php',
+    ], $stripPhp);
     // Embed worktype definitions and templates (prefer bundle file)
     $bundlePath = $sourceDir . '/includes/worktypes/worktypes.php';
     $embeddedWorktypes = [];
@@ -188,37 +208,28 @@ PHP;
             $embeddedLayoutAssets[$layoutName] = $layoutAssets;
         }
     }
-    $buildContent .= '$__worktypeEmbedded = ' . var_export($embeddedWorktypes, true) . ";\n";
-    $buildContent .= "Worktype::setEmbedded(\$__worktypeEmbedded);\n\n";
-    $buildContent .= '$__worktypeTemplates = ' . var_export($embeddedTemplates, true) . ";\n";
-    $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
-    $buildContent .= '$__worktypeLayoutAssets = ' . var_export($embeddedLayoutAssets, true) . ";\n";
-    $buildContent .= "Worktype::setEmbeddedLayoutAssets(\$__worktypeLayoutAssets);\n\n";
+    $appendExportAssignment($buildContent, '$__worktypeEmbedded', $embeddedWorktypes, "Worktype::setEmbedded(\$__worktypeEmbedded);");
+    $appendExportAssignment($buildContent, '$__worktypeTemplates', $embeddedTemplates, "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);");
+    $appendExportAssignment($buildContent, '$__worktypeLayoutAssets', $embeddedLayoutAssets, "Worktype::setEmbeddedLayoutAssets(\$__worktypeLayoutAssets);");
     $viewerShellCssAsset = __DIR__ . '/assets/app.css';
-    $buildContent .= '$__embeddedViewerShellCss = ' . var_export(
-        is_file($viewerShellCssAsset) ? trim((string) file_get_contents($viewerShellCssAsset)) : '',
-        true
-    ) . ";\n\n";
+    $appendExportAssignment(
+        $buildContent,
+        '$__embeddedViewerShellCss',
+        is_file($viewerShellCssAsset) ? trim((string) file_get_contents($viewerShellCssAsset)) : ''
+    );
 
     // Add edit-mode helpers, root detection, prompt/template sanitizers, and PoffConfig model so the built output stays single-file.
-    $editModeHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/edit-mode.php');
-    $projectRootHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/project-root.php');
-    $promptTemplateSanitize = ComponentReader::readComponentFile($sourceDir . '/includes/prompt-template-sanitize.php');
-    $poffConfigLayoutHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-helpers.php');
-    $poffConfigCoreHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/core-helpers.php');
-    $poffConfigLayoutFiles = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-files.php');
-    $poffConfigLayoutView = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-view.php');
-    $poffConfigLayoutCollections = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-collections.php');
-    $poffConfigPromptHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/prompt-helpers.php');
-    $viewerLinkTargets = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/link-targets.php');
-    $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
-    $stripPhp = static function (string $content): string {
-        $content = str_replace(['<?php', '?>'], '', $content);
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
-    };
-    $editModeHelpers = $stripPhp($editModeHelpers);
-    $projectRootHelpers = $stripPhp($projectRootHelpers);
-    $promptTemplateSanitize = $stripPhp($promptTemplateSanitize);
+    $editModeHelpers = $stripPhp($readSourceFile('/includes/edit-mode.php'));
+    $projectRootHelpers = $stripPhp($readSourceFile('/includes/project-root.php'));
+    $promptTemplateSanitize = $stripPhp($readSourceFile('/includes/prompt-template-sanitize.php'));
+    $poffConfigLayoutHelpers = $readSourceFile('/includes/PoffConfig/layout-helpers.php');
+    $poffConfigCoreHelpers = $readSourceFile('/includes/PoffConfig/core-helpers.php');
+    $poffConfigLayoutFiles = $readSourceFile('/includes/PoffConfig/layout-files.php');
+    $poffConfigLayoutView = $readSourceFile('/includes/PoffConfig/layout-view.php');
+    $poffConfigLayoutCollections = $readSourceFile('/includes/PoffConfig/layout-collections.php');
+    $poffConfigPromptHelpers = $readSourceFile('/includes/PoffConfig/prompt-helpers.php');
+    $viewerLinkTargets = $stripPhp($readSourceFile('/includes/viewer/link-targets.php'));
+    $poffConfigContent = $readSourceFile('/includes/PoffConfig.php');
     $poffConfigContent = PoffConfigBuilder::buildClass($poffConfigContent, [
         $poffConfigLayoutHelpers,
         $poffConfigCoreHelpers,
@@ -228,23 +239,21 @@ PHP;
         $poffConfigPromptHelpers,
     ]);
     $poffConfigContent = $stripPhp($poffConfigContent);
-    $viewerLinkTargets = $stripPhp($viewerLinkTargets);
-    $authHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/auth.php');
-    $authHelpers = $stripPhp($authHelpers);
-    $buildContent .= trim($editModeHelpers) . "\n\n";
-    $buildContent .= trim($authHelpers) . "\n\n";
-    $buildContent .= trim($projectRootHelpers) . "\n\n";
-    $buildContent .= trim($promptTemplateSanitize) . "\n\n";
-    $buildContent .= trim($viewerLinkTargets) . "\n\n";
-    $buildContent .= trim($poffConfigContent) . "\n\n";
-    $navRenderHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/nav-render.php');
-    $navRenderHelpers = $stripPhp($navRenderHelpers);
-    $buildContent .= trim($navRenderHelpers) . "\n\n";
+    $authHelpers = $stripPhp($readSourceFile('/includes/auth.php'));
+    $navRenderHelpers = $stripPhp($readSourceFile('/includes/nav-render.php'));
+    foreach ([
+        $editModeHelpers,
+        $authHelpers,
+        $projectRootHelpers,
+        $promptTemplateSanitize,
+        $viewerLinkTargets,
+        $poffConfigContent,
+        $navRenderHelpers,
+    ] as $phpBlock) {
+        $appendPhpBlock($buildContent, $phpBlock);
+    }
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
-    $stripRequires = static function (string $content): string {
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
-    };
     $viewerSharedParts = [
         '/includes/viewer/utils/core.php',
         '/includes/viewer/utils/targets.php',
@@ -257,11 +266,7 @@ PHP;
         '/includes/viewer/render/data.php',
         '/includes/viewer/render/shell.php',
     ];
-    foreach ($viewerSharedParts as $relativePath) {
-        $content = ComponentReader::readComponentFile($sourceDir . $relativePath);
-        $content = $stripRequires($content);
-        $buildContent .= trim($content) . "\n\n";
-    }
+    $appendSourceParts($buildContent, $viewerSharedParts, $stripRequires);
 
     $viewerEditParts = [
         '/includes/viewer/edit/core/config.php',
@@ -303,12 +308,8 @@ PHP;
         '/includes/viewer/edit/action/models-action.php',
         '/includes/viewer/edit/action/dispatch.php',
     ];
-    foreach ($viewerEditParts as $relativePath) {
-        $content = ComponentReader::readComponentFile($sourceDir . $relativePath);
-        $content = $stripRequires($content);
-        $buildContent .= trim($content) . "\n\n";
-    }
-    $buildContent .= "cmsHandleEditAction();\n\n";
+    $appendSourceParts($buildContent, $viewerEditParts, $stripRequires);
+    $appendPhpBlock($buildContent, "cmsHandleEditAction();");
 
     // Add initialization code
     $buildContent .= <<<'PHP'

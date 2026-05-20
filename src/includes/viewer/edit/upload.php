@@ -3,6 +3,39 @@
  * Upload and blank-file helpers for edit actions.
  */
 
+function cmsUploadStoredItem(string $name, array $extra = []): array
+{
+    return array_merge([
+        'name' => $name,
+        'path' => $name,
+    ], $extra);
+}
+
+function cmsUploadErrorResult(string $message): array
+{
+    return [
+        'stored' => [],
+        'errors' => [$message],
+    ];
+}
+
+function cmsUploadStoredResult(string $name, array $extra = []): array
+{
+    return [
+        'stored' => [cmsUploadStoredItem($name, $extra)],
+        'errors' => [],
+    ];
+}
+
+function cmsEnsureUploadDirectory(string $targetDir, string $errorMessage = 'Failed to create target directory.'): ?array
+{
+    if (is_dir($targetDir) || (mkdir($targetDir, 0755, true) || is_dir($targetDir))) {
+        return null;
+    }
+
+    return cmsUploadErrorResult($errorMessage);
+}
+
 function cmsCollectUploadedEntries(array $files): array
 {
     $entries = [];
@@ -40,11 +73,9 @@ function cmsStoreUploadEntries(string $targetDir, array $entries): array
     $stored = [];
     $errors = [];
 
-    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to create target directory.'],
-        ];
+    $dirError = cmsEnsureUploadDirectory($targetDir);
+    if ($dirError !== null) {
+        return $dirError;
     }
 
     foreach ($entries as $entry) {
@@ -72,10 +103,7 @@ function cmsStoreUploadEntries(string $targetDir, array $entries): array
             continue;
         }
 
-        $stored[] = [
-            'name' => $name,
-            'path' => $name,
-        ];
+        $stored[] = cmsUploadStoredItem($name);
     }
 
     return [
@@ -88,80 +116,64 @@ function cmsCreateBlankFile(string $targetDir, string $fileName, string $content
 {
     $name = cmsUploadSafeName($fileName);
     if ($name === '') {
-        return [
-            'stored' => [],
-            'errors' => ['Invalid file name.'],
-        ];
+        return cmsUploadErrorResult('Invalid file name.');
     }
 
-    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to create target directory.'],
-        ];
+    $dirError = cmsEnsureUploadDirectory($targetDir);
+    if ($dirError !== null) {
+        return $dirError;
     }
 
     $targetPath = $targetDir . DIRECTORY_SEPARATOR . $name;
+    if ($name === '.htaccess' && trim($contents) === '') {
+        $contents = cmsDefaultHtaccessContents();
+    }
     $written = file_put_contents($targetPath, $contents);
     if ($written === false) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to create blank file.'],
-        ];
+        return cmsUploadErrorResult('Failed to create blank file.');
     }
 
-    return [
-        'stored' => [[
-            'name' => $name,
-            'path' => $name,
-        ]],
-        'errors' => [],
-    ];
+    return cmsUploadStoredResult($name);
+}
+
+function cmsDefaultHtaccessContents(): string
+{
+    return <<<'HTACCESS'
+# Poff iframe policy
+# Edit this file to control which sites may embed this CMS in an <iframe>.
+
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "frame-ancestors 'self'"
+</IfModule>
+
+# To allow embedding from every origin, replace the policy above with:
+# Header always set Content-Security-Policy "frame-ancestors *"
+HTACCESS;
 }
 
 function cmsCreateFolder(string $targetDir, string $folderName): array
 {
     $name = cmsUploadSafeName($folderName);
     if ($name === '') {
-        return [
-            'stored' => [],
-            'errors' => ['Invalid folder name.'],
-        ];
+        return cmsUploadErrorResult('Invalid folder name.');
     }
 
     $targetPath = $targetDir . DIRECTORY_SEPARATOR . $name;
     if (is_file($targetPath)) {
-        return [
-            'stored' => [],
-            'errors' => ['A file with that name already exists.'],
-        ];
+        return cmsUploadErrorResult('A file with that name already exists.');
     }
     if (is_dir($targetPath)) {
-        return [
-            'stored' => [],
-            'errors' => ['Folder already exists.'],
-        ];
+        return cmsUploadErrorResult('Folder already exists.');
     }
-    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to create target directory.'],
-        ];
+    $dirError = cmsEnsureUploadDirectory($targetDir);
+    if ($dirError !== null) {
+        return $dirError;
     }
     if (!mkdir($targetPath, 0755, true) && !is_dir($targetPath)) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to create folder.'],
-        ];
+        return cmsUploadErrorResult('Failed to create folder.');
     }
 
-    return [
-        'stored' => [[
-            'name' => $name,
-            'path' => $name,
-        ]],
-        'errors' => [],
-    ];
+    return cmsUploadStoredResult($name);
 }
 
 function cmsPendingExternalLinkLimit(): int
@@ -227,26 +239,17 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
 {
     $target = trim($linkUrl);
     if ($target === '') {
-        return [
-            'stored' => [],
-            'errors' => ['Enter a link URL.'],
-        ];
+        return cmsUploadErrorResult('Enter a link URL.');
     }
 
     $scheme = strtolower((string) parse_url($target, PHP_URL_SCHEME));
     if (!in_array($scheme, ['http', 'https'], true)) {
-        return [
-            'stored' => [],
-            'errors' => ['Link URLs must start with http:// or https://.'],
-        ];
+        return cmsUploadErrorResult('Link URLs must start with http:// or https://.');
     }
 
     $pendingApproval = !empty($options['pendingApproval']);
     if ($pendingApproval && !cmsIsAllowedExternalPoffLink($target)) {
-        return [
-            'stored' => [],
-            'errors' => ['Only links from another Poff system are allowed. Use a viewer URL with ?view=1&path=..., ?view=1&file=..., or a hash route like #/work-name.'],
-        ];
+        return cmsUploadErrorResult('Only links from another Poff system are allowed. Use a viewer URL with ?view=1&path=..., ?view=1&file=..., or a hash route like #/work-name.');
     }
 
     $baseUrl = cmsNormalizeRemoteBaseUrl($target);
@@ -254,10 +257,7 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
     $config = PoffConfig::ensure($targetDir);
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
     if ($pendingApproval && cmsCountPendingExternalLinks($tree) >= cmsPendingExternalLinkLimit()) {
-        return [
-            'stored' => [],
-            'errors' => ['Too many external links are waiting for approval in this folder.'],
-        ];
+        return cmsUploadErrorResult('Too many external links are waiting for approval in this folder.');
     }
 
     $baseName = cmsUploadSafeName($label);
@@ -314,31 +314,21 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
 
     $configPath = PoffConfig::configPath($targetDir);
     $dirPath = dirname($configPath);
-    if (!is_dir($dirPath) && !mkdir($dirPath, 0755, true) && !is_dir($dirPath)) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to create config directory.'],
-        ];
+    $dirError = cmsEnsureUploadDirectory($dirPath, 'Failed to create config directory.');
+    if ($dirError !== null) {
+        return $dirError;
     }
 
     $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($encoded === false || file_put_contents($configPath, $encoded) === false) {
-        return [
-            'stored' => [],
-            'errors' => ['Failed to write config file.'],
-        ];
+        return cmsUploadErrorResult('Failed to write config file.');
     }
 
-    return [
-        'stored' => [[
-            'name' => $name,
-            'path' => $name,
-            'linkUrl' => $target,
-            'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
-            'pendingApproval' => $pendingApproval,
-        ]],
-        'errors' => [],
-    ];
+    return cmsUploadStoredResult($name, [
+        'linkUrl' => $target,
+        'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
+        'pendingApproval' => $pendingApproval,
+    ]);
 }
 
 function cmsNormalizeRemoteBaseUrl(string $url): string

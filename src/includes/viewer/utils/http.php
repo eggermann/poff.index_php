@@ -1,23 +1,38 @@
 <?php
 
+function cmsHttpOverrideResponse(string $globalKey, mixed ...$args): ?array
+{
+    $override = $GLOBALS[$globalKey] ?? null;
+    if (!is_callable($override)) return null;
+    $response = $override(...$args);
+    return is_array($response) ? $response : null;
+}
+
+function cmsHttpPrepareTimeout(): string|false
+{
+    if (function_exists('set_time_limit')) @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
+    $previous = ini_get('default_socket_timeout');
+    if (function_exists('ini_set')) @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
+    return $previous;
+}
+
+function cmsHttpRestoreTimeout(string|false $previous): void
+{
+    if ($previous !== false && function_exists('ini_set')) @ini_set('default_socket_timeout', (string) $previous);
+}
+
+function cmsHttpStatusFromResponseHeaders(?array $headers): array
+{
+    $statusLine = (string) ($headers[0] ?? '');
+    $status = preg_match('/\s(\d{3})\s/', $statusLine, $matches) === 1 ? (int) $matches[1] : 0;
+    return [$status, $statusLine];
+}
+
 function cmsHttpPost(string $url, array $headers, array $payload): array
 {
-    $override = $GLOBALS['__poff_prompt_http_post'] ?? null;
-    if (is_callable($override)) {
-        $response = $override($url, $headers, $payload);
-        if (is_array($response)) {
-            return $response;
-        }
-    }
-
-    if (function_exists('set_time_limit')) {
-        @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
-    }
-
-    $previousSocketTimeout = ini_get('default_socket_timeout');
-    if (function_exists('ini_set')) {
-        @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
-    }
+    $override = cmsHttpOverrideResponse('__poff_prompt_http_post', $url, $headers, $payload);
+    if ($override !== null) return $override;
+    $previousSocketTimeout = cmsHttpPrepareTimeout();
 
     $headerLines = array_merge(['Content-Type: application/json'], $headers);
     try {
@@ -32,17 +47,10 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
         ]);
         $response = @file_get_contents($url, false, $context);
     } finally {
-        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
-            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
-        }
+        cmsHttpRestoreTimeout($previousSocketTimeout);
     }
 
-    $status = 0;
-    $statusLine = '';
-    if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
-        $status = (int) $matches[1];
-        $statusLine = (string) $http_response_header[0];
-    }
+    [$status, $statusLine] = cmsHttpStatusFromResponseHeaders($http_response_header ?? null);
 
     return [
         'ok' => $response !== false && $status >= 200 && $status < 400,
@@ -54,29 +62,14 @@ function cmsHttpPost(string $url, array $headers, array $payload): array
 
 function cmsHttpGet(string $url, array $headers = []): array
 {
-    $override = $GLOBALS['__poff_prompt_http_get'] ?? null;
-    if (is_callable($override)) {
-        $response = $override($url, $headers);
-        if (is_array($response)) {
-            return $response;
-        }
-    }
-
-    if (function_exists('set_time_limit')) {
-        @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
-    }
-
-    $previousSocketTimeout = ini_get('default_socket_timeout');
-    if (function_exists('ini_set')) {
-        @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
-    }
+    $override = cmsHttpOverrideResponse('__poff_prompt_http_get', $url, $headers);
+    if ($override !== null) return $override;
+    $previousSocketTimeout = cmsHttpPrepareTimeout();
 
     try {
         if (function_exists('curl_init')) {
             $curl = curl_init($url);
-            if ($curl === false) {
-                return ['ok' => false, 'status' => 0, 'statusLine' => '', 'body' => ''];
-            }
+            if ($curl === false) return ['ok' => false, 'status' => 0, 'statusLine' => '', 'body' => ''];
 
             $responseBody = '';
             $status = 0;
@@ -129,12 +122,7 @@ function cmsHttpGet(string $url, array $headers = []): array
             ],
         ]);
         $response = @file_get_contents($url, false, $context);
-        $status = 0;
-        $statusLine = '';
-        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
-            $status = (int) $matches[1];
-            $statusLine = (string) $http_response_header[0];
-        }
+        [$status, $statusLine] = cmsHttpStatusFromResponseHeaders($http_response_header ?? null);
 
         return [
             'ok' => $response !== false && $status >= 200 && $status < 400,
@@ -143,30 +131,15 @@ function cmsHttpGet(string $url, array $headers = []): array
             'body' => $response !== false ? $response : '',
         ];
     } finally {
-        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
-            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
-        }
+        cmsHttpRestoreTimeout($previousSocketTimeout);
     }
 }
 
 function cmsHttpPostStream(string $url, array $headers, array $payload, ?callable $onChunk = null): array
 {
-    $override = $GLOBALS['__poff_prompt_http_post_stream'] ?? null;
-    if (is_callable($override)) {
-        $response = $override($url, $headers, $payload, $onChunk);
-        if (is_array($response)) {
-            return $response;
-        }
-    }
-
-    if (function_exists('set_time_limit')) {
-        @set_time_limit(CMS_HTTP_TIMEOUT_SECONDS + 30);
-    }
-
-    $previousSocketTimeout = ini_get('default_socket_timeout');
-    if (function_exists('ini_set')) {
-        @ini_set('default_socket_timeout', (string) CMS_HTTP_TIMEOUT_SECONDS);
-    }
+    $override = cmsHttpOverrideResponse('__poff_prompt_http_post_stream', $url, $headers, $payload, $onChunk);
+    if ($override !== null) return $override;
+    $previousSocketTimeout = cmsHttpPrepareTimeout();
 
     $headerLines = array_merge(['Content-Type: application/json'], $headers);
     $responseBody = '';
@@ -176,16 +149,12 @@ function cmsHttpPostStream(string $url, array $headers, array $payload, ?callabl
         if (!function_exists('curl_init')) {
             $response = cmsHttpPost($url, $headers, $payload);
             $responseBody = (string) ($response['body'] ?? '');
-            if (is_callable($onChunk) && $responseBody !== '') {
-                $onChunk($responseBody);
-            }
+            if (is_callable($onChunk) && $responseBody !== '') $onChunk($responseBody);
             return $response;
         }
 
         $curl = curl_init($url);
-        if ($curl === false) {
-            return ['ok' => false, 'status' => 0, 'statusLine' => '', 'body' => ''];
-        }
+        if ($curl === false) return ['ok' => false, 'status' => 0, 'statusLine' => '', 'body' => ''];
 
         curl_setopt_array($curl, [
             CURLOPT_POST => true,
@@ -230,9 +199,7 @@ function cmsHttpPostStream(string $url, array $headers, array $payload, ?callabl
             'error' => $error,
         ];
     } finally {
-        if ($previousSocketTimeout !== false && function_exists('ini_set')) {
-            @ini_set('default_socket_timeout', (string) $previousSocketTimeout);
-        }
+        cmsHttpRestoreTimeout($previousSocketTimeout);
     }
 }
 
@@ -259,9 +226,7 @@ function cmsPromptNormalizeErrorText(string $text): string
     $normalized = preg_replace('/sk-[A-Za-z0-9_-]{12,}/', 'sk-***', $normalized) ?? $normalized;
     $normalized = preg_replace('/AIza[0-9A-Za-z_-]{12,}/', 'AIza***', $normalized) ?? $normalized;
     $normalized = trim($normalized, " \t\n\r\0\x0B.:");
-    if ($normalized === '') {
-        return '';
-    }
+    if ($normalized === '') return '';
     if (strlen($normalized) > 220) {
         $normalized = substr($normalized, 0, 217) . '...';
     }
@@ -273,15 +238,11 @@ function cmsPromptExtractErrorDetail(mixed $value): string
 {
     if (is_string($value)) {
         $trimmed = trim($value);
-        if ($trimmed === '') {
-            return '';
-        }
+        if ($trimmed === '') return '';
         $decoded = json_decode($trimmed, true);
         if (is_array($decoded)) {
             $detail = cmsPromptExtractErrorDetail($decoded);
-            if ($detail !== '') {
-                return $detail;
-            }
+            if ($detail !== '') return $detail;
         }
         if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $trimmed, $matches)) {
             return cmsPromptNormalizeErrorText((string) $matches[1]);
@@ -290,24 +251,18 @@ function cmsPromptExtractErrorDetail(mixed $value): string
         return cmsPromptNormalizeErrorText($trimmed);
     }
 
-    if (!is_array($value)) {
-        return '';
-    }
+    if (!is_array($value)) return '';
 
     foreach (['message', 'detail', 'error', 'details'] as $key) {
         if (array_key_exists($key, $value)) {
             $detail = cmsPromptExtractErrorDetail($value[$key]);
-            if ($detail !== '') {
-                return $detail;
-            }
+            if ($detail !== '') return $detail;
         }
     }
 
     foreach ($value as $item) {
         $detail = cmsPromptExtractErrorDetail($item);
-        if ($detail !== '') {
-            return $detail;
-        }
+        if ($detail !== '') return $detail;
     }
 
     return '';

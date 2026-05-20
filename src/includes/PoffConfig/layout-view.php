@@ -9,9 +9,7 @@ trait PoffConfigLayoutViewHelpers
         $work['layout'] = self::hydrateLayoutFilesystem($work['layout'] ?? null, $dir, $fileName, $section);
         $workType = trim((string) ($work['type'] ?? ($fileName === null ? 'folder' : 'other')));
         $defaultSectionTemplate = Worktype::template($workType);
-        if (is_string($defaultSectionTemplate) && $defaultSectionTemplate !== '') {
-            $work['layout']['defaultSectionTemplate'] = $defaultSectionTemplate;
-        }
+        if (is_string($defaultSectionTemplate) && $defaultSectionTemplate !== '') $work['layout']['defaultSectionTemplate'] = $defaultSectionTemplate;
         $config['work'] = $work;
 
         return $config;
@@ -61,13 +59,9 @@ trait PoffConfigLayoutViewHelpers
                 if (is_string($bundleCss) && $bundleCss !== '') {
                     $resolved['css'] = $bundleCss;
                 }
-                if ((!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') && $usesDefaultBundleTemplate) {
-                    if ($defaultTemplateMarkup !== '') {
-                        $bundleCss = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_STYLE_FILE);
-                        if (is_string($bundleCss) && $bundleCss !== '') {
-                            $resolved['css'] = $bundleCss;
-                        }
-                    }
+                if ((!array_key_exists('css', $resolved) || trim((string) ($resolved['css'] ?? '')) === '') && $usesDefaultBundleTemplate && $defaultTemplateMarkup !== '') {
+                    $bundleCss = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_STYLE_FILE);
+                    if (is_string($bundleCss) && $bundleCss !== '') $resolved['css'] = $bundleCss;
                 }
             }
             if (!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') {
@@ -75,13 +69,9 @@ trait PoffConfigLayoutViewHelpers
                 if (is_string($bundleJs) && $bundleJs !== '') {
                     $resolved['js'] = $bundleJs;
                 }
-                if ((!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') && $usesDefaultBundleTemplate) {
-                    if ($defaultTemplateMarkup !== '') {
-                        $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
-                        if (is_string($bundleJs) && $bundleJs !== '') {
-                            $resolved['js'] = $bundleJs;
-                        }
-                    }
+                if ((!array_key_exists('js', $resolved) || trim((string) ($resolved['js'] ?? '')) === '') && $usesDefaultBundleTemplate && $defaultTemplateMarkup !== '') {
+                    $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
+                    if (is_string($bundleJs) && $bundleJs !== '') $resolved['js'] = $bundleJs;
                 }
             }
         }
@@ -105,15 +95,9 @@ trait PoffConfigLayoutViewHelpers
         $assets = [];
         $files = [];
         foreach (($resolved['assets'] ?? []) as $asset) {
-            if (!is_array($asset)) {
-                continue;
-            }
-
+            if (!is_array($asset)) continue;
             $assetPath = str_replace('\\', '/', (string) ($asset['path'] ?? ''));
-            if ($assetPath === '') {
-                continue;
-            }
-
+            if ($assetPath === '') continue;
             $asset['href'] = self::encodeRelativePath($basePath . '/' . $assetPath);
             $assets[] = $asset;
             $files[$assetPath] = $asset['href'];
@@ -144,15 +128,11 @@ trait PoffConfigLayoutViewHelpers
     private static function hydrateLayoutFilesystem(mixed $layout, string $dir, ?string $fileName, string $section): array
     {
         $resolved = Worktype::normalizeLayout($layout, $section);
-        $localLayoutDir = $fileName === null
-            ? self::folderLayoutDir($dir)
-            : self::fileLayoutDir($dir, $fileName);
+        $localLayoutDir = $fileName === null ? self::folderLayoutDir($dir) : self::fileLayoutDir($dir, $fileName);
         $hasLocalWrapperFiles = self::hasWrapperFiles($localLayoutDir);
         if (self::isImplicitDefaultLayoutValue($layout, $section) && !$hasLocalWrapperFiles) {
             $inheritedConfiguredLayout = self::resolveInheritedConfiguredLayout($dir, $section, $fileName !== null);
-            if (is_array($inheritedConfiguredLayout)) {
-                $resolved = $inheritedConfiguredLayout;
-            }
+            if (is_array($inheritedConfiguredLayout)) $resolved = $inheritedConfiguredLayout;
         }
         $mode = trim((string) ($resolved['mode'] ?? ''));
         $name = trim((string) ($resolved['name'] ?? ''));
@@ -197,9 +177,7 @@ trait PoffConfigLayoutViewHelpers
                 )
             );
         if ($sharedPreset) {
-            if ($sharedName === '' && isset($resolved['sharedLayouts'][0]['name'])) {
-                $sharedName = trim((string) $resolved['sharedLayouts'][0]['name']);
-            }
+            if ($sharedName === '' && isset($resolved['sharedLayouts'][0]['name'])) $sharedName = trim((string) $resolved['sharedLayouts'][0]['name']);
             $sharedPackage = $sharedName !== '' ? self::layoutCollectionPackage($dir, $section, $sharedName) : null;
             if (is_array($sharedPackage)) {
                 $resolved['storage'] = 'shared';
@@ -207,18 +185,10 @@ trait PoffConfigLayoutViewHelpers
                 $resolved['sharedName'] = $sharedName;
                 $resolved['directory'] = (string) ($sharedPackage['directory'] ?? ('shared/' . $section . '/' . $sharedName));
                 $resolved['sectionDirectory'] = $resolved['directory'];
-                if (!array_key_exists('template', $resolved) || trim((string) $resolved['template']) === '') {
-                    $resolved['template'] = self::sanitizeStoredPromptTemplate((string) ($sharedPackage['template'] ?? ''), true);
-                }
-                if (!array_key_exists('css', $resolved) || trim((string) $resolved['css'] ?? '') === '') {
-                    $resolved['css'] = (string) ($sharedPackage['css'] ?? '');
-                }
-                if (!array_key_exists('js', $resolved) || trim((string) $resolved['js'] ?? '') === '') {
-                    $resolved['js'] = (string) ($sharedPackage['js'] ?? '');
-                }
-                if (!array_key_exists('sectionTemplate', $resolved) || trim((string) $resolved['sectionTemplate'] ?? '') === '') {
-                    $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) ($sharedPackage['sectionTemplate'] ?? ''), false);
-                }
+                if (!array_key_exists('template', $resolved) || trim((string) $resolved['template']) === '') $resolved['template'] = self::sanitizeStoredPromptTemplate((string) ($sharedPackage['template'] ?? ''), true);
+                if (!array_key_exists('css', $resolved) || trim((string) $resolved['css'] ?? '') === '') $resolved['css'] = (string) ($sharedPackage['css'] ?? '');
+                if (!array_key_exists('js', $resolved) || trim((string) $resolved['js'] ?? '') === '') $resolved['js'] = (string) ($sharedPackage['js'] ?? '');
+                if (!array_key_exists('sectionTemplate', $resolved) || trim((string) $resolved['sectionTemplate'] ?? '') === '') $resolved['sectionTemplate'] = self::sanitizeStoredPromptTemplate((string) ($sharedPackage['sectionTemplate'] ?? ''), false);
                 $resolved['phpTemplate'] = (string) ($sharedPackage['template'] ?? $resolved['phpTemplate'] ?? '');
                 $resolved['assets'] = is_array($sharedPackage['assets'] ?? null) ? $sharedPackage['assets'] : [];
                 $resolved['files'] = is_array($sharedPackage['files'] ?? null) ? $sharedPackage['files'] : [];
@@ -235,9 +205,7 @@ trait PoffConfigLayoutViewHelpers
         $resolved['directory'] = $localRelativeDir;
         $resolved['localDirectory'] = $localRelativeDir;
         $inheritedLayout = self::findInheritedLayoutDir($dir, $localLayoutDir);
-        if (is_array($inheritedLayout)) {
-            $resolved['inheritedDirectory'] = $inheritedLayout['relative'];
-        }
+        if (is_array($inheritedLayout)) $resolved['inheritedDirectory'] = $inheritedLayout['relative'];
 
         $assets = [];
         $files = [];
@@ -260,24 +228,16 @@ trait PoffConfigLayoutViewHelpers
             }
 
             $templatePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_TEMPLATE_FILE;
-            if (is_file($templatePath)) {
-                $resolved['template'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($templatePath), true);
-            }
+            if (is_file($templatePath)) $resolved['template'] = self::sanitizeStoredPromptTemplate((string) file_get_contents($templatePath), true);
 
             $stylePath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_STYLE_FILE;
-            if (is_file($stylePath)) {
-                $resolved['css'] = (string) file_get_contents($stylePath);
-            }
+            if (is_file($stylePath)) $resolved['css'] = (string) file_get_contents($stylePath);
 
             $scriptPath = $layoutDir . DIRECTORY_SEPARATOR . self::LAYOUT_SCRIPT_FILE;
-            if (is_file($scriptPath)) {
-                $resolved['js'] = (string) file_get_contents($scriptPath);
-            }
+            if (is_file($scriptPath)) $resolved['js'] = (string) file_get_contents($scriptPath);
             if (array_key_exists('js', $resolved) && trim((string) $resolved['js']) !== '') {
                 $bundleJs = Worktype::layoutBundleAsset(Worktype::defaultLayoutName(), self::LAYOUT_SCRIPT_FILE);
-                if (is_string($bundleJs) && trim($bundleJs) !== '') {
-                    $resolved['jsInlineAfterHref'] = $bundleJs;
-                }
+                if (is_string($bundleJs) && trim($bundleJs) !== '') $resolved['jsInlineAfterHref'] = $bundleJs;
             }
 
             [$assets, $files] = self::scanLayoutAssets($layoutDir);

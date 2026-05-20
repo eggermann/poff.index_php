@@ -3,15 +3,11 @@
 function cmsExtractHtmlBodyFragment(string $html): string
 {
     $html = trim($html);
-    if ($html === '') {
-        return '';
-    }
+    if ($html === '') return '';
 
     if (preg_match('/<body\b[^>]*>(.*)<\/body>/is', $html, $matches) === 1) {
         $body = trim((string) ($matches[1] ?? ''));
-        if ($body !== '') {
-            return $body;
-        }
+        if ($body !== '') return $body;
     }
 
     return $html;
@@ -93,14 +89,8 @@ function cmsExtractPreferredRemoteRenderedHtml(string $html): string
 function cmsExtractPreferredRemoteRenderedNodeHtml(DOMXPath $xpath, DOMNode $node, DOMDocument $document): string
 {
     foreach ([
-        './/*[contains(concat(" ", normalize-space(@class), " "), " poff-default-layout__main ")]',
-        './/*[@id="contentFrame"]',
-        './/*[contains(concat(" ", normalize-space(@class), " "), " viewer ")]',
-        './/main',
-        './/article',
-        './/section',
-        './/picture',
-        './/figure',
+        './/*[contains(concat(" ", normalize-space(@class), " "), " poff-default-layout__main ")]', './/*[@id="contentFrame"]',
+        './/*[contains(concat(" ", normalize-space(@class), " "), " viewer ")]', './/main', './/article', './/section', './/picture', './/figure',
     ] as $query) {
         $matches = $xpath->query($query, $node);
         if (!($matches instanceof DOMNodeList) || $matches->length === 0) {
@@ -148,8 +138,7 @@ function cmsDomNodeInnerHtml(DOMNode $node, DOMDocument $document): string
 
 function cmsDomNodeOuterHtml(DOMNode $node, DOMDocument $document): string
 {
-    $html = $document->saveHTML($node);
-    return is_string($html) ? trim($html) : '';
+    return trim((string) $document->saveHTML($node));
 }
 
 function cmsStripRemoteAppChrome(string $html): string
@@ -167,17 +156,7 @@ function cmsStripRemoteAppChrome(string $html): string
         }
 
         $xpath = new DOMXPath($document);
-        foreach ([
-            '//*[@id="appSidebar"]',
-            '//*[@id="sidebarToggle"]',
-            '//*[@id="editPanel"]',
-            '//*[@id="editDrawer"]',
-            '//*[@id="promptDock"]',
-            '//*[@id="iframeLoading"]',
-            '//*[@id="sidebarLoading"]',
-            '//*[@id="editActionsMenu"]',
-            '//*[@class and contains(concat(" ", normalize-space(@class), " "), " app-edit-toggle-wrap ")]',
-        ] as $query) {
+        foreach (['//*[@id="appSidebar"]', '//*[@id="sidebarToggle"]', '//*[@id="editPanel"]', '//*[@id="editDrawer"]', '//*[@id="promptDock"]', '//*[@id="iframeLoading"]', '//*[@id="sidebarLoading"]', '//*[@id="editActionsMenu"]', '//*[@class and contains(concat(" ", normalize-space(@class), " "), " app-edit-toggle-wrap ")]'] as $query) {
             $nodes = $xpath->query($query);
             if (!($nodes instanceof DOMNodeList)) {
                 continue;
@@ -203,15 +182,11 @@ function cmsStripRemoteAppChrome(string $html): string
 function cmsHtmlLooksLikeRemoteShell(string $html): bool
 {
     $html = trim($html);
-    if ($html === '') {
-        return false;
-    }
-
-    return stripos($html, 'currentPoffConfig') !== false
+    return $html !== '' && (stripos($html, 'currentPoffConfig') !== false
         || stripos($html, 'poff-shell-standalone') !== false
         || stripos($html, 'appShell') !== false
         || stripos($html, 'contentFrame') !== false
-        || stripos($html, 'iframeLoading') !== false;
+        || stripos($html, 'iframeLoading') !== false);
 }
 
 function cmsNormalizeRenderedHtmlBaseUrl(string $html, string $baseUrl): string
@@ -233,18 +208,7 @@ function cmsNormalizeRenderedHtmlBaseUrl(string $html, string $baseUrl): string
 
         $xpath = new DOMXPath($document);
         $absoluteBase = rtrim($baseUrl, "/\\");
-        foreach ([
-            'a' => 'href',
-            'link' => 'href',
-            'img' => 'src',
-            'script' => 'src',
-            'iframe' => 'src',
-            'source' => 'src',
-            'video' => 'src',
-            'audio' => 'src',
-            'form' => 'action',
-            'object' => 'data',
-        ] as $tagName => $attributeName) {
+        foreach (['a' => 'href', 'link' => 'href', 'img' => 'src', 'script' => 'src', 'iframe' => 'src', 'source' => 'src', 'video' => 'src', 'audio' => 'src', 'form' => 'action', 'object' => 'data'] as $tagName => $attributeName) {
             foreach ($xpath->query('//' . $tagName . '[@' . $attributeName . ']') as $node) {
                 if (!($node instanceof DOMElement)) {
                     continue;
@@ -296,10 +260,8 @@ function cmsNormalizeRenderedHtmlBaseUrl(string $html, string $baseUrl): string
 function cmsShouldKeepRelativeRemoteUrl(string $value): bool
 {
     $trimmed = trim($value);
-    if ($trimmed === '') {
-        return true;
-    }
-    return str_starts_with($trimmed, '#')
+    return $trimmed === ''
+        || str_starts_with($trimmed, '#')
         || str_starts_with($trimmed, 'data:')
         || str_starts_with($trimmed, 'mailto:')
         || str_starts_with($trimmed, 'tel:')
@@ -310,12 +272,8 @@ function cmsRemoteAbsoluteUrl(string $baseUrl, string $value): string
 {
     $trimmedBase = trim($baseUrl);
     $trimmedValue = trim($value);
-    if ($trimmedValue === '') {
-        return '';
-    }
-    if ($trimmedBase === '' || cmsShouldKeepRelativeRemoteUrl($trimmedValue)) {
-        return $trimmedValue;
-    }
+    if ($trimmedValue === '') return '';
+    if ($trimmedBase === '' || cmsShouldKeepRelativeRemoteUrl($trimmedValue)) return $trimmedValue;
 
     $baseParts = parse_url($trimmedBase);
     if (!is_array($baseParts) || empty($baseParts['scheme']) || empty($baseParts['host'])) {
@@ -340,9 +298,7 @@ function cmsRemoteAbsoluteUrl(string $baseUrl, string $value): string
 
     $basePath = $baseParts['path'] ?? '';
     $directory = $basePath !== '' ? preg_replace('~/[^/]*$~', '/', $basePath) : '/';
-    if (!is_string($directory) || $directory === '') {
-        $directory = '/';
-    }
+    if (!is_string($directory) || $directory === '') $directory = '/';
     $resolvedPath = preg_replace('~/{2,}~', '/', $directory . $trimmedValue);
     $segments = [];
     foreach (explode('/', (string) $resolvedPath) as $segment) {
