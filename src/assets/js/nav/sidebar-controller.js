@@ -112,15 +112,9 @@ export function createSidebarController({
     }
 
     function showNavLoading() {
-        if (!navList) {
-            return;
+        if (typeof setLoadingVisible === 'function') {
+            setLoadingVisible(sidebarLoading, true);
         }
-        navList.innerHTML = `
-            <div id="navLoading" class="loading-row flex items-center">
-                <span class="loader"></span>
-                <span class="loader-label">Loading...</span>
-            </div>
-        `;
     }
 
     function loadNav(relPath = '') {

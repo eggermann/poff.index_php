@@ -69,6 +69,43 @@ test('hidden tree items render an unhide toggle', () => {
   }
 });
 
+test('shows a create placeholder for .htaccess when it does not exist yet', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-htaccess-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'visible.txt'), 'hello', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'visible.txt',
+          slug: 'visible-txt',
+          type: 'file',
+          path: 'visible.txt',
+          visible: true,
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, '', 'edit'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('data-nav-action="create-htaccess"');
+    expect(result.stdout).toContain('Create embed policy');
+    expect(result.stdout).toContain('.htaccess');
+    expect(result.stdout).not.toContain('data-file=".htaccess"');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('pending external links stay hidden from visitors and show review state for authenticated editors', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-pending-'));
   try {
