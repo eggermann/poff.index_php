@@ -237,6 +237,9 @@ PHP;
     $buildContent .= trim($promptTemplateSanitize) . "\n\n";
     $buildContent .= trim($viewerLinkTargets) . "\n\n";
     $buildContent .= trim($poffConfigContent) . "\n\n";
+    $navRenderHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/nav-render.php');
+    $navRenderHelpers = $stripPhp($navRenderHelpers);
+    $buildContent .= trim($navRenderHelpers) . "\n\n";
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
     $stripRequires = static function (string $content): string {
@@ -331,6 +334,23 @@ if (
 // Viewer route for typed rendering
 if (isset($_GET['view']) && (isset($_GET['file']) || array_key_exists('path', $_GET))) {
     renderViewer($baseDir, $_GET['file'] ?? $_GET['path']);
+    return;
+}
+
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'nav') {
+    if (is_dir($currentAbsolutePath)) {
+        $folderPoffConfig = class_exists('PoffConfig') ? PoffConfig::ensure($currentAbsolutePath) : null;
+    }
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<ul id="navList" class="nav-list">';
+    echo cmsRenderNavListMarkup([
+        'baseDir' => $baseDir,
+        'currentRelativePath' => $currentRelativePath,
+        'currentAbsolutePath' => $currentAbsolutePath,
+        'currentScript' => $currentScript,
+        'folderPoffConfig' => $folderPoffConfig,
+    ]);
+    echo '</ul>';
     return;
 }
 

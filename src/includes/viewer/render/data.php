@@ -1,7 +1,137 @@
 <?php
 
+function cmsFolderViewerCacheDirectory(): string
+{
+    static $cacheDir = null;
+
+    if (is_string($cacheDir) && $cacheDir !== '') {
+        return $cacheDir;
+    }
+
+    $rootHash = function_exists('cmsProjectRootDir')
+        ? sha1(cmsProjectRootDir())
+        : sha1((string) getcwd());
+    $cacheDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff-folder-viewer-cache' . DIRECTORY_SEPARATOR . $rootHash;
+
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0775, true);
+    }
+
+    return $cacheDir;
+}
+
+function cmsFolderViewerCachePath(string $fullPath, string $relativePath): string
+{
+    return cmsFolderViewerCacheDirectory() . DIRECTORY_SEPARATOR . sha1($fullPath . '|' . $relativePath) . '.json';
+}
+
+function cmsFolderViewerTrackDependency(array &$dependencies, string $path): void
+{
+    if ($path === '') {
+        return;
+    }
+
+    clearstatcache(false, $path);
+    $mtime = @filemtime($path);
+    if ($mtime === false) {
+        return;
+    }
+
+    $dependencies[$path] = (int) $mtime;
+}
+
+function cmsFolderViewerCollectDependencies(array $dependencies): array
+{
+    ksort($dependencies, SORT_STRING);
+
+    $resolved = [];
+    foreach ($dependencies as $path => $mtime) {
+        $resolved[] = [
+            'path' => $path,
+            'mtime' => (int) $mtime,
+        ];
+    }
+
+    return $resolved;
+}
+
+function cmsFolderViewerCacheIsFresh(array $dependencies): bool
+{
+    foreach ($dependencies as $dependency) {
+        if (!is_array($dependency)) {
+            return false;
+        }
+
+        $path = (string) ($dependency['path'] ?? '');
+        $expectedMtime = (int) ($dependency['mtime'] ?? 0);
+        if ($path === '' || $expectedMtime <= 0) {
+            return false;
+        }
+
+        clearstatcache(false, $path);
+        if (!file_exists($path)) {
+            return false;
+        }
+
+        $currentMtime = @filemtime($path);
+        if ($currentMtime === false || (int) $currentMtime !== $expectedMtime) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function cmsFolderViewerCacheLoad(string $fullPath, string $relativePath): ?array
+{
+    $cachePath = cmsFolderViewerCachePath($fullPath, $relativePath);
+    if (!is_file($cachePath)) {
+        return null;
+    }
+
+    $decoded = json_decode((string) file_get_contents($cachePath), true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+
+    if (!isset($decoded['dependencies']) || !is_array($decoded['dependencies'])) {
+        return null;
+    }
+
+    if (!cmsFolderViewerCacheIsFresh($decoded['dependencies'])) {
+        return null;
+    }
+
+    return is_array($decoded['data'] ?? null) ? $decoded['data'] : null;
+}
+
+function cmsFolderViewerCacheStore(string $fullPath, string $relativePath, array $data, array $dependencies): void
+{
+    $cachePath = cmsFolderViewerCachePath($fullPath, $relativePath);
+    $payload = [
+        'data' => $data,
+        'dependencies' => cmsFolderViewerCollectDependencies($dependencies),
+    ];
+
+    @file_put_contents($cachePath, json_encode($payload, JSON_UNESCAPED_SLASHES));
+}
+
 function buildFolderViewerData(string $relativePath, string $fullPath, ?array $folderConfig, array $rootMeta): array
 {
+    $dependencies = [];
+    cmsFolderViewerTrackDependency($dependencies, $fullPath);
+    if (class_exists('PoffConfig')) {
+        $rootConfigPath = PoffConfig::configPath($fullPath);
+        if (is_file($rootConfigPath)) {
+            cmsFolderViewerTrackDependency($dependencies, $rootConfigPath);
+        }
+    }
+
+    $cached = cmsFolderViewerCacheLoad($fullPath, $relativePath);
+    if (is_array($cached)) {
+        return $cached;
+    }
+
     $visited = [];
     $realPath = realpath($fullPath);
     if (is_string($realPath) && $realPath !== '') {
@@ -9,11 +139,11 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
     }
 
     $flatItems = [];
-    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig, $flatItems, $visited);
+    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig, $flatItems, $visited, $dependencies);
     $allFiles = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFile'])));
     $allFolders = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFolder'])));
 
-    return [
+    $data = [
         'tree' => $tree,
         'workTree' => [
             'name' => (string) ($rootMeta['name'] ?? basename($fullPath)),
@@ -44,9 +174,13 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
         'allLinks' => filterFolderViewerItemsByKind($allFiles, 'link'),
         'allOther' => filterFolderViewerItemsByKind($allFiles, 'other'),
     ];
+
+    cmsFolderViewerCacheStore($fullPath, $relativePath, $data, $dependencies);
+
+    return $data;
 }
 
-function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited): array
+function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited, array &$dependencies): array
 {
     $tree = resolveFolderViewerTree($fullPath, $folderConfig);
     $items = [];
@@ -75,6 +209,10 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         $hasPhysicalTarget = $entryFullPath !== '' && file_exists($entryFullPath);
         if (!$hasPhysicalTarget && $entryTarget === '') {
             continue;
+        }
+
+        if ($hasPhysicalTarget) {
+            cmsFolderViewerTrackDependency($dependencies, $entryFullPath);
         }
 
         $configuredType = strtolower(trim((string) ($entry['type'] ?? '')));
@@ -124,6 +262,12 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         if ($isFolder && $hasPhysicalTarget) {
             $childConfig = readExistingFolderViewerConfig($entryFullPath);
             if (is_array($childConfig)) {
+                if (class_exists('PoffConfig')) {
+                    $childConfigPath = PoffConfig::configPath($entryFullPath);
+                    if (is_file($childConfigPath)) {
+                        cmsFolderViewerTrackDependency($dependencies, $childConfigPath);
+                    }
+                }
                 if (isset($childConfig['title']) && is_string($childConfig['title']) && trim($childConfig['title']) !== '') {
                     $item['title'] = $childConfig['title'];
                 }
@@ -140,7 +284,7 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
                 if (is_string($realChildPath) && $realChildPath !== '') {
                     $visited[$realChildPath] = true;
                 }
-                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited);
+                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited, $dependencies);
             }
             $item['children'] = $children;
             $item['childCount'] = count($children);
@@ -150,9 +294,16 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         } else {
             $item['extension'] = strtolower((string) pathinfo($entryName, PATHINFO_EXTENSION));
             if ($hasPhysicalTarget) {
+                cmsFolderViewerTrackDependency($dependencies, $entryFullPath);
                 $item['mimeType'] = MediaType::detectMimeType($entryFullPath, $entryName) ?? '';
                 $fileConfig = readExistingFolderViewerFileConfig($fullPath, $entryName);
                 if (is_array($fileConfig)) {
+                    if (class_exists('PoffConfig')) {
+                        $fileConfigPath = PoffConfig::fileConfigPath($fullPath, $entryName);
+                        if (is_file($fileConfigPath)) {
+                            cmsFolderViewerTrackDependency($dependencies, $fileConfigPath);
+                        }
+                    }
                     if (isset($fileConfig['title']) && is_string($fileConfig['title']) && trim($fileConfig['title']) !== '') {
                         $item['title'] = $fileConfig['title'];
                     }

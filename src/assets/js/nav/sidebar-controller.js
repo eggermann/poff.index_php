@@ -12,6 +12,36 @@ export function createSidebarController({
     let activeLink = null;
     let currentFolderPath = '';
 
+    function scrollActiveLinkIntoView(link = activeLink) {
+        if (!link || typeof link.scrollIntoView !== 'function') {
+            return;
+        }
+        link.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest',
+        });
+    }
+
+    function centerActiveLinkInSidebar(link = activeLink) {
+        if (!navList || !link || typeof link.getBoundingClientRect !== 'function') {
+            return;
+        }
+        const sidebar = typeof navList.closest === 'function'
+            ? navList.closest('#appSidebar')
+            : navList.parentElement;
+        if (!sidebar || typeof sidebar.getBoundingClientRect !== 'function') {
+            return;
+        }
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const linkRect = link.getBoundingClientRect();
+        if (!sidebarRect || !linkRect) {
+            return;
+        }
+        const targetTop = sidebar.scrollTop + (linkRect.top - sidebarRect.top) - (sidebar.clientHeight / 2) + (linkRect.height / 2);
+        sidebar.scrollTop = Math.max(0, targetTop);
+    }
+
     function clearActiveLink() {
         if (activeLink) {
             activeLink.classList.remove('nav-link-active');
@@ -27,32 +57,58 @@ export function createSidebarController({
         });
     }
 
-    function setActiveFileLink(fileName = '') {
+    function setActiveLink(nextLink) {
         clearActiveLink();
-        if (!navList || !fileName) {
+        if (!nextLink) {
             return;
         }
-        const fileEls = navList.querySelectorAll('a[data-file]');
-        fileEls.forEach((el) => {
-            if (el.getAttribute('data-file') === fileName) {
-                el.classList.add('nav-link-active');
-                activeLink = el;
+        nextLink.classList.add('nav-link-active');
+        activeLink = nextLink;
+        centerActiveLinkInSidebar(nextLink);
+        scrollActiveLinkIntoView(nextLink);
+    }
+
+    function findNavLinkByPath(path = '', attribute = 'data-path') {
+        if (!navList || !path) {
+            return null;
+        }
+        const normalizedPath = String(path).trim();
+        if (!normalizedPath) {
+            return null;
+        }
+        const links = navList.querySelectorAll(`a[${attribute}]`);
+        for (const link of links) {
+            if ((link.getAttribute(attribute) || '').trim() === normalizedPath) {
+                return link;
             }
-        });
+        }
+        return null;
+    }
+
+    function setActiveFileLink(path = '') {
+        const nextLink = findNavLinkByPath(path, 'data-path');
+        if (nextLink) {
+            setActiveLink(nextLink);
+            return;
+        }
+        if (!navList || !path) {
+            return;
+        }
+        const fileName = String(path).split('/').pop() || '';
+        const fileEls = navList.querySelectorAll('a[data-file]');
+        for (const el of fileEls) {
+            if (el.getAttribute('data-file') === fileName) {
+                setActiveLink(el);
+                return;
+            }
+        }
     }
 
     function setActiveLayoutLink(layoutPath = '') {
-        clearActiveLink();
-        if (!navList || !layoutPath) {
-            return;
+        const nextLink = findNavLinkByPath(layoutPath, 'data-layout-path');
+        if (nextLink) {
+            setActiveLink(nextLink);
         }
-        const layoutEls = navList.querySelectorAll('a[data-layout-path]');
-        layoutEls.forEach((el) => {
-            if (el.getAttribute('data-layout-path') === layoutPath) {
-                el.classList.add('nav-link-active');
-                activeLink = el;
-            }
-        });
     }
 
     function showNavLoading() {
@@ -73,7 +129,7 @@ export function createSidebarController({
         }
         currentFolderPath = relPath || '';
         showNavLoading();
-        return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery}`)
+        return fetch(`?ajax=nav&path=${encodeURIComponent(relPath)}${editQuery}`)
             .then((response) => response.text())
             .then((html) => {
                 const extracted = extractNavHtml(html) || '';
@@ -150,13 +206,22 @@ export function createSidebarController({
             clearActiveLink();
             return;
         }
-        const parts = path.split('/');
-        const fileName = parts[parts.length - 1] || '';
-        setActiveFileLink(fileName);
+        setActiveFileLink(path);
     }
 
     function handleNavClick(event) {
         if (!navList) {
+            return;
+        }
+        const createHtaccessAction = event.target.closest?.('[data-nav-action="create-htaccess"]');
+        if (createHtaccessAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            window.dispatchEvent(new CustomEvent('poff:create-htaccess', {
+                detail: {
+                    folderPath: createHtaccessAction.getAttribute('data-nav-folder-path') || currentFolderPath || '',
+                },
+            }));
             return;
         }
         const reviewAction = event.target.closest?.('[data-nav-action="review-external"]');
