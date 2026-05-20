@@ -2414,6 +2414,29 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('creates a default .htaccess file with iframe policy boilerplate', async () => {
+    const tempDir = path.join(POFF_DIR, `htaccess-create-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    try {
+      const output = await runBlankFile(tempDir, '.htaccess');
+      const result = JSON.parse(output);
+      const filePath = path.join(tempDir, '.htaccess');
+
+      expect(result.errors).toEqual([]);
+      expect(result.stored).toEqual([
+        expect.objectContaining({ name: '.htaccess', path: '.htaccess' }),
+      ]);
+      expect(fs.existsSync(filePath)).toBe(true);
+      const contents = fs.readFileSync(filePath, 'utf8');
+      expect(contents).toContain('Poff iframe policy');
+      expect(contents).toContain('Content-Security-Policy');
+      expect(contents).toContain("frame-ancestors 'self'");
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('.poff-auth.php stays hidden in navigation and direct viewer access', async () => {
     const normalNav = await runNav('', POFF_DIR);
     const editNav = await runNav('', POFF_DIR, true);
@@ -3981,6 +4004,28 @@ describe('Worktype HBS renderer', () => {
       expect(result.config.work.loop).toBe(true);
       expect(result.config.work.muted).toBe(false);
       expect(result.config.work.poster).toBe('poster.png');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('defaults a blank file title to the file name during edit save', async () => {
+    const tempDir = path.join(POFF_DIR, `file-title-save-${Date.now()}`);
+    const fileName = 'untitled.mp4';
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, fileName), 'video');
+
+    try {
+      const result = await runViewerSave(tempDir, fileName, {
+        title: '',
+      });
+      const savedConfigPath = path.join(tempDir, '.works', `${fileName}.config.json`);
+      const savedConfig = JSON.parse(fs.readFileSync(savedConfigPath, 'utf8'));
+
+      expect(result.saved).toBe(true);
+      expect(result.config.title).toBe(fileName);
+      expect(savedConfig.title).toBe(fileName);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

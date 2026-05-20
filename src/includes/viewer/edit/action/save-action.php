@@ -8,7 +8,7 @@ function cmsHandleEditSaveAction(array $ctx): void
 
     $config = $ctx['config'];
     $data = $ctx['data'];
-    cmsEditSaveApplyBasicFields($config, $data);
+    cmsEditSaveApplyBasicFields($config, $data, $ctx['subjectType'], $ctx['targetFile']);
     cmsEditSaveApplyWorkFields($config, $data, $ctx['targetDir']);
     cmsEditSaveApplyLayoutFields($config, $data, $ctx['subjectType'], $ctx['targetDir'], $ctx['targetFile']);
     cmsEditSaveFinalize($config, $ctx['targetDir'], $ctx['subjectType'], $ctx['targetFile']);
