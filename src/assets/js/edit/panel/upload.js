@@ -1,5 +1,6 @@
 import { uploadValidationError } from './shared.js';
 import { setStatusMessage } from '../status.js';
+import { registerEscapeClose } from '../../core/escape-stack.js';
 
 export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false }) {
     if (isFileTarget) {
@@ -96,6 +97,7 @@ export function bindUploadDialog({
     };
     const readUploadMode = () => (externalOnly ? 'url' : (uploadSourceEl?.value || 'upload'));
     let uploadMode = readUploadMode();
+    let unregisterEscapeClose = null;
 
     if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== 'function' || typeof onCreateBlankFile !== 'function' || typeof onCreateFolder !== 'function' || typeof onCreateLink !== 'function') {
         return;
@@ -182,6 +184,10 @@ export function bindUploadDialog({
     };
 
     const closeUploadDialog = () => {
+        if (typeof unregisterEscapeClose === 'function') {
+            unregisterEscapeClose();
+            unregisterEscapeClose = null;
+        }
         uploadDialog.classList.remove('edit-upload-dialog-open');
         if (typeof uploadDialog.close === 'function') {
             uploadDialog.close();
@@ -206,6 +212,12 @@ export function bindUploadDialog({
             uploadDialog.setAttribute('open', 'open');
         }
         uploadDialog.classList.add('edit-upload-dialog-open');
+        if (typeof unregisterEscapeClose !== 'function') {
+            unregisterEscapeClose = registerEscapeClose(() => {
+                closeUploadDialog();
+                return true;
+            }, { label: 'upload-dialog' });
+        }
         const firstFocusable = uploadDialog.querySelector('select, input, button');
         if (firstFocusable && typeof firstFocusable.focus === 'function') {
             firstFocusable.focus();

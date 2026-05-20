@@ -1,5 +1,6 @@
 import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
+import { registerEscapeClose } from '../core/escape-stack.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
@@ -84,6 +85,7 @@ export function createEditController({ elements, context, editRequested }) {
     let editTarget = 'folder';
     let drawerOpen = false;
     let authFormVisible = false;
+    let unregisterDrawerEscapeClose = null;
     let authState = {
         configured: !!initialAuthState.configured,
         authenticated: !!initialAuthState.authenticated,
@@ -311,12 +313,23 @@ export function createEditController({ elements, context, editRequested }) {
             return;
         }
         if (!editRequested || !authState.canEdit || !drawerOpen) {
+            if (typeof unregisterDrawerEscapeClose === 'function') {
+                unregisterDrawerEscapeClose();
+                unregisterDrawerEscapeClose = null;
+            }
             editDrawer.classList.remove('edit-drawer-open');
             editDrawer.hidden = true;
             return;
         }
         editDrawer.hidden = false;
         editDrawer.classList.add('edit-drawer-open');
+        if (typeof unregisterDrawerEscapeClose !== 'function') {
+            unregisterDrawerEscapeClose = registerEscapeClose(() => {
+                drawerOpen = false;
+                syncDrawerVisibility();
+                return true;
+            }, { label: 'edit-drawer' });
+        }
     }
 
     async function refreshCurrentEditState(selection = getActiveSelection()) {
@@ -754,6 +767,32 @@ export function createEditController({ elements, context, editRequested }) {
         if (typeof window.POFF_REVIEW_PENDING_LINK === 'function') {
             window.POFF_REVIEW_PENDING_LINK({ path: reviewPath });
         }
+    });
+
+    window.addEventListener('poff:create-htaccess', async (event) => {
+        if (!editRequested || !authState.canEdit) {
+            return;
+        }
+        const folderPath = String(event?.detail?.folderPath || '').trim();
+        const data = await requestEditUpload({
+            path: folderPath,
+            source: 'blank',
+            fileName: '.htaccess',
+            contents: '',
+        });
+        if (data?.auth) {
+            updateAuthState(data.auth);
+        }
+        if (!data || data.error) {
+            throw new Error(data?.error || 'Create .htaccess failed.');
+        }
+        const inlineStatus = document.getElementById('editInlineStatus');
+        if (inlineStatus) {
+            setStatusMessage(inlineStatus, 'Created .htaccess.', true);
+        }
+        const selection = getActiveSelection();
+        await refreshCurrentEditState(selection);
+        window.dispatchEvent(new CustomEvent('poff:content-updated'));
     });
 
     return {

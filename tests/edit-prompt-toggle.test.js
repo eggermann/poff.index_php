@@ -46,6 +46,34 @@ module.exports = {
 function loadPromptLayerController(documentMock) {
   const filePath = path.join(__dirname, '..', 'src/assets/js/edit/prompt/layer.js');
   const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*$/gm, '')
+    .replace(/export function /g, 'function ');
+  const escapeStack = loadEscapeStack(documentMock);
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    document: documentMock,
+    registerEscapeClose: escapeStack.registerEscapeClose,
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  createPromptLayerController,
+};
+`, context);
+
+  return module.exports;
+}
+
+function loadEscapeStack(documentMock) {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/core/escape-stack.js');
+  const source = fs.readFileSync(filePath, 'utf8')
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
@@ -61,7 +89,7 @@ function loadPromptLayerController(documentMock) {
 
   vm.runInContext(`${source}
 module.exports = {
-  createPromptLayerController,
+  registerEscapeClose,
 };
 `, context);
 
@@ -162,7 +190,7 @@ describe('prompt floating toggle regressions', () => {
     const promptLayerOpenEl = { hidden: true, addEventListener() {} };
 
     const { createPromptLayerController } = loadPromptLayerController(documentMock);
-    createPromptLayerController({
+    const controller = createPromptLayerController({
       root,
       windowEl: promptWindowEl,
       closeEl: promptLayerCloseEl,
@@ -176,11 +204,60 @@ describe('prompt floating toggle regressions', () => {
       },
     });
 
+    controller.applyState(false, { skipPersist: true });
+
     expect(typeof listeners.keydown).toBe('function');
     listeners.keydown({ key: 'Escape' });
     expect(root.classList.contains('prompt-layer-collapsed')).toBe(true);
     expect(promptWindowEl.hidden).toBe(true);
     expect(promptLayerCloseEl.hidden).toBe(true);
     expect(promptLayerOpenEl.hidden).toBe(false);
+  });
+
+  test('Escape closes registered layers in last-opened-first-closed order', () => {
+    const listeners = {};
+    const documentMock = {
+      addEventListener(type, handler) {
+        listeners[type] = handler;
+      },
+    };
+    const { registerEscapeClose } = loadEscapeStack(documentMock);
+    const closed = [];
+
+    const unregisterA = registerEscapeClose(() => {
+      closed.push('a');
+      unregisterA();
+      return true;
+    });
+    const unregisterB = registerEscapeClose(() => {
+      closed.push('b');
+      unregisterB();
+      return true;
+    });
+    const unregisterC = registerEscapeClose(() => {
+      closed.push('c');
+      unregisterC();
+      return true;
+    });
+
+    expect(typeof listeners.keydown).toBe('function');
+
+    listeners.keydown({
+      key: 'Escape',
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    listeners.keydown({
+      key: 'Escape',
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    listeners.keydown({
+      key: 'Escape',
+      preventDefault() {},
+      stopPropagation() {},
+    });
+
+    expect(closed).toEqual(['c', 'b', 'a']);
   });
 });

@@ -1,3 +1,5 @@
+import { registerEscapeClose } from '../../core/escape-stack.js';
+
 export function createPromptLayerController({
     root,
     windowEl,
@@ -14,6 +16,9 @@ export function createPromptLayerController({
             return false;
         }
     };
+
+    let unregisterEscapeClose = null;
+    let unregisterEscapeOpen = null;
 
     const writeState = (collapsed) => {
         try {
@@ -35,6 +40,32 @@ export function createPromptLayerController({
         if (openEl) {
             openEl.hidden = !nextCollapsed;
         }
+        if (nextCollapsed) {
+            if (unregisterEscapeClose) {
+                unregisterEscapeClose();
+                unregisterEscapeClose = null;
+            }
+            if (!unregisterEscapeOpen) {
+                unregisterEscapeOpen = registerEscapeClose(() => {
+                    if (!root.classList.contains('prompt-layer-collapsed')) {
+                        applyState(true);
+                        return true;
+                    }
+                    return false;
+                }, { label: 'prompt-layer-open' });
+            }
+        } else {
+            if (unregisterEscapeOpen) {
+                unregisterEscapeOpen();
+                unregisterEscapeOpen = null;
+            }
+            if (!unregisterEscapeClose) {
+                unregisterEscapeClose = registerEscapeClose(() => {
+                    applyState(true);
+                    return true;
+                }, { label: 'prompt-layer-close' });
+            }
+        }
         if (!options.skipPersist) {
             writeState(nextCollapsed);
         }
@@ -46,15 +77,6 @@ export function createPromptLayerController({
     if (openEl) {
         openEl.addEventListener('click', () => applyState(false));
     }
-    if (typeof document !== 'undefined' && document && typeof document.addEventListener === 'function') {
-        document.addEventListener('keydown', (event) => {
-            if (!event || event.key !== 'Escape') {
-                return;
-            }
-            applyState(true);
-        });
-    }
-
     return {
         readState,
         writeState,
