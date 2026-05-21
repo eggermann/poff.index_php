@@ -679,6 +679,27 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 await saveConfig(payload, statusEl);
             },
+            onDeleteTarget: async ({ statusEl }) => {
+                const selection = getActiveSelection();
+                const targetPath = getEditTargetPath(selection);
+                if (!targetPath) {
+                    throw new Error('Delete target unavailable.');
+                }
+                const data = await requestEditDelete({
+                    path: targetPath,
+                    return: selection.previewPath || selection.path || '',
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Delete failed.');
+                }
+                drawerOpen = false;
+                syncDrawerVisibility();
+                setStatusMessage(statusEl, 'Deleted.', true);
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
+                window.location.hash = nextPath ? `#/${nextPath}` : '';
+                await refreshCurrentEditState(getActiveSelection());
+            },
         });
 
         if (panelState.promptRoot) {
@@ -767,32 +788,6 @@ export function createEditController({ elements, context, editRequested }) {
         if (typeof window.POFF_REVIEW_PENDING_LINK === 'function') {
             window.POFF_REVIEW_PENDING_LINK({ path: reviewPath });
         }
-    });
-
-    window.addEventListener('poff:create-htaccess', async (event) => {
-        if (!editRequested || !authState.canEdit) {
-            return;
-        }
-        const folderPath = String(event?.detail?.folderPath || '').trim();
-        const data = await requestEditUpload({
-            path: folderPath,
-            source: 'blank',
-            fileName: '.htaccess',
-            contents: '',
-        });
-        if (data?.auth) {
-            updateAuthState(data.auth);
-        }
-        if (!data || data.error) {
-            throw new Error(data?.error || 'Create .htaccess failed.');
-        }
-        const inlineStatus = document.getElementById('editInlineStatus');
-        if (inlineStatus) {
-            setStatusMessage(inlineStatus, 'Created .htaccess.', true);
-        }
-        const selection = getActiveSelection();
-        await refreshCurrentEditState(selection);
-        window.dispatchEvent(new CustomEvent('poff:content-updated'));
     });
 
     return {

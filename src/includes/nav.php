@@ -3,6 +3,8 @@
 
 require_once __DIR__ . '/nav-render.php';
 
+$folderPoffConfig = $folderPoffConfig ?? null;
+
 $navContext = [
     'baseDir' => $baseDir ?? '',
     'currentRelativePath' => $currentRelativePath ?? '',

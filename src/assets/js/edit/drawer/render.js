@@ -135,7 +135,7 @@ function renderDrawerTreeBulkToggle(treeItems = [], status) {
     `;
 }
 
-export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
+export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems, showDeleteAction = false }) {
     const templateDefaultsBody = Array.isArray(config?.workTemplateMapCatalog?.rows) && config.workTemplateMapCatalog.rows.length
         ? `
             <div class="edit-template-map-list">
@@ -193,6 +193,11 @@ export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) 
             ` : ''}
             <div class="edit-actions">
                 <button class="btn" type="submit">Save advanced</button>
+                ${showDeleteAction ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDrawerDeleteTarget">
+                    Delete
+                </button>
+                ` : ''}
             </div>
         </form>
     `;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/includes/MediaType.php';
+require_once __DIR__ . '/../src/includes/viewer/utils.php';
 require_once __DIR__ . '/../src/includes/Worktype.php';
 
 $action = $argv[1] ?? 'definition';
@@ -21,6 +22,11 @@ if ($action === 'catalog') {
     $selected = isset($payload['selected']) ? (string) $payload['selected'] : null;
     $subjectType = isset($payload['subjectType']) ? (string) $payload['subjectType'] : null;
     echo json_encode(Worktype::worktypeCatalog($mime, $fileName, $selected, $subjectType), JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($action === 'categories') {
+    echo json_encode(Worktype::availableCategories(), JSON_UNESCAPED_SLASHES);
     exit(0);
 }
 

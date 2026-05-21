@@ -52,7 +52,7 @@ trait WorktypeContextTrait
             'isVideo' => $kind === 'video',
             'isAudio' => $kind === 'audio',
             'isPdf' => $kind === 'pdf',
-            'isText' => $kind === 'text',
+            'isText' => in_array($kind, ['text', 'htaccess'], true),
             'isLink' => $kind === 'link',
             'isOther' => $kind === 'other',
         ];

@@ -1,0 +1,16 @@
+<div class="message">
+    <div class="mb-3">Apache .htaccess</div>
+    {{#if textContent}}
+    <pre class="min-h-screen w-full overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm text-slate-100">{{textContent}}</pre>
+    {{else}}
+    <pre class="min-h-screen w-full overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm text-slate-100"># Poff iframe policy
+# Edit this file to control which sites may embed this CMS in an &lt;iframe&gt;.
+
+&lt;IfModule mod_headers.c&gt;
+    Header always set Content-Security-Policy "frame-ancestors 'self'"
+&lt;/IfModule&gt;
+
+# To allow embedding from every origin, replace the policy above with:
+# Header always set Content-Security-Policy "frame-ancestors *"</pre>
+    {{/if}}
+</div>

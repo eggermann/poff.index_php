@@ -205,6 +205,12 @@ trait WorktypeRenderTrait
 
         $path = htmlspecialchars((string) ($ctx['path'] ?? ''), ENT_QUOTES, 'UTF-8');
         $name = htmlspecialchars((string) ($ctx['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $textContent = (string) ($ctx['textContent'] ?? '');
+        if ($textContent !== '' || in_array($kind, ['text', 'htaccess'], true)) {
+            return '<pre class="min-h-screen w-full overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm text-slate-100">'
+                . htmlspecialchars($textContent !== '' ? $textContent : $name, ENT_QUOTES, 'UTF-8')
+                . '</pre>';
+        }
 
         return '<iframe src="' . $path . '" title="' . $name . '"></iframe>';
     }

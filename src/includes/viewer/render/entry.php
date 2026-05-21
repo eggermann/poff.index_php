@@ -8,7 +8,7 @@ function renderViewer(string $baseDir, string $requestedPath): void
     $relativePath = sanitizeRelativePath($requestedPath);
     $entryName = basename($relativePath);
 
-    if ($entryName !== '' && cmsIsHiddenSystemEntry($entryName)) {
+    if ($entryName !== '' && cmsIsHiddenSystemEntry($entryName) && $entryName !== '.htaccess') {
         http_response_code(404);
         echo 'Path not found.';
         return;

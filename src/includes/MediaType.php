@@ -55,6 +55,10 @@ class MediaType
 
     public static function classifyExtension(string $fileName): string
     {
+        if (basename($fileName) === '.htaccess') {
+            return 'htaccess';
+        }
+
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         if (in_array($ext, self::IMAGE_EXTS, true)) {
             return 'image';
@@ -94,6 +98,10 @@ class MediaType
             return $cache[$cacheKey];
         }
 
+        if (basename($fileName) === '.htaccess') {
+            return $cache[$cacheKey] = 'text/plain';
+        }
+
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         if (isset(self::MIME_BY_EXT[$ext])) {
             return $cache[$cacheKey] = self::MIME_BY_EXT[$ext];
@@ -117,6 +125,10 @@ class MediaType
 
     public static function shouldUseInlineTextPreview(string $fileName, ?string $mimeType = null): bool
     {
+        if (basename($fileName) === '.htaccess') {
+            return true;
+        }
+
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         if (in_array($ext, self::INLINE_TEXT_PREVIEW_EXTS, true)) {
             return true;

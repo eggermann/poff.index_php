@@ -26,6 +26,27 @@ if (isset($payload['mockResponse']) && is_array($payload['mockResponse'])) {
         ];
     };
 }
+if (isset($payload['mockResponsesByUrl']) && is_array($payload['mockResponsesByUrl'])) {
+    $mockResponsesByUrl = $payload['mockResponsesByUrl'];
+    $GLOBALS['__poff_prompt_http_get'] = static function (string $url, array $headers = []) use ($mockResponsesByUrl): array {
+        $mockResponse = $mockResponsesByUrl[$url] ?? null;
+        if (!is_array($mockResponse)) {
+            return [
+                'ok' => false,
+                'status' => 404,
+                'statusLine' => 'HTTP/1.1 404 Not Found',
+                'body' => '',
+            ];
+        }
+
+        return [
+            'ok' => (bool) ($mockResponse['ok'] ?? true),
+            'status' => (int) ($mockResponse['status'] ?? 200),
+            'statusLine' => (string) ($mockResponse['statusLine'] ?? 'HTTP/1.1 200 OK'),
+            'body' => (string) ($mockResponse['body'] ?? ''),
+        ];
+    };
+}
 
 $item = is_array($payload['item'] ?? null) ? $payload['item'] : [];
 echo cmsResolveRemoteRenderedHtml($item);

@@ -2331,6 +2331,33 @@ describe('Worktype HBS renderer', () => {
     ]));
   });
 
+  test('merges saved custom categories into the shared category catalog', async () => {
+    const tempDir = path.join(ROOT, `shared-category-${Date.now()}`);
+    const fileName = 'custom-category.jpg';
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, fileName), 'image');
+
+    try {
+      const saved = await runViewerSave(tempDir, fileName, {
+        work: {
+          categories: ['fuzzy', 'visual'],
+        },
+      });
+
+      expect(saved.saved).toBe(true);
+      expect(saved.config.work.categories).toEqual(expect.arrayContaining(['fuzzy', 'visual']));
+
+      const catalog = JSON.parse(await runWorktype('catalog', 'image', {
+        subjectType: 'file',
+        fileName,
+      }));
+      expect(catalog.categories).toEqual(expect.arrayContaining(['fuzzy']));
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('renders a selected work template variant as the active section partial', async () => {
     const lightnCandyInstalled = await hasLightnCandy();
     const output = await runWorktype('render', 'video', {
@@ -2390,7 +2417,7 @@ describe('Worktype HBS renderer', () => {
     expect(config.tree.map((item) => item.name)).not.toContain('.layout');
   });
 
-  test('.htaccess stays hidden in the default tree but is shown in edit mode', async () => {
+  test('.htaccess is included in the default tree as a hidden entry and shown in edit mode', async () => {
     const tempDir = path.join(POFF_DIR, `htaccess-visibility-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
@@ -2399,16 +2426,21 @@ describe('Worktype HBS renderer', () => {
 
     try {
       const ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', tempDir));
-      expect(ensured.tree.map((item) => item.name)).not.toContain('.htaccess');
+      expect(ensured.tree.map((item) => item.name)).toContain('.htaccess');
+      expect(ensured.tree.find((item) => item.name === '.htaccess')).toMatchObject({
+        name: '.htaccess',
+        visible: false,
+      });
       expect(ensured.tree.map((item) => item.name)).toContain('visible.txt');
 
       const normalNav = await runNav('', tempDir);
       const editNav = await runNav('', tempDir, true);
 
       expect(normalNav).not.toContain('data-file=".htaccess"');
-      expect(normalNav).not.toContain('.htaccess</a>');
+      expect(normalNav).not.toContain('Create embed policy');
       expect(editNav).toContain('data-file=".htaccess"');
-      expect(editNav).toContain('.htaccess</a>');
+      expect(editNav).toContain('data-hidden="true"');
+      expect(editNav).toContain('nav-link-hidden');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -2445,6 +2477,23 @@ describe('Worktype HBS renderer', () => {
     expect(normalNav).not.toContain('.poff-auth.php');
     expect(editNav).not.toContain('.poff-auth.php');
     expect(viewerOutput).toContain('Path not found.');
+  });
+
+  test('.htaccess renders through the CMS viewer instead of Apache', async () => {
+    const tempDir = path.join(POFF_DIR, `htaccess-viewer-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.htaccess'), 'RewriteEngine On\n', 'utf8');
+
+    try {
+      const viewerOutput = await runViewer('.htaccess', tempDir);
+      expect(viewerOutput).toContain('data-viewer-type="htaccess"');
+      expect(viewerOutput).not.toContain('Forbidden');
+      expect(viewerOutput).not.toContain('Path not found.');
+      expect(viewerOutput).not.toContain('Submit external link');
+      expect(viewerOutput).not.toContain('data-viewer-type="external"');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('sanitizes persisted raw chat JSON in section templates on read', async () => {
@@ -3965,6 +4014,7 @@ describe('Worktype HBS renderer', () => {
   test('exposes worktype-specific config fields in the default work definitions', async () => {
     const videoDef = JSON.parse(await runWorktype('definition', 'video'));
     const imageDef = JSON.parse(await runWorktype('definition', 'image'));
+    const htaccessDef = JSON.parse(await runWorktype('definition', 'htaccess'));
 
     expect(videoDef).toMatchObject({
       type: 'video',
@@ -3979,6 +4029,43 @@ describe('Worktype HBS renderer', () => {
       background: '#000',
       caption: '',
     });
+    expect(htaccessDef).toMatchObject({
+      type: 'htaccess',
+      syntax: 'apacheconf',
+      headerName: 'Content-Security-Policy',
+      frameAncestors: ["'self'"],
+      allowAll: false,
+    });
+  });
+
+  test('selects the htaccess worktype for a dotfile filename', async () => {
+    const catalog = JSON.parse(await runWorktype('catalog', 'other', {
+      fileName: '.htaccess',
+      subjectType: 'file',
+    }));
+    expect(catalog.selected).toBe('htaccess');
+    expect(catalog.choices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          value: 'htaccess',
+        }),
+      ]),
+    );
+  });
+
+  test('renders htaccess work content as a text preview', async () => {
+    const rendered = await runWorktype('render', 'htaccess', {
+      ctx: {
+        textContent: '# Poff iframe policy',
+        work: {
+          template: 'htaccess',
+          syntax: 'apacheconf',
+        },
+      },
+    });
+
+    expect(rendered).toContain('# Poff iframe policy');
+    expect(rendered).toContain('Apache .htaccess');
   });
 
   test('persists worktype-specific config fields from edit save', async () => {

@@ -207,17 +207,6 @@ export function createSidebarController({
         if (!navList) {
             return;
         }
-        const createHtaccessAction = event.target.closest?.('[data-nav-action="create-htaccess"]');
-        if (createHtaccessAction) {
-            event.preventDefault();
-            event.stopPropagation();
-            window.dispatchEvent(new CustomEvent('poff:create-htaccess', {
-                detail: {
-                    folderPath: createHtaccessAction.getAttribute('data-nav-folder-path') || currentFolderPath || '',
-                },
-            }));
-            return;
-        }
         const reviewAction = event.target.closest?.('[data-nav-action="review-external"]');
         if (reviewAction) {
             event.preventDefault();

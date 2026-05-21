@@ -1,6 +1,6 @@
 import { bindStoredDetailsState } from '../panel/shared.js';
 
-export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubmit }) {
+export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubmit, onDeleteTarget }) {
     const drawerClose = editDrawer.querySelector('#editDrawerClose');
     if (drawerClose && typeof onClose === 'function') {
         drawerClose.addEventListener('click', () => onClose());
@@ -8,6 +8,7 @@ export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubm
 
     const drawerStatus = editDrawer.querySelector('#editDrawerStatus');
     const drawerForm = editDrawer.querySelector('#editDrawerForm');
+    const deleteTargetButton = editDrawer.querySelector('#editDrawerDeleteTarget');
     const templateDefaultsDetails = editDrawer.querySelector('#editTemplateDefaultsDetails');
     const treeBulkToggle = editDrawer.querySelector('#editTreeVisibleAll');
     if (templateDefaultsDetails) {
@@ -49,6 +50,15 @@ export function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubm
                 statusEl: drawerStatus,
                 treeVisible,
             });
+        });
+    }
+    if (deleteTargetButton && drawerStatus && typeof onDeleteTarget === 'function') {
+        deleteTargetButton.addEventListener('click', async () => {
+            const confirmed = window.confirm('Delete this item? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+            await onDeleteTarget({ statusEl: drawerStatus });
         });
     }
 

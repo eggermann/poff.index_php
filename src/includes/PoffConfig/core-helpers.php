@@ -259,7 +259,7 @@ trait PoffConfigCoreHelpers
                 'type' => $isDir ? 'folder' : 'file',
                 'path' => $entry,
                 'modifiedAt' => $modifiedAt ? date('c', (int) $modifiedAt) : null,
-                'visible' => true,
+                'visible' => $entry === '.htaccess' ? false : true,
             ];
         }
 
@@ -305,7 +305,7 @@ trait PoffConfigCoreHelpers
             'path' => $fileName,
             'size' => $size !== false ? $size : null,
             'modifiedAt' => $modified ? date('c', (int) $modified) : null,
-            'visible' => true,
+            'visible' => $fileName === '.htaccess' ? false : true,
             'mimeType' => $mime,
         ];
         $hash = hash('sha256', json_encode($base));

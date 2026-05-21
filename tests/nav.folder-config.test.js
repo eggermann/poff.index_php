@@ -69,10 +69,11 @@ test('hidden tree items render an unhide toggle', () => {
   }
 });
 
-test('shows a create placeholder for .htaccess when it does not exist yet', () => {
+test('renders .htaccess as a hidden normal file entry in edit mode', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-htaccess-'));
   try {
     fs.writeFileSync(path.join(tempRoot, 'visible.txt'), 'hello', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, '.htaccess'), 'RewriteEngine On', 'utf8');
     fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
       folderName: 'poff-nav',
       slug: 'poff-nav',
@@ -97,10 +98,10 @@ test('shows a create placeholder for .htaccess when it does not exist yet', () =
 
     expect(result.status).toBe(0);
     expect(result.stderr).toBe('');
-    expect(result.stdout).toContain('data-nav-action="create-htaccess"');
-    expect(result.stdout).toContain('Create embed policy');
-    expect(result.stdout).toContain('.htaccess');
-    expect(result.stdout).not.toContain('data-file=".htaccess"');
+    expect(result.stdout).toContain('data-file=".htaccess"');
+    expect(result.stdout).toContain('data-hidden="true"');
+    expect(result.stdout).toContain('nav-link-hidden');
+    expect(result.stdout).not.toContain('Create embed policy');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
