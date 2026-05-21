@@ -13,12 +13,15 @@ declare(strict_types=1);
 require_once __DIR__ . '/helpers.php';
 @require_once __DIR__ . '/../includes/MediaType.php';
 @require_once __DIR__ . '/../includes/Worktype.php';
+@require_once __DIR__ . '/../includes/Converter.php';
 @require_once __DIR__ . '/../includes/PoffConfig.php';
 require_once __DIR__ . '/routes/workprompt.php';
 require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/edit-config.php';
 require_once __DIR__ . '/routes/prompt-template.php';
 require_once __DIR__ . '/routes/remote-content.php';
+require_once __DIR__ . '/routes/converters.php';
+require_once __DIR__ . '/routes/convert.php';
 require_once __DIR__ . '/routes/style.php';
 
 $runtime = mcpRuntimeContext();
@@ -68,6 +71,21 @@ switch ($route) {
             'url' => mcpQueryString('url', '') ?? '',
             'sourceId' => mcpQueryString('sourceId', '') ?? '',
             'replace' => in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true),
+        ]));
+    case 'converters':
+        mcpJsonResponse(handleConverters([
+            'rootDir' => $rootDir,
+            'input' => mcpConvertersInput(),
+        ]));
+    case 'convert':
+        mcpJsonResponse(handleConvert([
+            'rootDir' => $rootDir,
+            'payload' => mcpReadRequestData(),
+        ]));
+    case 'save-converted-work':
+        mcpJsonResponse(handleSaveConvertedWork([
+            'rootDir' => $rootDir,
+            'payload' => mcpReadRequestData(),
         ]));
     case 'style':
         $response = handleStyleRoute($prompt, $mcpUrl, $configPath);

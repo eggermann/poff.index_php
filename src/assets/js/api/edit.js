@@ -99,6 +99,35 @@ export async function requestEditConfig(action, payload) {
     }
 }
 
+export async function requestMcpRoute(route, payload = {}) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set('mcp', '1');
+    url.searchParams.set('route', route);
+    try {
+        const res = await fetch(url.toString(), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return data || { ok: false, error: responseText.trim() || `MCP route failed (HTTP ${res.status}).` };
+        }
+        return data || { ok: false, error: 'MCP route returned invalid JSON.' };
+    } catch (err) {
+        return { ok: false, error: err?.message || 'MCP route unavailable.' };
+    }
+}
+
 export async function requestEditAuth(payload = {}) {
     const url = buildCmsUrl('auth', payload.path || '');
     const method = payload.method === 'GET' ? 'GET' : 'POST';

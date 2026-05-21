@@ -74,7 +74,12 @@
         }
     </style>
     <div class="external-work--embedded__toolbar">
-        <div class="external-work--embedded__title">{{title}}</div>
+        <div>
+            <div class="external-work--embedded__title">{{title}}</div>
+            {{#if external.relation}}
+                <div class="small-note">Generated relation: {{external.relation}}</div>
+            {{/if}}
+        </div>
         {{#if linkUrl}}
             <a class="external-work--embedded__direct-link" href="{{linkUrl}}" target="{{work.target}}" rel="noopener noreferrer">Direct link</a>
         {{/if}}
@@ -87,10 +92,19 @@
         {{#if previewUrl}}
             <iframe class="external-work__body external-work__body--iframe min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}"></iframe>
         {{else}}
-            <div class="external-work__body external-work__body--message message">
-                <div class="mb-3">External link</div>
-                <a href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a>
-            </div>
+            {{#if external.resultWork.srcUrl}}
+                <figure class="external-work__body external-work__body--generated">
+                    <img src="{{assetUrl}}" alt="{{title}}">
+                    <figcaption>
+                        Converted from {{external.sourceWork.path}} via {{external.generatedBy.id}}.
+                    </figcaption>
+                </figure>
+            {{else}}
+                <div class="external-work__body external-work__body--message message">
+                    <div class="mb-3">External link</div>
+                    <a href="{{linkUrl}}" target="{{work.target}}" rel="noopener">{{linkUrl}}</a>
+                </div>
+            {{/if}}
         {{/if}}
     {{/if}}
 </div>

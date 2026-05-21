@@ -9,6 +9,7 @@ require_once __DIR__ . '/../prompt-parse.php';
 require_once __DIR__ . '/../prompt-refs.php';
 require_once __DIR__ . '/../prompt-context.php';
 require_once __DIR__ . '/../prompt-compact.php';
+@require_once __DIR__ . '/../../../Converter.php';
 
 function cmsIniBytes(string $value): int
 {
@@ -129,5 +130,21 @@ function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, st
 {
     $config['workTemplateCatalog'] = cmsWorktypeCatalogForConfig($config, $subjectType, $targetDir, $targetFile);
     $config['workTemplateMapCatalog'] = cmsWorktypeMapCatalogForConfig($config, $subjectType, $targetDir, $targetFile, $folderViewData);
+    if ($subjectType === 'file' && class_exists('Converter')) {
+        $mime = strtolower(trim((string) ($config['mimeType'] ?? '')));
+        $kind = strtolower(trim((string) ($config['kind'] ?? '')));
+        $extension = strtolower(pathinfo((string) ($targetFile ?? $config['name'] ?? ''), PATHINFO_EXTENSION));
+        $config['converterCatalog'] = [
+            'webReadable' => Converter::isWebReadableMime($mime),
+            'available' => Converter::availableFor($mime, $kind, $extension),
+        ];
+        $folderConfig = class_exists('PoffConfig') ? PoffConfig::ensure($targetDir) : [];
+        $tree = is_array($folderConfig['tree'] ?? null) ? $folderConfig['tree'] : [];
+        $config['generatedWorks'] = array_values(array_filter($tree, static function ($item) use ($targetFile): bool {
+            return is_array($item)
+                && ($item['generated'] ?? false) === true
+                && (string) ($item['sourceWork'] ?? '') === (string) $targetFile;
+        }));
+    }
     return $config;
 }

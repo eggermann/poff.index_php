@@ -65,7 +65,13 @@ function renderFileViewer(string $relativePath, string $fullPath, ?array $fileCo
             $previewUrl = $trimmedLinkUrl;
         }
     }
-    if ($type !== 'htaccess' && ($renderedHtml !== '' || $previewUrl !== '' || ($type === 'link' && trim((string) ($linkUrl ?? '')) !== ''))) {
+    $externalMeta = is_array($fileConfig['external'] ?? null)
+        ? $fileConfig['external']
+        : (is_array($treeConfig['external'] ?? null) ? $treeConfig['external'] : []);
+    if ($externalMeta !== []) {
+        $externalMeta['generatedBy'] = $externalMeta['generatedBy'] ?? ($fileConfig['generatedBy'] ?? ($treeConfig['generatedBy'] ?? []));
+    }
+    if ($type !== 'htaccess' && ($externalMeta !== [] || $renderedHtml !== '' || $previewUrl !== '' || ($type === 'link' && trim((string) ($linkUrl ?? '')) !== ''))) {
         $work['template'] = 'external';
         $work['layout']['section'] = 'work';
         $work['layout']['sectionTemplate'] = '';
@@ -110,6 +116,7 @@ function renderFileViewer(string $relativePath, string $fullPath, ?array $fileCo
         'showInlineTextPreview' => $showInlineTextPreview,
         'textContent' => $textContent,
         'renderedHtml' => $renderedHtml,
+        'external' => $externalMeta,
         'work' => $work,
     ]);
 
@@ -177,6 +184,16 @@ function buildFileViewerSnapshotPayload(string $relativePath, string $fullPath, 
         $linkUrl = null;
     }
 
+    $externalMeta = is_array($fileConfig['external'] ?? null)
+        ? $fileConfig['external']
+        : (is_array($treeConfig['external'] ?? null) ? $treeConfig['external'] : []);
+    if ($externalMeta !== []) {
+        $externalMeta['generatedBy'] = $externalMeta['generatedBy'] ?? ($fileConfig['generatedBy'] ?? ($treeConfig['generatedBy'] ?? []));
+        $work['template'] = 'external';
+        $work['layout']['section'] = 'work';
+        $work['layout']['sectionTemplate'] = '';
+    }
+
     $snapshotContext = [
         'path' => $relativePath,
         'viewerHref' => '?view=1&file=' . rawurlencode($relativePath),
@@ -198,6 +215,7 @@ function buildFileViewerSnapshotPayload(string $relativePath, string $fullPath, 
         'showInlineTextPreview' => false,
         'textContent' => '',
         'renderedHtml' => $configuredRenderedHtml !== '' ? $configuredRenderedHtml : trim((string) ($fileConfig['renderedHtml'] ?? '')),
+        'external' => $externalMeta,
         'work' => $work,
     ];
 

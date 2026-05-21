@@ -25,7 +25,7 @@ import {
 import { bindUploadDialog, renderUploadSectionHtml } from './upload.js';
 import { renderEditLayoutPanel } from './layout.js';
 
-const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind']);
+const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
 const PASSWORD_DETAILS_STORAGE_KEY = 'password-details';
 
 function readRowText(row, selector) {
@@ -173,6 +173,27 @@ function readMediaConfigFromForm(form, currentWork = {}) {
     const categories = normalizeWorkCategories(nextWork.categories ?? nextWork.category ?? []);
     nextWork.categories = categories;
     nextWork.category = categories;
+    const converterId = String(form?.elements?.converter_id?.value || '').trim();
+    if (converterId) {
+        nextWork.converter = {
+            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
+            enabled: true,
+            id: converterId,
+            node: converterId === 'remote-node-converter'
+                ? (nextWork.converter?.node || { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+                : 'local',
+            quality: String(form?.elements?.converter_quality?.value || 'default').trim() || 'default',
+            format: String(form?.elements?.converter_format?.value || 'webp').trim() || 'webp',
+            saveMode: String(form?.elements?.converter_save_mode?.value || 'new-hidden-work').trim() || 'new-hidden-work',
+            hiddenByDefault: true,
+        };
+    } else if (Object.prototype.hasOwnProperty.call(nextWork, 'converter')) {
+        nextWork.converter = {
+            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
+            enabled: false,
+            id: '',
+        };
+    }
     return nextWork;
 }
 
@@ -244,6 +265,74 @@ function renderWorkConfigFieldsSection(config = {}) {
                 `).join('')}
             </div>
             ` : ''}
+        </div>
+    `;
+}
+
+function renderConverterSection(config = {}) {
+    const catalog = (config?.converterCatalog && typeof config.converterCatalog === 'object') ? config.converterCatalog : null;
+    const available = Array.isArray(catalog?.available) ? catalog.available : [];
+    const work = (config?.work && typeof config.work === 'object') ? config.work : {};
+    const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
+    const selectedId = String(converter.id || '').trim();
+    const defaults = available.find((item) => item?.id === selectedId)?.defaults || {};
+    const selectedQuality = String(converter.quality || defaults.quality || 'default');
+    const selectedFormat = String(converter.format || defaults.format || 'webp');
+    const selectedSaveMode = String(converter.saveMode || defaults.saveMode || 'new-hidden-work');
+    const unsupportedMessage = catalog && catalog.webReadable === false
+        ? '<div class="edit-status">This file is not directly web-readable. Choose a converter to create a poff-standard work.</div>'
+        : '';
+    const options = [
+        '<option value="">none</option>',
+        ...available.map((item) => {
+            const disabled = item.enabled === false;
+            const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
+            return `<option value="${escapeHtml(item.id || '')}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+        }),
+    ].join('');
+    const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
+    return `
+        <div class="edit-work-fields edit-work-converter">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Converter</div>
+                    <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
+                </div>
+            </div>
+            ${unsupportedMessage}
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-converter-id">Converter</label>
+                    <select class="form-select" id="edit-converter-id" name="converter_id">
+                        ${options}
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-quality">Quality</label>
+                    <select class="form-select" id="edit-converter-quality" name="converter_quality">
+                        ${['preview', 'default', 'archival', 'small-web'].map((value) => `<option value="${value}"${value === selectedQuality ? ' selected' : ''}>${value}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-format">Output format</label>
+                    <select class="form-select" id="edit-converter-format" name="converter_format">
+                        ${['webp', 'jpeg', 'png'].map((value) => `<option value="${value}"${value === selectedFormat ? ' selected' : ''}>${value}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-save-mode">Save mode</label>
+                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode">
+                        ${['new-hidden-work', 'replace-generated-work', 'temporary-preview-only'].map((value) => `<option value="${value}"${value === selectedSaveMode ? ' selected' : ''}>${value}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="edit-inline-actions">
+                <button class="btn btn-secondary" type="button" id="editConvertWork">Convert</button>
+            </div>
+            <div class="small-note">
+                Generated works:
+                ${generated.length ? generated.map((item) => `[${escapeHtml(item.name || '')}] [show] [make visible] [delete] [regenerate]`).join(' ') : 'none'}
+            </div>
         </div>
     `;
 }
@@ -569,6 +658,7 @@ export function renderEditPanel({
     onResetFolderWork,
     onDeleteTarget,
     onChangePassword,
+    onConvertWork,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -679,6 +769,7 @@ export function renderEditPanel({
             ${status?.target === 'file' || status?.target === 'folder' || (config?.work && typeof config.work === 'object' && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === 'type'))
                 ? renderWorkConfigFieldsSection(config)
                 : ''}
+            ${status?.target === 'file' ? renderConverterSection(config) : ''}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -734,6 +825,7 @@ export function renderEditPanel({
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
     const addWorkFieldButton = editPanel.querySelector('#editWorkFieldAdd');
+    const convertButton = editPanel.querySelector('#editConvertWork');
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
 
@@ -763,7 +855,7 @@ export function renderEditPanel({
             workFieldEditor.addWorkField();
         });
     }
-    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type').forEach((input) => {
+    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode').forEach((input) => {
         if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
             return;
         }
@@ -817,6 +909,16 @@ export function renderEditPanel({
                 return;
             }
             await onDeleteTarget({ statusEl });
+        });
+    }
+    if (convertButton && typeof onConvertWork === 'function') {
+        convertButton.addEventListener('click', async () => {
+            syncMediaState();
+            await onConvertWork({
+                statusEl,
+                form,
+                converter: readMediaConfigFromForm(form, config?.work || {}).converter || null,
+            });
         });
     }
 

@@ -1,4 +1,4 @@
-import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
+import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestMcpRoute, requestPromptTemplate } from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { registerEscapeClose } from '../core/escape-stack.js';
 import { bindPromptWindow } from './prompt.js';
@@ -58,6 +58,27 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
         }
         nextWork[key] = rawValue;
     });
+    const converterId = String(elements.converter_id?.value || '').trim();
+    if (converterId) {
+        nextWork.converter = {
+            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
+            enabled: true,
+            id: converterId,
+            node: converterId === 'remote-node-converter'
+                ? (nextWork.converter?.node || { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+                : 'local',
+            quality: String(elements.converter_quality?.value || 'default').trim() || 'default',
+            format: String(elements.converter_format?.value || 'webp').trim() || 'webp',
+            saveMode: String(elements.converter_save_mode?.value || 'new-hidden-work').trim() || 'new-hidden-work',
+            hiddenByDefault: true,
+        };
+    } else if (Object.prototype.hasOwnProperty.call(nextWork, 'converter')) {
+        nextWork.converter = {
+            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
+            enabled: false,
+            id: '',
+        };
+    }
     return nextWork;
 }
 
@@ -453,6 +474,51 @@ export function createEditController({ elements, context, editRequested }) {
                 const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
                 window.location.hash = nextPath ? `#/${nextPath}` : '';
                 await refreshCurrentEditState(getActiveSelection());
+            },
+            onConvertWork: async ({ statusEl, converter }) => {
+                const selection = getActiveSelection();
+                const sourcePath = getEditTargetPath(selection);
+                if (!sourcePath) {
+                    throw new Error('Convert target unavailable.');
+                }
+                if (!converter?.id) {
+                    setStatusMessage(statusEl, 'Choose a converter first.');
+                    return;
+                }
+                setStatusMessage(statusEl, 'Converting...');
+                const currentConfig = editConfig && typeof editConfig === 'object' ? editConfig : {};
+                const sourceName = sourcePath.split('/').pop() || sourcePath;
+                const payload = {
+                    source: {
+                        name: sourceName,
+                        path: sourcePath,
+                        mimeType: currentConfig.mimeType || '',
+                        extension: sourceName.includes('.') ? sourceName.split('.').pop() : '',
+                        size: currentConfig.size || 0,
+                        srcUrl: currentConfig.srcUrl || '',
+                    },
+                    converter,
+                    target: {
+                        folder: sourcePath.split('/').slice(0, -1).join('/'),
+                        saveAs: `${sourceName.replace(/\.[^.]+$/, '')}.${converter.format || 'webp'}`,
+                        mode: converter.saveMode || 'new-hidden-work',
+                    },
+                };
+                const converted = await requestMcpRoute('convert', payload);
+                if (!converted || converted.error || converted.ok === false) {
+                    throw new Error(converted?.error || 'Conversion failed.');
+                }
+                if ((converter.saveMode || 'new-hidden-work') !== 'temporary-preview-only') {
+                    const saved = await requestMcpRoute('save-converted-work', {
+                        sourcePath,
+                        conversion: converted,
+                    });
+                    if (!saved || saved.error || saved.ok === false) {
+                        throw new Error(saved?.error || 'Saving converted work failed.');
+                    }
+                }
+                window.alert('OK — this file was converted into a web-readable poff work and saved in the folder.');
+                await refreshCurrentEditState(selection);
             },
             onResetFolderWork: async ({ statusEl }) => {
                 const selection = getActiveSelection();

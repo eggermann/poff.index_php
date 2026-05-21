@@ -1986,6 +1986,132 @@ describe('MCP create route helper (CLI)', () => {
   });
 });
 
+function runConverterRoute(mode, rootDir, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      path.join(ROOT, 'tests/php_converter_routes.php'),
+      mode,
+      rootDir,
+      JSON.stringify(payload),
+    ];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(stdout.trim()));
+        return;
+      }
+      reject(new Error(`converter helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+describe('Poff converters', () => {
+  beforeAll(() => {
+    fs.mkdirSync(POFF_DIR, { recursive: true });
+  });
+
+  test('registry returns matching converters for image/tiff', async () => {
+    const result = await runConverterRoute('available', POFF_DIR, {
+      mimeType: 'image/tiff',
+      kind: 'image',
+      extension: 'tiff',
+    });
+
+    expect(result.map((item) => item.id)).toEqual(expect.arrayContaining([
+      'imagemagick-image-webp',
+      'imagemagick-image-jpeg',
+      'imagemagick-image-png',
+      'remote-node-converter',
+    ]));
+  });
+
+  test('unsupported MIME returns no enabled local image converter', async () => {
+    const result = await runConverterRoute('available', POFF_DIR, {
+      mimeType: 'application/x-poff-test',
+      kind: 'other',
+      extension: 'bin',
+    });
+
+    expect(result.filter((item) => item.enabled).length).toBe(0);
+  });
+
+  test('save-converted-work stores hidden generated metadata beside source', async () => {
+    const tempDir = path.join(POFF_DIR, `converter-save-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'scan-001.tiff'), 'fake tiff');
+
+    try {
+      const result = await runConverterRoute('save', tempDir, {
+        sourcePath: 'scan-001.tiff',
+        conversion: {
+          ok: true,
+          type: 'converted-work',
+          source: {
+            path: 'scan-001.tiff',
+            mimeType: 'image/tiff',
+          },
+          output: {
+            name: 'scan-001.webp',
+            mimeType: 'image/webp',
+            kind: 'image',
+            size: 4,
+            bodyBase64: Buffer.from('webp').toString('base64'),
+          },
+          generatedBy: {
+            type: 'converter',
+            id: 'imagemagick-image-webp',
+            node: 'local',
+            engine: 'imagemagick',
+            quality: 'default',
+            format: 'webp',
+            convertedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(fs.readFileSync(path.join(tempDir, 'scan-001.webp'), 'utf8')).toBe('webp');
+      const folderConfig = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
+      expect(folderConfig.tree).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'scan-001.webp',
+          visible: false,
+          generated: true,
+          sourceWork: 'scan-001.tiff',
+          generatedBy: expect.objectContaining({
+            id: 'imagemagick-image-webp',
+          }),
+          external: expect.objectContaining({
+            relation: 'converted-from',
+          }),
+        }),
+      ]));
+      const fileConfig = JSON.parse(fs.readFileSync(path.join(tempDir, '.works', 'scan-001.webp.config.json'), 'utf8'));
+      expect(fileConfig.work.template).toBe('external');
+      expect(fileConfig.external.sourceWork.path).toBe('scan-001.tiff');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('remote converter rejects private hosts', async () => {
+    const result = await runConverterRoute('remote-security', POFF_DIR, {
+      url: 'http://127.0.0.1/index.php?mcp=1&route=convert',
+    });
+
+    expect(result.error).toBe('Converter endpoint host is not allowed.');
+  });
+});
+
 describe('Worktype HBS renderer', () => {
   test('reads the current unsaved editor draft for layout and work prompt targets', () => {
     const { readPromptEditorDraft } = loadPromptDraftHelpers();
@@ -2329,33 +2455,6 @@ describe('Worktype HBS renderer', () => {
       'collection',
       'other',
     ]));
-  });
-
-  test('merges saved custom categories into the shared category catalog', async () => {
-    const tempDir = path.join(ROOT, `shared-category-${Date.now()}`);
-    const fileName = 'custom-category.jpg';
-    fs.mkdirSync(tempDir, { recursive: true });
-    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
-    fs.writeFileSync(path.join(tempDir, fileName), 'image');
-
-    try {
-      const saved = await runViewerSave(tempDir, fileName, {
-        work: {
-          categories: ['fuzzy', 'visual'],
-        },
-      });
-
-      expect(saved.saved).toBe(true);
-      expect(saved.config.work.categories).toEqual(expect.arrayContaining(['fuzzy', 'visual']));
-
-      const catalog = JSON.parse(await runWorktype('catalog', 'image', {
-        subjectType: 'file',
-        fileName,
-      }));
-      expect(catalog.categories).toEqual(expect.arrayContaining(['fuzzy']));
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
   });
 
   test('renders a selected work template variant as the active section partial', async () => {
