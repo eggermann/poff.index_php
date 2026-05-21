@@ -28,6 +28,22 @@
         width: 100%;
         margin-left: 0;
     }
+
+    #sidebarLoading,
+    #iframeLoading {
+        position: fixed !important;
+        left: 50%;
+        z-index: 9999;
+        transform: translateX(-50%);
+    }
+
+    #sidebarLoading {
+        top: 1rem;
+    }
+
+    #iframeLoading {
+        top: 4rem;
+    }
 </style>
 <div id="appShell" class="container">
     <button

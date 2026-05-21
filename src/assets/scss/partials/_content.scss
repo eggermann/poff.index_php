@@ -24,6 +24,14 @@
     scroll-margin-top: 16px;
 }
 
+#iframeLoading {
+    position: fixed;
+    top: 4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 80;
+}
+
 .prompt-dock {
     position: absolute;
     top: 20px;
