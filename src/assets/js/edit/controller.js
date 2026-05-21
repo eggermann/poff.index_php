@@ -58,14 +58,24 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
         }
         nextWork[key] = rawValue;
     });
-    const converterId = String(elements.converter_id?.value || '').trim();
+    const converterSelect = elements.converter_id;
+    const selectedOption = converterSelect?.selectedOptions && converterSelect.selectedOptions[0]
+        ? converterSelect.selectedOptions[0]
+        : null;
+    const converterId = String(converterSelect?.value || '').trim();
+    const converterName = String(selectedOption?.dataset?.converterName || '').trim();
+    const converterType = String(selectedOption?.dataset?.converterType || 'converter').trim() || 'converter';
+    const converterEngine = String(selectedOption?.dataset?.converterEngine || '').trim();
+    const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
         nextWork.converter = {
-            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
+            ...existingConverter,
+            type: converterType,
+            name: converterName || String(existingConverter.name || converterId.split('/').pop() || 'converter'),
             enabled: true,
             id: converterId,
-            node: converterId === 'remote-node-converter'
-                ? (nextWork.converter?.node || { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+            node: converterEngine === 'remote-node'
+                ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
             quality: String(elements.converter_quality?.value || 'default').trim() || 'default',
             format: String(elements.converter_format?.value || 'webp').trim() || 'webp',
@@ -73,11 +83,7 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
             hiddenByDefault: true,
         };
     } else if (Object.prototype.hasOwnProperty.call(nextWork, 'converter')) {
-        nextWork.converter = {
-            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
-            enabled: false,
-            id: '',
-        };
+        delete nextWork.converter;
     }
     return nextWork;
 }

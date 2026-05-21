@@ -2025,11 +2025,23 @@ describe('Poff converters', () => {
       extension: 'tiff',
     });
 
-    expect(result.map((item) => item.id)).toEqual(expect.arrayContaining([
-      'imagemagick-image-webp',
-      'imagemagick-image-jpeg',
-      'imagemagick-image-png',
-      'remote-node-converter',
+    expect(result).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'converter/imagemagick',
+        name: 'imagemagick',
+        label: 'ImageMagick',
+        formats: ['webp', 'jpeg', 'png'],
+      }),
+      expect.objectContaining({
+        id: 'converter/simple-image',
+        name: 'simple-image',
+        label: 'Simple Image',
+      }),
+      expect.objectContaining({
+        id: 'converter/remote-node',
+        name: 'remote-node',
+        label: 'Remote Node',
+      }),
     ]));
   });
 
@@ -2068,7 +2080,8 @@ describe('Poff converters', () => {
           },
           generatedBy: {
             type: 'converter',
-            id: 'imagemagick-image-webp',
+            name: 'imagemagick',
+            id: 'converter/imagemagick',
             node: 'local',
             engine: 'imagemagick',
             quality: 'default',
@@ -2088,7 +2101,8 @@ describe('Poff converters', () => {
           generated: true,
           sourceWork: 'scan-001.tiff',
           generatedBy: expect.objectContaining({
-            id: 'imagemagick-image-webp',
+            name: 'imagemagick',
+            id: 'converter/imagemagick',
           }),
           external: expect.objectContaining({
             relation: 'converted-from',

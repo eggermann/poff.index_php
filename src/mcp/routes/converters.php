@@ -48,6 +48,7 @@ function handleConverters(array $opts): array
                 'label' => $definition['label'] ?? ($definition['name'] ?? ''),
                 'accepts' => $definition['accepts'] ?? [],
                 'outputs' => $definition['outputs'] ?? [],
+                'formats' => $definition['formats'] ?? [],
                 'enabled' => (bool) ($definition['enabled'] ?? false),
                 'disabledReason' => (string) ($definition['disabledReason'] ?? ''),
                 'defaults' => $definition['defaults'] ?? [],

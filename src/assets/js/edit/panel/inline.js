@@ -173,14 +173,24 @@ function readMediaConfigFromForm(form, currentWork = {}) {
     const categories = normalizeWorkCategories(nextWork.categories ?? nextWork.category ?? []);
     nextWork.categories = categories;
     nextWork.category = categories;
-    const converterId = String(form?.elements?.converter_id?.value || '').trim();
+    const converterSelect = form?.elements?.converter_id;
+    const selectedOption = converterSelect?.selectedOptions && converterSelect.selectedOptions[0]
+        ? converterSelect.selectedOptions[0]
+        : null;
+    const converterId = String(converterSelect?.value || '').trim();
+    const converterName = String(selectedOption?.dataset?.converterName || '').trim();
+    const converterType = String(selectedOption?.dataset?.converterType || 'converter').trim() || 'converter';
+    const converterEngine = String(selectedOption?.dataset?.converterEngine || '').trim();
+    const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
         nextWork.converter = {
-            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
+            ...existingConverter,
+            type: converterType,
+            name: converterName || String(existingConverter.name || converterId.split('/').pop() || 'converter'),
             enabled: true,
             id: converterId,
-            node: converterId === 'remote-node-converter'
-                ? (nextWork.converter?.node || { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+            node: converterEngine === 'remote-node'
+                ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
             quality: String(form?.elements?.converter_quality?.value || 'default').trim() || 'default',
             format: String(form?.elements?.converter_format?.value || 'webp').trim() || 'webp',
@@ -188,11 +198,7 @@ function readMediaConfigFromForm(form, currentWork = {}) {
             hiddenByDefault: true,
         };
     } else if (Object.prototype.hasOwnProperty.call(nextWork, 'converter')) {
-        nextWork.converter = {
-            ...(nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {}),
-            enabled: false,
-            id: '',
-        };
+        delete nextWork.converter;
     }
     return nextWork;
 }
@@ -275,7 +281,8 @@ function renderConverterSection(config = {}) {
     const work = (config?.work && typeof config.work === 'object') ? config.work : {};
     const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
     const selectedId = String(converter.id || '').trim();
-    const defaults = available.find((item) => item?.id === selectedId)?.defaults || {};
+    const selectedDefinition = available.find((item) => item?.id === selectedId) || available[0] || null;
+    const defaults = selectedDefinition?.defaults || {};
     const selectedQuality = String(converter.quality || defaults.quality || 'default');
     const selectedFormat = String(converter.format || defaults.format || 'webp');
     const selectedSaveMode = String(converter.saveMode || defaults.saveMode || 'new-hidden-work');
@@ -287,10 +294,13 @@ function renderConverterSection(config = {}) {
         ...available.map((item) => {
             const disabled = item.enabled === false;
             const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
-            return `<option value="${escapeHtml(item.id || '')}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
         }),
     ].join('');
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
+    const formatOptions = Array.isArray(selectedDefinition?.formats) && selectedDefinition.formats.length
+        ? selectedDefinition.formats
+        : ['webp', 'jpeg', 'png'];
     return `
         <div class="edit-work-fields edit-work-converter">
             <div class="edit-work-fields-header">
@@ -316,7 +326,7 @@ function renderConverterSection(config = {}) {
                 <div>
                     <label class="edit-label" for="edit-converter-format">Output format</label>
                     <select class="form-select" id="edit-converter-format" name="converter_format">
-                        ${['webp', 'jpeg', 'png'].map((value) => `<option value="${value}"${value === selectedFormat ? ' selected' : ''}>${value}</option>`).join('')}
+                        ${formatOptions.map((value) => `<option value="${value}"${value === selectedFormat ? ' selected' : ''}>${value}</option>`).join('')}
                     </select>
                 </div>
                 <div>
