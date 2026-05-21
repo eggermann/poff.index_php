@@ -45,15 +45,20 @@ function handleConverters(array $opts): array
         'available' => array_values(array_map(static function (array $definition): array {
             return [
                 'id' => $definition['id'] ?? '',
+                'type' => $definition['type'] ?? 'converter',
+                'name' => $definition['name'] ?? '',
                 'label' => $definition['label'] ?? ($definition['name'] ?? ''),
+                'folder' => $definition['folder'] ?? '',
+                'templateFolder' => $definition['templateFolder'] ?? '',
                 'accepts' => $definition['accepts'] ?? [],
                 'outputs' => $definition['outputs'] ?? [],
                 'formats' => $definition['formats'] ?? [],
+                'engine' => $definition['engine'] ?? '',
                 'enabled' => (bool) ($definition['enabled'] ?? false),
                 'disabledReason' => (string) ($definition['disabledReason'] ?? ''),
                 'defaults' => $definition['defaults'] ?? [],
                 'ui' => $definition['ui'] ?? [],
             ];
-        }, Converter::availableFor($mimeType, $kind, $extension))),
+        }, Converter::availableFor($mimeType, $kind, $extension, $rootDir))),
     ];
 }

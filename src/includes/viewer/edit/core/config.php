@@ -134,9 +134,13 @@ function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, st
         $mime = strtolower(trim((string) ($config['mimeType'] ?? '')));
         $kind = strtolower(trim((string) ($config['kind'] ?? '')));
         $extension = strtolower(pathinfo((string) ($targetFile ?? $config['name'] ?? ''), PATHINFO_EXTENSION));
+        if (isset($config['work']['converter']) && is_array($config['work']['converter'])) {
+            $config['work']['converter'] = Converter::normalizeSelectedConverter($config['work']['converter']);
+        }
+        $rootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir($targetDir) : $targetDir;
         $config['converterCatalog'] = [
             'webReadable' => Converter::isWebReadableMime($mime),
-            'available' => Converter::availableFor($mime, $kind, $extension),
+            'available' => Converter::availableFor($mime, $kind, $extension, $rootDir),
         ];
         $folderConfig = class_exists('PoffConfig') ? PoffConfig::ensure($targetDir) : [];
         $tree = is_array($folderConfig['tree'] ?? null) ? $folderConfig['tree'] : [];

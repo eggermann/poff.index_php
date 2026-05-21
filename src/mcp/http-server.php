@@ -15,6 +15,7 @@ require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/remote-content.php';
 require_once __DIR__ . '/routes/converters.php';
 require_once __DIR__ . '/routes/convert.php';
+require_once __DIR__ . '/routes/converter-prompt.php';
 
 use PhpMcp\Server\Server;
 use PhpMcp\Server\Transports\StreamableHttpServerTransport;
@@ -148,6 +149,22 @@ $server = Server::make()
                 'conversion' => ['type' => 'object'],
             ],
             'required' => ['sourcePath', 'conversion'],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleConverterPrompt([
+                'rootDir' => $rootDir,
+                'path' => $args['path'] ?? '',
+            ]);
+        },
+        name: 'converter_prompt',
+        description: 'Return prompt instructions and grain metadata for editing a folder-backed poff converter app.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'path' => ['type' => 'string', 'description' => 'Relative converter folder path such as poff/converters/convert-image'],
+            ],
         ]
     )
     ->build();

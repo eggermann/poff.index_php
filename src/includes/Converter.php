@@ -7,7 +7,194 @@ class Converter
 {
     public const MAX_SOURCE_BYTES = 104857600;
 
-    public static function definitions(): array
+    public static function definitions(string $rootDir = ''): array
+    {
+        return self::discover($rootDir);
+    }
+
+    public static function discover(string $rootDir): array
+    {
+        $root = self::normalizeRootDir($rootDir);
+        $definitions = [];
+        foreach (['poff/converters', 'converters', '.converters'] as $relativeDir) {
+            foreach (self::discoverInDirectory($root, $relativeDir) as $id => $definition) {
+                $definitions[$id] = $definition;
+            }
+        }
+
+        foreach (self::discoverBundledConverterGrains($root) as $id => $definition) {
+            if (!isset($definitions[$id])) {
+                $definitions[$id] = $definition;
+            }
+        }
+
+        foreach (self::legacyDefinitions() as $id => $definition) {
+            if (!isset($definitions[$id])) {
+                $definitions[$id] = $definition;
+            }
+        }
+
+        return $definitions;
+    }
+
+    public static function discoverInDirectory(string $rootDir, string $relativeDir): array
+    {
+        $root = self::normalizeRootDir($rootDir);
+        $relativeDir = trim(str_replace('\\', '/', $relativeDir), '/');
+        $base = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+        if (!is_dir($base)) {
+            return [];
+        }
+
+        $definitions = [];
+        foreach (scandir($base) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $folder = $relativeDir . '/' . $entry;
+            $definition = self::definitionFromFolder($root, $folder);
+            if ($definition !== null) {
+                $definitions[(string) $definition['id']] = $definition;
+            }
+        }
+        return $definitions;
+    }
+
+    public static function definitionFromFolder(string $rootDir, string $folder): ?array
+    {
+        $root = self::normalizeRootDir($rootDir);
+        $relativeFolder = trim(str_replace('\\', '/', $folder), '/');
+        $fullFolder = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeFolder);
+        if (!is_dir($fullFolder)) {
+            return null;
+        }
+
+        $definitionPath = $fullFolder . DIRECTORY_SEPARATOR . 'converter.json';
+        if (!is_file($definitionPath)) {
+            return null;
+        }
+        $decoded = json_decode((string) file_get_contents($definitionPath), true);
+        if (!is_array($decoded) || strtolower((string) ($decoded['type'] ?? 'converter')) !== 'converter') {
+            return null;
+        }
+
+        $folderName = basename($relativeFolder);
+        $decoded['id'] = 'converter/' . self::normalizeConverterName($folderName);
+        $decoded['name'] = self::normalizeConverterName((string) ($decoded['name'] ?? $folderName));
+        $decoded['folder'] = $relativeFolder;
+        $decoded['templateFolder'] = $relativeFolder . '/.layout';
+        $decoded['source'] = $decoded['source'] ?? 'folder';
+
+        return self::converterDefinition($decoded);
+    }
+
+    private static function discoverBundledConverterGrains(string $rootDir): array
+    {
+        $base = __DIR__ . '/worktypes/templates/converter';
+        if (!is_dir($base)) {
+            return [];
+        }
+
+        $definitions = [];
+        foreach (scandir($base) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || $entry === 'default') {
+                continue;
+            }
+            $folder = $base . DIRECTORY_SEPARATOR . $entry;
+            if (!is_dir($folder) || !is_file($folder . DIRECTORY_SEPARATOR . 'converter.json')) {
+                continue;
+            }
+            $decoded = json_decode((string) file_get_contents($folder . DIRECTORY_SEPARATOR . 'converter.json'), true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            $decoded['id'] = 'converter/' . self::normalizeConverterName($entry);
+            $decoded['name'] = self::normalizeConverterName((string) ($decoded['name'] ?? $entry));
+            $decoded['folder'] = 'src/includes/worktypes/templates/converter/' . $entry;
+            $decoded['templateFolder'] = 'src/includes/worktypes/templates/converter/' . $entry;
+            $decoded['source'] = 'bundled-grain';
+            $decoded['grain'] = true;
+            $definition = self::converterDefinition($decoded);
+            $definitions[(string) $definition['id']] = $definition;
+        }
+
+        return $definitions;
+    }
+
+    public static function defaultGrain(): array
+    {
+        return [
+            'id' => 'converter/default',
+            'type' => 'converter-grain',
+            'name' => 'default',
+            'label' => 'Default Converter',
+            'folder' => 'src/includes/worktypes/templates/converter/default',
+            'templateFolder' => 'src/includes/worktypes/templates/converter/default',
+        ];
+    }
+
+    public static function ensureDefaultConverterFolder(string $rootDir, string $name): array
+    {
+        $root = self::normalizeRootDir($rootDir);
+        $name = self::normalizeConverterName($name);
+        if ($name === '') {
+            return self::error('Missing converter name.');
+        }
+
+        $targetRelative = 'poff/converters/' . $name;
+        $target = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $targetRelative);
+        $grain = __DIR__ . '/worktypes/templates/converter/default';
+        if (!is_dir($grain)) {
+            return self::error('Default converter grain is missing.');
+        }
+        if (!is_dir($target . DIRECTORY_SEPARATOR . '.layout')) {
+            mkdir($target . DIRECTORY_SEPARATOR . '.layout', 0755, true);
+        }
+
+        foreach (['template.hbs', 'work.hbs', 'external.hbs', 'style.css', 'script.js'] as $file) {
+            $source = $grain . DIRECTORY_SEPARATOR . $file;
+            $destination = $target . DIRECTORY_SEPARATOR . '.layout' . DIRECTORY_SEPARATOR . $file;
+            if (is_file($source) && !is_file($destination)) {
+                copy($source, $destination);
+            }
+        }
+
+        $converterJson = $target . DIRECTORY_SEPARATOR . 'converter.json';
+        if (!is_file($converterJson)) {
+            $definition = self::starterDefinitionForName($name);
+            self::writeJson($converterJson, $definition);
+        }
+
+        $definition = self::definitionFromFolder($root, $targetRelative);
+        return [
+            'ok' => $definition !== null,
+            'folder' => $targetRelative,
+            'definition' => $definition,
+        ];
+    }
+
+    private static function starterDefinitionForName(string $name): array
+    {
+        $label = ucwords(str_replace(['-', '_'], ' ', preg_replace('/^convert-/', '', $name) ?: $name));
+        return [
+            'type' => 'converter',
+            'name' => $name,
+            'label' => 'Convert ' . $label,
+            'description' => 'Converts incoming payloads into browser-readable poff works.',
+            'accepts' => ['image/tiff', 'image/*'],
+            'outputs' => ['image/webp', 'image/jpeg', 'image/png'],
+            'engine' => str_contains($name, 'remote') ? 'remote-node' : (str_contains($name, 'simple') ? 'simple-image' : 'imagemagick'),
+            'defaults' => [
+                'format' => 'webp',
+                'quality' => 'default',
+                'saveMode' => 'new-hidden-work',
+                'hiddenByDefault' => true,
+            ],
+            'ui' => self::defaultUi(),
+        ];
+    }
+
+    private static function legacyDefinitions(): array
     {
         $imagemagickEnabled = self::imagemagickAvailable();
         $imagemagickReason = $imagemagickEnabled
@@ -15,10 +202,12 @@ class Converter
             : 'Imagick extension missing; ImageMagick CLI disabled unless POFF_ENABLE_IMAGEMAGICK_CLI=1.';
 
         return [
-            'converter/imagemagick' => self::converterDefinition([
-                'name' => 'imagemagick',
-                'label' => 'ImageMagick',
+            'converter/convert-image' => self::converterDefinition([
+                'name' => 'convert-image',
+                'label' => 'Convert Image',
                 'engine' => 'imagemagick',
+                'folder' => 'poff/converters/convert-image',
+                'templateFolder' => 'poff/converters/convert-image/.layout',
                 'accepts' => ['image/tiff', 'image/*'],
                 'outputs' => ['image/webp', 'image/jpeg', 'image/png'],
                 'formats' => ['webp', 'jpeg', 'png'],
@@ -33,11 +222,36 @@ class Converter
                     'saveMode' => 'new-hidden-work',
                     'hiddenByDefault' => true,
                 ],
+                'source' => 'legacy-static',
             ]),
-            'converter/simple-image' => self::converterDefinition([
-                'name' => 'simple-image',
-                'label' => 'Simple Image',
+            'converter/convert-imagemagick' => self::converterDefinition([
+                'name' => 'convert-imagemagick',
+                'label' => 'Convert ImageMagick',
+                'engine' => 'imagemagick',
+                'folder' => 'poff/converters/convert-imagemagick',
+                'templateFolder' => 'poff/converters/convert-imagemagick/.layout',
+                'accepts' => ['image/tiff', 'image/*'],
+                'outputs' => ['image/webp', 'image/jpeg', 'image/png'],
+                'formats' => ['webp', 'jpeg', 'png'],
+                'enabled' => $imagemagickEnabled,
+                'disabledReason' => $imagemagickReason,
+                'defaults' => [
+                    'quality' => 'default',
+                    'format' => 'webp',
+                    'resize' => null,
+                    'stripMetadata' => true,
+                    'background' => 'white',
+                    'saveMode' => 'new-hidden-work',
+                    'hiddenByDefault' => true,
+                ],
+                'source' => 'legacy-static',
+            ]),
+            'converter/convert-simple-image' => self::converterDefinition([
+                'name' => 'convert-simple-image',
+                'label' => 'Convert Simple Image',
                 'engine' => 'simple-image',
+                'folder' => 'poff/converters/convert-simple-image',
+                'templateFolder' => 'poff/converters/convert-simple-image/.layout',
                 'accepts' => ['image/*'],
                 'outputs' => ['image/webp', 'image/jpeg', 'image/png'],
                 'formats' => ['webp', 'jpeg', 'png'],
@@ -49,11 +263,14 @@ class Converter
                     'saveMode' => 'new-hidden-work',
                     'hiddenByDefault' => true,
                 ],
+                'source' => 'legacy-static',
             ]),
-            'converter/remote-node' => self::converterDefinition([
-                'name' => 'remote-node',
-                'label' => 'Remote Node',
+            'converter/convert-remote-node' => self::converterDefinition([
+                'name' => 'convert-remote-node',
+                'label' => 'Convert Remote Node',
                 'engine' => 'remote-node',
+                'folder' => 'poff/converters/convert-remote-node',
+                'templateFolder' => 'poff/converters/convert-remote-node/.layout',
                 'accepts' => ['image/tiff', 'image/*'],
                 'outputs' => ['image/webp', 'image/jpeg', 'image/png'],
                 'formats' => ['webp', 'jpeg', 'png'],
@@ -64,6 +281,7 @@ class Converter
                     'saveMode' => 'new-hidden-work',
                     'hiddenByDefault' => true,
                 ],
+                'source' => 'legacy-static',
             ]),
         ];
     }
@@ -73,6 +291,18 @@ class Converter
         $name = self::normalizeConverterName((string) ($definition['name'] ?? 'converter'));
         $id = self::normalizeConverterId((string) ($definition['id'] ?? ('converter/' . $name)));
         $label = trim((string) ($definition['label'] ?? ucfirst($name)));
+        $outputs = array_values(array_map('strtolower', (array) ($definition['outputs'] ?? [])));
+        $formats = array_values(array_map('strtolower', (array) ($definition['formats'] ?? [])));
+        if ($formats === []) {
+            $formats = self::formatsFromOutputs($outputs);
+        }
+        $engine = (string) ($definition['engine'] ?? $name);
+        $enabled = (bool) ($definition['enabled'] ?? true);
+        $disabledReason = (string) ($definition['disabledReason'] ?? '');
+        if (in_array($engine, ['imagemagick', 'simple-image'], true) && !self::imagemagickAvailable()) {
+            $enabled = false;
+            $disabledReason = $disabledReason !== '' ? $disabledReason : 'Imagick extension missing; ImageMagick CLI disabled unless POFF_ENABLE_IMAGEMAGICK_CLI=1.';
+        }
 
         return [
             'id' => $id,
@@ -80,14 +310,18 @@ class Converter
             'name' => $name,
             'label' => $label,
             'accepts' => array_values(array_map('strtolower', (array) ($definition['accepts'] ?? []))),
-            'outputs' => array_values(array_map('strtolower', (array) ($definition['outputs'] ?? []))),
-            'formats' => array_values(array_map('strtolower', (array) ($definition['formats'] ?? []))),
-            'engine' => (string) ($definition['engine'] ?? $name),
-            'templateFolder' => (string) ($definition['templateFolder'] ?? '.layout/converters/' . $name),
-            'enabled' => (bool) ($definition['enabled'] ?? true),
-            'disabledReason' => (string) ($definition['disabledReason'] ?? ''),
+            'outputs' => $outputs,
+            'formats' => $formats,
+            'engine' => $engine,
+            'folder' => (string) ($definition['folder'] ?? ''),
+            'templateFolder' => (string) ($definition['templateFolder'] ?? (($definition['folder'] ?? '') !== '' ? (string) $definition['folder'] . '/.layout' : '.layout/converters/' . $name)),
+            'enabled' => $enabled,
+            'disabledReason' => $disabledReason,
             'defaults' => is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [],
-            'ui' => self::defaultUi(),
+            'ui' => is_array($definition['ui'] ?? null) ? $definition['ui'] : self::defaultUi(),
+            'remote' => is_array($definition['remote'] ?? null) ? $definition['remote'] : [],
+            'source' => (string) ($definition['source'] ?? ''),
+            'grain' => (bool) ($definition['grain'] ?? false),
         ];
     }
 
@@ -112,10 +346,11 @@ class Converter
         ];
     }
 
-    public static function definition(string $id): ?array
+    public static function definition(string $id, string $rootDir = ''): ?array
     {
-        $definitions = self::definitions();
-        $normalizedId = self::normalizeConverterId($id);
+        $selected = self::normalizeSelectedConverter(['id' => $id]);
+        $definitions = self::definitions($rootDir);
+        $normalizedId = self::normalizeConverterId((string) ($selected['id'] ?? $id));
         if ($normalizedId !== '' && isset($definitions[$normalizedId])) {
             return $definitions[$normalizedId];
         }
@@ -128,13 +363,13 @@ class Converter
         return null;
     }
 
-    public static function defaultOptions(string $id): array
+    public static function defaultOptions(string $id, string $rootDir = ''): array
     {
-        $definition = self::definition($id);
+        $definition = self::definition($id, $rootDir);
         return is_array($definition) && is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [];
     }
 
-    public static function availableFor(string $mimeType, string $kind, string $extension): array
+    public static function availableFor(string $mimeType, string $kind, string $extension, string $rootDir = ''): array
     {
         $mime = strtolower(trim($mimeType));
         $kind = strtolower(trim($kind));
@@ -144,14 +379,87 @@ class Converter
         }
 
         $available = [];
-        foreach (self::definitions() as $definition) {
-            if (!self::matchesDefinition($definition, $mime, $kind, $extension)) {
+        foreach (self::definitions($rootDir) as $definition) {
+            if (!self::matches($definition, $mime, $kind, $extension)) {
                 continue;
             }
             $available[] = $definition;
         }
 
         return $available;
+    }
+
+    public static function matches(array $definition, string $mimeType, string $kind, string $extension): bool
+    {
+        $mime = strtolower(trim($mimeType));
+        $kind = strtolower(trim($kind));
+        $extension = strtolower(trim($extension, '. '));
+        $accepts = array_values(array_map('strtolower', (array) ($definition['accepts'] ?? [])));
+        if ($mime !== '' && self::mimeAccepted($mime, $accepts)) {
+            return true;
+        }
+        if ($kind !== '') {
+            foreach ($accepts as $pattern) {
+                if ($pattern === $kind || str_starts_with($pattern, $kind . '/')) {
+                    return true;
+                }
+            }
+        }
+        if ($extension !== '' && in_array($extension, $accepts, true)) {
+            return true;
+        }
+        return false;
+    }
+
+    public static function normalizeSelectedConverter(array $converter): array
+    {
+        $id = strtolower(trim((string) ($converter['id'] ?? $converter['name'] ?? '')));
+        $format = strtolower(trim((string) ($converter['format'] ?? '')));
+        $map = [
+            'imagemagick-image-webp' => ['converter/convert-imagemagick', 'webp'],
+            'imagemagick-image-jpeg' => ['converter/convert-imagemagick', 'jpeg'],
+            'imagemagick-image-png' => ['converter/convert-imagemagick', 'png'],
+            'converter/imagemagick-image-webp' => ['converter/convert-imagemagick', 'webp'],
+            'converter/imagemagick-image-jpeg' => ['converter/convert-imagemagick', 'jpeg'],
+            'converter/imagemagick-image-png' => ['converter/convert-imagemagick', 'png'],
+            'remote-node-converter' => ['converter/convert-remote-node', ''],
+            'converter/remote-node-converter' => ['converter/convert-remote-node', ''],
+            'converter/imagemagick' => ['converter/convert-imagemagick', ''],
+            'imagemagick' => ['converter/convert-imagemagick', ''],
+            'converter/simple-image' => ['converter/convert-simple-image', ''],
+            'simple-image' => ['converter/convert-simple-image', ''],
+            'converter/remote-node' => ['converter/convert-remote-node', ''],
+            'remote-node' => ['converter/convert-remote-node', ''],
+        ];
+
+        if (isset($map[$id])) {
+            [$mappedId, $mappedFormat] = $map[$id];
+            $converter['id'] = $mappedId;
+            if ($format === '' && $mappedFormat !== '') {
+                $converter['format'] = $mappedFormat;
+            }
+        } else {
+            $converter['id'] = self::normalizeConverterId($id);
+        }
+
+        $converter['type'] = 'converter';
+        $converter['name'] = self::normalizeConverterName((string) ($converter['name'] ?? $converter['id'] ?? ''));
+        if ($converter['name'] === '' || isset($map[$id])) {
+            $converter['name'] = self::normalizeConverterName((string) ($converter['id'] ?? ''));
+        }
+        if (!isset($converter['saveMode'])) {
+            $converter['saveMode'] = 'new-hidden-work';
+        }
+        if (!array_key_exists('hiddenByDefault', $converter)) {
+            $converter['hiddenByDefault'] = true;
+        }
+        if (!isset($converter['quality'])) {
+            $converter['quality'] = 'default';
+        }
+        if (!isset($converter['format'])) {
+            $converter['format'] = 'webp';
+        }
+        return $converter;
     }
 
     public static function isWebReadableMime(string $mimeType): bool
@@ -180,6 +488,7 @@ class Converter
 
     public static function buildPayload(array $source, array $converterOptions): array
     {
+        $converterOptions = self::normalizeSelectedConverter($converterOptions);
         $sourceName = basename((string) ($source['name'] ?? $source['path'] ?? 'source'));
         $sourcePath = str_replace('\\', '/', trim((string) ($source['path'] ?? $sourceName), '/'));
         $folder = trim(dirname($sourcePath), '.');
@@ -203,6 +512,7 @@ class Converter
                 'type' => 'converter',
                 'name' => $name,
                 'id' => $id,
+                'folder' => (string) ($definition['folder'] ?? $converterOptions['folder'] ?? ''),
                 'quality' => self::normalizeQuality((string) ($converterOptions['quality'] ?? 'default')),
                 'format' => $format,
                 'node' => $converterOptions['node'] ?? 'local',
@@ -222,7 +532,9 @@ class Converter
     public static function convert(array $payload, string $rootDir): array
     {
         $converter = is_array($payload['converter'] ?? null) ? $payload['converter'] : [];
-        $definition = self::definition((string) ($converter['id'] ?? $converter['name'] ?? ''));
+        $converter = self::normalizeSelectedConverter($converter);
+        $payload['converter'] = $converter;
+        $definition = self::definition((string) ($converter['id'] ?? $converter['name'] ?? ''), $rootDir);
         if ($definition === null) {
             return self::error('Unknown converter.');
         }
@@ -391,6 +703,7 @@ class Converter
                 'type' => 'converter',
                 'name' => (string) ($definition['name'] ?? ''),
                 'id' => (string) ($definition['id'] ?? ''),
+                'folder' => (string) ($definition['folder'] ?? ''),
                 'node' => 'local',
                 'engine' => (string) ($definition['engine'] ?? 'imagemagick'),
                 'quality' => self::normalizeQuality((string) ($converter['quality'] ?? 'default')),
@@ -404,7 +717,8 @@ class Converter
     {
         $converter = is_array($payload['converter'] ?? null) ? $payload['converter'] : [];
         $node = is_array($converter['node'] ?? null) ? $converter['node'] : [];
-        $endpoint = trim((string) ($node['endpoint'] ?? ''));
+        $remote = is_array($definition['remote'] ?? null) ? $definition['remote'] : [];
+        $endpoint = trim((string) ($node['endpoint'] ?? $remote['endpoint'] ?? ''));
         $validation = self::validateRemoteEndpoint($endpoint);
         if ($validation !== null) {
             return self::error($validation);
@@ -427,10 +741,14 @@ class Converter
             is_array($decoded['generatedBy'] ?? null) ? $decoded['generatedBy'] : [],
             [
                 'type' => 'converter',
-                'name' => (string) ($definition['name'] ?? 'remote-node'),
-                'id' => (string) ($definition['id'] ?? 'converter/remote-node'),
-                'node' => (string) ($node['id'] ?? 'remote'),
+                'name' => (string) ($definition['name'] ?? 'convert-remote-node'),
+                'id' => (string) ($definition['id'] ?? 'converter/convert-remote-node'),
+                'folder' => (string) ($definition['folder'] ?? ''),
+                'node' => (string) ($node['id'] ?? $remote['nodeId'] ?? 'remote'),
+                'engine' => (string) ($definition['engine'] ?? 'remote-node'),
                 'endpoint' => $endpoint,
+                'quality' => self::normalizeQuality((string) ($converter['quality'] ?? 'default')),
+                'format' => self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'webp'))),
                 'convertedAt' => date('c'),
             ]
         );
@@ -457,21 +775,7 @@ class Converter
 
     private static function matchesDefinition(array $definition, string $mime, string $kind, string $extension): bool
     {
-        $accepts = array_values(array_map('strtolower', (array) ($definition['accepts'] ?? [])));
-        if ($mime !== '' && self::mimeAccepted($mime, $accepts)) {
-            return true;
-        }
-        if ($kind !== '') {
-            foreach ($accepts as $pattern) {
-                if ($pattern === $kind || str_starts_with($pattern, $kind . '/')) {
-                    return true;
-                }
-            }
-        }
-        if ($extension !== '' && in_array($extension, $accepts, true)) {
-            return true;
-        }
-        return false;
+        return self::matches($definition, $mime, $kind, $extension);
     }
 
     private static function mimeAccepted(string $mime, array $patterns): bool
@@ -513,6 +817,23 @@ class Converter
             'png' => 'image/png',
             default => 'image/webp',
         };
+    }
+
+    private static function formatsFromOutputs(array $outputs): array
+    {
+        $formats = [];
+        foreach ($outputs as $mime) {
+            $format = match (strtolower(trim((string) $mime))) {
+                'image/jpeg' => 'jpeg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+                default => '',
+            };
+            if ($format !== '' && !in_array($format, $formats, true)) {
+                $formats[] = $format;
+            }
+        }
+        return $formats;
     }
 
     private static function normalizeFormat(string $format): string
@@ -565,6 +886,19 @@ class Converter
         $value = strtolower(trim($name));
         $value = preg_replace('/^converter\//', '', $value) ?? $value;
         return preg_replace('/[^a-z0-9._-]+/i', '-', $value) ?: '';
+    }
+
+    private static function normalizeRootDir(string $rootDir): string
+    {
+        $candidate = trim($rootDir);
+        if ($candidate === '' && function_exists('cmsProjectRootDir')) {
+            $candidate = cmsProjectRootDir();
+        }
+        if ($candidate === '') {
+            $candidate = getcwd() ?: '.';
+        }
+        $resolved = realpath($candidate);
+        return is_string($resolved) && $resolved !== '' ? $resolved : $candidate;
     }
 
     private static function cliEnabled(): bool

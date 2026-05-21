@@ -2013,12 +2013,88 @@ function runConverterRoute(mode, rootDir, payload = {}) {
   });
 }
 
+function createConverterApp(rootDir, name, overrides = {}) {
+  const folder = path.join(rootDir, 'poff', 'converters', name);
+  const layout = path.join(folder, '.layout');
+  fs.mkdirSync(layout, { recursive: true });
+  const definition = {
+    type: 'converter',
+    name,
+    label: name.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' '),
+    accepts: ['image/tiff', 'image/*'],
+    outputs: ['image/webp', 'image/jpeg', 'image/png'],
+    engine: name.includes('remote') ? 'remote-node' : 'imagemagick',
+    defaults: {
+      format: 'webp',
+      quality: 'default',
+      saveMode: 'new-hidden-work',
+      hiddenByDefault: true,
+    },
+    ui: {
+      format: { type: 'select', label: 'Output format', options: ['webp', 'jpeg', 'png'] },
+      quality: { type: 'select', label: 'Quality', options: ['preview', 'default', 'archival', 'small-web'] },
+    },
+    ...overrides,
+  };
+  fs.writeFileSync(path.join(folder, 'converter.json'), JSON.stringify(definition, null, 2));
+  for (const file of ['template.hbs', 'work.hbs', 'external.hbs', 'style.css', 'script.js']) {
+    fs.writeFileSync(path.join(layout, file), file.endsWith('.hbs') ? `<section>${name}</section>` : '');
+  }
+  return folder;
+}
+
 describe('Poff converters', () => {
   beforeAll(() => {
     fs.mkdirSync(POFF_DIR, { recursive: true });
   });
 
-  test('registry returns matching converters for image/tiff', async () => {
+  test('discovers converter app folders and derives IDs from folder names', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-discovery-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    createConverterApp(tempRoot, 'convert-image', { label: 'Convert Image' });
+    createConverterApp(tempRoot, 'convert-imagemagick', { label: 'Convert ImageMagick' });
+    createConverterApp(tempRoot, 'convert-remote-image', {
+      label: 'Convert Remote Image',
+      engine: 'remote-node',
+      remote: { nodeId: 'image-converter-node', endpoint: 'https://converter.example/index.php?mcp=1&route=convert' },
+    });
+
+    try {
+      const result = await runConverterRoute('available', tempRoot, {
+        mimeType: 'image/tiff',
+        kind: 'image',
+        extension: 'tiff',
+      });
+
+      expect(result).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'converter/convert-image',
+          name: 'convert-image',
+          label: 'Convert Image',
+          folder: 'poff/converters/convert-image',
+          templateFolder: 'poff/converters/convert-image/.layout',
+          formats: ['webp', 'jpeg', 'png'],
+        }),
+        expect.objectContaining({
+          id: 'converter/convert-imagemagick',
+          name: 'convert-imagemagick',
+        }),
+        expect.objectContaining({
+          id: 'converter/convert-remote-image',
+          name: 'convert-remote-image',
+        }),
+      ]));
+      expect(result.map((item) => item.id)).not.toEqual(expect.arrayContaining([
+        'imagemagick-image-webp',
+        'imagemagick-image-jpeg',
+        'imagemagick-image-png',
+      ]));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('legacy fallback returns folder-backed converter IDs for image/tiff', async () => {
     const result = await runConverterRoute('available', POFF_DIR, {
       mimeType: 'image/tiff',
       kind: 'image',
@@ -2027,22 +2103,102 @@ describe('Poff converters', () => {
 
     expect(result).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        id: 'converter/imagemagick',
-        name: 'imagemagick',
-        label: 'ImageMagick',
+        id: 'converter/convert-image',
+        name: 'convert-image',
+        label: 'Convert Image',
         formats: ['webp', 'jpeg', 'png'],
       }),
       expect.objectContaining({
-        id: 'converter/simple-image',
-        name: 'simple-image',
-        label: 'Simple Image',
+        id: 'converter/convert-imagemagick',
+        name: 'convert-imagemagick',
+        label: 'Convert ImageMagick',
       }),
       expect.objectContaining({
-        id: 'converter/remote-node',
-        name: 'remote-node',
-        label: 'Remote Node',
+        id: 'converter/convert-remote-node',
+        name: 'convert-remote-node',
+        label: 'Convert Remote Node',
       }),
     ]));
+  });
+
+  test('creates a converter app from the default grain', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-grain-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+
+    try {
+      const result = await runConverterRoute('ensure-default', tempRoot, {
+        name: 'convert-image',
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.folder).toBe('poff/converters/convert-image');
+      expect(result.definition).toEqual(expect.objectContaining({
+        id: 'converter/convert-image',
+        name: 'convert-image',
+        folder: 'poff/converters/convert-image',
+      }));
+      expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/converter.json'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/.layout/template.hbs'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/.layout/work.hbs'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/.layout/external.hbs'))).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('converter prompt targets converter folders and references the default grain', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-prompt-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    createConverterApp(tempRoot, 'convert-image', { label: 'Convert Image' });
+
+    try {
+      const result = await runConverterRoute('converter-prompt', tempRoot, {
+        path: 'poff/converters/convert-image',
+      });
+
+      expect(result.route).toBe('converter-prompt');
+      expect(result.targetType).toBe('converter');
+      expect(result.grain).toEqual(expect.objectContaining({
+        folder: 'src/includes/worktypes/templates/converter/default',
+        templateFolder: 'src/includes/worktypes/templates/converter/default',
+      }));
+      expect(result.definition).toEqual(expect.objectContaining({
+        id: 'converter/convert-image',
+        folder: 'poff/converters/convert-image',
+      }));
+      expect(result.instruction).toContain('Do not render the final generated work directly.');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('normalizes legacy converter IDs to folder-backed IDs with format options', async () => {
+    const webp = await runConverterRoute('normalize', POFF_DIR, {
+      id: 'imagemagick-image-webp',
+      quality: 'preview',
+    });
+    const jpeg = await runConverterRoute('normalize', POFF_DIR, {
+      id: 'imagemagick-image-jpeg',
+    });
+    const remote = await runConverterRoute('normalize', POFF_DIR, {
+      id: 'remote-node-converter',
+    });
+
+    expect(webp).toEqual(expect.objectContaining({
+      id: 'converter/convert-imagemagick',
+      name: 'convert-imagemagick',
+      format: 'webp',
+      quality: 'preview',
+    }));
+    expect(jpeg).toEqual(expect.objectContaining({
+      id: 'converter/convert-imagemagick',
+      format: 'jpeg',
+    }));
+    expect(remote).toEqual(expect.objectContaining({
+      id: 'converter/convert-remote-node',
+      name: 'convert-remote-node',
+    }));
   });
 
   test('unsupported MIME returns no enabled local image converter', async () => {
@@ -2080,8 +2236,9 @@ describe('Poff converters', () => {
           },
           generatedBy: {
             type: 'converter',
-            name: 'imagemagick',
-            id: 'converter/imagemagick',
+            name: 'convert-imagemagick',
+            id: 'converter/convert-imagemagick',
+            folder: 'poff/converters/convert-imagemagick',
             node: 'local',
             engine: 'imagemagick',
             quality: 'default',
@@ -2101,8 +2258,9 @@ describe('Poff converters', () => {
           generated: true,
           sourceWork: 'scan-001.tiff',
           generatedBy: expect.objectContaining({
-            name: 'imagemagick',
-            id: 'converter/imagemagick',
+            name: 'convert-imagemagick',
+            id: 'converter/convert-imagemagick',
+            folder: 'poff/converters/convert-imagemagick',
           }),
           external: expect.objectContaining({
             relation: 'converted-from',

@@ -11,6 +11,7 @@ require_once __DIR__ . '/../src/includes/viewer/utils.php';
 require_once __DIR__ . '/../src/mcp/helpers.php';
 require_once __DIR__ . '/../src/mcp/routes/converters.php';
 require_once __DIR__ . '/../src/mcp/routes/convert.php';
+require_once __DIR__ . '/../src/mcp/routes/converter-prompt.php';
 
 $mode = $argv[1] ?? '';
 $rootDir = $argv[2] ?? '';
@@ -24,8 +25,35 @@ if ($mode === 'available') {
     echo json_encode(Converter::availableFor(
         (string) ($payload['mimeType'] ?? ''),
         (string) ($payload['kind'] ?? ''),
-        (string) ($payload['extension'] ?? '')
+        (string) ($payload['extension'] ?? ''),
+        $rootDir
     ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'discover') {
+    echo json_encode(Converter::discover($rootDir), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'ensure-default') {
+    echo json_encode(Converter::ensureDefaultConverterFolder(
+        $rootDir,
+        (string) ($payload['name'] ?? 'convert-image')
+    ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'normalize') {
+    echo json_encode(Converter::normalizeSelectedConverter($payload), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'converter-prompt') {
+    echo json_encode(handleConverterPrompt([
+        'rootDir' => $rootDir,
+        'path' => (string) ($payload['path'] ?? ''),
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit(0);
 }
 

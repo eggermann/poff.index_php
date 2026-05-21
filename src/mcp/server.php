@@ -22,6 +22,7 @@ require_once __DIR__ . '/routes/prompt-template.php';
 require_once __DIR__ . '/routes/remote-content.php';
 require_once __DIR__ . '/routes/converters.php';
 require_once __DIR__ . '/routes/convert.php';
+require_once __DIR__ . '/routes/converter-prompt.php';
 require_once __DIR__ . '/routes/style.php';
 
 $runtime = mcpRuntimeContext();
@@ -86,6 +87,11 @@ switch ($route) {
         mcpJsonResponse(handleSaveConvertedWork([
             'rootDir' => $rootDir,
             'payload' => mcpReadRequestData(),
+        ]));
+    case 'converter-prompt':
+        mcpJsonResponse(handleConverterPrompt([
+            'rootDir' => $rootDir,
+            'path' => mcpRoutePath(),
         ]));
     case 'style':
         $response = handleStyleRoute($prompt, $mcpUrl, $configPath);
