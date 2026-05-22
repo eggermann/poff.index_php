@@ -5,19 +5,19 @@
     "title": "invalid-json-template",
     "description": "",
     "type": "folder",
-    "id": "poff_647cae72c822d1ee",
+    "id": "poff_d0ed4776aba8ec4f",
     "tree": [
         {
             "name": "poster.txt",
             "slug": "poster-txt",
             "type": "file",
             "path": "poster.txt",
-            "modifiedAt": "2026-04-28T22:32:31+00:00",
+            "modifiedAt": "2026-05-22T21:42:29+00:00",
             "visible": true
         }
     ],
-    "treeHash": "dc6a001978b2410b13cc4cada91086b07e89d896e200a2dd23bcd506811582d4",
-    "updatedAt": "2026-04-28T22:32:33+00:00",
+    "treeHash": "d6c4799101ef2c558c56da6a18780402a43e475982ce276070c8e72695286d83",
+    "updatedAt": "2026-05-22T21:42:34+00:00",
     "work": {
         "type": "folder",
         "layout": {
@@ -25,6 +25,11 @@
             "name": "poff-layout",
             "engine": "lightncandy",
             "section": "works"
-        }
+        },
+        "categories": [
+            "folder",
+            "collection"
+        ],
+        "template": "folder"
     }
 }

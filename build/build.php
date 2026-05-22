@@ -37,10 +37,12 @@ try {
     $buildContent = "<?php\n";
     $stripPhp = static function (string $content): string {
         $content = str_replace(['<?php', '?>'], '', $content);
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
+        $content = preg_replace('/^\s*declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/m', '', $content) ?? $content;
+        return preg_replace('/^\s*@?require_once[^\n]*\n/m', '', $content);
     };
     $stripRequires = static function (string $content): string {
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
+        $content = preg_replace('/^\s*declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/m', '', $content) ?? $content;
+        return preg_replace('/^\s*@?require_once[^\n]*\n/m', '', $content);
     };
     $appendPhpBlock = static function (string &$buffer, string $content): void {
         $buffer .= trim($content) . "\n\n";
@@ -119,6 +121,9 @@ PHP
     $appendSourceParts($buildContent, ['/includes/MediaType.php'], static function (string $content): string {
         return str_replace(['<?php', '?>'], '', $content);
     });
+
+    // Add converter registry before edit-mode config references it.
+    $appendSourceParts($buildContent, ['/includes/Converter.php'], $stripPhp);
 
     // Add Worktype helper as a standalone class without runtime require_once dependencies.
     $appendSourceParts($buildContent, [

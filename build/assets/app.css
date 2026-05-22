@@ -89,6 +89,7 @@
 /* layer: default */
 .visible{visibility:visible;}
 .absolute{position:absolute;}
+.fixed{position:fixed;}
 .relative{position:relative;}
 .sticky{position:sticky;}
 .static{position:static;}
@@ -112,7 +113,6 @@
 .mt-2{margin-top:0.5rem;}
 .mt-3{margin-top:0.75rem;}
 .mt-3\.5{margin-top:0.875rem;}
-.mt-4{margin-top:1rem;}
 .inline{display:inline;}
 .block{display:block;}
 .inline-block{display:inline-block;}
@@ -134,9 +134,11 @@
 .flex-1{flex:1 1 0%;}
 .flex-col{flex-direction:column;}
 .flex-wrap{flex-wrap:wrap;}
+.transform{transform:translateX(var(--un-translate-x)) translateY(var(--un-translate-y)) translateZ(var(--un-translate-z)) rotate(var(--un-rotate)) rotateX(var(--un-rotate-x)) rotateY(var(--un-rotate-y)) rotateZ(var(--un-rotate-z)) skewX(var(--un-skew-x)) skewY(var(--un-skew-y)) scaleX(var(--un-scale-x)) scaleY(var(--un-scale-y)) scaleZ(var(--un-scale-z));}
 @keyframes pulse{0%, 100% {opacity:1} 50% {opacity:.5}}
 .animate-pulse{animation:pulse 2s cubic-bezier(0.4,0,.6,1) infinite;}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.resize{resize:both;}
 .items-start{align-items:flex-start;}
 .items-center{align-items:center;}
 .justify-center{justify-content:center;}
@@ -319,6 +321,50 @@ body, html {
   position: relative;
 }
 
+.loading-row {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  z-index: 80;
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #ffffff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.loader {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 4px solid rgb(59, 130, 246);
+  border-top-color: rgb(229, 231, 235);
+  border-radius: 9999px;
+  animation: spin 1s linear infinite;
+}
+
+.loader-label {
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 /* -------------- Main Content -------------- */
 .main-content {
   flex-grow: 1;
@@ -343,6 +389,14 @@ body, html {
   overflow: hidden;
   background: #ffffff;
   scroll-margin-top: 16px;
+}
+
+#iframeLoading {
+  position: fixed;
+  top: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
 }
 
 .prompt-dock {
@@ -382,15 +436,6 @@ body, html {
   min-height: 100%;
   box-sizing: border-box;
   width: 100%;
-}
-
-.content-frame > iframe.preview-iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 100vh;
-  border: 0;
-  background: transparent;
 }
 
 .content-frame > .viewer .poff-default-layout__main {
@@ -492,11 +537,14 @@ body, html {
 }
 :root {
   --poff-font-size-root: clamp(15px, 14px + 0.25vw, 17px);
+  --poff-font-size-base: clamp(0.96rem, 0.94rem + 0.18vw, 1.02rem);
   --poff-font-size-xs: clamp(0.72rem, 0.7rem + 0.12vw, 0.8rem);
   --poff-font-size-sm: clamp(0.82rem, 0.8rem + 0.14vw, 0.92rem);
   --poff-font-size-md: clamp(0.92rem, 0.89rem + 0.2vw, 1rem);
   --poff-font-size-lg: clamp(1rem, 0.96rem + 0.26vw, 1.12rem);
   --poff-font-size-xl: clamp(1.08rem, 1.02rem + 0.35vw, 1.24rem);
+  --poff-font-size-2xl: clamp(1.2rem, 1.1rem + 0.52vw, 1.45rem);
+  --poff-font-size-3xl: clamp(1.4rem, 1.24rem + 0.85vw, 1.9rem);
   --poff-color-neutral-0: #ffffff;
   --poff-color-neutral-50: #f8fafc;
   --poff-color-neutral-100: #f1f5f9;
@@ -543,6 +591,55 @@ body, html {
   --poff-color-danger-500: #ef4444;
   --poff-color-danger-600: #dc2626;
   --poff-color-danger-700: #b91c1c;
+  /* Compatibility aliases for older edit SCSS while the UI moves to primary/secondary tokens. */
+  --poff-color-white: var(--poff-color-neutral-0);
+  --poff-color-slate-50: var(--poff-color-neutral-50);
+  --poff-color-slate-100: var(--poff-color-neutral-100);
+  --poff-color-slate-200: var(--poff-color-neutral-200);
+  --poff-color-slate-300: var(--poff-color-neutral-300);
+  --poff-color-slate-400: #94a3b8;
+  --poff-color-slate-500: var(--poff-color-neutral-500);
+  --poff-color-slate-600: #475569;
+  --poff-color-slate-700: var(--poff-color-neutral-700);
+  --poff-color-slate-800: var(--poff-color-neutral-800);
+  --poff-color-slate-900: var(--poff-color-neutral-900);
+  --poff-color-gray-900: var(--poff-color-neutral-950);
+  --poff-color-blue-50: var(--poff-color-primary-50);
+  --poff-color-blue-100: var(--poff-color-primary-100);
+  --poff-color-blue-200: var(--poff-color-primary-200);
+  --poff-color-blue-300: var(--poff-color-primary-300);
+  --poff-color-blue-500: var(--poff-color-primary-500);
+  --poff-color-blue-600: var(--poff-color-primary-600);
+  --poff-color-blue-700: var(--poff-color-primary-700);
+  --poff-color-blue-800: var(--poff-color-primary-800);
+  --poff-color-indigo-50: var(--poff-color-secondary-50);
+  --poff-color-indigo-100: var(--poff-color-secondary-100);
+  --poff-color-indigo-200: var(--poff-color-secondary-200);
+  --poff-color-indigo-300: var(--poff-color-secondary-300);
+  --poff-color-indigo-500: var(--poff-color-secondary-500);
+  --poff-color-indigo-600: var(--poff-color-secondary-600);
+  --poff-color-indigo-700: var(--poff-color-secondary-700);
+  --poff-color-emerald-50: var(--poff-color-success-50);
+  --poff-color-emerald-100: var(--poff-color-success-100);
+  --poff-color-emerald-200: var(--poff-color-success-200);
+  --poff-color-emerald-500: var(--poff-color-success-500);
+  --poff-color-emerald-600: var(--poff-color-success-600);
+  --poff-color-emerald-700: var(--poff-color-success-700);
+  --poff-color-amber-50: var(--poff-color-warning-50);
+  --poff-color-amber-100: var(--poff-color-warning-100);
+  --poff-color-amber-200: var(--poff-color-warning-200);
+  --poff-color-amber-300: var(--poff-color-warning-300);
+  --poff-color-amber-500: var(--poff-color-warning-500);
+  --poff-color-amber-600: var(--poff-color-warning-600);
+  --poff-color-amber-700: var(--poff-color-warning-700);
+  --poff-color-amber-800: var(--poff-color-warning-800);
+  --poff-color-amber-900: var(--poff-color-warning-900);
+  --poff-color-red-50: var(--poff-color-danger-50);
+  --poff-color-red-100: var(--poff-color-danger-100);
+  --poff-color-red-200: var(--poff-color-danger-200);
+  --poff-color-red-500: var(--poff-color-danger-500);
+  --poff-color-red-600: var(--poff-color-danger-600);
+  --poff-color-red-700: var(--poff-color-danger-700);
   --poff-color-page-background: #f0f2f5;
   --poff-color-shell-background: var(--poff-color-neutral-900);
   --poff-color-surface: var(--poff-color-neutral-0);
@@ -554,6 +651,7 @@ body, html {
   --poff-color-surface-secondary: var(--poff-color-secondary-50);
   --poff-color-surface-success: var(--poff-color-success-50);
   --poff-color-surface-warning: var(--poff-color-warning-50);
+  --poff-color-surface-danger: var(--poff-color-danger-50);
   --poff-color-border: var(--poff-color-neutral-200);
   --poff-color-border-strong: var(--poff-color-neutral-300);
   --poff-color-border-subtle: rgba(148, 163, 184, 0.24);
@@ -561,14 +659,17 @@ body, html {
   --poff-color-border-elevated-weak: rgba(255, 255, 255, 0.34);
   --poff-color-border-primary: var(--poff-color-primary-200);
   --poff-color-border-primary-strong: var(--poff-color-primary-300);
+  --poff-color-border-secondary: var(--poff-color-secondary-200);
   --poff-color-border-secondary-strong: var(--poff-color-secondary-300);
   --poff-color-border-success: var(--poff-color-success-200);
   --poff-color-border-warning: var(--poff-color-warning-300);
+  --poff-color-border-danger: var(--poff-color-danger-200);
   --poff-color-text-primary: var(--poff-color-neutral-950);
   --poff-color-text-strong: var(--poff-color-neutral-900);
   --poff-color-text-secondary: var(--poff-color-neutral-700);
   --poff-color-text-muted: var(--poff-color-neutral-500);
   --poff-color-text-inverse: var(--poff-color-neutral-0);
+  --poff-color-text-primary-accent: var(--poff-color-primary-700);
   --poff-color-text-secondary-accent: var(--poff-color-secondary-700);
   --poff-color-text-success: var(--poff-color-success-700);
   --poff-color-text-warning: var(--poff-color-warning-800);
@@ -616,12 +717,14 @@ body, html {
   --poff-space-2xl: 2em;
   --poff-space-3xl: 2.5em;
   --poff-control-label-height: 2.55em;
+  --poff-control-height-sm: 2.25em;
   --poff-control-height-md: 2.625em;
   --poff-control-height-lg: 3em;
   --poff-control-height-textarea: 4.5rem;
   --poff-control-height-preview: 10rem;
   --poff-control-height-panel-sm: 11.25rem;
   --poff-control-height-panel-md: 13.75rem;
+  --poff-control-height-panel-lg: 16rem;
   --poff-control-height-input-sm: 5.625rem;
   --poff-control-size-dot: 0.625rem;
   --poff-control-radius-sm: 0.375em;
@@ -630,6 +733,7 @@ body, html {
   --poff-control-radius-xl: 1em;
   --poff-control-radius-pill: 999px;
   --poff-panel-radius: 1em;
+  --poff-panel-radius-lg: 1.125em;
   --poff-layout-shell-width: 67.5rem;
   --poff-layout-grid-width-sm: 13.75rem;
   --poff-layout-grid-width-md: 12.5rem;
@@ -830,6 +934,7 @@ body, html {
   z-index: 1;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--poff-space-xs);
   min-width: 0;
   overflow: hidden;
@@ -928,6 +1033,12 @@ body, html {
   transform: translateX(0);
 }
 
+#appSidebar .edit-auth-details[open] + .edit-toggle-secondary {
+  flex: 0 0 auto;
+  min-width: 8.5rem;
+  margin-left: calc(48px + var(--poff-space-xs));
+}
+
 #appSidebar .edit-toggle-secondary:hover {
   background: linear-gradient(135deg, #111827, #1f2937 58%, #334155);
 }
@@ -953,12 +1064,6 @@ body, html {
   display: none !important;
 }
 
-#appSidebar .edit-actions-menu:has(.edit-auth-details[open]) .edit-toggle-secondary {
-  opacity: 0;
-  transform: translateX(-0.75rem);
-  pointer-events: none;
-}
-
 #appSidebar .edit-auth-details[open] > .edit-auth-bubble:not([hidden]) {
   opacity: 1;
   transform: translateX(0);
@@ -966,13 +1071,11 @@ body, html {
 }
 
 #sidebarLoading {
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  justify-content: flex-start;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
-  backdrop-filter: blur(8px);
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
 }
 
 #navList.nav-list {
@@ -1005,6 +1108,29 @@ body, html {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+#appSidebar .nav-link-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(148, 163, 184, 0.18);
+  color: rgba(15, 23, 42, 0.72);
+}
+
+#appSidebar .nav-link-badge-pending {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+#appSidebar .nav-link-badge-approved {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0f766e;
 }
 
 #appSidebar .edit-form {
@@ -1067,52 +1193,30 @@ body, html {
   box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.14), 0 14px 24px rgba(148, 163, 184, 0.16);
 }
 
-#appSidebar .nav-link-remote {
-  background: linear-gradient(135deg, rgba(255, 228, 230, 0.92), rgba(253, 242, 248, 0.9));
-  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.12);
+#appSidebar .nav-link-pending-approval {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(254, 226, 226, 0.86));
+  box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.34), 0 14px 24px rgba(248, 113, 113, 0.14);
+  color: #7f1d1d;
 }
 
-#appSidebar .nav-link-remote:hover {
-  background: linear-gradient(135deg, rgba(255, 226, 229, 0.98), rgba(254, 242, 248, 0.96));
-  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.18), 0 14px 24px rgba(244, 63, 94, 0.08);
+#appSidebar .nav-link-pending-approval .item-icon {
+  background: rgba(254, 226, 226, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.24);
 }
 
-#appSidebar .nav-entry-label {
-  min-width: 0;
+#appSidebar .nav-link-approved-external {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(209, 250, 229, 0.34));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.14);
 }
 
-#appSidebar .nav-entry-url {
-  display: block;
-  margin-top: 4px;
-  margin-left: 36px;
-  font-size: 0.64rem;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
-  color: rgba(71, 85, 105, 0.9);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+#appSidebar .nav-row-action-review {
+  color: #b91c1c;
+  background: rgba(254, 226, 226, 0.78);
 }
 
-#appSidebar .nav-entry-badge {
-  margin-left: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 20px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-#appSidebar .nav-entry-badge--remote {
-  color: #9f1239;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.18);
+#appSidebar .nav-row-action-review:hover {
+  color: #7f1d1d;
+  background: rgba(254, 202, 202, 0.96);
 }
 
 #appSidebar .nav-row-action {
@@ -1295,6 +1399,46 @@ body, html {
   padding: var(--poff-space-3xs) 0;
   font-size: var(--poff-font-size-sm);
   color: var(--poff-color-text-secondary);
+}
+
+.edit-panel .edit-tree-item span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--poff-space-2xs);
+  flex-wrap: wrap;
+}
+
+.edit-panel .edit-tree-item-pending {
+  color: #991b1b;
+}
+
+.edit-panel .edit-tree-item-approved {
+  color: #0f766e;
+}
+
+.edit-panel .edit-tree-item-focused {
+  border-radius: var(--poff-control-radius-sm);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.edit-panel .edit-tree-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.edit-panel .edit-tree-badge-pending {
+  background: rgb(254, 226, 226);
+  color: #b91c1c;
+}
+
+.edit-panel .edit-tree-badge-approved {
+  background: rgb(209, 250, 229);
+  color: #0f766e;
 }
 
 .edit-panel .edit-actions {

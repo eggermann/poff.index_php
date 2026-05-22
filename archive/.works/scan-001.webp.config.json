@@ -1,0 +1,65 @@
+{
+    "name": "scan-001.webp",
+    "title": "scan-001",
+    "type": "file",
+    "kind": "image",
+    "mimeType": "image/webp",
+    "visible": false,
+    "generated": true,
+    "sourceWork": "scan-001.tiff",
+    "generatedBy": {
+        "type": "converter",
+        "name": "convert-image",
+        "id": "converter/convert-image",
+        "folder": "poff/converters/convert-image",
+        "node": "local",
+        "engine": "imagemagick",
+        "quality": "default",
+        "format": "webp",
+        "convertedAt": "2026-05-22T12:53:42+00:00"
+    },
+    "external": {
+        "type": "node-work",
+        "relation": "converted-from",
+        "visible": false,
+        "sourceWork": {
+            "path": "archive/scan-001.tiff",
+            "mimeType": "image/tiff"
+        },
+        "resultWork": {
+            "name": "scan-001.webp",
+            "mimeType": "image/webp",
+            "kind": "image",
+            "srcUrl": "scan-001.webp"
+        },
+        "generatedBy": {
+            "type": "converter",
+            "name": "convert-image",
+            "id": "converter/convert-image",
+            "folder": "poff/converters/convert-image",
+            "node": "local",
+            "engine": "imagemagick",
+            "quality": "default",
+            "format": "webp",
+            "convertedAt": "2026-05-22T12:53:42+00:00"
+        }
+    },
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "path": "scan-001.webp",
+    "size": 282,
+    "modifiedAt": "2026-05-22T12:53:52+00:00",
+    "updatedAt": "2026-05-22T12:53:52+00:00",
+    "id": "453850ced84dd8cb",
+    "work": {
+        "type": "image",
+        "kind": "image",
+        "mimeType": "image/webp",
+        "template": "external",
+        "layout": {
+            "mode": "poff-layout",
+            "name": "poff-layout",
+            "engine": "lightncandy",
+            "section": "work"
+        }
+    }
+}

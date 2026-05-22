@@ -283,6 +283,36 @@ class Converter
                 ],
                 'source' => 'legacy-static',
             ]),
+            'converter/convert-text' => self::converterDefinition([
+                'name' => 'convert-text',
+                'label' => 'Convert Text',
+                'engine' => 'text-copy',
+                'folder' => 'poff/converters/convert-text',
+                'templateFolder' => 'poff/converters/convert-text/.layout',
+                'accepts' => ['text/plain', 'text/*'],
+                'outputs' => ['text/plain'],
+                'formats' => ['txt'],
+                'enabled' => true,
+                'defaults' => [
+                    'quality' => 'default',
+                    'format' => 'txt',
+                    'saveMode' => 'new-hidden-work',
+                    'hiddenByDefault' => true,
+                ],
+                'ui' => [
+                    'format' => [
+                        'type' => 'select',
+                        'label' => 'Output format',
+                        'options' => ['txt'],
+                    ],
+                    'quality' => [
+                        'type' => 'select',
+                        'label' => 'Quality',
+                        'options' => ['preview', 'default', 'archival', 'small-web'],
+                    ],
+                ],
+                'source' => 'legacy-static',
+            ]),
         ];
     }
 
@@ -430,6 +460,10 @@ class Converter
             'simple-image' => ['converter/convert-simple-image', ''],
             'converter/remote-node' => ['converter/convert-remote-node', ''],
             'remote-node' => ['converter/convert-remote-node', ''],
+            'convert-text' => ['converter/convert-text', 'txt'],
+            'converter/convert-text' => ['converter/convert-text', 'txt'],
+            'text-copy' => ['converter/convert-text', 'txt'],
+            'converter/text-copy' => ['converter/convert-text', 'txt'],
         ];
 
         if (isset($map[$id])) {
@@ -558,6 +592,10 @@ class Converter
             return self::convertRemote($payload, $definition, $rootDir);
         }
 
+        if (($definition['engine'] ?? '') === 'text-copy') {
+            return self::convertText($payload, $definition, $rootDir);
+        }
+
         return self::convertLocalImage($payload, $definition, $rootDir);
     }
 
@@ -585,7 +623,7 @@ class Converter
         $output = $conversion['output'];
         $outputName = self::sanitizeOutputName((string) ($output['name'] ?? 'converted.webp'));
         $outputMime = strtolower(trim((string) ($output['mimeType'] ?? '')));
-        if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png'])) {
+        if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png', 'text/plain', 'text/markdown', 'text/html'])) {
             return self::error('Converted MIME type is not allowed.');
         }
 
@@ -713,6 +751,57 @@ class Converter
         ];
     }
 
+    private static function convertText(array $payload, array $definition, string $rootDir): array
+    {
+        if (($definition['enabled'] ?? false) !== true) {
+            return self::error((string) ($definition['disabledReason'] ?? 'Converter disabled.'));
+        }
+
+        $source = is_array($payload['source'] ?? null) ? $payload['source'] : [];
+        $sourcePath = str_replace('\\', '/', trim((string) ($source['path'] ?? ''), '/'));
+        $root = realpath($rootDir);
+        if (!is_string($root) || $root === '' || $sourcePath === '') {
+            return self::error('Invalid source.');
+        }
+        $fullPath = realpath($root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $sourcePath));
+        if (!is_string($fullPath) || !is_file($fullPath) || !str_starts_with($fullPath, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+            return self::error('Source file not found.');
+        }
+
+        $converter = is_array($payload['converter'] ?? null) ? $payload['converter'] : [];
+        $target = is_array($payload['target'] ?? null) ? $payload['target'] : [];
+        $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'txt')));
+        $outputMime = self::mimeFromFormat($format);
+        $outputName = self::sanitizeOutputName((string) ($target['saveAs'] ?? (pathinfo($fullPath, PATHINFO_FILENAME) . '.' . $format)));
+        $body = (string) file_get_contents($fullPath);
+        return [
+            'ok' => true,
+            'type' => 'converted-work',
+            'source' => [
+                'path' => $sourcePath,
+                'mimeType' => (string) ($source['mimeType'] ?? ''),
+            ],
+            'output' => [
+                'name' => $outputName,
+                'mimeType' => $outputMime,
+                'kind' => 'text',
+                'size' => strlen($body),
+                'bodyBase64' => base64_encode($body),
+            ],
+            'generatedBy' => [
+                'type' => 'converter',
+                'name' => (string) ($definition['name'] ?? ''),
+                'id' => (string) ($definition['id'] ?? ''),
+                'folder' => (string) ($definition['folder'] ?? ''),
+                'node' => 'local',
+                'engine' => (string) ($definition['engine'] ?? 'text-copy'),
+                'quality' => self::normalizeQuality((string) ($converter['quality'] ?? 'default')),
+                'format' => $format,
+                'convertedAt' => date('c'),
+            ],
+        ];
+    }
+
     private static function convertRemote(array $payload, array $definition, string $rootDir): array
     {
         $converter = is_array($payload['converter'] ?? null) ? $payload['converter'] : [];
@@ -806,6 +895,7 @@ class Converter
             'webp' => 'image/webp',
             'jpg', 'jpeg' => 'image/jpeg',
             'png' => 'image/png',
+            'txt' => 'text/plain',
             default => '',
         };
     }
@@ -815,6 +905,7 @@ class Converter
         return match (self::normalizeFormat($format)) {
             'jpeg' => 'image/jpeg',
             'png' => 'image/png',
+            'txt' => 'text/plain',
             default => 'image/webp',
         };
     }
@@ -827,6 +918,7 @@ class Converter
                 'image/jpeg' => 'jpeg',
                 'image/png' => 'png',
                 'image/webp' => 'webp',
+                'text/plain' => 'txt',
                 default => '',
             };
             if ($format !== '' && !in_array($format, $formats, true)) {
@@ -839,7 +931,7 @@ class Converter
     private static function normalizeFormat(string $format): string
     {
         $format = strtolower(trim($format));
-        return in_array($format, ['webp', 'jpeg', 'png'], true) ? $format : 'webp';
+        return in_array($format, ['webp', 'jpeg', 'png', 'txt'], true) ? $format : 'webp';
     }
 
     private static function normalizeQuality(string $quality): string

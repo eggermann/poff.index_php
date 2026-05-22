@@ -1,0 +1,26 @@
+{
+  "type": "converter",
+  "name": "convert-text",
+  "label": "Convert Text",
+  "accepts": ["text/plain", "text/*"],
+  "outputs": ["text/plain"],
+  "engine": "text-copy",
+  "defaults": {
+    "format": "txt",
+    "quality": "default",
+    "saveMode": "new-hidden-work",
+    "hiddenByDefault": true
+  },
+  "ui": {
+    "format": {
+      "type": "select",
+      "label": "Output format",
+      "options": ["txt"]
+    },
+    "quality": {
+      "type": "select",
+      "label": "Quality",
+      "options": ["preview", "default", "archival", "small-web"]
+    }
+  }
+}

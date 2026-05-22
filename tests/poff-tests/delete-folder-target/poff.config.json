@@ -5,10 +5,10 @@
     "title": "delete-folder-target",
     "description": "",
     "type": "folder",
-    "id": "poff_00b993ea3caa5028",
+    "id": "poff_d445e0ad589416a5",
     "tree": [],
     "treeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "updatedAt": "2026-04-28T22:32:35+00:00",
+    "updatedAt": "2026-05-22T21:42:39+00:00",
     "work": {
         "type": "folder",
         "layout": {
@@ -16,6 +16,11 @@
             "name": "poff-layout",
             "engine": "lightncandy",
             "section": "works"
-        }
+        },
+        "categories": [
+            "folder",
+            "collection"
+        ],
+        "template": "folder"
     }
 }

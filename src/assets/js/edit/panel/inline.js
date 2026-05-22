@@ -283,6 +283,7 @@ function renderConverterSection(config = {}) {
     const selectedId = String(converter.id || '').trim();
     const selectedDefinition = available.find((item) => item?.id === selectedId) || available[0] || null;
     const defaults = selectedDefinition?.defaults || {};
+    const ui = selectedDefinition?.ui && typeof selectedDefinition.ui === 'object' ? selectedDefinition.ui : {};
     const selectedQuality = String(converter.quality || defaults.quality || 'default');
     const selectedFormat = String(converter.format || defaults.format || 'webp');
     const selectedSaveMode = String(converter.saveMode || defaults.saveMode || 'new-hidden-work');
@@ -294,13 +295,21 @@ function renderConverterSection(config = {}) {
         ...available.map((item) => {
             const disabled = item.enabled === false;
             const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
-            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
         }),
     ].join('');
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
-    const formatOptions = Array.isArray(selectedDefinition?.formats) && selectedDefinition.formats.length
-        ? selectedDefinition.formats
-        : ['webp', 'jpeg', 'png'];
+    const renderSelectOptions = (values, selected) => Array.isArray(values)
+        ? values.map((value) => `<option value="${escapeHtml(String(value || ''))}"${String(value || '') === String(selected || '') ? ' selected' : ''}>${escapeHtml(String(value || ''))}</option>`).join('')
+        : '';
+    const formatOptions = Array.isArray(ui?.format?.options) && ui.format.options.length
+        ? ui.format.options
+        : (Array.isArray(selectedDefinition?.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ['webp', 'jpeg', 'png']);
+    const qualityOptions = Array.isArray(ui?.quality?.options) && ui.quality.options.length ? ui.quality.options : ['preview', 'default', 'archival', 'small-web'];
+    const saveModeOptions = Array.isArray(ui?.saveMode?.options) && ui.saveMode.options.length ? ui.saveMode.options : ['new-hidden-work', 'replace-generated-work', 'temporary-preview-only'];
+    const formatLabel = String(ui?.format?.label || 'Output format');
+    const qualityLabel = String(ui?.quality?.label || 'Quality');
+    const saveModeLabel = String(ui?.saveMode?.label || 'Save mode');
     return `
         <div class="edit-work-fields edit-work-converter">
             <div class="edit-work-fields-header">
@@ -318,21 +327,21 @@ function renderConverterSection(config = {}) {
                     </select>
                 </div>
                 <div>
-                    <label class="edit-label" for="edit-converter-quality">Quality</label>
+                    <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
                     <select class="form-select" id="edit-converter-quality" name="converter_quality">
-                        ${['preview', 'default', 'archival', 'small-web'].map((value) => `<option value="${value}"${value === selectedQuality ? ' selected' : ''}>${value}</option>`).join('')}
+                        ${renderSelectOptions(qualityOptions, selectedQuality)}
                     </select>
                 </div>
                 <div>
-                    <label class="edit-label" for="edit-converter-format">Output format</label>
+                    <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
                     <select class="form-select" id="edit-converter-format" name="converter_format">
-                        ${formatOptions.map((value) => `<option value="${value}"${value === selectedFormat ? ' selected' : ''}>${value}</option>`).join('')}
+                        ${renderSelectOptions(formatOptions, selectedFormat)}
                     </select>
                 </div>
                 <div>
-                    <label class="edit-label" for="edit-converter-save-mode">Save mode</label>
+                    <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
                     <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode">
-                        ${['new-hidden-work', 'replace-generated-work', 'temporary-preview-only'].map((value) => `<option value="${value}"${value === selectedSaveMode ? ' selected' : ''}>${value}</option>`).join('')}
+                        ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
                     </select>
                 </div>
             </div>

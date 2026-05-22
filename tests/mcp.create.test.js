@@ -2121,6 +2121,25 @@ describe('Poff converters', () => {
     ]));
   });
 
+  test('discovers the text converter for text/plain', async () => {
+    const result = await runConverterRoute('available', POFF_DIR, {
+      mimeType: 'text/plain',
+      kind: 'text',
+      extension: 'txt',
+    });
+
+    expect(result).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'converter/convert-text',
+        name: 'convert-text',
+        label: 'Convert Text',
+        folder: 'poff/converters/convert-text',
+        formats: ['txt'],
+        outputs: ['text/plain'],
+      }),
+    ]));
+  });
+
   test('creates a converter app from the default grain', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-grain-${Date.now()}`);
     fs.mkdirSync(tempRoot, { recursive: true });

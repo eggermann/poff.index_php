@@ -126,6 +126,34 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       return { allowed: false, error: "Edit endpoint unavailable." };
     }
   }
+  async function requestMcpRoute(route, payload = {}) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set("mcp", "1");
+    url.searchParams.set("route", route);
+    try {
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const responseText = await res.text();
+      let data = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (err) {
+        data = null;
+      }
+      if (!res.ok) {
+        return data || { ok: false, error: responseText.trim() || `MCP route failed (HTTP ${res.status}).` };
+      }
+      return data || { ok: false, error: "MCP route returned invalid JSON." };
+    } catch (err) {
+      return { ok: false, error: (err == null ? void 0 : err.message) || "MCP route unavailable." };
+    }
+  }
   async function requestEditAuth(payload = {}) {
     const url = buildCmsUrl("auth", payload.path || "");
     const method = payload.method === "GET" ? "GET" : "POST";
@@ -170,6 +198,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     formData.set("source", payload.source || "upload");
     if (typeof payload.fileName === "string") {
       formData.set("fileName", payload.fileName);
+    }
+    if (typeof payload.linkName === "string") {
+      formData.set("linkName", payload.linkName);
     }
     if (typeof payload.linkUrl === "string") {
       formData.set("linkUrl", payload.linkUrl);
@@ -598,6 +629,72 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       return getSelectionFromPath(filePath, { isFile: true });
     }
     return getSelectionFromPath(folderPath);
+  }
+
+  // src/assets/js/core/escape-stack.js
+  var escapeHandlers = [];
+  function getRootScope() {
+    if (typeof window !== "undefined" && window) {
+      return window;
+    }
+    if (typeof globalThis !== "undefined" && globalThis) {
+      return globalThis;
+    }
+    return null;
+  }
+  function handleEscapeKeydown(event) {
+    if (!event || event.key !== "Escape" || event.defaultPrevented) {
+      return;
+    }
+    for (let index = escapeHandlers.length - 1; index >= 0; index -= 1) {
+      const entry = escapeHandlers[index];
+      if (!entry || typeof entry.close !== "function") {
+        continue;
+      }
+      const shouldStop = entry.close(event);
+      if (shouldStop === false) {
+        continue;
+      }
+      if (typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+      return;
+    }
+  }
+  function ensureEscapeListener() {
+    const root = getRootScope();
+    if (!root || typeof document === "undefined" || !document || typeof document.addEventListener !== "function") {
+      return;
+    }
+    if (root.__POFF_ESCAPE_STACK_BOUND__) {
+      return;
+    }
+    root.__POFF_ESCAPE_STACK_BOUND__ = true;
+    document.addEventListener("keydown", handleEscapeKeydown, true);
+  }
+  function registerEscapeClose(close, options = {}) {
+    if (typeof close !== "function") {
+      return () => {
+      };
+    }
+    ensureEscapeListener();
+    const entry = {
+      close,
+      label: typeof options.label === "string" ? options.label : ""
+    };
+    escapeHandlers.push(entry);
+    return () => {
+      const index = escapeHandlers.indexOf(entry);
+      if (index >= 0) {
+        escapeHandlers.splice(index, 1);
+      }
+    };
+  }
+  if (typeof window !== "undefined" && window) {
+    window.POFF_REGISTER_ESCAPE_CLOSE = registerEscapeClose;
   }
 
   // src/assets/js/edit/prompt/shared-work-prompt.json
@@ -1095,6 +1192,8 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
         return false;
       }
     };
+    let unregisterEscapeClose = null;
+    let unregisterEscapeOpen = null;
     const writeState = (collapsed) => {
       try {
         storage.setItem(storageKey, JSON.stringify({ collapsed: !!collapsed }));
@@ -1113,6 +1212,32 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
       if (openEl) {
         openEl.hidden = !nextCollapsed;
       }
+      if (nextCollapsed) {
+        if (unregisterEscapeClose) {
+          unregisterEscapeClose();
+          unregisterEscapeClose = null;
+        }
+        if (!unregisterEscapeOpen) {
+          unregisterEscapeOpen = registerEscapeClose(() => {
+            if (!root.classList.contains("prompt-layer-collapsed")) {
+              applyState(true);
+              return true;
+            }
+            return false;
+          }, { label: "prompt-layer-open" });
+        }
+      } else {
+        if (unregisterEscapeOpen) {
+          unregisterEscapeOpen();
+          unregisterEscapeOpen = null;
+        }
+        if (!unregisterEscapeClose) {
+          unregisterEscapeClose = registerEscapeClose(() => {
+            applyState(true);
+            return true;
+          }, { label: "prompt-layer-close" });
+        }
+      }
       if (!options.skipPersist) {
         writeState(nextCollapsed);
       }
@@ -1122,14 +1247,6 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     }
     if (openEl) {
       openEl.addEventListener("click", () => applyState(false));
-    }
-    if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
-      document.addEventListener("keydown", (event) => {
-        if (!event || event.key !== "Escape") {
-          return;
-        }
-        applyState(true);
-      });
     }
     return {
       readState,
@@ -3730,7 +3847,211 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
   }
 
+  // src/assets/js/edit/panel/shared.js
+  var DETAILS_STORAGE_PREFIX = "poff.edit.details";
+  function resolveStorage(storage = null) {
+    if (storage) {
+      return storage;
+    }
+    if (typeof localStorage !== "undefined") {
+      return localStorage;
+    }
+    return null;
+  }
+  function normalizeDetailsStorageKey(storageKey) {
+    const key = String(storageKey || "").trim();
+    if (!key) {
+      return "";
+    }
+    return key.startsWith(DETAILS_STORAGE_PREFIX) ? key : `${DETAILS_STORAGE_PREFIX}:${key}`;
+  }
+  function readStoredDetailsState(storageKey, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+      return null;
+    }
+    try {
+      const raw = resolvedStorage.getItem(key);
+      if (raw === null) {
+        return null;
+      }
+      const stored = JSON.parse(raw);
+      if (typeof stored === "boolean") {
+        return stored;
+      }
+      if (stored && typeof stored === "object" && Object.prototype.hasOwnProperty.call(stored, "open")) {
+        return !!stored.open;
+      }
+      return null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function writeStoredDetailsState(storageKey, open, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+      return;
+    }
+    try {
+      resolvedStorage.setItem(key, JSON.stringify({ open: !!open }));
+    } catch (err) {
+    }
+  }
+  function bindStoredDetailsState(detailsEl, storageKey, storage = null) {
+    if (!detailsEl) {
+      return () => {
+      };
+    }
+    const key = normalizeDetailsStorageKey(storageKey);
+    const onToggle = () => {
+      writeStoredDetailsState(key, !!detailsEl.open, storage);
+    };
+    detailsEl.addEventListener("toggle", onToggle);
+    return () => {
+      detailsEl.removeEventListener("toggle", onToggle);
+    };
+  }
+  function renderPersistentDetailsSection({
+    storageKey = "",
+    defaultOpen = true,
+    id = "",
+    className = "",
+    summaryClassName = "",
+    bodyClassName = "",
+    titleHtml = "",
+    noteHtml = "",
+    bodyHtml = ""
+  } = {}) {
+    const storedOpen = readStoredDetailsState(storageKey);
+    const detailsOpen = storedOpen === null ? defaultOpen : storedOpen;
+    const detailsClasses = ["edit-collapsible-details", className].filter(Boolean).join(" ");
+    const summaryClasses = ["edit-work-fields-header", "edit-collapsible-summary", summaryClassName].filter(Boolean).join(" ");
+    const bodyClasses = ["edit-collapsible-details-body", bodyClassName].filter(Boolean).join(" ");
+    return `
+        <details class="${detailsClasses}"${id ? ` id="${id}"` : ""}${detailsOpen ? " open" : ""}>
+            <summary class="${summaryClasses}">
+                <div>
+                    ${titleHtml ? `<div class="edit-work-fields-title">${titleHtml}</div>` : ""}
+                    ${noteHtml ? `<div class="small-note">${noteHtml}</div>` : ""}
+                </div>
+            </summary>
+            <div class="${bodyClasses}">
+                ${bodyHtml}
+            </div>
+        </details>
+    `;
+  }
+  function formatUploadBytes(value = 0) {
+    const bytes = Number(value) || 0;
+    if (bytes <= 0) {
+      return "0 B";
+    }
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes;
+    let index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index += 1;
+    }
+    const rounded = size >= 10 || index === 0 ? Math.round(size) : Math.round(size * 10) / 10;
+    return `${rounded} ${units[index]}`;
+  }
+  function uploadValidationError(files = [], uploadLimits = null) {
+    if (!Array.isArray(files) || files.length === 0) {
+      return null;
+    }
+    const perFileLimit = Number((uploadLimits == null ? void 0 : uploadLimits.uploadMaxBytes) || 0);
+    const postLimit = Number((uploadLimits == null ? void 0 : uploadLimits.postMaxBytes) || 0);
+    const totalSize = files.reduce((sum, file) => sum + (Number(file == null ? void 0 : file.size) || 0), 0);
+    if (perFileLimit > 0) {
+      const oversizedFile = files.find((file) => (Number(file == null ? void 0 : file.size) || 0) > perFileLimit);
+      if (oversizedFile) {
+        return `${oversizedFile.name} is too large. Max file size is ${(uploadLimits == null ? void 0 : uploadLimits.uploadMax) || formatUploadBytes(perFileLimit)}.`;
+      }
+    }
+    if (postLimit > 0 && totalSize > postLimit) {
+      return `Selected files are too large together. Max upload payload is ${(uploadLimits == null ? void 0 : uploadLimits.postMax) || formatUploadBytes(postLimit)}.`;
+    }
+    return null;
+  }
+  function syncPromptDock(promptRoot = null) {
+    const promptDock = document.querySelector("#promptDock");
+    if (!promptDock) {
+      return;
+    }
+    if (promptRoot) {
+      promptDock.replaceChildren(promptRoot);
+      return;
+    }
+    promptDock.replaceChildren();
+  }
+  function layoutOverlayState(config, status) {
+    const layoutState = getLayoutState(config);
+    const isFile = (status == null ? void 0 : status.target) === "file";
+    const sectionName = layoutState.section || (isFile ? "work" : "works");
+    const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile ? `.works/${config.name || config.path || "item"}.layout` : ".layout");
+    const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
+    const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
+    const activeSectionDirectory = String(layoutState.sectionDirectory || "").trim();
+    const sectionTarget = activeSectionDirectory ? `${activeSectionDirectory}/${sectionName}.hbs` : isFile && layoutState.storage === "filesystem" && layoutState.directory !== localLayoutDirectory ? `built-in ${sectionName}.hbs` : localSectionTarget;
+    const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
+    const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
+    const hasInheritedLayout = !!layoutState.inheritedDirectory;
+    const originalTarget = layoutState.storage === "filesystem" ? layoutState.directory || localLayoutDirectory : layoutState.inheritedDirectory || "";
+    const originalEditable = originalTarget !== "";
+    const originalUsesLocal = originalTarget === localLayoutDirectory;
+    const localWrapperTemplate = wrapperWasLocal ? layoutState.template || "" : "";
+    const localWrapperCss = wrapperWasLocal ? layoutState.css || "" : "";
+    const localWrapperJs = wrapperWasLocal ? layoutState.js || "" : "";
+    let originalTemplate = "";
+    let originalCss = "";
+    let originalJs = "";
+    if (originalEditable && layoutState.storage === "filesystem") {
+      originalTemplate = layoutState.template || "";
+      originalCss = layoutState.css || "";
+      originalJs = layoutState.js || "";
+    } else if (layoutState.storage === "shared") {
+      originalTemplate = layoutState.template || "";
+      originalCss = layoutState.css || "";
+      originalJs = layoutState.js || "";
+    } else if (!originalEditable) {
+      originalTemplate = layoutState.phpTemplate || "";
+    }
+    const resolvedDirectory = layoutState.directory || localLayoutDirectory;
+    const wrapperSourceLabel = layoutState.mode === "none" || layoutState.storage === "none" ? "No outer layout" : layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
+    const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
+    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
+    const displayMode = layoutState.mode === "filesystem-layout" ? layoutState.directory === localLayoutDirectory ? "custom-layout" : "inherit-layout" : layoutState.mode;
+    return {
+      layoutState,
+      displayMode,
+      sectionName,
+      localLayoutDirectory,
+      wrapperTarget,
+      localSectionTarget,
+      sectionTarget,
+      wrapperWasLocal,
+      sectionWasLocal,
+      hasInheritedLayout,
+      originalTarget,
+      originalEditable,
+      originalUsesLocal,
+      localWrapperTemplate,
+      localWrapperCss,
+      localWrapperJs,
+      originalTemplate,
+      originalCss,
+      originalJs,
+      wrapperSourceLabel,
+      inheritedLayoutLabel,
+      originalLabel
+    };
+  }
+
   // src/assets/js/edit/drawer/render.js
+  var TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY = "template-defaults-details";
   function groupWorktypeChoices(choices = []) {
     return Array.isArray(choices) ? choices.reduce((groups, choice) => {
       const group = String((choice == null ? void 0 : choice.kind) || "other").trim() || "other";
@@ -3813,10 +4134,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const key = escapeHtml(item.path || item.name || "");
       const visible = item.visible !== false ? "checked" : "";
       const type = escapeHtml(item.type || "item");
+      const approvalStatus = String((item == null ? void 0 : item.approvalStatus) || "").trim();
+      const pendingApproval = approvalStatus === "pending";
+      const approvedExternal = !!(item == null ? void 0 : item.externalSubmission) && approvalStatus === "approved";
+      const badge = pendingApproval ? '<span class="edit-tree-badge edit-tree-badge-pending">new approval</span>' : approvedExternal ? '<span class="edit-tree-badge edit-tree-badge-approved">approved external</span>' : "";
       return `
-                <label class="edit-tree-item">
+                <label class="edit-tree-item${pendingApproval ? " edit-tree-item-pending" : ""}${approvedExternal ? " edit-tree-item-approved" : ""}" data-tree-item-path="${key}">
                     <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
-                    <span>${label} <span class="opacity-60">(${type})</span></span>
+                    <span>${label} <span class="opacity-60">(${type})</span>${badge}</span>
                 </label>
             `;
     }).join("") : '<div class="edit-tree-item">No items found.</div>';
@@ -3835,8 +4160,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         </div>
     `;
   }
-  function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
+  function renderEditDrawerMarkup({ config, status, treeHtml, treeItems, showDeleteAction = false }) {
     var _a;
+    const templateDefaultsBody = Array.isArray((_a = config == null ? void 0 : config.workTemplateMapCatalog) == null ? void 0 : _a.rows) && config.workTemplateMapCatalog.rows.length ? `
+            <div class="edit-template-map-list">
+                ${config.workTemplateMapCatalog.rows.map((row) => `
+                    <div class="edit-template-map-row">
+                        ${renderTemplateMapSelect(row)}
+                    </div>
+                `).join("")}
+            </div>
+        ` : "";
     return `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -3861,19 +4195,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
                 <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
-            ${Array.isArray((_a = config == null ? void 0 : config.workTemplateMapCatalog) == null ? void 0 : _a.rows) && config.workTemplateMapCatalog.rows.length ? `
-            <div class="edit-fieldset">
-                <div class="edit-fieldset-title">Template defaults by MIME</div>
-                <div class="small-note">Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.</div>
-                <div class="edit-template-map-list">
-                    ${config.workTemplateMapCatalog.rows.map((row) => `
-                        <div class="edit-template-map-row">
-                            ${renderTemplateMapSelect(row)}
-                        </div>
-                    `).join("")}
-                </div>
-            </div>
-            ` : ""}
+            ${templateDefaultsBody ? renderPersistentDetailsSection({
+      storageKey: TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY,
+      defaultOpen: true,
+      id: "editTemplateDefaultsDetails",
+      className: "edit-fieldset edit-template-default-details",
+      summaryClassName: "edit-template-default-details-summary",
+      bodyClassName: "edit-template-default-details-body",
+      titleHtml: "Template defaults by MIME",
+      noteHtml: "Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.",
+      bodyHtml: templateDefaultsBody
+    }) : ""}
             ${(status == null ? void 0 : status.target) !== "file" ? `
             <div>
                 <label class="edit-label">Visible items</label>
@@ -3883,20 +4215,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             ` : ""}
             <div class="edit-actions">
                 <button class="btn" type="submit">Save advanced</button>
+                ${showDeleteAction ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDrawerDeleteTarget">
+                    Delete
+                </button>
+                ` : ""}
             </div>
         </form>
     `;
   }
 
   // src/assets/js/edit/drawer/bind.js
-  function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubmit }) {
+  function bindEditDrawerInteractions({ editDrawer, status, onClose, onSubmit, onDeleteTarget }) {
     const drawerClose = editDrawer.querySelector("#editDrawerClose");
     if (drawerClose && typeof onClose === "function") {
       drawerClose.addEventListener("click", () => onClose());
     }
     const drawerStatus = editDrawer.querySelector("#editDrawerStatus");
     const drawerForm = editDrawer.querySelector("#editDrawerForm");
+    const deleteTargetButton = editDrawer.querySelector("#editDrawerDeleteTarget");
+    const templateDefaultsDetails = editDrawer.querySelector("#editTemplateDefaultsDetails");
     const treeBulkToggle = editDrawer.querySelector("#editTreeVisibleAll");
+    if (templateDefaultsDetails) {
+      bindStoredDetailsState(templateDefaultsDetails, "template-defaults-details");
+    }
     const treeVisibleInputs = () => Array.from(editDrawer.querySelectorAll('input[name="tree_visible"]'));
     const syncTreeBulkToggle = () => {
       if (!treeBulkToggle) {
@@ -3932,7 +4274,35 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         });
       });
     }
-    return { drawerForm, drawerStatus };
+    if (deleteTargetButton && drawerStatus && typeof onDeleteTarget === "function") {
+      deleteTargetButton.addEventListener("click", async () => {
+        const confirmed = window.confirm("Delete this item? This cannot be undone.");
+        if (!confirmed) {
+          return;
+        }
+        await onDeleteTarget({ statusEl: drawerStatus });
+      });
+    }
+    function focusTreeItem(path = "") {
+      if (!path) {
+        return false;
+      }
+      const row = Array.from(editDrawer.querySelectorAll("[data-tree-item-path]")).find((candidate) => candidate.getAttribute("data-tree-item-path") === path);
+      if (!row) {
+        return false;
+      }
+      row.classList.add("edit-tree-item-focused");
+      window.setTimeout(() => {
+        row.classList.remove("edit-tree-item-focused");
+      }, 1800);
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+      const checkbox = row.querySelector('input[name="tree_visible"]');
+      if (checkbox && typeof checkbox.focus === "function") {
+        checkbox.focus({ preventScroll: true });
+      }
+      return true;
+    }
+    return { drawerForm, drawerStatus, focusTreeItem };
   }
 
   // src/assets/js/edit/drawer.js
@@ -3942,7 +4312,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     config,
     status,
     onClose,
-    onSubmit
+    onSubmit,
+    onDeleteTarget
   }) {
     if (!editDrawer) {
       return { drawerForm: null, drawerStatus: null };
@@ -3957,12 +4328,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return { drawerForm: null, drawerStatus: null };
     }
     const treeHtml = renderDrawerTreeHtml(config, status);
-    editDrawer.innerHTML = renderEditDrawerMarkup({ config, status, treeHtml, treeItems: (config == null ? void 0 : config.tree) || [] });
+    editDrawer.innerHTML = renderEditDrawerMarkup({
+      config,
+      status,
+      treeHtml,
+      treeItems: (config == null ? void 0 : config.tree) || [],
+      showDeleteAction: typeof onDeleteTarget === "function"
+    });
     return bindEditDrawerInteractions({
       editDrawer,
       status,
       onClose,
-      onSubmit
+      onSubmit,
+      onDeleteTarget
     });
   }
 
@@ -4361,199 +4739,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     };
   }
 
-  // src/assets/js/edit/panel/shared.js
-  var DETAILS_STORAGE_PREFIX = "poff.edit.details";
-  function resolveStorage(storage = null) {
-    if (storage) {
-      return storage;
-    }
-    if (typeof localStorage !== "undefined") {
-      return localStorage;
-    }
-    return null;
-  }
-  function normalizeDetailsStorageKey(storageKey) {
-    const key = String(storageKey || "").trim();
-    if (!key) {
-      return "";
-    }
-    return key.startsWith(DETAILS_STORAGE_PREFIX) ? key : `${DETAILS_STORAGE_PREFIX}:${key}`;
-  }
-  function readStoredDetailsState(storageKey, storage = null) {
-    const resolvedStorage = resolveStorage(storage);
-    const key = normalizeDetailsStorageKey(storageKey);
-    if (!resolvedStorage || !key) {
-      return null;
-    }
-    try {
-      const raw = resolvedStorage.getItem(key);
-      if (raw === null) {
-        return null;
-      }
-      const stored = JSON.parse(raw);
-      if (typeof stored === "boolean") {
-        return stored;
-      }
-      if (stored && typeof stored === "object" && Object.prototype.hasOwnProperty.call(stored, "open")) {
-        return !!stored.open;
-      }
-      return null;
-    } catch (err) {
-      return null;
-    }
-  }
-  function writeStoredDetailsState(storageKey, open, storage = null) {
-    const resolvedStorage = resolveStorage(storage);
-    const key = normalizeDetailsStorageKey(storageKey);
-    if (!resolvedStorage || !key) {
-      return;
-    }
-    try {
-      resolvedStorage.setItem(key, JSON.stringify({ open: !!open }));
-    } catch (err) {
-    }
-  }
-  function bindStoredDetailsState(detailsEl, storageKey, storage = null) {
-    if (!detailsEl) {
-      return () => {
-      };
-    }
-    const key = normalizeDetailsStorageKey(storageKey);
-    const onToggle = () => {
-      writeStoredDetailsState(key, !!detailsEl.open, storage);
-    };
-    detailsEl.addEventListener("toggle", onToggle);
-    return () => {
-      detailsEl.removeEventListener("toggle", onToggle);
-    };
-  }
-  function formatUploadBytes(value = 0) {
-    const bytes = Number(value) || 0;
-    if (bytes <= 0) {
-      return "0 B";
-    }
-    const units = ["B", "KB", "MB", "GB"];
-    let size = bytes;
-    let index = 0;
-    while (size >= 1024 && index < units.length - 1) {
-      size /= 1024;
-      index += 1;
-    }
-    const rounded = size >= 10 || index === 0 ? Math.round(size) : Math.round(size * 10) / 10;
-    return `${rounded} ${units[index]}`;
-  }
-  function uploadValidationError(files = [], uploadLimits = null) {
-    if (!Array.isArray(files) || files.length === 0) {
-      return null;
-    }
-    const perFileLimit = Number((uploadLimits == null ? void 0 : uploadLimits.uploadMaxBytes) || 0);
-    const postLimit = Number((uploadLimits == null ? void 0 : uploadLimits.postMaxBytes) || 0);
-    const totalSize = files.reduce((sum, file) => sum + (Number(file == null ? void 0 : file.size) || 0), 0);
-    if (perFileLimit > 0) {
-      const oversizedFile = files.find((file) => (Number(file == null ? void 0 : file.size) || 0) > perFileLimit);
-      if (oversizedFile) {
-        return `${oversizedFile.name} is too large. Max file size is ${(uploadLimits == null ? void 0 : uploadLimits.uploadMax) || formatUploadBytes(perFileLimit)}.`;
-      }
-    }
-    if (postLimit > 0 && totalSize > postLimit) {
-      return `Selected files are too large together. Max upload payload is ${(uploadLimits == null ? void 0 : uploadLimits.postMax) || formatUploadBytes(postLimit)}.`;
-    }
-    return null;
-  }
-  function syncPromptDock(promptRoot = null) {
-    const promptDock = document.querySelector("#promptDock");
-    if (!promptDock) {
-      return;
-    }
-    if (promptRoot) {
-      promptDock.replaceChildren(promptRoot);
-      return;
-    }
-    promptDock.replaceChildren();
-  }
-  function layoutOverlayState(config, status) {
-    const layoutState = getLayoutState(config);
-    const isFile = (status == null ? void 0 : status.target) === "file";
-    const sectionName = layoutState.section || (isFile ? "work" : "works");
-    const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile ? `.works/${config.name || config.path || "item"}.layout` : ".layout");
-    const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
-    const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
-    const activeSectionDirectory = String(layoutState.sectionDirectory || "").trim();
-    const sectionTarget = activeSectionDirectory ? `${activeSectionDirectory}/${sectionName}.hbs` : isFile && layoutState.storage === "filesystem" && layoutState.directory !== localLayoutDirectory ? `built-in ${sectionName}.hbs` : localSectionTarget;
-    const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
-    const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
-    const hasInheritedLayout = !!layoutState.inheritedDirectory;
-    const originalTarget = layoutState.storage === "filesystem" ? layoutState.directory || localLayoutDirectory : layoutState.inheritedDirectory || "";
-    const originalEditable = originalTarget !== "";
-    const originalUsesLocal = originalTarget === localLayoutDirectory;
-    const localWrapperTemplate = wrapperWasLocal ? layoutState.template || "" : "";
-    const localWrapperCss = wrapperWasLocal ? layoutState.css || "" : "";
-    const localWrapperJs = wrapperWasLocal ? layoutState.js || "" : "";
-    let originalTemplate = "";
-    let originalCss = "";
-    let originalJs = "";
-    if (originalEditable && layoutState.storage === "filesystem") {
-      originalTemplate = layoutState.template || "";
-      originalCss = layoutState.css || "";
-      originalJs = layoutState.js || "";
-    } else if (layoutState.storage === "shared") {
-      originalTemplate = layoutState.template || "";
-      originalCss = layoutState.css || "";
-      originalJs = layoutState.js || "";
-    } else if (!originalEditable) {
-      originalTemplate = layoutState.phpTemplate || "";
-    }
-    const resolvedDirectory = layoutState.directory || localLayoutDirectory;
-    const wrapperSourceLabel = layoutState.mode === "none" || layoutState.storage === "none" ? "No outer layout" : layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
-    const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
-    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
-    const displayMode = layoutState.mode === "filesystem-layout" ? layoutState.directory === localLayoutDirectory ? "custom-layout" : "inherit-layout" : layoutState.mode;
-    return {
-      layoutState,
-      displayMode,
-      sectionName,
-      localLayoutDirectory,
-      wrapperTarget,
-      localSectionTarget,
-      sectionTarget,
-      wrapperWasLocal,
-      sectionWasLocal,
-      hasInheritedLayout,
-      originalTarget,
-      originalEditable,
-      originalUsesLocal,
-      localWrapperTemplate,
-      localWrapperCss,
-      localWrapperJs,
-      originalTemplate,
-      originalCss,
-      originalJs,
-      wrapperSourceLabel,
-      inheritedLayoutLabel,
-      originalLabel
-    };
-  }
-
   // src/assets/js/edit/panel/upload.js
-  function renderUploadSectionHtml({ isFileTarget, isEmptyFolder }) {
+  function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false }) {
     if (isFileTarget) {
       return "";
     }
-    return `
-        <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Add work</div>
-                <div class="small-note">${isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder."}</div>
-            </div>
-            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">Add work</button>
-        </div>
-        <dialog class="edit-upload-dialog" id="editUploadDialog">
-            <form method="dialog" class="edit-upload-dialog-form">
-                <div class="drawer-header">
-                    <h4 class="drawer-title">Add work</h4>
-                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
-                </div>
-                <div class="edit-grid">
+    const launcherCopy = externalOnly ? "Submit a Poff link from another system. It stays hidden until an editor confirms it." : isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder.";
+    const sourceFieldHtml = externalOnly ? '<input type="hidden" name="upload_source" value="url">' : `
                     <div>
                         <label class="edit-label" for="edit-upload-source">Source</label>
                         <select class="form-select" id="edit-upload-source" name="upload_source">
@@ -4563,6 +4755,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <option value="url">Poff link</option>
                         </select>
                     </div>
+        `;
+    return `
+        <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
+            <div class="edit-layout-copy">
+                <div class="edit-layout-title">Add work</div>
+                <div class="small-note">${launcherCopy}</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">${externalOnly ? "Submit link" : "Add work"}</button>
+        </div>
+        <dialog class="edit-upload-dialog" id="editUploadDialog">
+            <form method="dialog" class="edit-upload-dialog-form">
+                <div class="drawer-header">
+                    <h4 class="drawer-title">${externalOnly ? "Submit external link" : "Add work"}</h4>
+                    <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
+                </div>
+                <div class="edit-grid">
+                    ${sourceFieldHtml}
                     <div id="editUploadFilesWrap">
                         <label class="edit-label" for="edit-upload-files">Files</label>
                         <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
@@ -4576,9 +4785,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/index.php?view=1&path=folder">
                     </div>
                 </div>
-                <div class="small-note" id="editUploadSummary">No files selected.</div>
+                <div class="small-note" id="editUploadSummary">${externalOnly ? "Use a Poff viewer URL from another system. Max 5 pending links per folder." : "No files selected."}</div>
                 <div class="edit-inline-actions">
-                    <button class="btn" type="button" id="editUploadSubmit">Add</button>
+                    <button class="btn" type="button" id="editUploadSubmit">${externalOnly ? "Submit for review" : "Add"}</button>
                     <button class="btn btn-secondary" type="button" id="editUploadCancel">Cancel</button>
                 </div>
             </form>
@@ -4589,6 +4798,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editPanel,
     statusEl,
     uploadLimits,
+    externalOnly = false,
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
@@ -4616,7 +4826,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const uploadUrlDrafts = {
       url: ""
     };
-    let uploadMode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+    const readUploadMode = () => externalOnly ? "url" : (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+    let uploadMode = readUploadMode();
+    let unregisterEscapeClose = null;
     if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== "function" || typeof onCreateBlankFile !== "function" || typeof onCreateFolder !== "function" || typeof onCreateLink !== "function") {
       return;
     }
@@ -4626,7 +4838,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (!uploadSummaryEl) {
         return;
       }
-      const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+      const mode = readUploadMode();
       if (mode === "blank" || mode === "folder") {
         const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
         uploadSummaryEl.textContent = name ? `Will create: ${name}` : mode === "folder" ? "Enter a folder name." : "Enter a file name.";
@@ -4635,7 +4847,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (mode === "url") {
         const linkName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
         const linkUrl = ((_c = linkUrlEl == null ? void 0 : linkUrlEl.value) == null ? void 0 : _c.trim()) || "";
-        uploadSummaryEl.textContent = linkUrl ? `Will add link: ${linkName || linkUrl}` : "Enter a link URL.";
+        uploadSummaryEl.textContent = linkUrl ? externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}` : "Enter a link URL.";
         return;
       }
       const validationError = uploadValidationError(files, uploadLimits);
@@ -4646,7 +4858,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(", ") : "No files selected.";
     };
     const syncUploadMode = () => {
-      const mode = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+      const mode = readUploadMode();
       if ((uploadMode === "blank" || uploadMode === "folder") && blankFileNameEl) {
         uploadNameDrafts[uploadMode] = blankFileNameEl.value || "";
       }
@@ -4679,11 +4891,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         linkUrlEl.value = mode === "url" ? uploadUrlDrafts.url || linkUrlEl.value || "" : linkUrlEl.value || "";
       }
       if (uploadSubmitButton) {
-        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? "Add link" : "Upload";
+        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? externalOnly ? "Submit for review" : "Add link" : "Upload";
       }
       setUploadSummary();
     };
     const closeUploadDialog = () => {
+      if (typeof unregisterEscapeClose === "function") {
+        unregisterEscapeClose();
+        unregisterEscapeClose = null;
+      }
       uploadDialog.classList.remove("edit-upload-dialog-open");
       if (typeof uploadDialog.close === "function") {
         uploadDialog.close();
@@ -4692,18 +4908,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
     };
     const openUploadDialog = () => {
+      if (!uploadDialog.isConnected) {
+        return false;
+      }
       syncUploadMode();
       setUploadSummary();
-      if (typeof uploadDialog.showModal === "function") {
-        uploadDialog.showModal();
-      } else {
+      try {
+        if (typeof uploadDialog.showModal === "function") {
+          uploadDialog.showModal();
+        } else {
+          uploadDialog.setAttribute("open", "open");
+        }
+      } catch (err) {
         uploadDialog.setAttribute("open", "open");
       }
       uploadDialog.classList.add("edit-upload-dialog-open");
+      if (typeof unregisterEscapeClose !== "function") {
+        unregisterEscapeClose = registerEscapeClose(() => {
+          closeUploadDialog();
+          return true;
+        }, { label: "upload-dialog" });
+      }
       const firstFocusable = uploadDialog.querySelector("select, input, button");
       if (firstFocusable && typeof firstFocusable.focus === "function") {
         firstFocusable.focus();
       }
+      return true;
     };
     openUploadDialogButton.addEventListener("click", openUploadDialog);
     if (uploadCloseButton) {
@@ -4724,7 +4954,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (uploadSubmitButton) {
       uploadSubmitButton.addEventListener("click", async () => {
         var _a, _b, _c, _d;
-        const source = (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+        const source = readUploadMode();
         try {
           uploadSubmitButton.disabled = true;
           if (source === "blank") {
@@ -4788,6 +5018,22 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
     }
     syncUploadMode();
+    const addIntent = new URL(window.location.href).searchParams.get("add") || "";
+    if (externalOnly && addIntent === "url" || !externalOnly && addIntent === "work") {
+      const openWhenReady = () => {
+        if (!uploadDialog.isConnected) {
+          window.requestAnimationFrame(openWhenReady);
+          return;
+        }
+        if (!openUploadDialog()) {
+          return;
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete("add");
+        window.history.replaceState(null, "", url.toString());
+      };
+      window.requestAnimationFrame(openWhenReady);
+    }
   }
 
   // src/assets/js/edit/panel/layout-shared.js
@@ -5057,7 +5303,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
-    onCreateLink,
     onResetFolderWork
   }) {
     const settings = loadPromptSettings();
@@ -5316,14 +5561,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       onUploadFiles,
       onCreateBlankFile,
       onCreateFolder,
-      onCreateLink,
       onResetFolderWork
     });
     return { statusEl, promptRoot };
   }
 
   // src/assets/js/edit/panel/inline.js
-  var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind"]);
+  var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind", "converter"]);
   var PASSWORD_DETAILS_STORAGE_KEY = "password-details";
   function readRowText(row, selector) {
     const field = row.querySelector(selector);
@@ -5400,7 +5644,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return options.filter((option, index) => option && options.indexOf(option) === index).map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
   }
   function readMediaConfigFromForm(form, currentWork = {}) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const typeField = (_a = form == null ? void 0 : form.elements) == null ? void 0 : _a.work_type;
     if (typeField && typeof typeField.value === "string") {
@@ -5452,6 +5696,29 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const categories = normalizeWorkCategories2((_c = (_b = nextWork.categories) != null ? _b : nextWork.category) != null ? _c : []);
     nextWork.categories = categories;
     nextWork.category = categories;
+    const converterSelect = (_d = form == null ? void 0 : form.elements) == null ? void 0 : _d.converter_id;
+    const selectedOption = (converterSelect == null ? void 0 : converterSelect.selectedOptions) && converterSelect.selectedOptions[0] ? converterSelect.selectedOptions[0] : null;
+    const converterId = String((converterSelect == null ? void 0 : converterSelect.value) || "").trim();
+    const converterName = String(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterName) || "").trim();
+    const converterType = String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterType) || "converter").trim() || "converter";
+    const converterEngine = String(((_g = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _g.converterEngine) || "").trim();
+    const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
+    if (converterId) {
+      nextWork.converter = {
+        ...existingConverter,
+        type: converterType,
+        name: converterName || String(existingConverter.name || converterId.split("/").pop() || "converter"),
+        enabled: true,
+        id: converterId,
+        node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
+        quality: String(((_i = (_h = form == null ? void 0 : form.elements) == null ? void 0 : _h.converter_quality) == null ? void 0 : _i.value) || "default").trim() || "default",
+        format: String(((_k = (_j = form == null ? void 0 : form.elements) == null ? void 0 : _j.converter_format) == null ? void 0 : _k.value) || "webp").trim() || "webp",
+        saveMode: String(((_m = (_l = form == null ? void 0 : form.elements) == null ? void 0 : _l.converter_save_mode) == null ? void 0 : _m.value) || "new-hidden-work").trim() || "new-hidden-work",
+        hiddenByDefault: true
+      };
+    } else if (Object.prototype.hasOwnProperty.call(nextWork, "converter")) {
+      delete nextWork.converter;
+    }
     return nextWork;
   }
   function renderWorkValueControl(key, value) {
@@ -5519,23 +5786,98 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         </div>
     `;
   }
+  function renderConverterSection(config = {}) {
+    var _a, _b, _c, _d, _e, _f;
+    const catalog = (config == null ? void 0 : config.converterCatalog) && typeof config.converterCatalog === "object" ? config.converterCatalog : null;
+    const available = Array.isArray(catalog == null ? void 0 : catalog.available) ? catalog.available : [];
+    const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
+    const converter = work.converter && typeof work.converter === "object" ? work.converter : {};
+    const selectedId = String(converter.id || "").trim();
+    const selectedDefinition = available.find((item) => (item == null ? void 0 : item.id) === selectedId) || available[0] || null;
+    const defaults = (selectedDefinition == null ? void 0 : selectedDefinition.defaults) || {};
+    const ui = (selectedDefinition == null ? void 0 : selectedDefinition.ui) && typeof selectedDefinition.ui === "object" ? selectedDefinition.ui : {};
+    const selectedQuality = String(converter.quality || defaults.quality || "default");
+    const selectedFormat = String(converter.format || defaults.format || "webp");
+    const selectedSaveMode = String(converter.saveMode || defaults.saveMode || "new-hidden-work");
+    const unsupportedMessage = catalog && catalog.webReadable === false ? '<div class="edit-status">This file is not directly web-readable. Choose a converter to create a poff-standard work.</div>' : "";
+    const options = [
+      '<option value="">none</option>',
+      ...available.map((item) => {
+        const disabled = item.enabled === false;
+        const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ""}`;
+        return `<option value="${escapeHtml(item.id || "")}" data-converter-type="${escapeHtml(item.type || "converter")}" data-converter-name="${escapeHtml(item.name || "")}" data-converter-engine="${escapeHtml(item.engine || "")}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(",") : "")}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(",") : "")}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}"${item.id === selectedId ? " selected" : ""}${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
+      })
+    ].join("");
+    const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
+    const renderSelectOptions = (values, selected) => Array.isArray(values) ? values.map((value) => `<option value="${escapeHtml(String(value || ""))}"${String(value || "") === String(selected || "") ? " selected" : ""}>${escapeHtml(String(value || ""))}</option>`).join("") : "";
+    const formatOptions = Array.isArray((_a = ui == null ? void 0 : ui.format) == null ? void 0 : _a.options) && ui.format.options.length ? ui.format.options : Array.isArray(selectedDefinition == null ? void 0 : selectedDefinition.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ["webp", "jpeg", "png"];
+    const qualityOptions = Array.isArray((_b = ui == null ? void 0 : ui.quality) == null ? void 0 : _b.options) && ui.quality.options.length ? ui.quality.options : ["preview", "default", "archival", "small-web"];
+    const saveModeOptions = Array.isArray((_c = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _c.options) && ui.saveMode.options.length ? ui.saveMode.options : ["new-hidden-work", "replace-generated-work", "temporary-preview-only"];
+    const formatLabel = String(((_d = ui == null ? void 0 : ui.format) == null ? void 0 : _d.label) || "Output format");
+    const qualityLabel = String(((_e = ui == null ? void 0 : ui.quality) == null ? void 0 : _e.label) || "Quality");
+    const saveModeLabel = String(((_f = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _f.label) || "Save mode");
+    return `
+        <div class="edit-work-fields edit-work-converter">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Converter</div>
+                    <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
+                </div>
+            </div>
+            ${unsupportedMessage}
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-converter-id">Converter</label>
+                    <select class="form-select" id="edit-converter-id" name="converter_id">
+                        ${options}
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
+                    <select class="form-select" id="edit-converter-quality" name="converter_quality">
+                        ${renderSelectOptions(qualityOptions, selectedQuality)}
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
+                    <select class="form-select" id="edit-converter-format" name="converter_format">
+                        ${renderSelectOptions(formatOptions, selectedFormat)}
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
+                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode">
+                        ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
+                    </select>
+                </div>
+            </div>
+            <div class="edit-inline-actions">
+                <button class="btn btn-secondary" type="button" id="editConvertWork">Convert</button>
+            </div>
+            <div class="small-note">
+                Generated works:
+                ${generated.length ? generated.map((item) => `[${escapeHtml(item.name || "")}] [show] [make visible] [delete] [regenerate]`).join(" ") : "none"}
+            </div>
+        </div>
+    `;
+  }
   function renderPasswordChangeSection(status = {}) {
     var _a, _b;
     if (!((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit)) {
       return "";
     }
     const configPath = String(((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.configPath) || "").trim();
-    const storedOpen = readStoredDetailsState(PASSWORD_DETAILS_STORAGE_KEY);
-    const detailsOpen = storedOpen === null ? true : storedOpen;
-    return `
-        <details class="edit-work-fields edit-password-details" id="editPasswordDetails"${detailsOpen ? " open" : ""}>
-            <summary class="edit-work-fields-header edit-password-details-summary">
-                <div>
-                    <div class="edit-work-fields-title">Change password</div>
-                    <div class="small-note">Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ""}.</div>
-                </div>
-            </summary>
-            <form id="editPasswordForm" class="edit-inline edit-password-details-body">
+    return renderPersistentDetailsSection({
+      storageKey: PASSWORD_DETAILS_STORAGE_KEY,
+      defaultOpen: true,
+      id: "editPasswordDetails",
+      className: "edit-work-fields edit-password-details",
+      summaryClassName: "edit-password-details-summary",
+      bodyClassName: "edit-inline edit-password-details-body",
+      titleHtml: "Change password",
+      noteHtml: `Updates <code>.poff-auth.php</code>${configPath ? ` at <code>${escapeHtml(configPath)}</code>` : ""}.`,
+      bodyHtml: `
+            <form id="editPasswordForm" class="edit-inline">
                 <div>
                     <label class="edit-label" for="edit-current-password">Current password</label>
                     <input class="form-input" id="edit-current-password" type="password" name="currentPassword" autocomplete="current-password">
@@ -5553,8 +5895,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
                 <div class="edit-status" id="editPasswordStatus"></div>
             </form>
-        </details>
-    `;
+        `
+    });
   }
   function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
     if (!fields.length) {
@@ -5825,8 +6167,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onCreateLink,
     onResetFolderWork,
     onDeleteTarget,
-    onChangePassword
+    onChangePassword,
+    onConvertWork
   }) {
+    var _a, _b;
     if (!editPanel) {
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
@@ -5836,7 +6180,34 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
+    const canRenderPublicExternalSubmission = !((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit) && ((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.editModeAllowed) !== false && (status == null ? void 0 : status.target) !== "file";
     editPanel.hidden = false;
+    if (canRenderPublicExternalSubmission) {
+      const treeItems2 = Array.isArray(config == null ? void 0 : config.tree) ? config.tree : [];
+      const uploadSectionHtml2 = renderUploadSectionHtml({
+        isFileTarget: false,
+        isEmptyFolder: treeItems2.length === 0,
+        externalOnly: true
+      });
+      editPanel.innerHTML = `
+            <h3 class="edit-panel-title">Submit external link</h3>
+            <div class="edit-status" id="editInlineStatus">${escapeHtml((status == null ? void 0 : status.error) || "External links stay hidden until an editor confirms them.")}</div>
+            ${uploadSectionHtml2}
+        `;
+      const statusEl2 = editPanel.querySelector("#editInlineStatus");
+      bindUploadDialog({
+        editPanel,
+        statusEl: statusEl2,
+        uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
+        externalOnly: true,
+        onUploadFiles,
+        onCreateBlankFile,
+        onCreateFolder,
+        onCreateLink
+      });
+      syncPromptDock();
+      return { statusEl: statusEl2, promptRoot: null };
+    }
     if (!config || (status == null ? void 0 : status.error)) {
       const authMessage = (status == null ? void 0 : status.auth) && !status.auth.canEdit ? (status == null ? void 0 : status.error) || "Enter the editor password to unlock editing." : null;
       const message = (status == null ? void 0 : status.error) || "Edit mode is unavailable.";
@@ -5883,7 +6254,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     });
     const uploadSectionHtml = renderUploadSectionHtml({
       isFileTarget,
-      isEmptyFolder
+      isEmptyFolder,
+      externalOnly: false
     });
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
@@ -5899,6 +6271,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
             </div>
             ${(status == null ? void 0 : status.target) === "file" || (status == null ? void 0 : status.target) === "folder" || (config == null ? void 0 : config.work) && typeof config.work === "object" && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === "type") ? renderWorkConfigFieldsSection(config) : ""}
+            ${(status == null ? void 0 : status.target) === "file" ? renderConverterSection(config) : ""}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -5953,6 +6326,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
     const addWorkFieldButton = editPanel.querySelector("#editWorkFieldAdd");
+    const convertButton = editPanel.querySelector("#editConvertWork");
     const promptRoot = editPanel.querySelector("#promptLayer");
     syncPromptDock(promptRoot);
     if (passwordDetailsEl) {
@@ -5979,7 +6353,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         workFieldEditor.addWorkField();
       });
     }
-    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type").forEach((input) => {
+    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode").forEach((input) => {
       if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
         return;
       }
@@ -6035,10 +6409,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         await onDeleteTarget({ statusEl });
       });
     }
+    if (convertButton && typeof onConvertWork === "function") {
+      convertButton.addEventListener("click", async () => {
+        syncMediaState();
+        await onConvertWork({
+          statusEl,
+          form,
+          converter: readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}).converter || null
+        });
+      });
+    }
     bindUploadDialog({
       editPanel,
       statusEl,
       uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
+      externalOnly: false,
       onUploadFiles,
       onCreateBlankFile,
       onCreateFolder,
@@ -6102,13 +6487,65 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/controller/paths.js
+  function normalizeViewerPath(path = "") {
+    return String(path || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  }
+  function parentViewerPath(path = "") {
+    const normalized = normalizeViewerPath(path);
+    if (!normalized) {
+      return "";
+    }
+    return normalized.split("/").slice(0, -1).join("/");
+  }
+  function findConfiguredSelectionItem(items = [], targetPath = "", prefix = "") {
+    const normalizedTarget = normalizeViewerPath(targetPath);
+    if (!normalizedTarget || !Array.isArray(items)) {
+      return null;
+    }
+    for (const item of items) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const name = normalizeViewerPath(item.name || "");
+      const rawPath = normalizeViewerPath(item.path || item.relativePath || name);
+      const resolvedPath = normalizeViewerPath(prefix ? `${prefix}/${rawPath}` : rawPath);
+      const slug = normalizeViewerPath(item.slug || "");
+      const candidates = [resolvedPath, rawPath, name, slug].filter(Boolean);
+      if (candidates.includes(normalizedTarget)) {
+        return item;
+      }
+      if (Array.isArray(item.children)) {
+        const found = findConfiguredSelectionItem(item.children, normalizedTarget, resolvedPath);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return null;
+  }
+  function resolveConfiguredSelectionItem(selection2 = getActiveSelection()) {
+    var _a;
+    if (typeof window === "undefined" || !(window == null ? void 0 : window.POFF_CONTEXT) || typeof window.POFF_CONTEXT !== "object") {
+      return null;
+    }
+    const tree = (_a = window.POFF_CONTEXT.currentPoffConfig) == null ? void 0 : _a.tree;
+    if (!Array.isArray(tree)) {
+      return null;
+    }
+    const targetPath = normalizeViewerPath((selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "");
+    if (!targetPath) {
+      return null;
+    }
+    return findConfiguredSelectionItem(tree, targetPath);
+  }
   function getContentTargetPath(selection2 = getActiveSelection()) {
     if (selection2 == null ? void 0 : selection2.isLayout) {
       return selection2.path || "";
     }
+    const configuredItem = resolveConfiguredSelectionItem(selection2);
     const previewPath = (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
-    if (selection2 == null ? void 0 : selection2.previewIsFile) {
-      return previewPath.split("/").slice(0, -1).join("/");
+    if ((selection2 == null ? void 0 : selection2.previewIsFile) || configuredItem && configuredItem.type && configuredItem.type !== "folder") {
+      return parentViewerPath(previewPath);
     }
     return previewPath;
   }
@@ -6128,6 +6565,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
 
   // src/assets/js/edit/controller.js
   function readMediaConfigFromElements(elements2, form, currentWork = {}) {
+    var _a, _b, _c, _d, _e, _f;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const typeField = elements2.work_type;
     if (typeField && typeof typeField.value === "string") {
@@ -6176,6 +6614,29 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       nextWork[key] = rawValue;
     });
+    const converterSelect = elements2.converter_id;
+    const selectedOption = (converterSelect == null ? void 0 : converterSelect.selectedOptions) && converterSelect.selectedOptions[0] ? converterSelect.selectedOptions[0] : null;
+    const converterId = String((converterSelect == null ? void 0 : converterSelect.value) || "").trim();
+    const converterName = String(((_a = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _a.converterName) || "").trim();
+    const converterType = String(((_b = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _b.converterType) || "converter").trim() || "converter";
+    const converterEngine = String(((_c = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _c.converterEngine) || "").trim();
+    const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
+    if (converterId) {
+      nextWork.converter = {
+        ...existingConverter,
+        type: converterType,
+        name: converterName || String(existingConverter.name || converterId.split("/").pop() || "converter"),
+        enabled: true,
+        id: converterId,
+        node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
+        quality: String(((_d = elements2.converter_quality) == null ? void 0 : _d.value) || "default").trim() || "default",
+        format: String(((_e = elements2.converter_format) == null ? void 0 : _e.value) || "webp").trim() || "webp",
+        saveMode: String(((_f = elements2.converter_save_mode) == null ? void 0 : _f.value) || "new-hidden-work").trim() || "new-hidden-work",
+        hiddenByDefault: true
+      };
+    } else if (Object.prototype.hasOwnProperty.call(nextWork, "converter")) {
+      delete nextWork.converter;
+    }
     return nextWork;
   }
   function createEditController({ elements: elements2, context, editRequested: editRequested2 }) {
@@ -6197,6 +6658,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let editTarget = "folder";
     let drawerOpen = false;
     let authFormVisible = false;
+    let unregisterDrawerEscapeClose = null;
     let authState = {
       configured: !!initialAuthState.configured,
       authenticated: !!initialAuthState.authenticated,
@@ -6341,6 +6803,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
         const url = new URL(window.location.href);
         url.searchParams.set("edit", "true");
+        url.searchParams.set("add", authState.canEdit ? "work" : "url");
         window.location.href = url.toString();
       });
     }
@@ -6408,12 +6871,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       if (!editRequested2 || !authState.canEdit || !drawerOpen) {
+        if (typeof unregisterDrawerEscapeClose === "function") {
+          unregisterDrawerEscapeClose();
+          unregisterDrawerEscapeClose = null;
+        }
         editDrawer.classList.remove("edit-drawer-open");
         editDrawer.hidden = true;
         return;
       }
       editDrawer.hidden = false;
       editDrawer.classList.add("edit-drawer-open");
+      if (typeof unregisterDrawerEscapeClose !== "function") {
+        unregisterDrawerEscapeClose = registerEscapeClose(() => {
+          drawerOpen = false;
+          syncDrawerVisibility();
+          return true;
+        }, { label: "edit-drawer" });
+      }
     }
     async function refreshCurrentEditState(selection2 = getActiveSelection()) {
       const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
@@ -6443,7 +6917,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const layoutNameForPreset = createLayoutNameForPreset(editConfig);
       const panelState = renderEditPanel({
         editPanel,
-        editRequested: editRequested2 && authState.canEdit,
+        editRequested: editRequested2,
         config,
         status,
         contentTargetLabel: getContentTargetPath(),
@@ -6535,6 +7009,51 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
           window.location.hash = nextPath ? `#/${nextPath}` : "";
           await refreshCurrentEditState(getActiveSelection());
+        },
+        onConvertWork: async ({ statusEl, converter }) => {
+          const selection2 = getActiveSelection();
+          const sourcePath = getEditTargetPath(selection2);
+          if (!sourcePath) {
+            throw new Error("Convert target unavailable.");
+          }
+          if (!(converter == null ? void 0 : converter.id)) {
+            setStatusMessage(statusEl, "Choose a converter first.");
+            return;
+          }
+          setStatusMessage(statusEl, "Converting...");
+          const currentConfig = editConfig && typeof editConfig === "object" ? editConfig : {};
+          const sourceName = sourcePath.split("/").pop() || sourcePath;
+          const payload = {
+            source: {
+              name: sourceName,
+              path: sourcePath,
+              mimeType: currentConfig.mimeType || "",
+              extension: sourceName.includes(".") ? sourceName.split(".").pop() : "",
+              size: currentConfig.size || 0,
+              srcUrl: currentConfig.srcUrl || ""
+            },
+            converter,
+            target: {
+              folder: sourcePath.split("/").slice(0, -1).join("/"),
+              saveAs: `${sourceName.replace(/\.[^.]+$/, "")}.${converter.format || "webp"}`,
+              mode: converter.saveMode || "new-hidden-work"
+            }
+          };
+          const converted = await requestMcpRoute("convert", payload);
+          if (!converted || converted.error || converted.ok === false) {
+            throw new Error((converted == null ? void 0 : converted.error) || "Conversion failed.");
+          }
+          if ((converter.saveMode || "new-hidden-work") !== "temporary-preview-only") {
+            const saved = await requestMcpRoute("save-converted-work", {
+              sourcePath,
+              conversion: converted
+            });
+            if (!saved || saved.error || saved.ok === false) {
+              throw new Error((saved == null ? void 0 : saved.error) || "Saving converted work failed.");
+            }
+          }
+          window.alert("OK \u2014 this file was converted into a web-readable poff work and saved in the folder.");
+          await refreshCurrentEditState(selection2);
         },
         onResetFolderWork: async ({ statusEl }) => {
           const selection2 = getActiveSelection();
@@ -6654,20 +7173,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const data = await requestEditUpload({
             path: getContentTargetPath(selection2),
             source,
+            linkName,
             fileName: linkName,
             linkUrl,
             files: []
           });
+          if (data == null ? void 0 : data.auth) {
+            updateAuthState(data.auth);
+          }
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Create link failed.");
           }
-          await refreshCurrentEditState(selection2);
           const inlineStatus = document.getElementById("editInlineStatus");
           if (inlineStatus) {
             const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : linkName || linkUrl;
-            setStatusMessage(inlineStatus, `Created link ${createdName}.`, true);
+            const message = data.pendingApproval ? `Submitted ${createdName} for approval.` : `Created link ${createdName}.`;
+            setStatusMessage(inlineStatus, message, true);
           }
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          if (!(data.pendingApproval && !authState.canEdit)) {
+            await refreshCurrentEditState(selection2);
+            window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          }
         },
         onChangePassword: async ({ elements: elements3, form, statusEl }) => {
           var _a, _b, _c;
@@ -6743,6 +7269,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             payload.treeVisible = treeVisible;
           }
           await saveConfig(payload, statusEl);
+        },
+        onDeleteTarget: async ({ statusEl }) => {
+          const selection2 = getActiveSelection();
+          const targetPath = getEditTargetPath(selection2);
+          if (!targetPath) {
+            throw new Error("Delete target unavailable.");
+          }
+          const data = await requestEditDelete({
+            path: targetPath,
+            return: selection2.previewPath || selection2.path || ""
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Delete failed.");
+          }
+          drawerOpen = false;
+          syncDrawerVisibility();
+          setStatusMessage(statusEl, "Deleted.", true);
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
+          window.location.hash = nextPath ? `#/${nextPath}` : "";
+          await refreshCurrentEditState(getActiveSelection());
         }
       });
       if (panelState.promptRoot) {
@@ -6757,6 +7304,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         });
       }
       syncDrawerVisibility();
+      window.POFF_REVIEW_PENDING_LINK = ({ path = "" } = {}) => {
+        drawerOpen = true;
+        syncDrawerVisibility();
+        if (!path || typeof drawerState.focusTreeItem !== "function") {
+          return;
+        }
+        window.setTimeout(() => {
+          drawerState.focusTreeItem(path);
+        }, 30);
+      };
+      const reviewPath = new URL(window.location.href).searchParams.get("review") || "";
+      if (reviewPath) {
+        window.POFF_REVIEW_PENDING_LINK({ path: reviewPath });
+        const url = new URL(window.location.href);
+        url.searchParams.delete("review");
+        window.history.replaceState(null, "", url.toString());
+      }
     }
     async function initEditMode() {
       var _a;
@@ -6800,6 +7364,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         auth: data.auth || authState
       });
     }
+    window.addEventListener("poff:review-external-link", (event) => {
+      var _a;
+      const reviewPath = ((_a = event == null ? void 0 : event.detail) == null ? void 0 : _a.path) || "";
+      if (!editRequested2 || !authState.canEdit) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("edit", "true");
+        url.searchParams.set("review", reviewPath);
+        window.location.href = url.toString();
+        return;
+      }
+      if (typeof window.POFF_REVIEW_PENDING_LINK === "function") {
+        window.POFF_REVIEW_PENDING_LINK({ path: reviewPath });
+      }
+    });
     return {
       renderFolderMeta,
       syncEditToggle,
@@ -6994,19 +7572,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return "";
       }
       if (typeof candidateRoot.querySelector === "function") {
+        const layout = candidateRoot.querySelector(".poff-default-layout");
+        if (layout && typeof layout.outerHTML === "string") {
+          return layout.outerHTML.trim();
+        }
         const main = candidateRoot.querySelector(".poff-default-layout__main");
         if (main && typeof main.innerHTML === "string") {
           return main.innerHTML.trim();
         }
-        const layout = candidateRoot.querySelector(".poff-default-layout");
-        if (layout && typeof layout.querySelector === "function") {
-          const layoutMain = layout.querySelector(".poff-default-layout__main");
-          if (layoutMain && typeof layoutMain.innerHTML === "string") {
-            return layoutMain.innerHTML.trim();
-          }
-        }
         const appShell = candidateRoot.querySelector("#appShell");
         if (appShell && typeof appShell.querySelector === "function") {
+          const appShellLayout = appShell.querySelector(".poff-default-layout");
+          if (appShellLayout && typeof appShellLayout.outerHTML === "string") {
+            return appShellLayout.outerHTML.trim();
+          }
           const appShellMain = appShell.querySelector(".poff-default-layout__main");
           if (appShellMain && typeof appShellMain.innerHTML === "string") {
             return appShellMain.innerHTML.trim();
@@ -7348,12 +7927,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return routeResolution(aliasPath);
       }
       if (!normalizedPath.includes("/")) {
-        const link = findNavLinkByAttribute(navList, "data-slug", normalizedPath);
+        const link = findNavLinkByAttribute(navList, "data-route-slug", normalizedPath) || findNavLinkByAttribute(navList, "data-slug", normalizedPath);
         const targetPath = navTargetPath(link);
         if (targetPath) {
           rememberSlugPathAlias({
             path: targetPath,
-            slug: normalizedPath
+            slug: (link == null ? void 0 : link.getAttribute("data-route-slug")) || normalizedPath
           });
           return routeResolution(targetPath, navTargetIsFile(link, targetPath));
         }
@@ -7398,8 +7977,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (aliasSlug) {
         return aliasSlug;
       }
-      const link = findNavLinkByAttribute(navList, "data-path", normalizedPath);
-      const slug = (link == null ? void 0 : link.getAttribute("data-slug")) || "";
+      const link = findNavLinkByAttribute(navList, "data-path", normalizedPath) || findNavLinkByAttribute(navList, "data-route-path", normalizedPath);
+      const slug = (link == null ? void 0 : link.getAttribute("data-route-slug")) || (link == null ? void 0 : link.getAttribute("data-slug")) || "";
       if (slug && !slug.includes("/")) {
         rememberSlugPathAlias({
           path: normalizedPath,
@@ -7440,6 +8019,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }) {
     let activeLink = null;
     let currentFolderPath = "";
+    function scrollActiveLinkIntoView(link = activeLink) {
+      if (!link || typeof link.scrollIntoView !== "function") {
+        return;
+      }
+      link.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest"
+      });
+    }
+    function centerActiveLinkInSidebar(link = activeLink) {
+      if (!navList || !link || typeof link.getBoundingClientRect !== "function") {
+        return;
+      }
+      const sidebar = typeof navList.closest === "function" ? navList.closest("#appSidebar") : navList.parentElement;
+      if (!sidebar || typeof sidebar.getBoundingClientRect !== "function") {
+        return;
+      }
+      const sidebarRect = sidebar.getBoundingClientRect();
+      const linkRect = link.getBoundingClientRect();
+      if (!sidebarRect || !linkRect) {
+        return;
+      }
+      const targetTop = sidebar.scrollTop + (linkRect.top - sidebarRect.top) - sidebar.clientHeight / 2 + linkRect.height / 2;
+      sidebar.scrollTop = Math.max(0, targetTop);
+    }
     function clearActiveLink() {
       if (activeLink) {
         activeLink.classList.remove("nav-link-active");
@@ -7454,42 +8059,60 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       });
     }
-    function setActiveFileLink(fileName = "") {
+    function setActiveLink(nextLink) {
       clearActiveLink();
-      if (!navList || !fileName) {
+      if (!nextLink) {
         return;
       }
-      const fileEls = navList.querySelectorAll("a[data-file]");
-      fileEls.forEach((el) => {
-        if (el.getAttribute("data-file") === fileName) {
-          el.classList.add("nav-link-active");
-          activeLink = el;
+      nextLink.classList.add("nav-link-active");
+      activeLink = nextLink;
+      centerActiveLinkInSidebar(nextLink);
+      scrollActiveLinkIntoView(nextLink);
+    }
+    function findNavLinkByPath(path = "", attribute = "data-path") {
+      if (!navList || !path) {
+        return null;
+      }
+      const normalizedPath = String(path).trim();
+      if (!normalizedPath) {
+        return null;
+      }
+      const links = navList.querySelectorAll(`a[${attribute}]`);
+      for (const link of links) {
+        if ((link.getAttribute(attribute) || "").trim() === normalizedPath) {
+          return link;
         }
-      });
+      }
+      return null;
+    }
+    function setActiveFileLink(path = "") {
+      const nextLink = findNavLinkByPath(path, "data-path");
+      if (nextLink) {
+        setActiveLink(nextLink);
+        return;
+      }
+      if (!navList || !path) {
+        return;
+      }
+      const fileName = String(path).split("/").pop() || "";
+      const fileEls = navList.querySelectorAll("a[data-file]");
+      for (const el of fileEls) {
+        if (el.getAttribute("data-file") === fileName) {
+          setActiveLink(el);
+          return;
+        }
+      }
     }
     function setActiveLayoutLink(layoutPath = "") {
-      clearActiveLink();
-      if (!navList || !layoutPath) {
-        return;
+      const nextLink = findNavLinkByPath(layoutPath, "data-layout-path");
+      if (nextLink) {
+        setActiveLink(nextLink);
       }
-      const layoutEls = navList.querySelectorAll("a[data-layout-path]");
-      layoutEls.forEach((el) => {
-        if (el.getAttribute("data-layout-path") === layoutPath) {
-          el.classList.add("nav-link-active");
-          activeLink = el;
-        }
-      });
     }
     function showNavLoading() {
-      if (!navList) {
-        return;
+      if (typeof setLoadingVisible === "function") {
+        setLoadingVisible(sidebarLoading, true);
       }
-      navList.innerHTML = `
-            <div id="navLoading" class="loading-row flex items-center">
-                <span class="loader"></span>
-                <span class="loader-label">Loading...</span>
-            </div>
-        `;
     }
     function loadNav(relPath = "") {
       if (!navList) {
@@ -7497,7 +8120,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       currentFolderPath = relPath || "";
       showNavLoading();
-      return fetch(`?ajax=1&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
+      return fetch(`?ajax=nav&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
         const extracted = extractNavHtml(html) || "";
         if (extracted.trim()) {
           navList.innerHTML = extracted;
@@ -7566,20 +8189,31 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         clearActiveLink();
         return;
       }
-      const parts = path.split("/");
-      const fileName = parts[parts.length - 1] || "";
-      setActiveFileLink(fileName);
+      setActiveFileLink(path);
     }
     function handleNavClick(event) {
-      var _a, _b, _c;
+      var _a, _b, _c, _d, _e;
       if (!navList) {
         return;
       }
-      const fastAction = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, '[data-nav-action="toggle-visibility"]');
+      const reviewAction = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, '[data-nav-action="review-external"]');
+      if (reviewAction) {
+        event.preventDefault();
+        event.stopPropagation();
+        const reviewPath = reviewAction.getAttribute("data-nav-path") || "";
+        window.dispatchEvent(new CustomEvent("poff:review-external-link", {
+          detail: {
+            path: reviewPath,
+            folderPath: currentFolderPath
+          }
+        }));
+        return;
+      }
+      const fastAction = (_d = (_c = event.target).closest) == null ? void 0 : _d.call(_c, '[data-nav-action="toggle-visibility"]');
       if (fastAction) {
         event.preventDefault();
         event.stopPropagation();
-        const rowLink = (_c = fastAction.closest("li")) == null ? void 0 : _c.querySelector('a[data-tree-item="1"]');
+        const rowLink = (_e = fastAction.closest("li")) == null ? void 0 : _e.querySelector('a[data-tree-item="1"]');
         toggleNavEntry(rowLink).catch(() => {
         });
         return;
@@ -7638,8 +8272,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editQuery: editQuery2,
     currentPathForIframe: currentPathForIframe2,
     renderFolderMeta,
-    initEditMode,
-    setSidebarCollapsed
+    initEditMode
   }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
     let ignoreNextHashSync = false;
@@ -7674,131 +8307,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       getCurrentSelection,
       setLoadingVisible
     });
-    function shouldCollapseSidebarForSelection(selection2 = null) {
-      if (!navList || !(selection2 == null ? void 0 : selection2.previewPath)) {
-        return false;
-      }
-      const normalizedTargetPath = normalizeHashAlias(selection2.previewPath);
-      const targetName = normalizeHashAlias(selection2.previewPath.split("/").pop() || selection2.previewPath);
-      const remoteLinks = navList.querySelectorAll('a[data-tree-item="1"][data-remote-rendered="1"]');
-      for (const link of remoteLinks) {
-        const linkPath = normalizeHashAlias(link.getAttribute("data-path") || "");
-        const linkFile = normalizeHashAlias(link.getAttribute("data-file") || "");
-        if (linkPath === normalizedTargetPath || linkFile === targetName) {
-          return true;
-        }
-      }
-      return false;
-    }
-    function findNavLinkForSelection(selection2 = null) {
-      if (!navList || !(selection2 == null ? void 0 : selection2.previewPath)) {
-        return null;
-      }
-      const normalizedTargetPath = normalizeHashAlias(selection2.previewPath);
-      const targetName = normalizeHashAlias(selection2.previewPath.split("/").pop() || selection2.previewPath);
-      const links = navList.querySelectorAll('a[data-tree-item="1"]');
-      for (const link of links) {
-        const linkPath = normalizeHashAlias(link.getAttribute("data-path") || "");
-        const linkFile = normalizeHashAlias(link.getAttribute("data-file") || "");
-        if (linkPath === normalizedTargetPath || linkFile === targetName) {
-          return link;
-        }
-      }
-      return null;
-    }
-    async function resolvePreviewUrlForSelection(selection2, previewPath, previewIsFile, forceRefresh = false) {
-      const localPreviewUrl = previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh);
-      const link = findNavLinkForSelection(selection2);
-      if ((link == null ? void 0 : link.getAttribute("data-remote-rendered")) === "1") {
-        return localPreviewUrl;
-      }
-      const previewUrl = trimLinkUrl((link == null ? void 0 : link.getAttribute("data-preview-url")) || "");
-      if (previewUrl) {
-        try {
-          const resolvedPreview = new URL(previewUrl, window.location.href);
-          const hashSlug = resolvedPreview.hash.replace(/^#\/+/, "").trim();
-          if (hashSlug && resolvedPreview.origin === window.location.origin && resolvedPreview.pathname.includes("/dominikeggermann.com")) {
-            const ajaxUrl = new URL(resolvedPreview.pathname, resolvedPreview.origin);
-            ajaxUrl.searchParams.set("ajax", "resolve");
-            ajaxUrl.searchParams.set("slug", hashSlug);
-            const response = await fetch(ajaxUrl.href, {
-              credentials: "same-origin",
-              headers: {
-                "Accept": "application/json"
-              }
-            });
-            if (response.ok) {
-              const data = await response.json();
-              if ((data == null ? void 0 : data.resolved) && data.path) {
-                return buildPreviewUrlAtPath(
-                  resolvedPreview.pathname,
-                  data.path,
-                  typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder",
-                  forceRefresh
-                );
-              }
-            }
-          }
-          if (!previewUrl.includes("#/")) {
-            return resolvedPreview.href;
-          }
-        } catch (err) {
-        }
-      }
-      const linkUrl = trimLinkUrl((link == null ? void 0 : link.getAttribute("data-link-url")) || "");
-      if (!linkUrl) {
-        return localPreviewUrl;
-      }
-      try {
-        const resolved = new URL(linkUrl, window.location.href);
-        const hashSlug = resolved.hash.replace(/^#\/+/, "").trim();
-        if (hashSlug && resolved.origin === window.location.origin && resolved.pathname.includes("/dominikeggermann.com")) {
-          try {
-            const ajaxUrl = new URL(resolved.pathname, resolved.origin);
-            ajaxUrl.searchParams.set("ajax", "resolve");
-            ajaxUrl.searchParams.set("slug", hashSlug);
-            const response = await fetch(ajaxUrl.href, {
-              credentials: "same-origin",
-              headers: {
-                "Accept": "application/json"
-              }
-            });
-            if (response.ok) {
-              const data = await response.json();
-              if ((data == null ? void 0 : data.resolved) && data.path) {
-                return buildPreviewUrlAtPath(
-                  resolved.pathname,
-                  data.path,
-                  typeof data.isFile === "boolean" ? data.isFile : data.type !== "folder",
-                  forceRefresh
-                );
-              }
-            }
-          } catch (err) {
-          }
-        }
-        if (resolved.origin === window.location.origin) {
-          return resolved.href;
-        }
-      } catch (err) {
-        return localPreviewUrl;
-      }
-      return localPreviewUrl;
-    }
-    function trimLinkUrl(value = "") {
-      return String(value || "").trim();
-    }
-    function buildPreviewUrlAtPath(viewerPath, targetPath, isFile = false, forceRefresh = false) {
-      const url = new URL(viewerPath, window.location.origin);
-      url.search = "";
-      url.hash = "";
-      url.searchParams.set("view", "1");
-      url.searchParams.set(isFile ? "file" : "path", targetPath);
-      if (forceRefresh) {
-        url.searchParams.set("_refresh", String(Date.now()));
-      }
-      return url.pathname + url.search;
-    }
     function writeHashPath(path = "") {
       const hashPath = routeResolver.displayHashPath(path);
       const nextHash = hashPath ? `#/${hashPath.replace(/^\/+/, "")}` : "";
@@ -7819,9 +8327,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const selection2 = getSelectionFromPath(resolved.path, {
         isFile: typeof (options == null ? void 0 : options.isFile) === "boolean" ? options.isFile : resolved.isFile
       });
-      return navigateToSelection(selection2, options);
+      navigateToSelection(selection2, options);
     }
-    async function navigateToSelection(selectionInput, options = {}) {
+    function navigateToSelection(selectionInput, options = {}) {
       const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
       const {
         updateHash = true,
@@ -7830,12 +8338,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const previewPath = selection2.previewPath || "";
       const previewIsFile = !!selection2.previewIsFile;
       const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
-      const previewUrl = await resolvePreviewUrlForSelection(selection2, previewPath, previewIsFile, forceRefresh);
       setLoadingVisible(iframeLoading, true);
       if (contentFrame) {
         contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
         previewController.syncPreviewDisabledState(!!selection2.isLayout);
-        previewController.renderPreview(previewUrl);
+        previewController.renderPreview(previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
       }
       if (updateHash) {
         writeHashPath(selection2.path || "");
@@ -7844,15 +8351,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setLoadingVisible(sidebarLoading, true);
         sidebarController2.loadNav(folderPath).then(() => {
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          if (typeof setSidebarCollapsed === "function") {
-            setSidebarCollapsed(!shouldCollapseSidebarForSelection(selection2));
-          }
           setLoadingVisible(sidebarLoading, false);
         }).catch(() => {
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          if (typeof setSidebarCollapsed === "function") {
-            setSidebarCollapsed(!shouldCollapseSidebarForSelection(selection2));
-          }
           setLoadingVisible(sidebarLoading, false);
         });
       }
@@ -7863,7 +8364,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     function loadCurrentFolderInIframe() {
       var _a;
       const selection2 = getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : "");
-      return navigateToSelection(selection2, { updateHash: false });
+      navigateToSelection(selection2, { updateHash: false });
       if (renderFolderMeta) {
         renderFolderMeta();
       }
@@ -7874,12 +8375,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const hashPath = readHashPath();
       if (hashPath || window.location.hash) {
         const resolved = await routeResolver.resolveHashPathAsync(hashPath);
-        return navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
+        navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
           updateHash: false,
           forceRefresh
         });
+        return;
       }
-      return navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
+      navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
         updateHash: false,
         forceRefresh
       });
@@ -7993,6 +8495,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   var elements = createAppElements();
   var poffContext = window.POFF_CONTEXT || {};
   var currentPathForIframe = Object.prototype.hasOwnProperty.call(poffContext, "currentPathForIframe") ? poffContext.currentPathForIframe : null;
+  function resolveRootDocumentTitle(context = {}) {
+    const config = context && typeof context === "object" ? context.currentPoffConfig : null;
+    const title = typeof (config == null ? void 0 : config.title) === "string" ? config.title.trim() : "";
+    if (title) {
+      return title;
+    }
+    const folderName = typeof (config == null ? void 0 : config.folderName) === "string" ? config.folderName.trim() : "";
+    return folderName || "poff.io";
+  }
+  document.title = resolveRootDocumentTitle(poffContext);
   var editRequested = new URLSearchParams(window.location.search).get("edit") === "true";
   var editQuery = editRequested ? "&edit=true" : "";
   var editController = createEditController({
@@ -8000,15 +8512,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     context: poffContext,
     editRequested
   });
-  var sidebarController = bindSidebarToggle(elements);
   var navigation = initNavigation({
     elements,
     editQuery,
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
-    initEditMode: editController.initEditMode,
-    setSidebarCollapsed: (sidebarController == null ? void 0 : sidebarController.syncSidebarState) || null
+    initEditMode: editController.initEditMode
   });
+  var sidebarController = bindSidebarToggle(elements);
   document.addEventListener("DOMContentLoaded", async () => {
     if (sidebarController) {
       sidebarController.syncSidebarState(true);

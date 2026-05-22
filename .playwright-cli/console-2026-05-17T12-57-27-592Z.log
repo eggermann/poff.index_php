@@ -1,0 +1,48 @@
+[460410031ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?view=1&file=flux-jpeg:0
+[460414621ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/:0
+[460426378ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/bild2-eggermann-tif:0
+[460426516ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/bild2-eggermann-tif:0
+[460426516ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/bild2-eggermann-tif:0
+[460454830ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460455267ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460455478ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460510797ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460511176ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460511390ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460519467ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460519865ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460520010ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460520224ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460556693ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/trudels:0
+[460556693ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/trudels:0
+[460557660ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/df-jpg:0
+[460557660ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/df-jpg:0
+[460576319ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460576729ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
+[460578370ms] Error: MCP route returned invalid JSON.
+    at onConvertWork (http://localhost:8888/MAUSMAUS/?edit=true:9885:19)
+    at async HTMLButtonElement.<anonymous> (http://localhost:8888/MAUSMAUS/?edit=true:9256:9)
