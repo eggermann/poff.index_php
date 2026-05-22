@@ -41,6 +41,50 @@
     z-index: 1;
 }
 
+#appSidebar .sidebar-file-drop-zone {
+    position: absolute;
+    inset: var(--poff-space-sm);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed rgba(37, 99, 235, 0.58);
+    border-radius: 18px;
+    background: rgba(248, 250, 252, 0.9);
+    color: #0f172a;
+    box-shadow: 0 22px 44px rgba(15, 23, 42, 0.18);
+    opacity: 0;
+    transform: scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+#appSidebar .sidebar-file-drop-zone__inner {
+    display: grid;
+    gap: 0.28rem;
+    text-align: center;
+}
+
+#appSidebar .sidebar-file-drop-zone__inner strong {
+    font-size: 1rem;
+    font-weight: 760;
+}
+
+#appSidebar .sidebar-file-drop-zone__inner span {
+    font-size: 0.78rem;
+    color: rgba(51, 65, 85, 0.82);
+}
+
+#appSidebar.sidebar-file-drop-active .sidebar-file-drop-zone,
+#appSidebar.sidebar-file-drop-busy .sidebar-file-drop-zone {
+    opacity: 1;
+    transform: scale(1);
+}
+
+#appSidebar.sidebar-file-drop-busy .sidebar-file-drop-zone {
+    border-color: rgba(249, 115, 22, 0.7);
+}
+
 #appSidebar[hidden] {
     display: none !important;
 }

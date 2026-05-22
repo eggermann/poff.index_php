@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();
+    editController.bindSidebarFileDrop(elements.appSidebar);
     editController.bindAuthForm();
 
     if (isPreviewHashActive()) {

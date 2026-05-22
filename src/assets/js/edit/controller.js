@@ -4,6 +4,7 @@ import { registerEscapeClose } from '../core/escape-stack.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
+import { uploadValidationError } from './panel/shared.js';
 import { materializeWorkFields } from './work-fields.js';
 import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layout.js';
 import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
@@ -110,6 +111,7 @@ export function createEditController({ elements, context, editRequested }) {
     let folderConfig = currentPoffConfig;
     let editConfig = currentPoffConfig;
     let editTarget = 'folder';
+    let uploadLimits = null;
     let drawerOpen = false;
     let authFormVisible = false;
     let unregisterDrawerEscapeClose = null;
@@ -275,6 +277,129 @@ export function createEditController({ elements, context, editRequested }) {
         });
     }
 
+    function bindSidebarFileDrop(sidebarEl) {
+        if (!sidebarEl || !editRequested) {
+            return null;
+        }
+
+        const dropZone = document.createElement('div');
+        dropZone.className = 'sidebar-file-drop-zone';
+        dropZone.setAttribute('aria-hidden', 'true');
+        dropZone.innerHTML = '<div class="sidebar-file-drop-zone__inner"><strong>Drop files</strong><span>Add to current folder</span></div>';
+        sidebarEl.appendChild(dropZone);
+
+        let dragDepth = 0;
+        let uploading = false;
+
+        const hasDraggedFiles = (event) => {
+            const types = Array.from(event.dataTransfer?.types || []);
+            return types.includes('Files');
+        };
+
+        const setDropActive = (active) => {
+            sidebarEl.classList.toggle('sidebar-file-drop-active', !!active);
+        };
+
+        const setDropBusy = (busy) => {
+            uploading = !!busy;
+            sidebarEl.classList.toggle('sidebar-file-drop-busy', uploading);
+        };
+
+        const setDropStatus = (message, success = false) => {
+            const inlineStatus = document.getElementById('editInlineStatus') || editAuthStatus;
+            if (inlineStatus) {
+                setStatusMessage(inlineStatus, message, success);
+            }
+        };
+
+        const onDragEnter = (event) => {
+            if (uploading || !hasDraggedFiles(event)) {
+                return;
+            }
+            event.preventDefault();
+            dragDepth += 1;
+            setDropActive(true);
+        };
+
+        const onDragOver = (event) => {
+            if (uploading || !hasDraggedFiles(event)) {
+                return;
+            }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = authState.canEdit ? 'copy' : 'none';
+            setDropActive(true);
+        };
+
+        const onDragLeave = () => {
+            dragDepth = Math.max(0, dragDepth - 1);
+            if (dragDepth === 0) {
+                setDropActive(false);
+            }
+        };
+
+        const onDrop = async (event) => {
+            if (!hasDraggedFiles(event)) {
+                return;
+            }
+            event.preventDefault();
+            dragDepth = 0;
+            setDropActive(false);
+
+            const files = Array.from(event.dataTransfer?.files || []);
+            if (!authState.canEdit) {
+                setDropStatus('Unlock edit mode before uploading files.');
+                return;
+            }
+            if (files.length === 0) {
+                setDropStatus('Drop at least one file.');
+                return;
+            }
+
+            const validationError = uploadValidationError(files, uploadLimits);
+            if (validationError) {
+                setDropStatus(validationError);
+                return;
+            }
+
+            const selection = getActiveSelection();
+            try {
+                setDropBusy(true);
+                setDropStatus('Uploading...');
+                const data = await requestEditUpload({
+                    path: getContentTargetPath(selection),
+                    source: 'upload',
+                    files,
+                });
+                if (!data || data.error) {
+                    throw new Error(data?.error || 'Upload failed.');
+                }
+                await refreshCurrentEditState(selection);
+                const count = Array.isArray(data.uploaded) ? data.uploaded.length : files.length;
+                setDropStatus(count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`, true);
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            } catch (err) {
+                setDropStatus(err.message || 'Upload failed.');
+            } finally {
+                setDropBusy(false);
+            }
+        };
+
+        sidebarEl.addEventListener('dragenter', onDragEnter);
+        sidebarEl.addEventListener('dragover', onDragOver);
+        sidebarEl.addEventListener('dragleave', onDragLeave);
+        sidebarEl.addEventListener('drop', onDrop);
+
+        return {
+            destroy() {
+                sidebarEl.removeEventListener('dragenter', onDragEnter);
+                sidebarEl.removeEventListener('dragover', onDragOver);
+                sidebarEl.removeEventListener('dragleave', onDragLeave);
+                sidebarEl.removeEventListener('drop', onDrop);
+                dropZone.remove();
+            },
+        };
+    }
+
     function bindAuthForm() {
         if (editAuthForm) {
             editAuthForm.addEventListener('submit', async (event) => {
@@ -385,6 +510,7 @@ export function createEditController({ elements, context, editRequested }) {
     function renderEditUI(config, status) {
         syncEditToggle();
         syncAuthDisclosure(false, status);
+        uploadLimits = status?.uploadLimits || uploadLimits;
         const layoutNameForPreset = createLayoutNameForPreset(editConfig);
         const panelState = renderEditPanel({
             editPanel,
@@ -867,6 +993,7 @@ export function createEditController({ elements, context, editRequested }) {
         syncEditToggle,
         bindEditToggle,
         bindAddWorkButton,
+        bindSidebarFileDrop,
         bindAuthForm,
         initEditMode,
     };
