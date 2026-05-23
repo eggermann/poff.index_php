@@ -44,6 +44,11 @@ const navigation = initNavigation({
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode,
+    getPreviewParams: editController.getPreviewParams,
+});
+
+editController.setPreviewRefreshHandler(() => {
+    navigation.refreshCurrentLocation();
 });
 
 const sidebarController = bindSidebarToggle(elements);

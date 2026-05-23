@@ -121,6 +121,8 @@ export function createEditController({ elements, context, editRequested }) {
         editModeAllowed: initialAuthState.editModeAllowed !== false,
         canEdit: !!initialAuthState.canEdit,
     };
+    let previewRefreshHandler = null;
+    let activeConverterPreview = null;
 
     function annotateConfigPath(config, selection = getActiveSelection(), status = {}) {
         if (!config || typeof config !== 'object') {
@@ -141,6 +143,51 @@ export function createEditController({ elements, context, editRequested }) {
             },
         });
         return config;
+    }
+
+    function previewStateKey(previewState) {
+        if (!previewState || typeof previewState !== 'object') {
+            return '';
+        }
+        return JSON.stringify({
+            path: previewState.path || '',
+            isFile: !!previewState.isFile,
+            params: previewState.params || {},
+        });
+    }
+
+    function buildConverterPreviewState(workState, selection = getActiveSelection()) {
+        if (!selection?.previewIsFile) {
+            return null;
+        }
+        const sourcePath = getEditTargetPath(selection);
+        const converter = workState?.converter && typeof workState.converter === 'object'
+            ? workState.converter
+            : null;
+        const converterId = String(converter?.id || '').trim();
+        if (!sourcePath || !converterId) {
+            return null;
+        }
+        return {
+            path: selection.previewPath || sourcePath,
+            isFile: true,
+            params: {
+                converter_preview: '1',
+                converter_id: converterId,
+                converter_format: String(converter.format || 'webp').trim() || 'webp',
+                converter_quality: String(converter.quality || 'default').trim() || 'default',
+                converter_save_mode: String(converter.saveMode || 'new-hidden-work').trim() || 'new-hidden-work',
+            },
+        };
+    }
+
+    function updateConverterPreviewState(nextState, { refresh = true } = {}) {
+        const previousKey = previewStateKey(activeConverterPreview);
+        const nextKey = previewStateKey(nextState);
+        activeConverterPreview = nextState;
+        if (refresh && previousKey !== nextKey && typeof previewRefreshHandler === 'function') {
+            previewRefreshHandler();
+        }
     }
 
     function updateAuthState(nextAuth) {
@@ -291,12 +338,30 @@ export function createEditController({ elements, context, editRequested }) {
         let dragDepth = 0;
         let uploading = false;
 
+        const syncDropZoneBounds = () => {
+            const rect = sidebarEl.getBoundingClientRect();
+            dropZone.style.left = `${Math.round(rect.left)}px`;
+            dropZone.style.top = `${Math.round(rect.top)}px`;
+            dropZone.style.width = `${Math.round(rect.width)}px`;
+            dropZone.style.height = `${Math.round(rect.height)}px`;
+        };
+
+        const clearDropZoneBounds = () => {
+            dropZone.style.left = '';
+            dropZone.style.top = '';
+            dropZone.style.width = '';
+            dropZone.style.height = '';
+        };
+
         const hasDraggedFiles = (event) => {
             const types = Array.from(event.dataTransfer?.types || []);
             return types.includes('Files');
         };
 
         const setDropActive = (active) => {
+            if (active) {
+                syncDropZoneBounds();
+            }
             sidebarEl.classList.toggle('sidebar-file-drop-active', !!active);
         };
 
@@ -326,6 +391,7 @@ export function createEditController({ elements, context, editRequested }) {
                 return;
             }
             event.preventDefault();
+            syncDropZoneBounds();
             event.dataTransfer.dropEffect = authState.canEdit ? 'copy' : 'none';
             setDropActive(true);
         };
@@ -344,6 +410,7 @@ export function createEditController({ elements, context, editRequested }) {
             event.preventDefault();
             dragDepth = 0;
             setDropActive(false);
+            clearDropZoneBounds();
 
             const files = Array.from(event.dataTransfer?.files || []);
             if (!authState.canEdit) {
@@ -388,6 +455,7 @@ export function createEditController({ elements, context, editRequested }) {
         sidebarEl.addEventListener('dragover', onDragOver);
         sidebarEl.addEventListener('dragleave', onDragLeave);
         sidebarEl.addEventListener('drop', onDrop);
+        window.addEventListener('resize', syncDropZoneBounds);
 
         return {
             destroy() {
@@ -395,6 +463,8 @@ export function createEditController({ elements, context, editRequested }) {
                 sidebarEl.removeEventListener('dragover', onDragOver);
                 sidebarEl.removeEventListener('dragleave', onDragLeave);
                 sidebarEl.removeEventListener('drop', onDrop);
+                window.removeEventListener('resize', syncDropZoneBounds);
+                clearDropZoneBounds();
                 dropZone.remove();
             },
         };
@@ -492,6 +562,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (refreshed?.config) {
             editConfig = annotateConfigPath(refreshed.config, selection, refreshed);
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
+            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection), { refresh: false });
             if (editTarget === 'folder' || (editTarget === 'layout' && refreshed.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
@@ -555,6 +626,7 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 const currentWork = (editConfig.work && typeof editConfig.work === 'object') ? editConfig.work : {};
                 editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
+                updateConverterPreviewState(buildConverterPreviewState(editConfig.work));
             },
             onSubmit: async ({ elements, statusEl }) => {
                 const selection = getActiveSelection();
@@ -912,6 +984,7 @@ export function createEditController({ elements, context, editRequested }) {
             });
         }
         syncDrawerVisibility();
+        updateConverterPreviewState(buildConverterPreviewState(config?.work || {}));
 
         window.POFF_REVIEW_PENDING_LINK = ({ path = '' } = {}) => {
             drawerOpen = true;
@@ -959,6 +1032,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (data.config) {
             editConfig = annotateConfigPath(data.config, selection, data);
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');
+            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection), { refresh: false });
             if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
@@ -996,5 +1070,18 @@ export function createEditController({ elements, context, editRequested }) {
         bindSidebarFileDrop,
         bindAuthForm,
         initEditMode,
+        getPreviewParams({ path = '', isFile = false } = {}) {
+            if (!activeConverterPreview || !isFile) {
+                return null;
+            }
+            const targetPath = String(path || '').trim();
+            if (targetPath === '' || targetPath !== String(activeConverterPreview.path || '').trim()) {
+                return null;
+            }
+            return activeConverterPreview.params || null;
+        },
+        setPreviewRefreshHandler(handler) {
+            previewRefreshHandler = typeof handler === 'function' ? handler : null;
+        },
     };
 }
