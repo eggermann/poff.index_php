@@ -2013,6 +2013,33 @@ function runConverterRoute(mode, rootDir, payload = {}) {
   });
 }
 
+function runViewerMcpRoute(route, rootDir, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      path.join(ROOT, 'tests/php_viewer_mcp_route.php'),
+      rootDir,
+      route,
+      JSON.stringify(payload),
+    ];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(stdout.trim()));
+        return;
+      }
+      reject(new Error(`viewer mcp helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function createConverterApp(rootDir, name, overrides = {}) {
   const folder = path.join(rootDir, 'poff', 'converters', name);
   const layout = path.join(folder, '.layout');
@@ -2072,6 +2099,8 @@ describe('Poff converters', () => {
           name: 'convert-image',
           label: 'Convert Image',
           folder: 'poff/converters/convert-image',
+          path: 'poff/converters/convert-image',
+          viewerHref: '?view=1&path=poff%2Fconverters%2Fconvert-image',
           templateFolder: 'poff/converters/convert-image/.layout',
           formats: ['webp', 'jpeg', 'png'],
         }),
@@ -2140,6 +2169,54 @@ describe('Poff converters', () => {
     ]));
   });
 
+  test('file viewer switches to converter template preview when a converter is selected', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-preview-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'hello.txt'), 'Hello world');
+    createConverterApp(tempRoot, 'convert-text', {
+      label: 'Convert Text',
+      accepts: ['text/plain', 'text/*'],
+      outputs: ['text/plain'],
+      engine: 'text-copy',
+      defaults: {
+        format: 'txt',
+        quality: 'preview',
+        saveMode: 'new-hidden-work',
+        hiddenByDefault: true,
+      },
+      ui: {
+        format: { type: 'select', label: 'Output format', options: ['txt'] },
+        quality: { type: 'select', label: 'Quality', options: ['preview', 'default'] },
+      },
+    });
+    fs.writeFileSync(
+      path.join(tempRoot, 'poff', 'converters', 'convert-text', '.layout', 'template.hbs'),
+      '<section class="converter-preview">{{> work}}</section>'
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, 'poff', 'converters', 'convert-text', '.layout', 'work.hbs'),
+      '<div class="converter-preview__panel">{{converter.label}}|{{source.name}}|{{target.saveAs}}|{{status.state}}</div>'
+    );
+
+    try {
+      const rendered = await runViewerWithQuery('hello.txt', tempRoot, false, {
+        converter_preview: '1',
+        converter_id: 'converter/convert-text',
+        converter_format: 'txt',
+        converter_quality: 'preview',
+        converter_save_mode: 'new-hidden-work',
+      });
+
+      expect(rendered).toContain('converter-preview');
+      expect(rendered).toContain('Convert Text');
+      expect(rendered).toContain('hello.txt');
+      expect(rendered).toContain('Convert Text|hello.txt|hello.txt|ready');
+      expect(rendered).not.toContain('<pre class=');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('creates a converter app from the default grain', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-grain-${Date.now()}`);
     fs.mkdirSync(tempRoot, { recursive: true });
@@ -2160,6 +2237,83 @@ describe('Poff converters', () => {
       expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/.layout/template.hbs'))).toBe(true);
       expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/.layout/work.hbs'))).toBe(true);
       expect(fs.existsSync(path.join(tempRoot, 'poff/converters/convert-image/.layout/external.hbs'))).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('create-converter route creates a folder-backed converter app from the starter grain', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-create-route-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+
+    try {
+      const result = await runConverterRoute('create-converter', tempRoot, {
+        path: 'hello.txt',
+        name: 'convert-mov-audio',
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        route: 'create-converter',
+        ok: true,
+        folder: 'converters/convert-mov-audio',
+        targetType: 'converter',
+        promptPath: 'converters/convert-mov-audio',
+      }));
+      expect(result.definition).toEqual(expect.objectContaining({
+        id: 'converter/convert-mov-audio',
+        name: 'convert-mov-audio',
+        folder: 'converters/convert-mov-audio',
+        path: 'converters/convert-mov-audio',
+        viewerHref: '?view=1&path=converters%2Fconvert-mov-audio',
+      }));
+      expect(fs.existsSync(path.join(tempRoot, 'converters/convert-mov-audio/converter.json'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'converters/convert-mov-audio/poff.config.json'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'converters/convert-mov-audio/.layout/template.hbs'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'converters/convert-mov-audio/.layout/work.hbs'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'converters/convert-mov-audio/.layout/external.hbs'))).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('viewer bootstrap dispatches mcp routes as json instead of html', async () => {
+    const tempRoot = path.join(POFF_DIR, `viewer-mcp-route-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+
+    try {
+      const result = await runViewerMcpRoute('create-converter', tempRoot, {
+        path: 'hello.txt',
+        name: 'convert-live-entry',
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        route: 'create-converter',
+        ok: true,
+        folder: 'converters/convert-live-entry',
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('directly opening a created converter folder renders it as a converter work', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-viewer-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+
+    try {
+      const created = await runConverterRoute('create-converter', tempRoot, {
+        path: 'hello.txt',
+        name: 'convert-mov-audio',
+      });
+
+      expect(created.ok).toBe(true);
+      const output = await runViewer('converters/convert-mov-audio', tempRoot);
+      expect(output).toContain('data-viewer-type="converter"');
+      expect(output).toContain('poff-converter-work');
+      expect(output).toContain('Convert Mov Audio');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

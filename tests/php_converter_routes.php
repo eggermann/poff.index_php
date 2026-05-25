@@ -11,6 +11,7 @@ require_once __DIR__ . '/../src/includes/viewer/utils.php';
 require_once __DIR__ . '/../src/mcp/helpers.php';
 require_once __DIR__ . '/../src/mcp/routes/converters.php';
 require_once __DIR__ . '/../src/mcp/routes/convert.php';
+require_once __DIR__ . '/../src/mcp/routes/create-converter.php';
 require_once __DIR__ . '/../src/mcp/routes/converter-prompt.php';
 
 $mode = $argv[1] ?? '';
@@ -53,6 +54,15 @@ if ($mode === 'converter-prompt') {
     echo json_encode(handleConverterPrompt([
         'rootDir' => $rootDir,
         'path' => (string) ($payload['path'] ?? ''),
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'create-converter') {
+    echo json_encode(handleCreateConverter([
+        'rootDir' => $rootDir,
+        'path' => (string) ($payload['path'] ?? ''),
+        'payload' => $payload,
     ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit(0);
 }

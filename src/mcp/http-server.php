@@ -15,6 +15,7 @@ require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/remote-content.php';
 require_once __DIR__ . '/routes/converters.php';
 require_once __DIR__ . '/routes/convert.php';
+require_once __DIR__ . '/routes/create-converter.php';
 require_once __DIR__ . '/routes/converter-prompt.php';
 
 use PhpMcp\Server\Server;
@@ -149,6 +150,25 @@ $server = Server::make()
                 'conversion' => ['type' => 'object'],
             ],
             'required' => ['sourcePath', 'conversion'],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleCreateConverter([
+                'rootDir' => $rootDir,
+                'path' => $args['path'] ?? '',
+                'payload' => $args,
+            ]);
+        },
+        name: 'create_converter',
+        description: 'Create a new folder-backed converter app from the default starter grain.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'path' => ['type' => 'string', 'description' => 'Relative content path used for editor access checks'],
+                'name' => ['type' => 'string', 'description' => 'Converter folder name such as convert-image'],
+            ],
+            'required' => ['name'],
         ]
     )
     ->withTool(

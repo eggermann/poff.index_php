@@ -143,8 +143,8 @@ class Converter
 
         $targetRelative = 'poff/converters/' . $name;
         $target = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $targetRelative);
-        $grain = __DIR__ . '/worktypes/templates/converter/default';
-        if (!is_dir($grain)) {
+        $grainFiles = self::defaultGrainFiles();
+        if ($grainFiles === null) {
             return self::error('Default converter grain is missing.');
         }
         if (!is_dir($target . DIRECTORY_SEPARATOR . '.layout')) {
@@ -152,10 +152,9 @@ class Converter
         }
 
         foreach (['template.hbs', 'work.hbs', 'external.hbs', 'style.css', 'script.js'] as $file) {
-            $source = $grain . DIRECTORY_SEPARATOR . $file;
             $destination = $target . DIRECTORY_SEPARATOR . '.layout' . DIRECTORY_SEPARATOR . $file;
-            if (is_file($source) && !is_file($destination)) {
-                copy($source, $destination);
+            if (!is_file($destination) && array_key_exists($file, $grainFiles)) {
+                file_put_contents($destination, (string) $grainFiles[$file]);
             }
         }
 
@@ -163,6 +162,49 @@ class Converter
         if (!is_file($converterJson)) {
             $definition = self::starterDefinitionForName($name);
             self::writeJson($converterJson, $definition);
+        }
+
+        $definition = self::definitionFromFolder($root, $targetRelative);
+        return [
+            'ok' => $definition !== null,
+            'folder' => $targetRelative,
+            'definition' => $definition,
+        ];
+    }
+
+    public static function ensureVisibleConverterFolder(string $rootDir, string $name): array
+    {
+        $root = self::normalizeRootDir($rootDir);
+        $name = self::normalizeConverterName($name);
+        if ($name === '') {
+            return self::error('Missing converter name.');
+        }
+
+        $targetRelative = 'converters/' . $name;
+        $target = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $targetRelative);
+        $grainFiles = self::defaultGrainFiles();
+        if ($grainFiles === null) {
+            return self::error('Default converter grain is missing.');
+        }
+        if (!is_dir($target . DIRECTORY_SEPARATOR . '.layout')) {
+            mkdir($target . DIRECTORY_SEPARATOR . '.layout', 0755, true);
+        }
+
+        foreach (['template.hbs', 'work.hbs', 'external.hbs', 'style.css', 'script.js'] as $file) {
+            $destination = $target . DIRECTORY_SEPARATOR . '.layout' . DIRECTORY_SEPARATOR . $file;
+            if (!is_file($destination) && array_key_exists($file, $grainFiles)) {
+                file_put_contents($destination, (string) $grainFiles[$file]);
+            }
+        }
+
+        $converterJson = $target . DIRECTORY_SEPARATOR . 'converter.json';
+        if (!is_file($converterJson)) {
+            self::writeJson($converterJson, self::starterDefinitionForName($name));
+        }
+
+        $folderConfigPath = $target . DIRECTORY_SEPARATOR . 'poff.config.json';
+        if (!is_file($folderConfigPath)) {
+            self::writeJson($folderConfigPath, self::starterFolderConfigForName($name));
         }
 
         $definition = self::definitionFromFolder($root, $targetRelative);
@@ -191,6 +233,89 @@ class Converter
                 'hiddenByDefault' => true,
             ],
             'ui' => self::defaultUi(),
+        ];
+    }
+
+    private static function starterFolderConfigForName(string $name): array
+    {
+        $label = ucwords(str_replace(['-', '_'], ' ', preg_replace('/^convert-/', '', $name) ?: $name));
+        return [
+            'title' => 'Convert ' . $label,
+            'folderName' => $name,
+            'description' => 'Converter app folder. Open this work to configure and run conversions.',
+            'work' => [
+                'type' => 'converter',
+                'template' => 'converter',
+            ],
+        ];
+    }
+
+    private static function defaultGrainFiles(): ?array
+    {
+        $grainDir = __DIR__ . '/worktypes/templates/converter/default';
+        if (is_dir($grainDir)) {
+            return [
+                'template.hbs' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'template.hbs'),
+                'work.hbs' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'work.hbs'),
+                'external.hbs' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'external.hbs'),
+                'style.css' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'style.css'),
+                'script.js' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'script.js'),
+            ];
+        }
+
+        return [
+            'template.hbs' => <<<'HBS'
+<section class="poff-converter-work">
+    <h2>{{title}}</h2>
+    <p>Converter work accepts source payloads and produces generated poff works.</p>
+    {{#if work.accepts}}
+        <div class="poff-converter-work__meta">Accepts configured source MIME patterns.</div>
+    {{/if}}
+</section>
+HBS,
+            'work.hbs' => <<<'HBS'
+<section class="poff-converter-work">
+    <header class="poff-converter-work__header">
+        <p class="poff-converter-work__eyebrow">Converter app</p>
+        <h2 class="poff-converter-work__title">{{converter.label}}</h2>
+    </header>
+    <dl class="poff-converter-work__details">
+        <div class="poff-converter-work__row">
+            <dt>Source</dt>
+            <dd>{{source.name}}</dd>
+        </div>
+        <div class="poff-converter-work__row">
+            <dt>Format</dt>
+            <dd>{{converter.format}}</dd>
+        </div>
+        <div class="poff-converter-work__row">
+            <dt>Status</dt>
+            <dd>{{status.state}}</dd>
+        </div>
+    </dl>
+</section>
+HBS,
+            'external.hbs' => <<<'HBS'
+<section class="poff-converter-external">
+    <h2>{{title}}</h2>
+    {{#if external.sourceWork.path}}
+        <p>Converted from <code>{{external.sourceWork.path}}</code>.</p>
+    {{/if}}
+    {{#if external.resultWork.srcUrl}}
+        <a href="{{external.resultWork.srcUrl}}">{{external.resultWork.name}}</a>
+    {{/if}}
+</section>
+HBS,
+            'style.css' => <<<'CSS'
+.poff-converter-work,
+.poff-converter-external {
+    display: grid;
+    gap: 0.75rem;
+}
+CSS,
+            'script.js' => <<<'JS'
+document.documentElement.dataset.poffConverterTemplate = 'default';
+JS,
         ];
     }
 
@@ -333,6 +458,11 @@ class Converter
             $enabled = false;
             $disabledReason = $disabledReason !== '' ? $disabledReason : 'Imagick extension missing; ImageMagick CLI disabled unless POFF_ENABLE_IMAGEMAGICK_CLI=1.';
         }
+        $folder = (string) ($definition['folder'] ?? '');
+        $templateFolder = (string) ($definition['templateFolder'] ?? ($folder !== '' ? $folder . '/.layout' : '.layout/converters/' . $name));
+        $path = self::definitionPath($folder);
+        $viewerHref = $path !== '' ? '?view=1&path=' . rawurlencode($path) : '';
+        $url = $viewerHref;
 
         return [
             'id' => $id,
@@ -343,8 +473,11 @@ class Converter
             'outputs' => $outputs,
             'formats' => $formats,
             'engine' => $engine,
-            'folder' => (string) ($definition['folder'] ?? ''),
-            'templateFolder' => (string) ($definition['templateFolder'] ?? (($definition['folder'] ?? '') !== '' ? (string) $definition['folder'] . '/.layout' : '.layout/converters/' . $name)),
+            'folder' => $folder,
+            'templateFolder' => $templateFolder,
+            'path' => $path,
+            'viewerHref' => $viewerHref,
+            'url' => $url,
             'enabled' => $enabled,
             'disabledReason' => $disabledReason,
             'defaults' => is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [],
@@ -376,6 +509,12 @@ class Converter
         ];
     }
 
+    private static function readTemplatePackageFile(string $absoluteFolder, string $fileName): ?string
+    {
+        $path = rtrim($absoluteFolder, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($fileName, '/');
+        return is_file($path) ? (string) file_get_contents($path) : null;
+    }
+
     public static function definition(string $id, string $rootDir = ''): ?array
     {
         $selected = self::normalizeSelectedConverter(['id' => $id]);
@@ -397,6 +536,41 @@ class Converter
     {
         $definition = self::definition($id, $rootDir);
         return is_array($definition) && is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [];
+    }
+
+    public static function templatePackage(array|string $converter, string $rootDir = ''): ?array
+    {
+        $definition = is_array($converter)
+            ? self::definition((string) ($converter['id'] ?? $converter['name'] ?? ''), $rootDir)
+            : self::definition((string) $converter, $rootDir);
+        if ($definition === null) {
+            return null;
+        }
+
+        $root = self::normalizeRootDir($rootDir);
+        $templateFolder = trim(str_replace('\\', '/', (string) ($definition['templateFolder'] ?? '')), '/');
+        if ($templateFolder === '') {
+            return null;
+        }
+
+        $absoluteFolder = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $templateFolder);
+        if (!is_dir($absoluteFolder)) {
+            return null;
+        }
+
+        $template = self::readTemplatePackageFile($absoluteFolder, 'template.hbs');
+        if ($template === null || trim($template) === '') {
+            return null;
+        }
+
+        return [
+            'directory' => $templateFolder,
+            'template' => $template,
+            'workTemplate' => self::readTemplatePackageFile($absoluteFolder, 'work.hbs') ?? '',
+            'externalTemplate' => self::readTemplatePackageFile($absoluteFolder, 'external.hbs') ?? '',
+            'css' => self::readTemplatePackageFile($absoluteFolder, 'style.css') ?? '',
+            'js' => self::readTemplatePackageFile($absoluteFolder, 'script.js') ?? '',
+        ];
     }
 
     public static function availableFor(string $mimeType, string $kind, string $extension, string $rootDir = ''): array
@@ -492,6 +666,15 @@ class Converter
         }
         if (!isset($converter['format'])) {
             $converter['format'] = 'webp';
+        }
+        if (isset($converter['path'])) {
+            $converter['path'] = trim(str_replace('\\', '/', (string) $converter['path']), '/');
+        }
+        if (isset($converter['viewerHref'])) {
+            $converter['viewerHref'] = trim((string) $converter['viewerHref']);
+        }
+        if (isset($converter['url'])) {
+            $converter['url'] = trim((string) $converter['url']);
         }
         return $converter;
     }
@@ -978,6 +1161,15 @@ class Converter
         $value = strtolower(trim($name));
         $value = preg_replace('/^converter\//', '', $value) ?? $value;
         return preg_replace('/[^a-z0-9._-]+/i', '-', $value) ?: '';
+    }
+
+    private static function definitionPath(string $folder): string
+    {
+        $normalized = trim(str_replace('\\', '/', $folder), '/');
+        if ($normalized === '' || str_starts_with($normalized, 'src/')) {
+            return '';
+        }
+        return $normalized;
     }
 
     private static function normalizeRootDir(string $rootDir): string

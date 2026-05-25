@@ -67,6 +67,9 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
     const converterName = String(selectedOption?.dataset?.converterName || '').trim();
     const converterType = String(selectedOption?.dataset?.converterType || 'converter').trim() || 'converter';
     const converterEngine = String(selectedOption?.dataset?.converterEngine || '').trim();
+    const converterPath = String(selectedOption?.dataset?.converterPath || '').trim();
+    const converterViewerHref = String(selectedOption?.dataset?.converterViewerHref || '').trim();
+    const converterUrl = String(selectedOption?.dataset?.converterUrl || '').trim();
     const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
         nextWork.converter = {
@@ -75,6 +78,9 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
             name: converterName || String(existingConverter.name || converterId.split('/').pop() || 'converter'),
             enabled: true,
             id: converterId,
+            path: converterPath,
+            viewerHref: converterViewerHref,
+            url: converterUrl,
             node: converterEngine === 'remote-node'
                 ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
@@ -174,6 +180,8 @@ export function createEditController({ elements, context, editRequested }) {
             params: {
                 converter_preview: '1',
                 converter_id: converterId,
+                converter_path: String(converter.path || '').trim(),
+                converter_url: String(converter.url || '').trim(),
                 converter_format: String(converter.format || 'webp').trim() || 'webp',
                 converter_quality: String(converter.quality || 'default').trim() || 'default',
                 converter_save_mode: String(converter.saveMode || 'new-hidden-work').trim() || 'new-hidden-work',
@@ -723,6 +731,56 @@ export function createEditController({ elements, context, editRequested }) {
                 }
                 window.alert('OK — this file was converted into a web-readable poff work and saved in the folder.');
                 await refreshCurrentEditState(selection);
+            },
+            onCreateConverter: async ({ statusEl, form }) => {
+                const selection = getActiveSelection();
+                const sourcePath = getEditTargetPath(selection);
+                const currentWork = (editConfig?.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+                const suggestedBase = String(currentWork.type || editConfig?.kind || 'image').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'converter';
+                const suggestedName = suggestedBase.startsWith('convert-') ? suggestedBase : `convert-${suggestedBase}`;
+                const requestedName = window.prompt('New converter folder name', suggestedName);
+                if (requestedName === null) {
+                    return;
+                }
+                const name = requestedName.trim();
+                if (!name) {
+                    setStatusMessage(statusEl, 'Converter creation cancelled.');
+                    return;
+                }
+                setStatusMessage(statusEl, 'Creating converter...');
+                const created = await requestMcpRoute('create-converter', {
+                    path: sourcePath,
+                    name,
+                });
+                if (!created || created.ok === false || created.error) {
+                    throw new Error(created?.error || 'Creating converter failed.');
+                }
+                const definition = created.definition && typeof created.definition === 'object' ? created.definition : null;
+                const nextPath = String(definition?.path || created.folder || '').trim().replace(/^\/+|\/+$/g, '');
+                if (nextPath) {
+                    const nextHash = `#/${nextPath}`;
+                    if (window.location.hash === nextHash) {
+                        window.dispatchEvent(new Event('hashchange'));
+                    } else {
+                        window.location.hash = nextHash;
+                    }
+                    return;
+                }
+                await refreshCurrentEditState(selection);
+                const refreshedForm = editPanel?.querySelector?.('#inlineEditForm') || form;
+                const refreshedSelect = refreshedForm?.elements?.converter_id instanceof HTMLSelectElement
+                    ? refreshedForm.elements.converter_id
+                    : null;
+                if (definition && refreshedSelect) {
+                    refreshedSelect.value = String(definition.id || '');
+                    refreshedSelect.dispatchEvent(new Event('input', { bubbles: true }));
+                    refreshedSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                setStatusMessage(
+                    editPanel?.querySelector?.('#editInlineStatus') || statusEl,
+                    `Created converter ${definition?.label || definition?.name || name} at ${created.folder || ''}. Select it to continue.`,
+                    true
+                );
             },
             onResetFolderWork: async ({ statusEl }) => {
                 const selection = getActiveSelection();

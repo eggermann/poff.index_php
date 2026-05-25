@@ -73,11 +73,92 @@ function cmsNavBadgeMarkup(bool $isHidden, bool $isPendingApproval, bool $isAppr
     return '';
 }
 
-function cmsNavRenderItem(array $item, bool $editMode, bool $isFile): string
+function cmsNavPathLooksLikeConverter(string $path): bool
+{
+    $normalized = trim(str_replace('\\', '/', $path), '/');
+    if ($normalized === '') {
+        return false;
+    }
+
+    return (bool) preg_match('~^converters/[^/]+(?:/.*)?$~', $normalized);
+}
+
+function cmsNavFolderWorkType(string $baseDir, string $relativePath): string
+{
+    $normalized = trim(str_replace('\\', '/', $relativePath), '/');
+    if ($normalized === '') {
+        return '';
+    }
+
+    $absolutePath = rtrim($baseDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+    if (!is_dir($absolutePath)) {
+        return '';
+    }
+
+    $configPath = $absolutePath . DIRECTORY_SEPARATOR . 'poff.config.json';
+    if (!is_file($configPath)) {
+        return '';
+    }
+
+    $decoded = json_decode((string) file_get_contents($configPath), true);
+    if (!is_array($decoded)) {
+        return '';
+    }
+
+    return trim((string) (($decoded['work']['type'] ?? $decoded['type'] ?? '')));
+}
+
+function cmsNavIsConverterItem(array $item, bool $isFile, string $baseDir): bool
+{
+    if (!empty($item['isConverter'])) {
+        return true;
+    }
+
+    if ($isFile) {
+        return false;
+    }
+
+    $workType = trim((string) (($item['work']['type'] ?? $item['type'] ?? '')));
+    if ($workType === 'converter') {
+        return true;
+    }
+
+    $relativePath = trim((string) ($item['path'] ?? ''), "/\\");
+    if ($relativePath === '') {
+        return false;
+    }
+
+    if (cmsNavPathLooksLikeConverter($relativePath)) {
+        return cmsNavFolderWorkType($baseDir, $relativePath) === 'converter' || !str_contains($relativePath, '/');
+    }
+
+    return cmsNavFolderWorkType($baseDir, $relativePath) === 'converter';
+}
+
+function cmsNavBadgeForItem(bool $isHidden, bool $isPendingApproval, bool $isApprovedExternal, bool $isConverter): string
+{
+    if ($isPendingApproval) {
+        return '<span class="nav-link-badge nav-link-badge-pending">new</span>';
+    }
+    if ($isHidden) {
+        return '<span class="nav-link-badge">hidden</span>';
+    }
+    if ($isApprovedExternal) {
+        return '<span class="nav-link-badge nav-link-badge-approved">external</span>';
+    }
+    if ($isConverter) {
+        return '<span class="nav-link-badge nav-link-badge-converter">converter</span>';
+    }
+
+    return '';
+}
+
+function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $baseDir): string
 {
     $isHidden = !empty($item['hidden']);
     $isPendingApproval = !empty($item['pendingApproval']);
     $isApprovedExternal = !empty($item['approvedExternal']);
+    $isConverter = cmsNavIsConverterItem($item, $isFile, $baseDir);
     $displayName = (string) ($item['title'] ?? $item['name']);
     $hiddenAttrs = $isHidden
         ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
@@ -88,7 +169,8 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile): string
     $navLinkClasses = 'nav-link'
         . ($isHidden ? ' nav-link-hidden' : '')
         . ($isPendingApproval ? ' nav-link-pending-approval' : '')
-        . ($isApprovedExternal ? ' nav-link-approved-external' : '');
+        . ($isApprovedExternal ? ' nav-link-approved-external' : '')
+        . ($isConverter ? ' nav-link-converter' : '');
     $href = $isFile ? '#' : ($isHidden ? '#' : $item['link']);
     $dataAttrs = ' data-tree-item="1" data-path="' . htmlspecialchars($item['path']) . '" data-slug="' . htmlspecialchars($item['slug']) . '"';
 
@@ -98,7 +180,7 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile): string
 
     return '<li style="' . $rowStyle . '">'
         . '<a class="' . $navLinkClasses . '" style="flex:1;" href="' . htmlspecialchars($href) . '"' . $dataAttrs . ' title="' . htmlspecialchars((string) ($item['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>'
-        . $item['icon'] . htmlspecialchars($displayName) . cmsNavBadgeMarkup($isHidden, $isPendingApproval, $isApprovedExternal) . '</a>'
+        . $item['icon'] . htmlspecialchars($displayName) . cmsNavBadgeForItem($isHidden, $isPendingApproval, $isApprovedExternal, $isConverter) . '</a>'
         . ($isPendingApproval ? cmsNavActionButton('Review', 'Review external link submission', 'nav-row-action-review', cmsNavIcon('pending'), ' data-nav-action="review-external" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '')
         . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr((string) ($item['copyText'] ?? $item['name']))) : '')
         . ($editMode && !$isPendingApproval ? cmsNavActionButton($isHidden ? 'Unhide' : 'Hide', $isHidden ? 'Unhide in sidebar' : 'Hide from sidebar', 'nav-row-action-toggle', $isHidden ? cmsNavIcon('show') : cmsNavIcon('hide'), ' data-nav-action="toggle-visibility" data-nav-path="' . htmlspecialchars($item['path']) . '" data-nav-hidden="' . ($isHidden ? '1' : '0') . '"') : '')
@@ -225,7 +307,7 @@ function cmsRenderNavListMarkup(array $context): string
     usort($files, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
     foreach ($directories as $dir) {
-        echo cmsNavRenderItem($dir, $editMode, false);
+        echo cmsNavRenderItem($dir, $editMode, false, $baseDir);
     }
 
     if ($editMode) {
@@ -240,7 +322,7 @@ function cmsRenderNavListMarkup(array $context): string
     }
 
     foreach ($files as $file) {
-        echo cmsNavRenderItem($file, $editMode, true);
+        echo cmsNavRenderItem($file, $editMode, true, $baseDir);
     }
 
     return (string) ob_get_clean();

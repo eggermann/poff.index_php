@@ -181,6 +181,9 @@ function readMediaConfigFromForm(form, currentWork = {}) {
     const converterName = String(selectedOption?.dataset?.converterName || '').trim();
     const converterType = String(selectedOption?.dataset?.converterType || 'converter').trim() || 'converter';
     const converterEngine = String(selectedOption?.dataset?.converterEngine || '').trim();
+    const converterPath = String(selectedOption?.dataset?.converterPath || '').trim();
+    const converterViewerHref = String(selectedOption?.dataset?.converterViewerHref || '').trim();
+    const converterUrl = String(selectedOption?.dataset?.converterUrl || '').trim();
     const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
         nextWork.converter = {
@@ -189,6 +192,9 @@ function readMediaConfigFromForm(form, currentWork = {}) {
             name: converterName || String(existingConverter.name || converterId.split('/').pop() || 'converter'),
             enabled: true,
             id: converterId,
+            path: converterPath,
+            viewerHref: converterViewerHref,
+            url: converterUrl,
             node: converterEngine === 'remote-node'
                 ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
@@ -295,7 +301,7 @@ function renderConverterSection(config = {}) {
         ...available.map((item) => {
             const disabled = item.enabled === false;
             const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
-            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
         }),
     ].join('');
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
@@ -317,6 +323,7 @@ function renderConverterSection(config = {}) {
                     <div class="edit-work-fields-title">Converter</div>
                     <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
                 </div>
+                <button class="btn btn-secondary" type="button" id="editCreateConverter">New converter</button>
             </div>
             ${unsupportedMessage}
             <div class="edit-grid edit-grid-cols">
@@ -678,6 +685,7 @@ export function renderEditPanel({
     onDeleteTarget,
     onChangePassword,
     onConvertWork,
+    onCreateConverter,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -845,6 +853,7 @@ export function renderEditPanel({
     const descInput = editPanel.querySelector('#edit-description');
     const addWorkFieldButton = editPanel.querySelector('#editWorkFieldAdd');
     const convertButton = editPanel.querySelector('#editConvertWork');
+    const createConverterButton = editPanel.querySelector('#editCreateConverter');
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
 
@@ -911,6 +920,11 @@ export function renderEditPanel({
     }
     if (changeLayoutButton && typeof onOpenLayoutPage === 'function') {
         changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
+    }
+    if (createConverterButton && typeof onCreateConverter === 'function') {
+        createConverterButton.addEventListener('click', async () => {
+            await onCreateConverter({ statusEl, form });
+        });
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === 'function') {
         resetFolderWorkButton.addEventListener('click', async () => {

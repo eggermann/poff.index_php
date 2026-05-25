@@ -150,3 +150,32 @@ test('pending external links stay hidden from visitors and show review state for
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('converter folders render a visible converter badge in the sidebar nav', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-converter-'));
+  try {
+    fs.mkdirSync(path.join(tempRoot, 'converters', 'convert-text'), { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'converters', 'convert-text', 'poff.config.json'), JSON.stringify({
+      folderName: 'convert-text',
+      title: 'Convert Text',
+      type: 'folder',
+      work: {
+        type: 'converter',
+      },
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, 'converters'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('nav-link-converter');
+    expect(result.stdout).toContain('nav-link-badge-converter');
+    expect(result.stdout).toContain('converter</span>');
+    expect(result.stdout).toContain('convert-text');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

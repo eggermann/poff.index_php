@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../core/utils.js';
+import { bindStoredDetailsState, renderPersistentDetailsSection } from './shared.js';
 
 const DEFAULT_CATEGORY_OPTIONS = ['image', 'media', 'visual', 'video', 'motion', 'audio', 'sound', 'pdf', 'document', 'text', 'link', 'reference', 'folder', 'collection', 'other'];
 const CATEGORY_FIELD_ID = 'edit-work-categories';
@@ -7,6 +8,7 @@ const CATEGORY_CUSTOM_ID = 'edit-work-category-custom';
 const CATEGORY_PILLS_ID = 'editWorkCategoryPills';
 const CATEGORY_ADD_ID = 'editWorkCategoryAdd';
 const CATEGORY_CUSTOM_ADD_ID = 'editWorkCategoryCustomAdd';
+const CATEGORY_DETAILS_STORAGE_KEY = 'category-details';
 const CATEGORY_MAX_LENGTH = 24;
 const CATEGORY_MAX_COUNT = 12;
 
@@ -89,43 +91,43 @@ export function renderWorkCategorySection(config = {}) {
     ]));
     const selectedCategory = normalizeCategoryValue(options.find((option) => !categories.includes(option)) || options[0] || '');
 
-    return `
-        <div class="edit-work-category-section" data-work-category-section>
-            <div class="edit-work-category-header">
-                <div>
-                    <div class="edit-work-fields-title">Categories</div>
-                    <div class="small-note">Pick shared work categories for filtering and prompt context.</div>
+    return renderPersistentDetailsSection({
+        storageKey: CATEGORY_DETAILS_STORAGE_KEY,
+        defaultOpen: false,
+        id: 'editWorkCategorySection',
+        className: 'edit-work-fields edit-work-category-section',
+        summaryClassName: 'edit-work-category-summary',
+        bodyClassName: 'edit-work-category-controls',
+        titleHtml: 'Categories',
+        noteHtml: 'Pick shared work categories for filtering and prompt context.',
+        bodyHtml: `
+            <div class="edit-work-category-picker">
+                <label class="edit-label" for="${CATEGORY_SELECT_ID}">Add from works</label>
+                <div class="edit-work-category-picker-row">
+                    <select class="form-select" id="${CATEGORY_SELECT_ID}" name="work_category_select">
+                        ${renderCategoryOptions(options, selectedCategory)}
+                    </select>
+                    <button class="btn btn-secondary" type="button" id="${CATEGORY_ADD_ID}" aria-label="Add selected category">+</button>
                 </div>
+                <div class="small-note">The list comes from the shared worktype categories.</div>
             </div>
-            <div class="edit-work-category-controls">
-                <div class="edit-work-category-picker">
-                    <label class="edit-label" for="${CATEGORY_SELECT_ID}">Add from works</label>
-                    <div class="edit-work-category-picker-row">
-                        <select class="form-select" id="${CATEGORY_SELECT_ID}" name="work_category_select">
-                            ${renderCategoryOptions(options, selectedCategory)}
-                        </select>
-                        <button class="btn btn-secondary" type="button" id="${CATEGORY_ADD_ID}" aria-label="Add selected category">+</button>
-                    </div>
-                    <div class="small-note">The list comes from the shared worktype categories.</div>
+            <div class="edit-work-category-picker">
+                <label class="edit-label" for="${CATEGORY_CUSTOM_ID}">Custom category</label>
+                <div class="edit-work-category-picker-row">
+                    <input class="form-input" id="${CATEGORY_CUSTOM_ID}" type="text" maxlength="${CATEGORY_MAX_LENGTH}" placeholder="type a custom category">
+                    <button class="btn btn-secondary" type="button" id="${CATEGORY_CUSTOM_ADD_ID}" aria-label="Add custom category">+</button>
                 </div>
-                <div class="edit-work-category-picker">
-                    <label class="edit-label" for="${CATEGORY_CUSTOM_ID}">Custom category</label>
-                    <div class="edit-work-category-picker-row">
-                        <input class="form-input" id="${CATEGORY_CUSTOM_ID}" type="text" maxlength="${CATEGORY_MAX_LENGTH}" placeholder="type a custom category">
-                        <button class="btn btn-secondary" type="button" id="${CATEGORY_CUSTOM_ADD_ID}" aria-label="Add custom category">+</button>
-                    </div>
-                    <div class="small-note">Limit ${CATEGORY_MAX_LENGTH} chars, max ${CATEGORY_MAX_COUNT} categories.</div>
-                </div>
-                <div class="edit-work-category-current">
-                    <div class="edit-label">Current categories</div>
-                    <div class="edit-work-category-pills" id="${CATEGORY_PILLS_ID}">
-                        ${categories.length ? categories.map(renderCategoryPill).join('') : '<div class="small-note">No categories selected yet.</div>'}
-                    </div>
+                <div class="small-note">Limit ${CATEGORY_MAX_LENGTH} chars, max ${CATEGORY_MAX_COUNT} categories.</div>
+            </div>
+            <div class="edit-work-category-current">
+                <div class="edit-label">Current categories</div>
+                <div class="edit-work-category-pills" id="${CATEGORY_PILLS_ID}">
+                    ${categories.length ? categories.map(renderCategoryPill).join('') : '<div class="small-note">No categories selected yet.</div>'}
                 </div>
             </div>
             <input type="hidden" id="${CATEGORY_FIELD_ID}" data-work-config-field data-work-config-key="categories" data-work-config-kind="json" value="${escapeHtml(JSON.stringify(categories))}">
-        </div>
-    `;
+        `,
+    });
 }
 
 function renderCategoryPills(editPanel, categories) {
@@ -200,6 +202,8 @@ export function bindWorkCategoryControls({ editPanel, onMediaInput }) {
         return () => {};
     }
 
+    const cleanupDetailsState = bindStoredDetailsState(sectionEl, CATEGORY_DETAILS_STORAGE_KEY);
+
     const onAddClick = () => {
         if (!(selectEl instanceof HTMLSelectElement)) {
             return;
@@ -252,5 +256,6 @@ export function bindWorkCategoryControls({ editPanel, onMediaInput }) {
             customAddEl.removeEventListener('click', onCustomAddClick);
         }
         sectionEl.removeEventListener('click', onSectionClick);
+        cleanupDetailsState();
     };
 }

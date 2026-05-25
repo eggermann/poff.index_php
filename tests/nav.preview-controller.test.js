@@ -172,6 +172,13 @@ function loadPreviewController() {
       options,
     }),
     requestAnimationFrame: (fn) => fn(),
+    window: {
+      location: {
+        href: 'http://example.test/',
+        origin: 'http://example.test',
+        pathname: '/',
+      },
+    },
     getSelectionFromPath(pathValue) {
       return {
         previewPath: pathValue,
@@ -255,5 +262,37 @@ describe('preview controller', () => {
     expect(contentFrame.innerHTML).not.toContain('class="viewer"');
     expect(contentFrame.innerHTML).not.toContain('preview-iframe');
     expect(loadingCalls).toEqual([false]);
+  });
+
+  test('builds viewer urls with transient converter preview params', () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController();
+    const controller = createPreviewController({
+      contentFrame: new FakeHTMLElement(),
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return {
+          previewPath: 'hello.txt',
+          previewIsFile: true,
+        };
+      },
+      getPreviewParams({ path: targetPath, isFile }) {
+        if (!isFile || targetPath !== 'hello.txt') {
+          return null;
+        }
+        return {
+          converter_preview: '1',
+          converter_id: 'converter/convert-text',
+          converter_format: 'txt',
+          converter_quality: 'preview',
+        };
+      },
+    });
+
+    expect(controller.buildViewerUrl('hello.txt', true, false)).toBe(
+      '/?view=1&file=hello.txt&converter_preview=1&converter_id=converter%2Fconvert-text&converter_format=txt&converter_quality=preview'
+    );
   });
 });

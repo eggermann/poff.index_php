@@ -439,6 +439,12 @@
     color: #0f766e;
 }
 
+#appSidebar .nav-link-badge-converter {
+    background: var(--poff-color-surface-secondary);
+    color: var(--poff-color-text-secondary-accent);
+    box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary);
+}
+
 #appSidebar .edit-form {
     clear: both;
     display: grid;
@@ -515,6 +521,24 @@
 #appSidebar .nav-link-approved-external {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(209, 250, 229, 0.34));
     box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.14);
+}
+
+#appSidebar .nav-link-converter {
+    background: linear-gradient(180deg, var(--poff-color-surface) 0%, var(--poff-color-surface-secondary) 100%);
+    box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary);
+    color: var(--poff-color-text-secondary-accent);
+}
+
+#appSidebar .nav-link-converter .item-icon {
+    background: var(--poff-color-secondary-100);
+    box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary);
+    color: var(--poff-color-secondary-700);
+}
+
+#appSidebar .nav-link-converter:hover {
+    color: var(--poff-color-secondary-700);
+    background: linear-gradient(180deg, var(--poff-color-surface) 0%, var(--poff-color-secondary-100) 100%);
+    box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary-strong), 0 14px 24px rgba(99, 102, 241, 0.12);
 }
 
 #appSidebar .nav-row-action-review {

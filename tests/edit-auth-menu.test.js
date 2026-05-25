@@ -51,14 +51,14 @@ function createElementMock() {
   };
 }
 
-function loadEditController(documentMock = null) {
+function loadEditController(documentMock = null, overrides = {}) {
   const filePath = path.join(__dirname, '..', 'src/assets/js/edit/controller.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/^import .*$/gm, '')
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
-  const window = {
+  const window = overrides.window || {
     location: {
       href: 'http://example.test/MAUSMAUS/?edit=true',
       search: '?edit=true',
@@ -66,11 +66,13 @@ function loadEditController(documentMock = null) {
       pathname: '/MAUSMAUS/',
     },
     dispatchEvent() {},
+    addEventListener() {},
+    prompt() { return null; },
     history: {
       replaceState() {},
     },
   };
-  const document = documentMock || {
+  const document = documentMock || overrides.document || {
     getElementById() {
       return null;
     },
@@ -91,10 +93,10 @@ function loadEditController(documentMock = null) {
     HTMLInputElement: function HTMLInputElement() {},
     HTMLTextAreaElement: function HTMLTextAreaElement() {},
     HTMLSelectElement: function HTMLSelectElement() {},
-    requestEditAuth() {
+    requestEditAuth: overrides.requestEditAuth || function requestEditAuth() {
       throw new Error('requestEditAuth should not be called in this test');
     },
-    requestEditConfig() {
+    requestEditConfig: overrides.requestEditConfig || function requestEditConfig() {
       throw new Error('requestEditConfig should not be called in this test');
     },
     requestEditDelete() {
@@ -109,15 +111,18 @@ function loadEditController(documentMock = null) {
     requestPromptTemplate() {
       throw new Error('requestPromptTemplate should not be called in this test');
     },
+    requestMcpRoute: overrides.requestMcpRoute || function requestMcpRoute() {
+      throw new Error('requestMcpRoute should not be called in this test');
+    },
     buildVirtualLayoutPath: (value) => value,
-    getActiveSelection: () => ({ path: '', previewPath: '', previewIsFile: false, isFile: false, isLayout: false }),
+    getActiveSelection: overrides.getActiveSelection || (() => ({ path: '', previewPath: '', previewIsFile: false, isFile: false, isLayout: false })),
     bindPromptWindow() {
       return {};
     },
     renderEditDrawer() {
       return { drawerForm: null };
     },
-    renderEditPanel() {
+    renderEditPanel: overrides.renderEditPanel || function renderEditPanel() {
       return { statusEl: null, promptRoot: null };
     },
     materializeWorkFields: (value) => value,
@@ -125,9 +130,9 @@ function loadEditController(documentMock = null) {
       return { layoutPayload: {} };
     },
     createLayoutNameForPreset: () => () => 'layout',
-    getContentTargetPath: () => '',
-    getEditTargetPath: () => '',
-    setStatusMessage() {},
+    getContentTargetPath: overrides.getContentTargetPath || (() => ''),
+    getEditTargetPath: overrides.getEditTargetPath || (() => ''),
+    setStatusMessage: overrides.setStatusMessage || function setStatusMessage() {},
   });
 
   vm.runInContext(`${source}
@@ -255,4 +260,105 @@ describe('edit auth disclosure', () => {
     editAddWork.listener();
     expect(openUploadDialogButton.clickCalled).toBe(true);
   });
+});
+
+test('creating a converter navigates to the new converter folder path', async () => {
+  let capturedPanelOptions = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+  const windowMock = {
+    location: {
+      href: 'http://example.test/MAUSMAUS/?edit=true',
+      search: '?edit=true',
+      hash: '#/bild2-eggermann-tif',
+      pathname: '/MAUSMAUS/',
+    },
+    dispatchEvent() {},
+    prompt() {
+      return 'convert-image';
+    },
+    history: {
+      replaceState() {},
+    },
+    addEventListener() {},
+  };
+
+  const { createEditController } = loadEditController(null, {
+    window: windowMock,
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'file',
+      subjectTarget: 'file',
+      config: {
+        kind: 'image',
+        work: {
+          type: 'image',
+        },
+      },
+    }),
+    requestMcpRoute: async (route) => {
+      expect(route).toBe('create-converter');
+      return {
+        ok: true,
+        folder: 'converters/convert-image',
+        definition: {
+          id: 'converter/convert-image',
+          path: 'converters/convert-image',
+          name: 'convert-image',
+          label: 'Convert Image',
+        },
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'bild2-eggermann.tif',
+      previewPath: 'bild2-eggermann.tif',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'bild2-eggermann.tif',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  expect(capturedPanelOptions).toBeTruthy();
+  await capturedPanelOptions.onCreateConverter({
+    statusEl: { textContent: '' },
+    form: null,
+  });
+
+  expect(windowMock.location.hash).toBe('#/converters/convert-image');
 });

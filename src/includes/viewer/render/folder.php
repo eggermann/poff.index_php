@@ -21,8 +21,10 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         $work['template'] = $workTemplateKey !== '' ? $workTemplateKey : 'folder';
     }
     $work['type'] = $work['type'] ?? 'folder';
+    $isConverterWork = strtolower(trim((string) ($work['type'] ?? ''))) === 'converter'
+        || strtolower(trim((string) ($work['template'] ?? ''))) === 'converter';
     if (class_exists('PoffConfig')) {
-        $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, false, 'works');
+        $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, false, $isConverterWork ? 'work' : 'works');
     }
 
     $rawName = $folderConfig['folderName'] ?? basename($fullPath);
@@ -48,7 +50,13 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         $browseHref .= rawurlencode($relativePath);
     }
 
-    $bodyContent = Worktype::render('folder', [
+    $converterDefinition = null;
+    if ($isConverterWork && class_exists('Converter')) {
+        $converterRootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir($fullPath) : dirname($fullPath);
+        $converterDefinition = Converter::definitionFromFolder($converterRootDir, $relativePath);
+    }
+
+    $context = [
         'path' => $relativePath,
         'viewerHref' => $viewerHref,
         'viewUrl' => $viewerHref,
@@ -80,10 +88,41 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'itemCount' => count($tree),
         'allItemCount' => count($folderViewData['allItems']),
         'work' => $work,
-    ]);
+    ];
+    if ($isConverterWork) {
+        $context['converter'] = [
+            'id' => (string) ($converterDefinition['id'] ?? ''),
+            'name' => (string) ($converterDefinition['name'] ?? basename($relativePath)),
+            'label' => (string) ($converterDefinition['label'] ?? ($folderConfig['title'] ?? $rawName)),
+            'accepts' => $converterDefinition['accepts'] ?? [],
+            'outputs' => $converterDefinition['outputs'] ?? [],
+            'formats' => $converterDefinition['formats'] ?? [],
+            'engine' => (string) ($converterDefinition['engine'] ?? ''),
+            'path' => (string) ($converterDefinition['path'] ?? $relativePath),
+            'folder' => (string) ($converterDefinition['folder'] ?? $relativePath),
+            'viewerHref' => (string) ($converterDefinition['viewerHref'] ?? $viewerHref),
+            'url' => (string) ($converterDefinition['url'] ?? $viewerHref),
+            'format' => (string) (($converterDefinition['defaults']['format'] ?? '')),
+            'quality' => (string) (($converterDefinition['defaults']['quality'] ?? '')),
+        ];
+        $context['source'] = [
+            'name' => '',
+            'path' => '',
+            'mimeType' => '',
+        ];
+        $context['target'] = [
+            'saveAs' => '',
+            'mode' => (string) (($converterDefinition['defaults']['saveMode'] ?? 'new-hidden-work')),
+        ];
+        $context['status'] = [
+            'state' => 'ready',
+        ];
+    }
+
+    $bodyContent = Worktype::render($isConverterWork ? 'converter' : 'folder', $context);
 
     renderViewerShell([
-        'type' => 'folder',
+        'type' => $isConverterWork ? 'converter' : 'folder',
         'name' => $rawName,
         'title' => $folderConfig['title'] ?? $rawName,
         'path' => $relativePath,

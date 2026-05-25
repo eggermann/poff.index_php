@@ -9,6 +9,7 @@ export function initNavigation({
     currentPathForIframe,
     renderFolderMeta,
     initEditMode,
+    getPreviewParams,
 }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements;
     let ignoreNextHashSync = false;
@@ -38,6 +39,7 @@ export function initNavigation({
         navigateToPath,
         setLoadingVisible,
         getCurrentSelection,
+        getPreviewParams,
     });
 
     const sidebarController = createSidebarController({

@@ -12,6 +12,7 @@ export function createPreviewController({
     navigateToPath,
     setLoadingVisible,
     getCurrentSelection,
+    getPreviewParams,
 }) {
     let previewRequestId = 0;
     let previewClickBound = false;
@@ -145,6 +146,19 @@ export function createPreviewController({
         url.hash = '';
         url.searchParams.set('view', '1');
         url.searchParams.set(isFile ? 'file' : 'path', path);
+        const previewParams = typeof getPreviewParams === 'function' ? getPreviewParams({
+            path,
+            isFile,
+        }) : null;
+        if (previewParams && typeof previewParams === 'object') {
+            Object.entries(previewParams).forEach(([key, value]) => {
+                const normalizedKey = String(key || '').trim();
+                if (!normalizedKey || value === undefined || value === null || value === '') {
+                    return;
+                }
+                url.searchParams.set(normalizedKey, String(value));
+            });
+        }
         if (forceRefresh) {
             url.searchParams.set('_refresh', String(Date.now()));
         }

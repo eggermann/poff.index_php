@@ -316,6 +316,21 @@ PHP
     $appendSourceParts($buildContent, $viewerEditParts, $stripRequires);
     $appendPhpBlock($buildContent, "cmsHandleEditAction();");
 
+    $mcpParts = [
+        '/mcp/helpers.php',
+        '/mcp/routes/workprompt.php',
+        '/mcp/routes/create.php',
+        '/mcp/routes/edit-config.php',
+        '/mcp/routes/prompt-template.php',
+        '/mcp/routes/remote-content.php',
+        '/mcp/routes/converters.php',
+        '/mcp/routes/convert.php',
+        '/mcp/routes/create-converter.php',
+        '/mcp/routes/converter-prompt.php',
+        '/mcp/routes/style.php',
+    ];
+    $appendSourceParts($buildContent, $mcpParts, $stripRequires);
+
     // Add initialization code
     $buildContent .= <<<'PHP'
 // Initialize path variables
@@ -345,6 +360,117 @@ if (
 if (isset($_GET['view']) && (isset($_GET['file']) || array_key_exists('path', $_GET))) {
     renderViewer($baseDir, $_GET['file'] ?? $_GET['path']);
     return;
+}
+
+if ((string) ($_GET['mcp'] ?? '') === '1') {
+    register_shutdown_function(static function (): void {
+        $error = error_get_last();
+        if (!is_array($error)) {
+            return;
+        }
+        $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+        if (!in_array((int) ($error['type'] ?? 0), $fatalTypes, true) || headers_sent()) {
+            return;
+        }
+        mcpJsonResponse([
+            'ok' => false,
+            'error' => sprintf(
+                'MCP route fatal error: %s in %s:%d',
+                (string) ($error['message'] ?? 'Unknown error'),
+                (string) ($error['file'] ?? 'unknown'),
+                (int) ($error['line'] ?? 0)
+            ),
+        ], 500);
+    });
+
+    try {
+        $route = mcpQueryString('route', 'info') ?? 'info';
+        $prompt = mcpQueryString('prompt', '') ?? '';
+        $targetFile = mcpRouteFile();
+        $stylePrompt = mcpRouteStyle();
+        $mcpUrl = rtrim((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'), '/') . '#mcp';
+
+        header('Content-Type: application/json');
+
+        switch ($route) {
+            case 'workprompt':
+                mcpJsonResponse(handleWorkPrompt(mcpWorkPromptArgs($baseDir, $targetFile, $stylePrompt)));
+            case 'create':
+                mcpJsonResponse(handleCreate(mcpCreateArgs($baseDir, [
+                    'dest' => mcpRouteDest(),
+                    'path' => mcpQueryString('path', null),
+                    'url' => mcpQueryString('url', null),
+                    'poffDir' => mcpPoffDirOverride(),
+                ])));
+            case 'edit-config':
+                mcpJsonResponse(handleEditConfig([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'prompt-template':
+                mcpJsonResponse(handlePromptTemplate([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'export-content':
+                mcpJsonResponse(handleExportContent([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'import-remote':
+                mcpJsonResponse(handleImportRemote([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                    'url' => mcpQueryString('url', '') ?? '',
+                    'sourceId' => mcpQueryString('sourceId', '') ?? '',
+                    'replace' => in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true),
+                ]));
+            case 'converters':
+                mcpJsonResponse(handleConverters([
+                    'rootDir' => $baseDir,
+                    'input' => mcpConvertersInput(),
+                ]));
+            case 'convert':
+                mcpJsonResponse(handleConvert([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'create-converter':
+                mcpJsonResponse(handleCreateConverter([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'save-converted-work':
+                mcpJsonResponse(handleSaveConvertedWork([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'converter-prompt':
+                mcpJsonResponse(handleConverterPrompt([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'style':
+                mcpJsonResponse(handleStyleRoute($prompt, $mcpUrl, $baseDir . DIRECTORY_SEPARATOR . 'poff.config.toon'));
+            default:
+                mcpJsonResponse([
+                    'route' => 'info',
+                    'mcpUrl' => $mcpUrl,
+                    'rootDir' => $baseDir,
+                ]);
+        }
+    } catch (Throwable $error) {
+        mcpJsonResponse([
+            'ok' => false,
+            'error' => sprintf(
+                'MCP route error: %s in %s:%d',
+                $error->getMessage(),
+                $error->getFile(),
+                $error->getLine()
+            ),
+        ], 500);
+    }
 }
 
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'nav') {
@@ -455,16 +581,11 @@ PHP;
                 throw new Exception("Failed to copy standalone build to: $targetFile");
             }
 
-            FileCopier::copyFileToAllDirectories($outputFile, $resolvedTargetDir);
-
             $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
             if (is_file($layoutAsset)) {
                 FileCopier::copyFileToLayoutDirectories($layoutAsset, $resolvedTargetDir);
             }
         }
-
-        // Copy the built index.php to all directories
-        FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
 
         // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
         $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
