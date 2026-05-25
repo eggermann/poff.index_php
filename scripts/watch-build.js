@@ -93,7 +93,7 @@ function ensureStandaloneCopies(outputDir, outputFile) {
     const targetFile = path.join(targetDir, outputFile);
     fs.mkdirSync(targetDir, { recursive: true });
     fs.copyFileSync(sourceFile, targetFile);
-    copyFileToAllDirectories(sourceFile, targetDir, outputFile);
+    removeGeneratedEntrypointsFromSubdirectories(targetDir, outputFile);
     if (fs.existsSync(bundledLayoutAsset)) {
       copyFileToLayoutDirectories(bundledLayoutAsset, targetDir);
     }
@@ -133,17 +133,28 @@ function findAllDirectories(rootDir) {
   return dirs;
 }
 
-function copyFileToAllDirectories(sourceFile, targetRoot, fileName) {
-  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
-    fs.copyFileSync(sourceFile, path.join(dir, fileName));
-  });
-}
-
 function copyFileToLayoutDirectories(sourceFile, targetRoot, layoutDirName = '.layout') {
   [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
     const destinationDir = path.join(dir, layoutDirName);
     fs.mkdirSync(destinationDir, { recursive: true });
     fs.copyFileSync(sourceFile, path.join(destinationDir, path.basename(sourceFile)));
+  });
+}
+
+function removeGeneratedEntrypointsFromSubdirectories(targetRoot, fileName = 'index.php') {
+  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
+    const candidate = path.join(dir, fileName);
+    if (dir === targetRoot || !fs.existsSync(candidate)) {
+      return;
+    }
+
+    const stat = fs.statSync(candidate);
+    if (!stat.isFile()) {
+      return;
+    }
+
+    fs.unlinkSync(candidate);
+    console.log(`[watch] Removed subdirectory entrypoint: ${candidate}`);
   });
 }
 
