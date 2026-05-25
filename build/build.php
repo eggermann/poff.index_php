@@ -580,12 +580,15 @@ PHP;
             if (!copy($outputFile, $targetFile)) {
                 throw new Exception("Failed to copy standalone build to: $targetFile");
             }
+            FileCopier::removeGeneratedEntrypointsFromSubdirectories($resolvedTargetDir, $outputFileName);
 
             $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
             if (is_file($layoutAsset)) {
                 FileCopier::copyFileToLayoutDirectories($layoutAsset, $resolvedTargetDir);
             }
         }
+
+        FileCopier::removeGeneratedEntrypointsFromSubdirectories($outputDir, $outputFileName);
 
         // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
         $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';

@@ -1,6 +1,6 @@
 <?php
 
-function renderFolderViewer(string $relativePath, string $fullPath): void
+function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullPath): array
 {
     $folderConfig = null;
     if (class_exists('PoffConfig')) {
@@ -119,10 +119,11 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         ];
     }
 
-    $bodyContent = Worktype::render($isConverterWork ? 'converter' : 'folder', $context);
+    $viewerType = $isConverterWork ? 'converter' : 'folder';
+    $bodyContent = Worktype::render($viewerType, $context);
 
-    renderViewerShell([
-        'type' => $isConverterWork ? 'converter' : 'folder',
+    return [
+        'type' => $viewerType,
         'name' => $rawName,
         'title' => $folderConfig['title'] ?? $rawName,
         'path' => $relativePath,
@@ -130,5 +131,22 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'bodyContent' => $bodyContent,
         'openHref' => $browseHref,
         'openLabel' => 'Open Folder',
+        'snapshotContext' => $context,
+        'renderedHtml' => $bodyContent,
+    ];
+}
+
+function renderFolderViewer(string $relativePath, string $fullPath): void
+{
+    $payload = cmsBuildFolderViewerSnapshotPayload($relativePath, $fullPath);
+    renderViewerShell([
+        'type' => $payload['type'],
+        'name' => $payload['name'],
+        'title' => $payload['title'],
+        'path' => $payload['path'],
+        'layout' => $payload['layout'],
+        'bodyContent' => $payload['bodyContent'],
+        'openHref' => $payload['openHref'],
+        'openLabel' => $payload['openLabel'],
     ]);
 }

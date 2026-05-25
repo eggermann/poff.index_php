@@ -93,6 +93,19 @@ export function createPreviewController({
         return rewritten;
     }
 
+    function isExternalPreviewUrl(url) {
+        const trimmed = String(url || '').trim();
+        if (!trimmed) {
+            return false;
+        }
+        try {
+            const resolved = new URL(trimmed, window.location.href);
+            return resolved.origin !== window.location.origin;
+        } catch (err) {
+            return false;
+        }
+    }
+
     function extractPreferredPreviewMarkup(previewDocument, previewRoot) {
         const candidateRoot = previewRoot && typeof previewRoot.cloneNode === 'function'
             ? previewRoot.cloneNode(true)
@@ -387,7 +400,11 @@ export function createPreviewController({
                 extractPreferredPreviewMarkup(previewDocument, previewRoot),
                 response.url
             );
-            const fallbackMarkup = previewMarkup || `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`;
+            const fallbackMarkup = previewMarkup || (
+                isExternalPreviewUrl(response.url)
+                    ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`
+                    : '<div class="viewer-error">Preview unavailable.</div>'
+            );
             previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
             syncPreviewDisabledState(previewDisabled);
             bindPreviewNavigation();

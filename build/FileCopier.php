@@ -41,6 +41,26 @@ class FileCopier {
         }
     }
 
+    public static function removeGeneratedEntrypointsFromSubdirectories(string $targetDir, string $fileName = 'index.php'): void {
+        $projectRoot = rtrim($targetDir, '/\\');
+        if (!is_dir($projectRoot)) {
+            return;
+        }
+
+        foreach (self::findAllDirectories($projectRoot) as $dir) {
+            $candidate = $dir . DIRECTORY_SEPARATOR . $fileName;
+            if (!is_file($candidate)) {
+                continue;
+            }
+
+            if (@unlink($candidate)) {
+                echo "Removed subdirectory entrypoint: $candidate\n";
+            } else {
+                echo "Failed to remove subdirectory entrypoint: $candidate\n";
+            }
+        }
+    }
+
     public static function copyDirectoryToAllDirectories(string $sourceDir, string $targetDir, string $targetSubdir = ''): void {
         $projectRoot = rtrim($targetDir, '/\\');
 

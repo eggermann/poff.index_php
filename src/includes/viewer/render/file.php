@@ -4,6 +4,12 @@
 
 function renderFileViewer(string $relativePath, string $fullPath, ?array $fileConfigOverride = null, ?array $treeConfigOverride = null): void
 {
+    $converterTarget = cmsResolveConverterDefinitionViewerTarget($relativePath, $fullPath);
+    if (is_array($converterTarget)) {
+        renderFolderViewer((string) $converterTarget['relativePath'], (string) $converterTarget['fullPath']);
+        return;
+    }
+
     $hasPhysicalFile = is_file($fullPath);
     $fileConfig = $fileConfigOverride;
     if ($fileConfig === null && $hasPhysicalFile && class_exists('PoffConfig')) {
@@ -78,6 +84,11 @@ function renderFileViewer(string $relativePath, string $fullPath, ?array $fileCo
 
 function buildFileViewerSnapshotPayload(string $relativePath, string $fullPath, ?array $fileConfigOverride = null, ?array $treeConfigOverride = null): array
 {
+    $converterTarget = cmsResolveConverterDefinitionViewerTarget($relativePath, $fullPath);
+    if (is_array($converterTarget) && function_exists('cmsBuildFolderViewerSnapshotPayload')) {
+        return cmsBuildFolderViewerSnapshotPayload((string) $converterTarget['relativePath'], (string) $converterTarget['fullPath']);
+    }
+
     $hasPhysicalFile = is_file($fullPath);
     $fileConfig = $fileConfigOverride;
     if ($fileConfig === null && $hasPhysicalFile && class_exists('PoffConfig')) {
@@ -146,6 +157,57 @@ function buildFileViewerSnapshotPayload(string $relativePath, string $fullPath, 
         'snapshotContext' => $snapshotContext,
         'renderedHtml' => $rendered,
     ];
+}
+
+function cmsResolveConverterDefinitionViewerTarget(string $relativePath, string $fullPath): ?array
+{
+    if (!class_exists('Converter')) {
+        return null;
+    }
+
+    if (strtolower(basename($relativePath)) !== 'converter.json') {
+        return null;
+    }
+
+    $parentFullPath = dirname($fullPath);
+    if (!is_dir($parentFullPath)) {
+        return null;
+    }
+
+    $parentRelativePath = trim(str_replace('\\', '/', dirname($relativePath)), '.');
+    if ($parentRelativePath === '') {
+        return null;
+    }
+
+    $rootCandidates = [];
+    if (function_exists('cmsProjectRootDir')) {
+        $rootCandidates[] = cmsProjectRootDir($parentFullPath);
+    }
+    $currentRoot = $parentFullPath;
+    while ($currentRoot !== '' && $currentRoot !== DIRECTORY_SEPARATOR) {
+        $rootCandidates[] = $currentRoot;
+        $parentRoot = dirname($currentRoot);
+        if ($parentRoot === $currentRoot) {
+            break;
+        }
+        $currentRoot = $parentRoot;
+    }
+    $seen = [];
+    foreach ($rootCandidates as $candidateRoot) {
+        $candidateRoot = is_string($candidateRoot) ? trim($candidateRoot) : '';
+        if ($candidateRoot === '' || isset($seen[$candidateRoot])) {
+            continue;
+        }
+        $seen[$candidateRoot] = true;
+        if (Converter::definitionFromFolder($candidateRoot, $parentRelativePath) !== null) {
+            return [
+                'relativePath' => $parentRelativePath,
+                'fullPath' => $parentFullPath,
+            ];
+        }
+    }
+
+    return null;
 }
 
 function cmsResolveFileViewerState(string $relativePath, string $fullPath, ?array $fileConfig, ?array $treeConfig): array

@@ -69,6 +69,24 @@ function runCreate(args) {
   });
 }
 
+function runFileCopierCleanup(rootDir) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_file_copier_cleanup.php'), rootDir], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`file copier cleanup failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runWorktype(action, kind, payload = null) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_render_worktype.php'), action, kind];
@@ -1141,6 +1159,19 @@ describe('MCP create route helper (CLI)', () => {
     await runCreate([`--dest=${TEST_NAME}`]);
 
     expect(fs.existsSync(TEST_DEST)).toBe(true);
+  });
+
+  test('build cleanup removes all subfolder index files', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-build-cleanup-'));
+    try {
+      await runFileCopierCleanup(tempRoot);
+
+      expect(fs.existsSync(path.join(tempRoot, 'index.php'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'generated-child', 'index.php'))).toBe(false);
+      expect(fs.existsSync(path.join(tempRoot, 'custom-child', 'index.php'))).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('copies from path into destination', async () => {
@@ -2314,6 +2345,27 @@ describe('Poff converters', () => {
       expect(output).toContain('data-viewer-type="converter"');
       expect(output).toContain('poff-converter-work');
       expect(output).toContain('Convert Mov Audio');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('opening converter.json renders the parent converter work preview', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-definition-viewer-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+
+    try {
+      const created = await runConverterRoute('create-converter', tempRoot, {
+        path: 'hello.txt',
+        name: 'convert-text-preview',
+      });
+
+      expect(created.ok).toBe(true);
+      const output = await runViewer('converters/convert-text-preview/converter.json', tempRoot, true);
+      expect(output).toContain('data-viewer-type="converter"');
+      expect(output).toContain('poff-converter-work');
+      expect(output).toContain('Convert Text Preview');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
