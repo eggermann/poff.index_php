@@ -2210,15 +2210,20 @@ describe('Poff converters', () => {
     expect(editorDefinition?.templateFolder || '').toContain('worktypes/templates/converter/convert-text-editor');
   });
 
-  test('does not offer the text editor converter for application/rtf', async () => {
+  test('offers the text editor converter for application/rtf as plain text', async () => {
     const result = await runConverterRoute('available', POFF_DIR, {
       mimeType: 'application/rtf',
       kind: 'text',
       extension: 'rtf',
     });
 
-    expect(result.map((item) => item.id)).not.toContain('converter/convert-text-editor');
-    expect(result.map((item) => item.id)).not.toContain('converter/convert-text');
+    expect(result).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'converter/convert-text-editor',
+        name: 'convert-text-editor',
+        label: 'Convert Text Editor',
+      }),
+    ]));
   });
 
   test('text editor converter can save edited html output for a text file', async () => {

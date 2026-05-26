@@ -3,7 +3,7 @@
   "name": "convert-text-editor",
   "label": "Convert Text Editor",
   "description": "Loads a zero-build CDN code editor for text files and saves the edited result as a generated work.",
-  "accepts": ["text/plain", "text/*", "application/json"],
+  "accepts": ["text/plain", "text/*", "application/json", "application/rtf", "text/rtf"],
   "outputs": ["application/json", "text/html", "text/plain", "text/markdown"],
   "engine": "text-copy",
   "defaults": {
