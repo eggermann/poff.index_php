@@ -2197,7 +2197,65 @@ describe('Poff converters', () => {
         formats: ['txt'],
         outputs: ['text/plain'],
       }),
+      expect.objectContaining({
+        id: 'converter/convert-text-editor',
+        name: 'convert-text-editor',
+        label: 'Convert Text Editor',
+        formats: ['json', 'html', 'txt', 'md'],
+        outputs: ['application/json', 'text/html', 'text/plain', 'text/markdown'],
+      }),
     ]));
+    const editorDefinition = result.find((item) => item.id === 'converter/convert-text-editor');
+    expect(editorDefinition?.folder || '').toContain('worktypes/templates/converter/convert-text-editor');
+    expect(editorDefinition?.templateFolder || '').toContain('worktypes/templates/converter/convert-text-editor');
+  });
+
+  test('text editor converter can save edited html output for a text file', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-text-editor-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempRoot, 'draft.txt'), 'Original text');
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'draft.txt',
+          path: 'draft.txt',
+          mimeType: 'text/plain',
+          extension: 'txt',
+          size: 13,
+        },
+        converter: {
+          id: 'converter/convert-text-editor',
+          format: 'html',
+          quality: 'default',
+          saveMode: 'new-hidden-work',
+        },
+        target: {
+          folder: '',
+          saveAs: 'draft.html',
+          mode: 'new-hidden-work',
+        },
+        editor: {
+          content: 'Edited text from converter',
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        type: 'converted-work',
+      }));
+      expect(result.output).toEqual(expect.objectContaining({
+        name: 'draft.html',
+        mimeType: 'text/html',
+        kind: 'text',
+      }));
+      const html = Buffer.from(result.output.bodyBase64, 'base64').toString('utf8');
+      expect(html).toContain('Edited text from converter');
+      expect(html).toContain('Convert Text Editor');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('file viewer switches to converter template preview when a converter is selected', async () => {
@@ -2243,6 +2301,52 @@ describe('Poff converters', () => {
       expect(rendered).toContain('hello.txt');
       expect(rendered).toContain('Convert Text|hello.txt|hello.txt|ready');
       expect(rendered).not.toContain('<pre class=');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('text editor converter preview receives source file content', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-editor-preview-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'draft.txt'), 'Hello from source file');
+    createConverterApp(tempRoot, 'convert-text-editor', {
+      label: 'Convert Text Editor',
+      accepts: ['text/plain', 'text/*'],
+      outputs: ['text/html', 'text/plain', 'text/markdown'],
+      engine: 'text-copy',
+      defaults: {
+        format: 'html',
+        quality: 'default',
+        saveMode: 'new-hidden-work',
+        hiddenByDefault: true,
+      },
+      ui: {
+        format: { type: 'select', label: 'Output format', options: ['html', 'txt', 'md'] },
+        quality: { type: 'select', label: 'Quality', options: ['default'] },
+      },
+    });
+    fs.writeFileSync(
+      path.join(tempRoot, 'poff', 'converters', 'convert-text-editor', '.layout', 'template.hbs'),
+      '<section class="poff-text-editor-converter">{{> work}}</section>'
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, 'poff', 'converters', 'convert-text-editor', '.layout', 'work.hbs'),
+      '<h2>{{converter.label}}</h2><textarea data-poff-text-editor-fallback>{{textContent}}</textarea>'
+    );
+
+    try {
+      const rendered = await runViewerWithQuery('draft.txt', tempRoot, false, {
+        converter_preview: '1',
+        converter_id: 'converter/convert-text-editor',
+        converter_format: 'html',
+        converter_quality: 'default',
+        converter_save_mode: 'new-hidden-work',
+      });
+
+      expect(rendered).toContain('poff-text-editor-converter');
+      expect(rendered).toContain('Convert Text Editor');
+      expect(rendered).toContain('Hello from source file');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

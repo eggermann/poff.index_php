@@ -94,6 +94,11 @@ class Converter
         if (!is_dir($base)) {
             return [];
         }
+        $root = self::normalizeRootDir($rootDir);
+        $relativeBase = self::relativePathFromRoot($root, $base);
+        if ($relativeBase === '') {
+            $relativeBase = 'worktypes/templates/converter';
+        }
 
         $definitions = [];
         foreach (scandir($base) ?: [] as $entry) {
@@ -110,8 +115,8 @@ class Converter
             }
             $decoded['id'] = 'converter/' . self::normalizeConverterName($entry);
             $decoded['name'] = self::normalizeConverterName((string) ($decoded['name'] ?? $entry));
-            $decoded['folder'] = 'src/includes/worktypes/templates/converter/' . $entry;
-            $decoded['templateFolder'] = 'src/includes/worktypes/templates/converter/' . $entry;
+            $decoded['folder'] = $relativeBase . '/' . $entry;
+            $decoded['templateFolder'] = $relativeBase . '/' . $entry;
             $decoded['source'] = 'bundled-grain';
             $decoded['grain'] = true;
             $definition = self::converterDefinition($decoded);
@@ -638,6 +643,10 @@ JS,
             'converter/convert-text' => ['converter/convert-text', 'txt'],
             'text-copy' => ['converter/convert-text', 'txt'],
             'converter/text-copy' => ['converter/convert-text', 'txt'],
+            'convert-text-editor' => ['converter/convert-text-editor', 'source'],
+            'converter/convert-text-editor' => ['converter/convert-text-editor', 'source'],
+            'text-editor' => ['converter/convert-text-editor', 'source'],
+            'converter/text-editor' => ['converter/convert-text-editor', 'source'],
         ];
 
         if (isset($map[$id])) {
@@ -665,7 +674,7 @@ JS,
             $converter['quality'] = 'default';
         }
         if (!isset($converter['format'])) {
-            $converter['format'] = 'webp';
+            $converter['format'] = str_contains((string) ($converter['id'] ?? ''), 'convert-text') ? 'source' : 'webp';
         }
         if (isset($converter['path'])) {
             $converter['path'] = trim(str_replace('\\', '/', (string) $converter['path']), '/');
@@ -715,6 +724,9 @@ JS,
         $name = trim((string) ($definition['name'] ?? $converterOptions['name'] ?? 'converter'));
         $format = self::normalizeFormat((string) ($converterOptions['format'] ?? self::defaultOptions($id)['format'] ?? 'webp'));
         $baseName = pathinfo($sourceName, PATHINFO_FILENAME);
+        $saveAs = $format === 'source'
+            ? $sourceName
+            : self::sanitizeOutputName($baseName . '.' . $format);
 
         return [
             'source' => [
@@ -736,7 +748,7 @@ JS,
             ],
             'target' => [
                 'folder' => $folder,
-                'saveAs' => self::sanitizeOutputName($baseName . '.' . $format),
+                'saveAs' => $saveAs,
                 'mode' => self::normalizeSaveMode((string) ($converterOptions['saveMode'] ?? 'new-hidden-work')),
             ],
             'requestingNode' => [
@@ -766,7 +778,9 @@ JS,
         }
 
         $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'webp')));
-        $outputMime = self::mimeFromFormat($format);
+        $outputMime = ($definition['engine'] ?? '') === 'text-copy'
+            ? self::textMimeFromFormat($format, (string) ($source['path'] ?? ''), $mime)
+            : self::mimeFromFormat($format);
         if (!self::mimeAccepted($outputMime, $definition['outputs'] ?? [])) {
             return self::error('Output MIME type is not allowed.');
         }
@@ -952,11 +966,23 @@ JS,
         }
 
         $converter = is_array($payload['converter'] ?? null) ? $payload['converter'] : [];
+        $editor = is_array($payload['editor'] ?? null) ? $payload['editor'] : [];
         $target = is_array($payload['target'] ?? null) ? $payload['target'] : [];
-        $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'txt')));
-        $outputMime = self::mimeFromFormat($format);
-        $outputName = self::sanitizeOutputName((string) ($target['saveAs'] ?? (pathinfo($fullPath, PATHINFO_FILENAME) . '.' . $format)));
-        $body = (string) file_get_contents($fullPath);
+        $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'source')));
+        $actualFormat = self::resolveTextOutputFormat($format, $sourcePath, (string) ($source['mimeType'] ?? ''));
+        $outputMime = self::textMimeFromFormat($format, $sourcePath, (string) ($source['mimeType'] ?? ''));
+        $defaultOutputName = $format === 'source'
+            ? basename($sourcePath)
+            : (pathinfo($fullPath, PATHINFO_FILENAME) . '.' . $actualFormat);
+        $outputName = self::sanitizeOutputName((string) ($target['saveAs'] ?? $defaultOutputName));
+        $body = array_key_exists('content', $editor) ? (string) ($editor['content'] ?? '') : (string) file_get_contents($fullPath);
+        if ($actualFormat === 'html') {
+            $body = self::renderTextEditorHtmlDocument(
+                $body,
+                basename($sourcePath),
+                (string) ($definition['label'] ?? ($definition['name'] ?? 'Text Editor Converter'))
+            );
+        }
         return [
             'ok' => true,
             'type' => 'converted-work',
@@ -980,9 +1006,76 @@ JS,
                 'engine' => (string) ($definition['engine'] ?? 'text-copy'),
                 'quality' => self::normalizeQuality((string) ($converter['quality'] ?? 'default')),
                 'format' => $format,
+                'outputFormat' => $actualFormat,
                 'convertedAt' => date('c'),
             ],
         ];
+    }
+
+    private static function renderTextEditorHtmlDocument(string $content, string $sourceName, string $converterLabel): string
+    {
+        $safeTitle = htmlspecialchars($sourceName, ENT_QUOTES, 'UTF-8');
+        $safeConverter = htmlspecialchars($converterLabel, ENT_QUOTES, 'UTF-8');
+        $safeBody = htmlspecialchars($content, ENT_QUOTES, 'UTF-8');
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$safeTitle}</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            background: #0b1020;
+            color: #e5eefb;
+        }
+        .poff-text-converted {
+            max-width: 72rem;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .poff-text-converted__meta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+            color: #8ba4c7;
+            font-size: 0.95rem;
+        }
+        .poff-text-converted__surface {
+            border: 1px solid rgba(124, 162, 255, 0.28);
+            border-radius: 1rem;
+            background: rgba(14, 22, 42, 0.88);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+        }
+        .poff-text-converted__code {
+            margin: 0;
+            padding: 1.5rem;
+            overflow: auto;
+            font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+            font-size: 0.95rem;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <main class="poff-text-converted">
+        <div class="poff-text-converted__meta">
+            <span>{$safeConverter}</span>
+            <span>{$safeTitle}</span>
+        </div>
+        <section class="poff-text-converted__surface">
+            <pre class="poff-text-converted__code">{$safeBody}</pre>
+        </section>
+    </main>
+</body>
+</html>
+HTML;
     }
 
     private static function convertRemote(array $payload, array $definition, string $rootDir): array
@@ -1079,6 +1172,9 @@ JS,
             'jpg', 'jpeg' => 'image/jpeg',
             'png' => 'image/png',
             'txt' => 'text/plain',
+            'md', 'markdown' => 'text/markdown',
+            'html', 'htm' => 'text/html',
+            'json' => 'application/json',
             default => '',
         };
     }
@@ -1088,8 +1184,42 @@ JS,
         return match (self::normalizeFormat($format)) {
             'jpeg' => 'image/jpeg',
             'png' => 'image/png',
+            'json' => 'application/json',
             'txt' => 'text/plain',
+            'md' => 'text/markdown',
+            'html' => 'text/html',
             default => 'image/webp',
+        };
+    }
+
+    private static function textMimeFromFormat(string $format, string $sourcePath, string $sourceMime): string
+    {
+        $actualFormat = self::resolveTextOutputFormat($format, $sourcePath, $sourceMime);
+        return match ($actualFormat) {
+            'json' => 'application/json',
+            'md' => 'text/markdown',
+            'html' => 'text/html',
+            default => 'text/plain',
+        };
+    }
+
+    private static function resolveTextOutputFormat(string $format, string $sourcePath, string $sourceMime): string
+    {
+        $normalized = self::normalizeFormat($format);
+        if ($normalized !== 'source') {
+            return $normalized;
+        }
+
+        $extension = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+        if (in_array($extension, ['json', 'html', 'txt', 'md'], true)) {
+            return $extension;
+        }
+        $mime = strtolower(trim($sourceMime));
+        return match ($mime) {
+            'application/json' => 'json',
+            'text/html' => 'html',
+            'text/markdown' => 'md',
+            default => 'txt',
         };
     }
 
@@ -1101,7 +1231,10 @@ JS,
                 'image/jpeg' => 'jpeg',
                 'image/png' => 'png',
                 'image/webp' => 'webp',
+                'application/json' => 'json',
                 'text/plain' => 'txt',
+                'text/markdown' => 'md',
+                'text/html' => 'html',
                 default => '',
             };
             if ($format !== '' && !in_array($format, $formats, true)) {
@@ -1114,7 +1247,7 @@ JS,
     private static function normalizeFormat(string $format): string
     {
         $format = strtolower(trim($format));
-        return in_array($format, ['webp', 'jpeg', 'png', 'txt'], true) ? $format : 'webp';
+        return in_array($format, ['source', 'webp', 'jpeg', 'png', 'json', 'txt', 'md', 'html'], true) ? $format : 'webp';
     }
 
     private static function normalizeQuality(string $quality): string
@@ -1183,6 +1316,24 @@ JS,
         }
         $resolved = realpath($candidate);
         return is_string($resolved) && $resolved !== '' ? $resolved : $candidate;
+    }
+
+    private static function relativePathFromRoot(string $rootDir, string $path): string
+    {
+        $root = realpath($rootDir);
+        $target = realpath($path);
+        if ($root === false || $target === false) {
+            return '';
+        }
+        $root = rtrim(str_replace('\\', '/', $root), '/');
+        $target = rtrim(str_replace('\\', '/', $target), '/');
+        if ($target === $root) {
+            return '';
+        }
+        if (!str_starts_with($target . '/', $root . '/')) {
+            return '';
+        }
+        return trim(substr($target, strlen($root)), '/');
     }
 
     private static function cliEnabled(): bool

@@ -1,0 +1,115 @@
+.poff-text-editor-converter {
+  --poff-text-editor-border: rgba(127, 167, 255, 0.22);
+  --poff-text-editor-surface: rgba(11, 18, 36, 0.92);
+  --poff-text-editor-surface-soft: rgba(17, 28, 54, 0.88);
+  --poff-text-editor-text: #eaf2ff;
+  --poff-text-editor-muted: #8ba5cb;
+  --poff-text-editor-accent: #9cc3ff;
+  --poff-text-editor-shadow: 0 24px 72px rgba(0, 0, 0, 0.34);
+}
+
+.poff-text-editor-converter__panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  color: var(--poff-text-editor-text);
+}
+
+.poff-text-editor-converter__header,
+.poff-text-editor-converter__meta {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.poff-text-editor-converter__eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: var(--poff-text-editor-accent);
+}
+
+.poff-text-editor-converter__title,
+.poff-text-editor-converter__summary {
+  margin: 0;
+}
+
+.poff-text-editor-converter__summary,
+.poff-text-editor-converter__meta dt {
+  color: var(--poff-text-editor-muted);
+}
+
+.poff-text-editor-converter__meta {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.poff-text-editor-converter__meta dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+}
+
+.poff-text-editor-converter__surface {
+  border: 1px solid var(--poff-text-editor-border);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--poff-text-editor-surface);
+  box-shadow: var(--poff-text-editor-shadow);
+}
+
+.poff-text-editor-converter__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(180deg, rgba(31, 47, 83, 0.92) 0%, rgba(18, 29, 54, 0.96) 100%);
+  border-bottom: 1px solid var(--poff-text-editor-border);
+}
+
+.poff-text-editor-converter__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(156, 195, 255, 0.12);
+  color: var(--poff-text-editor-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.poff-text-editor-converter__status {
+  color: var(--poff-text-editor-muted);
+  font-size: 0.85rem;
+}
+
+.poff-text-editor-converter__fallback,
+.poff-text-editor-converter__editor {
+  min-height: 22rem;
+  width: 100%;
+}
+
+.poff-text-editor-converter__fallback {
+  display: block;
+  margin: 0;
+  padding: 1rem;
+  border: 0;
+  resize: vertical;
+  background: var(--poff-text-editor-surface-soft);
+  color: var(--poff-text-editor-text);
+  font: 500 0.95rem/1.65 "IBM Plex Mono", "SFMono-Regular", monospace;
+  white-space: pre;
+  tab-size: 2;
+  outline: none;
+}
+
+.poff-text-editor-converter__editor {
+  display: none;
+}
+
+.poff-text-editor-converter[data-editor-ready="true"] .poff-text-editor-converter__fallback {
+  display: none;
+}
+
+.poff-text-editor-converter[data-editor-ready="true"] .poff-text-editor-converter__editor {
+  display: block;
+}

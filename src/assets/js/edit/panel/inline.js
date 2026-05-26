@@ -199,7 +199,7 @@ function readMediaConfigFromForm(form, currentWork = {}) {
                 ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
             quality: String(form?.elements?.converter_quality?.value || 'default').trim() || 'default',
-            format: String(form?.elements?.converter_format?.value || 'webp').trim() || 'webp',
+            format: String(form?.elements?.converter_format?.value || '').trim() || 'source',
             saveMode: String(form?.elements?.converter_save_mode?.value || 'new-hidden-work').trim() || 'new-hidden-work',
             hiddenByDefault: true,
         };
@@ -287,11 +287,11 @@ function renderConverterSection(config = {}) {
     const work = (config?.work && typeof config.work === 'object') ? config.work : {};
     const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
     const selectedId = String(converter.id || '').trim();
-    const selectedDefinition = available.find((item) => item?.id === selectedId) || available[0] || null;
+    const selectedDefinition = selectedId ? (available.find((item) => item?.id === selectedId) || null) : null;
     const defaults = selectedDefinition?.defaults || {};
     const ui = selectedDefinition?.ui && typeof selectedDefinition.ui === 'object' ? selectedDefinition.ui : {};
     const selectedQuality = String(converter.quality || defaults.quality || 'default');
-    const selectedFormat = String(converter.format || defaults.format || 'webp');
+    const selectedFormat = String(converter.format || defaults.format || '');
     const selectedSaveMode = String(converter.saveMode || defaults.saveMode || 'new-hidden-work');
     const unsupportedMessage = catalog && catalog.webReadable === false
         ? '<div class="edit-status">This file is not directly web-readable. Choose a converter to create a poff-standard work.</div>'
@@ -301,16 +301,24 @@ function renderConverterSection(config = {}) {
         ...available.map((item) => {
             const disabled = item.enabled === false;
             const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
-            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
         }),
     ].join('');
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
-    const renderSelectOptions = (values, selected) => Array.isArray(values)
-        ? values.map((value) => `<option value="${escapeHtml(String(value || ''))}"${String(value || '') === String(selected || '') ? ' selected' : ''}>${escapeHtml(String(value || ''))}</option>`).join('')
+    const formatOptionLabel = (value) => {
+        const normalized = String(value || '');
+        return normalized === 'source' ? 'same as source' : normalized;
+    };
+    const renderSelectOptions = (values, selected, labeler = null) => Array.isArray(values)
+        ? values.map((value) => {
+            const normalized = String(value || '');
+            const label = typeof labeler === 'function' ? labeler(normalized) : normalized;
+            return `<option value="${escapeHtml(normalized)}"${normalized === String(selected || '') ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('')
         : '';
     const formatOptions = Array.isArray(ui?.format?.options) && ui.format.options.length
         ? ui.format.options
-        : (Array.isArray(selectedDefinition?.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ['webp', 'jpeg', 'png']);
+        : (Array.isArray(selectedDefinition?.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ['source']);
     const qualityOptions = Array.isArray(ui?.quality?.options) && ui.quality.options.length ? ui.quality.options : ['preview', 'default', 'archival', 'small-web'];
     const saveModeOptions = Array.isArray(ui?.saveMode?.options) && ui.saveMode.options.length ? ui.saveMode.options : ['new-hidden-work', 'replace-generated-work', 'temporary-preview-only'];
     const formatLabel = String(ui?.format?.label || 'Output format');
@@ -342,7 +350,7 @@ function renderConverterSection(config = {}) {
                 <div>
                     <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
                     <select class="form-select" id="edit-converter-format" name="converter_format">
-                        ${renderSelectOptions(formatOptions, selectedFormat)}
+                        ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
                     </select>
                 </div>
                 <div>
@@ -867,6 +875,37 @@ export function renderEditPanel({
         }
         onMediaInput(readMediaConfigFromForm(form, config?.work || {}));
     };
+    const syncConverterFormatOptions = () => {
+        const converterSelect = form?.elements?.converter_id;
+        const formatSelect = form?.elements?.converter_format;
+        if (!(converterSelect instanceof HTMLSelectElement) || !(formatSelect instanceof HTMLSelectElement)) {
+            return;
+        }
+        const selectedOption = converterSelect.selectedOptions && converterSelect.selectedOptions[0] ? converterSelect.selectedOptions[0] : null;
+        let ui = {};
+        let defaults = {};
+        try {
+            ui = JSON.parse(selectedOption?.dataset?.converterUi || '{}');
+        } catch {
+            ui = {};
+        }
+        try {
+            defaults = JSON.parse(selectedOption?.dataset?.converterDefaults || '{}');
+        } catch {
+            defaults = {};
+        }
+        const formats = Array.isArray(ui?.format?.options) && ui.format.options.length
+            ? ui.format.options
+            : String(selectedOption?.dataset?.converterFormats || '')
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+        const nextOptions = formats.length ? formats : ['source'];
+        const selected = String(defaults.format || nextOptions[0] || 'source');
+        formatSelect.innerHTML = nextOptions
+            .map((item) => `<option value="${escapeHtml(item)}"${item === selected ? ' selected' : ''}>${escapeHtml(item === 'source' ? 'same as source' : item)}</option>`)
+            .join('');
+    };
 
     if (titleInput && typeof onTitleInput === 'function') {
         titleInput.addEventListener('input', () => {
@@ -888,7 +927,12 @@ export function renderEditPanel({
             return;
         }
         input.addEventListener('input', syncMediaState);
-        input.addEventListener('change', syncMediaState);
+        input.addEventListener('change', () => {
+            if (input.id === 'edit-converter-id') {
+                syncConverterFormatOptions();
+            }
+            syncMediaState();
+        });
     });
     bindWorkCategoryControls({
         editPanel,

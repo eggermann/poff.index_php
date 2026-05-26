@@ -75,6 +75,14 @@ if ($mode === 'save') {
     exit(0);
 }
 
+if ($mode === 'convert') {
+    echo json_encode(handleConvert([
+        'rootDir' => $rootDir,
+        'payload' => $payload,
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($mode === 'remote-security') {
     echo json_encode([
         'error' => Converter::validateRemoteEndpoint((string) ($payload['url'] ?? '')),

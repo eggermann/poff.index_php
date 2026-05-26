@@ -1,0 +1,32 @@
+{
+  "type": "converter",
+  "name": "convert-text-editor",
+  "label": "Convert Text Editor",
+  "description": "Loads a zero-build CDN code editor for text files and saves the edited result as a generated work.",
+  "accepts": ["text/plain", "text/*", "application/json"],
+  "outputs": ["application/json", "text/html", "text/plain", "text/markdown"],
+  "engine": "text-copy",
+  "defaults": {
+    "format": "source",
+    "quality": "default",
+    "saveMode": "new-hidden-work",
+    "hiddenByDefault": true
+  },
+  "ui": {
+    "format": {
+      "type": "select",
+      "label": "Output format",
+      "options": ["source", "json", "html", "txt", "md"]
+    },
+    "quality": {
+      "type": "select",
+      "label": "Quality",
+      "options": ["preview", "default", "archival", "small-web"]
+    },
+    "saveMode": {
+      "type": "select",
+      "label": "Save mode",
+      "options": ["new-hidden-work", "temporary-preview-only"]
+    }
+  }
+}

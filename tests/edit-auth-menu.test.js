@@ -362,3 +362,130 @@ test('creating a converter navigates to the new converter folder path', async ()
 
   expect(windowMock.location.hash).toBe('#/converters/convert-image');
 });
+
+test('saving a selected converter persists converter work config even without existing work config', async () => {
+  let capturedPanelOptions = null;
+  let savedPayload = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async (action, payload) => {
+      if (action === 'save') {
+        savedPayload = payload;
+        return {
+          auth,
+          allowed: true,
+          saved: true,
+          target: 'file',
+          subjectTarget: 'file',
+          routePath: 'notes.txt',
+          config: {
+            kind: 'text',
+            work: payload.work,
+          },
+        };
+      }
+      return {
+        auth,
+        allowed: true,
+        target: 'file',
+        subjectTarget: 'file',
+        config: {
+          kind: 'text',
+          mimeType: 'text/plain',
+        },
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  expect(capturedPanelOptions).toBeTruthy();
+
+  const converterOption = {
+    dataset: {
+      converterName: 'convert-text-editor',
+      converterType: 'converter',
+      converterEngine: 'text-copy',
+      converterPath: 'worktypes/templates/converter/convert-text-editor',
+      converterViewerHref: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
+      converterUrl: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
+    },
+  };
+  const form = {
+    elements: {
+      form: null,
+      title: { value: 'Notes' },
+      description: { value: '' },
+      work_type: { value: 'text' },
+      converter_id: {
+        value: 'converter/convert-text-editor',
+        selectedOptions: [converterOption],
+      },
+      converter_quality: { value: 'default' },
+      converter_format: { value: 'html' },
+      converter_save_mode: { value: 'new-hidden-work' },
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+  form.elements.form = form;
+
+  await capturedPanelOptions.onSubmit({
+    elements: form.elements,
+    form,
+    statusEl: { textContent: '' },
+  });
+
+  expect(savedPayload).toBeTruthy();
+  expect(savedPayload.path).toBe('notes.txt');
+  expect(savedPayload.work.converter).toEqual(expect.objectContaining({
+    id: 'converter/convert-text-editor',
+    name: 'convert-text-editor',
+    format: 'html',
+    quality: 'default',
+    saveMode: 'new-hidden-work',
+  }));
+});

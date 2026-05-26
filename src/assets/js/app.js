@@ -48,7 +48,7 @@ const navigation = initNavigation({
 });
 
 editController.setPreviewRefreshHandler(() => {
-    navigation.refreshCurrentLocation();
+    navigation.refreshCurrentPreviewLocation();
 });
 
 const sidebarController = bindSidebarToggle(elements);

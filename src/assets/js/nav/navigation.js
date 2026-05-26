@@ -29,7 +29,12 @@ export function initNavigation({
     }
 
     function getCurrentSelection() {
-        return getSelectionFromPath(readHashPath() || initialQueryPath || '');
+        const hashPath = readHashPath();
+        if (hashPath) {
+            const resolved = routeResolver.resolveHashPath(hashPath);
+            return getSelectionFromPath(resolved.path, { isFile: resolved.isFile });
+        }
+        return getSelectionFromPath(initialQueryPath || '');
     }
 
     const previewController = createPreviewController({
@@ -82,6 +87,8 @@ export function initNavigation({
         const {
             updateHash = true,
             forceRefresh = false,
+            skipSidebarReload = false,
+            skipEditInit = false,
         } = options;
         const previewPath = selection.previewPath || '';
         const previewIsFile = !!selection.previewIsFile;
@@ -96,7 +103,7 @@ export function initNavigation({
         if (updateHash) {
             writeHashPath(selection.path || '');
         }
-        if (navList) {
+        if (navList && !skipSidebarReload) {
             setLoadingVisible(sidebarLoading, true);
             sidebarController.loadNav(folderPath)
                 .then(() => {
@@ -108,7 +115,7 @@ export function initNavigation({
                     setLoadingVisible(sidebarLoading, false);
                 });
         }
-        if (initEditMode) {
+        if (initEditMode && !skipEditInit) {
             initEditMode();
         }
     }
@@ -122,24 +129,46 @@ export function initNavigation({
     }
 
     async function syncFromLocation(options = {}) {
-        const { forceRefresh = false } = options;
+        const {
+            forceRefresh = false,
+            skipSidebarReload = false,
+            skipEditInit = false,
+        } = options;
         const hashPath = readHashPath();
         if (hashPath || window.location.hash) {
             const resolved = await routeResolver.resolveHashPathAsync(hashPath);
             navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
                 updateHash: false,
                 forceRefresh,
+                skipSidebarReload,
+                skipEditInit,
             });
             return;
         }
         navigateToSelection(getSelectionFromPath(currentPathForIframe ?? initialQueryPath ?? ''), {
             updateHash: false,
             forceRefresh,
+            skipSidebarReload,
+            skipEditInit,
         });
     }
 
     function refreshCurrentLocation() {
         syncFromLocation({ forceRefresh: true });
+    }
+
+    function refreshCurrentPreviewLocation() {
+        const hashPath = readHashPath();
+        const resolved = hashPath ? routeResolver.resolveHashPath(hashPath) : null;
+        const selection = resolved
+            ? getSelectionFromPath(resolved.path, { isFile: resolved.isFile })
+            : getCurrentSelection();
+        navigateToSelection(selection, {
+            updateHash: false,
+            forceRefresh: true,
+            skipSidebarReload: true,
+            skipEditInit: true,
+        });
     }
 
     if (navList) {
@@ -160,6 +189,7 @@ export function initNavigation({
         },
         loadCurrentFolderInIframe,
         refreshCurrentLocation,
+        refreshCurrentPreviewLocation,
         rememberSlugPathAlias: routeResolver.rememberSlugPathAlias,
         syncFromLocation,
         writeHashPath,

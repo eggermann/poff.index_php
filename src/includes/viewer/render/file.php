@@ -402,7 +402,9 @@ function cmsResolveConverterPreviewState(string $relativePath, string $fullPath,
     $saveMode = trim((string) ($selected['saveMode'] ?? ($definition['defaults']['saveMode'] ?? 'new-hidden-work')));
     $sourceName = basename($relativePath);
     $sourceDir = trim(dirname($relativePath), '.');
-    $saveAs = pathinfo($sourceName, PATHINFO_FILENAME) . '.' . ($format !== '' ? $format : 'webp');
+    $saveAs = ($format === 'source' || $format === '')
+        ? $sourceName
+        : (pathinfo($sourceName, PATHINFO_FILENAME) . '.' . $format);
     $selected['name'] = (string) ($definition['name'] ?? ($selected['name'] ?? 'converter'));
     $selected['folder'] = (string) ($definition['folder'] ?? '');
     $selected['templateFolder'] = (string) ($definition['templateFolder'] ?? '');
@@ -415,6 +417,7 @@ function cmsResolveConverterPreviewState(string $relativePath, string $fullPath,
     $selected['format'] = $format;
     $selected['quality'] = $quality;
     $selected['saveMode'] = $saveMode;
+    $sourceTextContent = cmsReadConverterPreviewSourceText($relativePath, $fullPath, $mime);
 
     return [
         'work' => [
@@ -446,7 +449,9 @@ function cmsResolveConverterPreviewState(string $relativePath, string $fullPath,
                 'extension' => $extension,
                 'size' => is_file($fullPath) ? filesize($fullPath) : 0,
                 'srcUrl' => viewerAssetHref($relativePath),
+                'content' => $sourceTextContent,
             ],
+            'textContent' => $sourceTextContent,
             'target' => [
                 'folder' => $sourceDir === '' ? '' : $sourceDir,
                 'saveAs' => $saveAs,
@@ -457,4 +462,32 @@ function cmsResolveConverterPreviewState(string $relativePath, string $fullPath,
             ],
         ],
     ];
+}
+
+function cmsReadConverterPreviewSourceText(string $relativePath, string $fullPath, string $mime): string
+{
+    if (!is_file($fullPath) || !is_readable($fullPath)) {
+        return '';
+    }
+
+    $size = @filesize($fullPath);
+    if ($size === false || $size > 1024 * 1024) {
+        return '';
+    }
+
+    $fileName = basename($relativePath);
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    $textExtensions = ['txt', 'md', 'csv', 'json', 'log', 'ini', 'yml', 'yaml', 'xml', 'html', 'htm', 'css', 'js', 'rtf', 'hbs', 'tpl', 'mustache', 'htaccess'];
+    $textMimes = ['application/json', 'application/xml', 'application/javascript', 'application/x-javascript', 'application/rtf', 'text/rtf'];
+    $isTextLike = str_starts_with($mime, 'text/')
+        || in_array($mime, $textMimes, true)
+        || in_array($extension, $textExtensions, true)
+        || $fileName === '.htaccess';
+
+    if (!$isTextLike) {
+        return '';
+    }
+
+    $contents = @file_get_contents($fullPath);
+    return $contents === false ? '' : $contents;
 }

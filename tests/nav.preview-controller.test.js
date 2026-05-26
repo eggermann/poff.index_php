@@ -39,6 +39,8 @@ function loadPreviewController(overrides = {}) {
       return node;
     }
 
+    addEventListener() {}
+
     querySelectorAll() {
       return [];
     }
@@ -313,6 +315,69 @@ describe('preview controller', () => {
     expect(controller.buildViewerUrl('hello.txt', true, false)).toBe(
       '/?view=1&file=hello.txt&converter_preview=1&converter_id=converter%2Fconvert-text&converter_format=txt&converter_quality=preview'
     );
+  });
+
+  test('converter previews prefer converter markup over the normal file iframe and execute converter scripts', async () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      DOMParser: class {
+        parseFromString() {
+          const converter = new FakeHTMLElement('section', '<textarea data-poff-text-editor-fallback>{"ok":true}</textarea>');
+          converter.setAttribute('class', 'poff-text-editor-converter');
+          converter.setAttribute('data-poff-text-editor-converter', '');
+          const layout = new FakeHTMLElement('div', '<main><iframe src="/raw.json"></iframe></main>');
+          layout.setAttribute('class', 'poff-default-layout');
+          const viewer = new FakeHTMLElement('div', `${layout.outerHTML}${converter.outerHTML}`, {
+            '[data-poff-text-editor-converter], .poff-text-editor-converter, [data-poff-converter], .converter-app': converter,
+            '.poff-default-layout': layout,
+          });
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: { children: [] },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            querySelectorAll(selector) {
+              if (selector === 'script') {
+                const script = new FakeHTMLElement('script');
+                script.textContent = 'window.poffConverterPayloadProvider = function () { return {}; };';
+                return [script];
+              }
+              return [];
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+      fetch: async (url, options) => ({
+        ok: true,
+        url: `http://example.test${url}`,
+        text: async () => '<html></html>',
+        options,
+      }),
+    });
+    const contentFrame = new FakeHTMLElement();
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return null;
+      },
+    });
+
+    await controller.renderPreview('/?view=1&file=hello.json&converter_preview=1&converter_id=converter%2Fconvert-text-editor');
+
+    expect(contentFrame.innerHTML).toContain('poff-text-editor-converter');
+    expect(contentFrame.innerHTML).not.toContain('<iframe');
+    expect(contentFrame.children).toHaveLength(1);
+    expect(contentFrame.children[0].textContent).toContain('poffConverterPayloadProvider');
   });
 
   test('uses a local preview fallback message instead of remote snapshot text for same-origin responses', async () => {

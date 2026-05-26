@@ -106,7 +106,7 @@ export function createPreviewController({
         }
     }
 
-    function extractPreferredPreviewMarkup(previewDocument, previewRoot) {
+    function extractPreferredPreviewMarkup(previewDocument, previewRoot, options = {}) {
         const candidateRoot = previewRoot && typeof previewRoot.cloneNode === 'function'
             ? previewRoot.cloneNode(true)
             : previewDocument.body;
@@ -115,6 +115,13 @@ export function createPreviewController({
         }
 
         if (typeof candidateRoot.querySelector === 'function') {
+            if (options.converterPreview) {
+                const converterRoot = candidateRoot.querySelector('[data-poff-text-editor-converter], .poff-text-editor-converter, [data-poff-converter], .converter-app');
+                if (converterRoot && typeof converterRoot.outerHTML === 'string') {
+                    return converterRoot.outerHTML.trim();
+                }
+            }
+
             const layout = candidateRoot.querySelector('.poff-default-layout');
             if (layout && typeof layout.outerHTML === 'string') {
                 return layout.outerHTML.trim();
@@ -151,6 +158,66 @@ export function createPreviewController({
             return candidateRoot.outerHTML.trim();
         }
         return '';
+    }
+
+    function isConverterPreviewUrl(url) {
+        try {
+            const parsed = new URL(url, window.location.href);
+            return parsed.searchParams.get('converter_preview') === '1';
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function collectPreviewScripts(previewDocument, baseUrl, enabled = false) {
+        if (!enabled || !previewDocument || typeof previewDocument.querySelectorAll !== 'function') {
+            return [];
+        }
+
+        return Array.from(previewDocument.querySelectorAll('script'))
+            .map((node) => {
+                const src = node.getAttribute('src') || '';
+                const text = node.textContent || '';
+                if (src) {
+                    try {
+                        return {
+                            src: new URL(src, baseUrl).href,
+                            text: '',
+                        };
+                    } catch (err) {
+                        return null;
+                    }
+                }
+                const trimmed = String(text || '').trim();
+                if (trimmed === '' || trimmed.includes('POFF_CONTEXT') || trimmed.includes('currentPoffConfig')) {
+                    return null;
+                }
+                return {
+                    src: '',
+                    text: trimmed,
+                };
+            })
+            .filter(Boolean);
+    }
+
+    function executePreviewScripts(previewContainer, scripts = []) {
+        if (!previewContainer || !scripts.length) {
+            return;
+        }
+        scripts.forEach((scriptData) => {
+            try {
+                const script = document.createElement('script');
+                if (scriptData.src) {
+                    script.src = scriptData.src;
+                    script.async = false;
+                } else {
+                    script.textContent = scriptData.text || '';
+                }
+                previewContainer.appendChild(script);
+            } catch (err) {
+                // Converter previews still render through their HTML/CSS fallback if a script cannot be mounted.
+            }
+        });
     }
 
     function buildViewerUrl(path, isFile = false, forceRefresh = false) {
@@ -371,6 +438,7 @@ export function createPreviewController({
             const parser = new DOMParser();
             const previewDocument = parser.parseFromString(html, 'text/html');
             const previewRoot = previewDocument.querySelector('#contentFrame > .viewer') || previewDocument.querySelector('.viewer') || previewDocument.body;
+            const converterPreview = isConverterPreviewUrl(url);
             const previewContainer = contentFrame.shadowRoot || contentFrame;
             previewMountRoot = previewContainer;
             previewContainer.innerHTML = '';
@@ -397,15 +465,22 @@ export function createPreviewController({
                 .filter(Boolean)
                 .join('');
             const previewMarkup = rewritePreviewMarkupUrls(
-                extractPreferredPreviewMarkup(previewDocument, previewRoot),
+                extractPreferredPreviewMarkup(previewDocument, previewRoot, { converterPreview }),
                 response.url
             );
+            let previewScripts = [];
+            try {
+                previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview);
+            } catch (err) {
+                previewScripts = [];
+            }
             const fallbackMarkup = previewMarkup || (
                 isExternalPreviewUrl(response.url)
                     ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`
                     : '<div class="viewer-error">Preview unavailable.</div>'
             );
             previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
+            executePreviewScripts(previewContainer, previewScripts);
             syncPreviewDisabledState(previewDisabled);
             bindPreviewNavigation();
             lastPreviewKey = nextPreview.key;

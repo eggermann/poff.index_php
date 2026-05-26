@@ -238,7 +238,7 @@ function cmsRenderNavListMarkup(array $context): string
 
     $directories = [];
     $files = [];
-    $tree = $folderPoffConfig['tree'] ?? null;
+    $tree = $currentNavConfig['tree'] ?? null;
 
     if (is_array($tree)) {
         foreach ($tree as $item) {

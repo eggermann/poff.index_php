@@ -10,6 +10,14 @@ import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layo
 import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
 import { setStatusMessage } from './status.js';
 
+function buildConverterSaveAs(sourceName, format) {
+    const normalizedFormat = String(format || '').trim().toLowerCase();
+    if (!normalizedFormat || normalizedFormat === 'source') {
+        return sourceName;
+    }
+    return `${sourceName.replace(/\.[^.]+$/, '')}.${normalizedFormat}`;
+}
+
 function readMediaConfigFromElements(elements, form, currentWork = {}) {
     const nextWork = { ...(currentWork && typeof currentWork === 'object' ? currentWork : {}) };
     const typeField = elements.work_type;
@@ -85,7 +93,7 @@ function readMediaConfigFromElements(elements, form, currentWork = {}) {
                 ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
             quality: String(elements.converter_quality?.value || 'default').trim() || 'default',
-            format: String(elements.converter_format?.value || 'webp').trim() || 'webp',
+            format: String(elements.converter_format?.value || '').trim() || 'source',
             saveMode: String(elements.converter_save_mode?.value || 'new-hidden-work').trim() || 'new-hidden-work',
             hiddenByDefault: true,
         };
@@ -182,7 +190,7 @@ export function createEditController({ elements, context, editRequested }) {
                 converter_id: converterId,
                 converter_path: String(converter.path || '').trim(),
                 converter_url: String(converter.url || '').trim(),
-                converter_format: String(converter.format || 'webp').trim() || 'webp',
+                converter_format: String(converter.format || '').trim() || 'source',
                 converter_quality: String(converter.quality || 'default').trim() || 'default',
                 converter_save_mode: String(converter.saveMode || 'new-hidden-work').trim() || 'new-hidden-work',
             },
@@ -646,7 +654,7 @@ export function createEditController({ elements, context, editRequested }) {
                     title: (elements.title?.value || '').trim(),
                     description: (elements.description?.value || '').trim(),
                 };
-                if (editConfig?.work && typeof editConfig.work === 'object') {
+                if (mediaWork && typeof mediaWork === 'object' && Object.keys(mediaWork).length > 0) {
                     payload.work = materializeWorkFields(mediaWork);
                 }
                 await saveConfig(payload, statusEl);
@@ -712,10 +720,32 @@ export function createEditController({ elements, context, editRequested }) {
                     converter,
                     target: {
                         folder: sourcePath.split('/').slice(0, -1).join('/'),
-                        saveAs: `${sourceName.replace(/\.[^.]+$/, '')}.${converter.format || 'webp'}`,
+                        saveAs: buildConverterSaveAs(sourceName, converter.format || 'source'),
                         mode: converter.saveMode || 'new-hidden-work',
                     },
                 };
+                if (typeof window.poffConverterPayloadProvider === 'function') {
+                    const extraPayload = await Promise.resolve(window.poffConverterPayloadProvider({
+                        sourcePath,
+                        sourceName,
+                        converter: { ...converter },
+                        target: { ...payload.target },
+                    }));
+                    if (extraPayload && typeof extraPayload === 'object') {
+                        if (extraPayload.source && typeof extraPayload.source === 'object') {
+                            payload.source = { ...payload.source, ...extraPayload.source };
+                        }
+                        if (extraPayload.converter && typeof extraPayload.converter === 'object') {
+                            payload.converter = { ...payload.converter, ...extraPayload.converter };
+                        }
+                        if (extraPayload.target && typeof extraPayload.target === 'object') {
+                            payload.target = { ...payload.target, ...extraPayload.target };
+                        }
+                        if (extraPayload.editor && typeof extraPayload.editor === 'object') {
+                            payload.editor = { ...extraPayload.editor };
+                        }
+                    }
+                }
                 const converted = await requestMcpRoute('convert', payload);
                 if (!converted || converted.error || converted.ok === false) {
                     throw new Error(converted?.error || 'Conversion failed.');

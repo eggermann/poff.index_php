@@ -82,12 +82,13 @@ export function getEditTargetPath(selection = getActiveSelection()) {
     if (selection?.isLayout) {
         return selection.path || '';
     }
-    if (selection?.previewIsFile) {
-        const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
-        const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
-        if (navPath) {
-            return navPath;
-        }
+    const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
+    const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
+    const navLooksLikeFile = !!activeFileLink?.hasAttribute?.('data-file')
+        || !!activeFileLink?.hasAttribute?.('data-src')
+        || /\.[^\\/]+$/.test(navPath);
+    if (navPath && (selection?.previewIsFile || navLooksLikeFile)) {
+        return navPath;
     }
     return selection?.previewPath || selection?.path || '';
 }
