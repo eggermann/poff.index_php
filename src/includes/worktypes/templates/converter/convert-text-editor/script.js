@@ -22,6 +22,28 @@
     const mime = String(root.dataset.sourceMime || '').toLowerCase();
     const isJsonSource = extension === 'json' || mime === 'application/json';
 
+    const resolveAceMode = () => {
+      if (isJsonSource) {
+        return 'ace/mode/json';
+      }
+      if (extension === 'md' || mime === 'text/markdown') {
+        return 'ace/mode/markdown';
+      }
+      if (extension === 'html' || extension === 'htm' || mime === 'text/html') {
+        return 'ace/mode/html';
+      }
+      if (extension === 'css' || mime === 'text/css') {
+        return 'ace/mode/css';
+      }
+      if (extension === 'js' || mime === 'application/javascript') {
+        return 'ace/mode/javascript';
+      }
+      if (extension === 'rtf' || mime === 'application/rtf' || mime === 'text/rtf') {
+        return 'ace/mode/text';
+      }
+      return 'ace/mode/text';
+    };
+
     const updateStatus = (message) => {
       if (status instanceof HTMLElement) {
         status.textContent = message;
@@ -67,18 +89,7 @@
       root.dataset.editorReady = 'true';
       editor = window.ace.edit(host);
       editor.setTheme('ace/theme/monokai');
-      const mode = isJsonSource
-        ? 'ace/mode/json'
-        : extension === 'md' || mime === 'text/markdown'
-          ? 'ace/mode/markdown'
-          : extension === 'html' || extension === 'htm' || mime === 'text/html'
-            ? 'ace/mode/html'
-            : extension === 'css' || mime === 'text/css'
-              ? 'ace/mode/css'
-              : extension === 'js' || mime === 'application/javascript'
-                ? 'ace/mode/javascript'
-                : 'ace/mode/text';
-      editor.session.setMode(mode);
+      editor.session.setMode(resolveAceMode());
       editor.session.setUseWrapMode(true);
       editor.setValue(fallback.value || '', -1);
       editor.setOptions({

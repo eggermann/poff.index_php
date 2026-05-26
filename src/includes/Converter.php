@@ -604,8 +604,8 @@ JS,
         $kind = strtolower(trim($kind));
         $extension = strtolower(trim($extension, '. '));
         $accepts = array_values(array_map('strtolower', (array) ($definition['accepts'] ?? [])));
-        if ($mime !== '' && self::mimeAccepted($mime, $accepts)) {
-            return true;
+        if ($mime !== '') {
+            return self::mimeAccepted($mime, $accepts);
         }
         if ($kind !== '') {
             foreach ($accepts as $pattern) {
@@ -614,8 +614,14 @@ JS,
                 }
             }
         }
-        if ($extension !== '' && in_array($extension, $accepts, true)) {
-            return true;
+        if ($extension !== '') {
+            if (in_array($extension, $accepts, true)) {
+                return true;
+            }
+            $mimeFromExtension = self::mimeFromExtension($extension);
+            if ($mimeFromExtension !== '' && self::mimeAccepted($mimeFromExtension, $accepts)) {
+                return true;
+            }
         }
         return false;
     }
