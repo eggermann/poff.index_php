@@ -584,7 +584,7 @@ JS,
         $kind = strtolower(trim($kind));
         $extension = strtolower(trim($extension, '. '));
         if ($mime === '' && $extension !== '') {
-            $mime = self::mimeFromExtension($extension);
+            $mime = MediaType::mimeFromExtension($extension);
         }
 
         $available = [];
@@ -618,7 +618,7 @@ JS,
             if (in_array($extension, $accepts, true)) {
                 return true;
             }
-            $mimeFromExtension = self::mimeFromExtension($extension);
+            $mimeFromExtension = MediaType::mimeFromExtension($extension);
             if ($mimeFromExtension !== '' && self::mimeAccepted($mimeFromExtension, $accepts)) {
                 return true;
             }
@@ -1168,21 +1168,6 @@ HTML;
             }
         }
         return false;
-    }
-
-    private static function mimeFromExtension(string $extension): string
-    {
-        return match (strtolower(trim($extension, '.'))) {
-            'tif', 'tiff' => 'image/tiff',
-            'webp' => 'image/webp',
-            'jpg', 'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'txt' => 'text/plain',
-            'md', 'markdown' => 'text/markdown',
-            'html', 'htm' => 'text/html',
-            'json' => 'application/json',
-            default => '',
-        };
     }
 
     private static function mimeFromFormat(string $format): string

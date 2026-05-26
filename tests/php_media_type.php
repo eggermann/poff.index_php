@@ -12,6 +12,8 @@ $checks = [
     ['video/webm', MediaType::detectMimeType('/tmp/generated-video-2.webm', 'generated-video-2.webm')],
     ['image/jpeg', MediaType::detectMimeType('/tmp/generated-image.jpg', 'generated-image.jpg')],
     ['application/json', MediaType::detectMimeType('/tmp/generated-data.json', 'generated-data.json')],
+    ['application/json', MediaType::mimeFromExtension('json')],
+    ['application/rtf', MediaType::mimeFromExtension('rtf')],
     ['video/quicktime', PoffConfig::detectMimeType('/tmp/generated-video-3.mov', 'generated-video-3.mov')],
     ['image/png', PoffConfig::detectMimeType('/tmp/generated-image-2.png', 'generated-image-2.png')],
 ];

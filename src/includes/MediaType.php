@@ -103,8 +103,9 @@ class MediaType
         }
 
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        if (isset(self::MIME_BY_EXT[$ext])) {
-            return $cache[$cacheKey] = self::MIME_BY_EXT[$ext];
+        $mimeFromExtension = self::mimeFromExtension($ext);
+        if ($mimeFromExtension !== '') {
+            return $cache[$cacheKey] = $mimeFromExtension;
         }
 
         if (function_exists('finfo_open')) {
@@ -121,6 +122,12 @@ class MediaType
         $cache[$cacheKey] = null;
 
         return null;
+    }
+
+    public static function mimeFromExtension(string $extension): string
+    {
+        $ext = strtolower(trim($extension, '.'));
+        return self::MIME_BY_EXT[$ext] ?? '';
     }
 
     public static function shouldUseInlineTextPreview(string $fileName, ?string $mimeType = null): bool
