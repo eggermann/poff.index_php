@@ -489,3 +489,81 @@ test('saving a selected converter persists converter work config even without ex
     saveMode: 'new-hidden-work',
   }));
 });
+
+test('init edit mode refreshes preview when a file already has a selected converter', async () => {
+  let refreshCount = 0;
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'file',
+      subjectTarget: 'file',
+      config: {
+        kind: 'text',
+        mimeType: 'text/plain',
+        work: {
+          type: 'text',
+          converter: {
+            id: 'converter/convert-text-editor',
+            path: 'worktypes/templates/converter/convert-text-editor',
+            url: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
+            format: 'html',
+            quality: 'default',
+            saveMode: 'new-hidden-work',
+          },
+        },
+      },
+    }),
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel() {
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel: { querySelector() { return null; } },
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  controller.setPreviewRefreshHandler(() => {
+    refreshCount += 1;
+  });
+
+  await controller.initEditMode();
+
+  expect(refreshCount).toBe(1);
+  expect(controller.getPreviewParams({ path: 'notes.txt', isFile: true })).toEqual(expect.objectContaining({
+    converter_preview: '1',
+    converter_id: 'converter/convert-text-editor',
+    converter_format: 'html',
+  }));
+});

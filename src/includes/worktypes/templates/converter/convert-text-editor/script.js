@@ -20,25 +20,53 @@
     let settled = false;
     const extension = String(root.dataset.sourceExtension || '').toLowerCase();
     const mime = String(root.dataset.sourceMime || '').toLowerCase();
-    const isJsonSource = extension === 'json' || mime === 'application/json';
+    const converterFormat = String(root.dataset.converterFormat || '').toLowerCase();
+
+    const resolveEffectiveFormat = () => {
+      if (converterFormat && converterFormat !== 'source') {
+        return converterFormat;
+      }
+      if (extension) {
+        return extension;
+      }
+      if (mime === 'application/json') {
+        return 'json';
+      }
+      if (mime === 'text/markdown') {
+        return 'md';
+      }
+      if (mime === 'text/html') {
+        return 'html';
+      }
+      if (mime === 'text/css') {
+        return 'css';
+      }
+      if (mime === 'application/javascript') {
+        return 'js';
+      }
+      return 'txt';
+    };
+
+    const effectiveFormat = resolveEffectiveFormat();
+    const isJsonSource = effectiveFormat === 'json';
 
     const resolveAceMode = () => {
-      if (isJsonSource) {
+      if (effectiveFormat === 'json') {
         return 'ace/mode/json';
       }
-      if (extension === 'md' || mime === 'text/markdown') {
+      if (effectiveFormat === 'md' || effectiveFormat === 'markdown') {
         return 'ace/mode/markdown';
       }
-      if (extension === 'html' || extension === 'htm' || mime === 'text/html') {
+      if (effectiveFormat === 'html' || effectiveFormat === 'htm') {
         return 'ace/mode/html';
       }
-      if (extension === 'css' || mime === 'text/css') {
+      if (effectiveFormat === 'css') {
         return 'ace/mode/css';
       }
-      if (extension === 'js' || mime === 'application/javascript') {
+      if (effectiveFormat === 'js' || effectiveFormat === 'mjs' || effectiveFormat === 'cjs' || effectiveFormat === 'javascript') {
         return 'ace/mode/javascript';
       }
-      if (extension === 'rtf' || mime === 'application/rtf' || mime === 'text/rtf') {
+      if (effectiveFormat === 'rtf') {
         return 'ace/mode/text';
       }
       return 'ace/mode/text';

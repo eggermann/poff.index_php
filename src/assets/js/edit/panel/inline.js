@@ -371,6 +371,21 @@ function renderConverterSection(config = {}) {
     `;
 }
 
+function renderDirectFileLink(config = {}, status = {}) {
+    if (status?.target !== 'file') {
+        return '';
+    }
+    const directUrl = String(config?.srcUrl || '').trim();
+    if (!directUrl) {
+        return '';
+    }
+    return `
+        <div class="small-note">
+            <a href="${escapeHtml(directUrl)}" target="_blank" rel="noopener noreferrer">Open original file</a>
+        </div>
+    `;
+}
+
 function renderPasswordChangeSection(status = {}) {
     if (!status?.auth?.canEdit) {
         return '';
@@ -790,6 +805,7 @@ export function renderEditPanel({
 
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
+        ${renderDirectFileLink(config, status)}
         <div class="edit-status" id="editInlineStatus"></div>
         ${renderPasswordChangeSection(status)}
         <form id="inlineEditForm" class="edit-inline">
@@ -938,6 +954,8 @@ export function renderEditPanel({
         editPanel,
         onMediaInput,
     });
+    syncConverterFormatOptions();
+    syncMediaState();
     if (form && typeof onSubmit === 'function') {
         form.addEventListener('submit', (event) => {
             event.preventDefault();

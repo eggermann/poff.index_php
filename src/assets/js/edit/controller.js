@@ -578,7 +578,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (refreshed?.config) {
             editConfig = annotateConfigPath(refreshed.config, selection, refreshed);
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
-            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection), { refresh: false });
+            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection));
             if (editTarget === 'folder' || (editTarget === 'layout' && refreshed.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
@@ -1120,7 +1120,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (data.config) {
             editConfig = annotateConfigPath(data.config, selection, data);
             editTarget = data.target || (selection.isFile ? 'file' : 'folder');
-            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection), { refresh: false });
+            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection));
             if (editTarget === 'folder' || (editTarget === 'layout' && data.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();

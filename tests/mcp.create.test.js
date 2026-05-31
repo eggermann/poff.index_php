@@ -2368,6 +2368,51 @@ describe('Poff converters', () => {
     }
   });
 
+  test('text editor converter preview exposes the selected output format to the template', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-editor-format-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'draft.json'), '{"hello":true}');
+    createConverterApp(tempRoot, 'convert-text-editor', {
+      label: 'Convert Text Editor',
+      accepts: ['text/plain', 'text/*', 'application/json'],
+      outputs: ['text/html', 'application/json', 'text/plain', 'text/markdown'],
+      engine: 'text-copy',
+      defaults: {
+        format: 'html',
+        quality: 'default',
+        saveMode: 'new-hidden-work',
+        hiddenByDefault: true,
+      },
+      ui: {
+        format: { type: 'select', label: 'Output format', options: ['source', 'json', 'html', 'txt', 'md'] },
+        quality: { type: 'select', label: 'Quality', options: ['default'] },
+      },
+    });
+    fs.writeFileSync(
+      path.join(tempRoot, 'poff', 'converters', 'convert-text-editor', '.layout', 'template.hbs'),
+      fs.readFileSync(path.join(ROOT, 'src/includes/worktypes/templates/converter/convert-text-editor/template.hbs'), 'utf8')
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, 'poff', 'converters', 'convert-text-editor', '.layout', 'work.hbs'),
+      fs.readFileSync(path.join(ROOT, 'src/includes/worktypes/templates/converter/convert-text-editor/work.hbs'), 'utf8')
+    );
+
+    try {
+      const rendered = await runViewerWithQuery('draft.json', tempRoot, false, {
+        converter_preview: '1',
+        converter_id: 'converter/convert-text-editor',
+        converter_format: 'html',
+        converter_quality: 'default',
+        converter_save_mode: 'new-hidden-work',
+      });
+
+      expect(rendered).toContain('poff-text-editor-converter');
+      expect(rendered).toContain('data-converter-format="html"');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('creates a converter app from the default grain', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-grain-${Date.now()}`);
     fs.mkdirSync(tempRoot, { recursive: true });
