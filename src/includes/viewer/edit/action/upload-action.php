@@ -34,6 +34,7 @@ function cmsHandleEditUploadAction(array $ctx): void
             (string) ($data['linkUrl'] ?? $data['url'] ?? ''),
             [
                 'pendingApproval' => !$editorAuthenticated,
+                'htaccessDir' => $rootDir,
             ]
         ),
         default => function () use ($targetDir): array {

@@ -174,7 +174,7 @@ function loadPreviewController(overrides = {}) {
       options,
     })),
     requestAnimationFrame: (fn) => fn(),
-    window: {
+    window: overrides.window || {
       location: {
         href: 'http://example.test/',
         origin: 'http://example.test',
@@ -315,6 +315,33 @@ describe('preview controller', () => {
     expect(controller.buildViewerUrl('hello.txt', true, false)).toBe(
       '/?view=1&file=hello.txt&converter_preview=1&converter_id=converter%2Fconvert-text&converter_format=txt&converter_quality=preview'
     );
+  });
+
+  test('preserves edit=true in viewer urls for hidden edit-mode previews', () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      window: {
+        location: {
+          href: 'http://example.test/?edit=true#/mcmmcmc',
+          origin: 'http://example.test',
+          pathname: '/',
+        },
+      },
+    });
+    const controller = createPreviewController({
+      contentFrame: new FakeHTMLElement(),
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return {
+          previewPath: 'mcmmcmc',
+          previewIsFile: true,
+        };
+      },
+    });
+
+    expect(controller.buildViewerUrl('mcmmcmc', true, false)).toBe('/?edit=true&view=1&file=mcmmcmc');
   });
 
   test('converter previews prefer converter markup over the normal file iframe and execute converter scripts', async () => {

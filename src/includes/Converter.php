@@ -784,7 +784,11 @@ JS,
         }
 
         $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'webp')));
-        $outputMime = ($definition['engine'] ?? '') === 'text-copy'
+        $engine = (string) ($definition['engine'] ?? '');
+        $outputMime = (
+            $engine === 'text-copy'
+            || ($engine === 'remote-node' && self::remoteUsesTextFormats($format, $definition))
+        )
             ? self::textMimeFromFormat($format, (string) ($source['path'] ?? ''), $mime)
             : self::mimeFromFormat($format);
         if (!self::mimeAccepted($outputMime, $definition['outputs'] ?? [])) {
@@ -826,7 +830,7 @@ JS,
         $output = $conversion['output'];
         $outputName = self::sanitizeOutputName((string) ($output['name'] ?? 'converted.webp'));
         $outputMime = strtolower(trim((string) ($output['mimeType'] ?? '')));
-        if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png', 'text/plain', 'text/markdown', 'text/html'])) {
+        if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png', 'application/json', 'text/plain', 'text/markdown', 'text/html'])) {
             return self::error('Converted MIME type is not allowed.');
         }
 
@@ -1090,7 +1094,7 @@ HTML;
         $node = is_array($converter['node'] ?? null) ? $converter['node'] : [];
         $remote = is_array($definition['remote'] ?? null) ? $definition['remote'] : [];
         $endpoint = trim((string) ($node['endpoint'] ?? $remote['endpoint'] ?? ''));
-        $validation = self::validateRemoteEndpoint($endpoint);
+        $validation = self::validateRemoteEndpoint($endpoint, self::isTrustedLocalPageoffConverterEndpoint($endpoint));
         if ($validation !== null) {
             return self::error($validation);
         }
@@ -1521,6 +1525,39 @@ HTML;
             'status' => $status,
             'body' => $body !== false ? $body : '',
         ];
+    }
+
+    private static function remoteUsesTextFormats(string $format, array $definition): bool
+    {
+        $normalized = self::normalizeFormat($format);
+        if (!in_array($normalized, ['source', 'json', 'txt', 'md', 'html'], true)) {
+            return false;
+        }
+
+        foreach (($definition['outputs'] ?? []) as $mime) {
+            if (in_array(strtolower(trim((string) $mime)), ['application/json', 'text/plain', 'text/markdown', 'text/html'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isTrustedLocalPageoffConverterEndpoint(string $url): bool
+    {
+        $scheme = strtolower((string) (parse_url($url, PHP_URL_SCHEME) ?? ''));
+        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+        if (!in_array($host, ['localhost', '127.0.0.1', '::1'], true) && !str_ends_with($host, '.localhost')) {
+            return false;
+        }
+        $path = str_replace('\\', '/', trim((string) (parse_url($url, PHP_URL_PATH) ?? ''), '/'));
+        return in_array($path, [
+            'worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
+            'worktypes/templates/converter/convert-text-editor/converter.php',
+        ], true);
     }
 
     private static function httpGet(string $url): array

@@ -474,6 +474,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
 }
 
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'nav') {
+    $folderPoffConfig = null;
     if (is_dir($currentAbsolutePath)) {
         $folderPoffConfig = class_exists('PoffConfig') ? PoffConfig::ensure($currentAbsolutePath) : null;
     }
@@ -586,6 +587,10 @@ PHP;
             if (is_file($layoutAsset)) {
                 FileCopier::copyFileToLayoutDirectories($layoutAsset, $resolvedTargetDir);
             }
+            $converterGrainDir = $sourceDir . '/includes/worktypes/templates/converter';
+            if (is_dir($converterGrainDir)) {
+                FileCopier::mirrorDirectory($converterGrainDir, $resolvedTargetDir . '/worktypes/templates/converter');
+            }
         }
 
         FileCopier::removeGeneratedEntrypointsFromSubdirectories($outputDir, $outputFileName);
@@ -594,6 +599,10 @@ PHP;
         $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
         if (is_file($layoutAsset)) {
             FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
+        }
+        $converterGrainDir = $sourceDir . '/includes/worktypes/templates/converter';
+        if (is_dir($converterGrainDir)) {
+            FileCopier::mirrorDirectory($converterGrainDir, $outputDir . '/worktypes/templates/converter');
         }
     }
 

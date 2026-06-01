@@ -324,6 +324,11 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
         return cmsUploadErrorResult('Failed to write config file.');
     }
 
+    if (!$pendingApproval) {
+        $htaccessDir = trim((string) ($options['htaccessDir'] ?? ''));
+        cmsEnsureHtaccessFrameAncestorForUrl($htaccessDir !== '' ? $htaccessDir : $targetDir, $target);
+    }
+
     return cmsUploadStoredResult($name, [
         'linkUrl' => $target,
         'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
@@ -353,6 +358,111 @@ function cmsNormalizeRemoteBaseUrl(string $url): string
     }
 
     return rtrim($normalized, '/');
+}
+
+function cmsExternalFrameAncestorOrigin(string $url): string
+{
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        return '';
+    }
+
+    $scheme = strtolower((string) $parts['scheme']);
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return '';
+    }
+
+    $origin = $scheme . '://' . $parts['host'];
+    if (isset($parts['port'])) {
+        $origin .= ':' . $parts['port'];
+    }
+
+    return $origin;
+}
+
+function cmsAppendFrameAncestorToPolicy(string $policyLine, string $origin): string
+{
+    if ($origin === '' || strpos($policyLine, 'frame-ancestors') === false) {
+        return $policyLine;
+    }
+    if (preg_match('/\bframe-ancestors\s+\*/i', $policyLine) === 1) {
+        return $policyLine;
+    }
+    if (strpos($policyLine, $origin) !== false) {
+        return $policyLine;
+    }
+
+    return preg_replace_callback(
+        '/(frame-ancestors\s+)([^"]+)/i',
+        static function (array $matches) use ($origin): string {
+            $existing = trim((string) ($matches[2] ?? ''));
+            $updated = $existing === '' ? $origin : ($existing . ' ' . $origin);
+            return (string) ($matches[1] ?? 'frame-ancestors ') . $updated;
+        },
+        $policyLine,
+        1
+    ) ?? $policyLine;
+}
+
+function cmsEnsureHtaccessFrameAncestorForUrl(string $targetDir, string $url): void
+{
+    $origin = cmsExternalFrameAncestorOrigin($url);
+    if ($origin === '') {
+        return;
+    }
+
+    $dirError = cmsEnsureUploadDirectory($targetDir);
+    if ($dirError !== null) {
+        return;
+    }
+
+    $htaccessPath = rtrim($targetDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.htaccess';
+    $contents = is_file($htaccessPath) ? (string) file_get_contents($htaccessPath) : '';
+    if (trim($contents) === '') {
+        $contents = cmsDefaultHtaccessContents();
+    }
+
+    $lines = preg_split("/\r\n|\n|\r/", $contents) ?: [];
+    $updated = false;
+    foreach ($lines as $index => $line) {
+        $trimmed = ltrim($line);
+        if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+            continue;
+        }
+        if (stripos($line, 'Header always set Content-Security-Policy') === false || stripos($line, 'frame-ancestors') === false) {
+            continue;
+        }
+        $nextLine = cmsAppendFrameAncestorToPolicy($line, $origin);
+        if ($nextLine !== $line) {
+            $lines[$index] = $nextLine;
+        }
+        $updated = true;
+        break;
+    }
+
+    if (!$updated) {
+        $block = [
+            '',
+            '# Allow embedded preview for linked external client origins',
+            '<IfModule mod_headers.c>',
+            '    Header always set Content-Security-Policy "frame-ancestors \'self\' ' . $origin . '"',
+            '</IfModule>',
+        ];
+        $contents = rtrim($contents);
+        $contents .= ($contents === '' ? '' : PHP_EOL) . implode(PHP_EOL, $block) . PHP_EOL;
+    } else {
+        $contents = implode(PHP_EOL, $lines);
+        if ($contents !== '' && !str_ends_with($contents, PHP_EOL)) {
+            $contents .= PHP_EOL;
+        }
+    }
+
+    @file_put_contents($htaccessPath, $contents);
 }
 
 function cmsUploadSafeName(string $name): string

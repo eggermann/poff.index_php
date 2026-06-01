@@ -43,3 +43,39 @@ test('folder viewer cache invalidates when nested folder contents change', () =>
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('folder viewer can build a shallow root snapshot without descending into nested folders', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-folder-shallow-'));
+
+  try {
+    fs.mkdirSync(path.join(tempRoot, 'nested-child', 'deep-child'), { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'visible.txt'), 'hello', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, 'nested-child', 'nested-video.mp4'), 'video', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, 'nested-child', 'deep-child', 'too-deep.txt'), 'deep', 'utf8');
+
+    const result = spawnSync('php', [
+      path.join(ROOT, 'tests/php_folder_viewer_data.php'),
+      tempRoot,
+      '',
+      JSON.stringify({ maxDepth: 0 }),
+    ], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+
+    const payload = JSON.parse(result.stdout);
+    const nestedFolder = payload.tree.find((item) => item.name === 'nested-child');
+    expect(nestedFolder).toEqual(expect.objectContaining({
+      isFolder: true,
+      childCount: 0,
+      children: [],
+    }));
+    expect(JSON.stringify(payload)).not.toContain('too-deep.txt');
+    expect(payload.allItems.some((item) => item.name === 'nested-video.mp4')).toBe(false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

@@ -97,7 +97,19 @@
       return fallback.value;
     };
 
-    window.poffConverterPayloadProvider = () => ({
+    const buildEndpoint = () => new URL(
+      'worktypes/templates/converter/convert-text-editor/converter.php',
+      `${window.location.origin}${window.location.pathname}`
+    ).toString();
+
+    window.poffConverterPayloadProvider = ({ converter = {} } = {}) => ({
+      converter: {
+        ...converter,
+        node: {
+          id: 'text-editor-local-php',
+          endpoint: buildEndpoint(),
+        },
+      },
       editor: {
         content: currentValue(),
         editorKind: editor ? 'ace-cdn' : 'textarea-fallback',
@@ -126,7 +138,7 @@
         useSoftTabs: true,
         tabSize: 2,
       });
-      updateStatus('Editor ready. Converted output will save the current editor content.');
+      updateStatus('Editor ready. Convert will send the current editor content to local PHP.');
       return true;
     };
 

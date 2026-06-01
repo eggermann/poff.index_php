@@ -221,9 +221,14 @@ export function createPreviewController({
     }
 
     function buildViewerUrl(path, isFile = false, forceRefresh = false) {
+        const currentUrl = new URL(window.location.href);
+        const editRequested = currentUrl.searchParams.get('edit') === 'true';
         const url = new URL(window.location.href);
         url.search = '';
         url.hash = '';
+        if (editRequested) {
+            url.searchParams.set('edit', 'true');
+        }
         url.searchParams.set('view', '1');
         url.searchParams.set(isFile ? 'file' : 'path', path);
         const previewParams = typeof getPreviewParams === 'function' ? getPreviewParams({

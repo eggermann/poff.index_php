@@ -1,5 +1,54 @@
 <?php
 
+function cmsCompactFolderRenderTree(array $items, int $depthRemaining): array
+{
+    $compacted = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $next = $item;
+        if (isset($next['children']) && is_array($next['children'])) {
+            if ($depthRemaining > 0) {
+                $next['children'] = cmsCompactFolderRenderTree($next['children'], $depthRemaining - 1);
+                $next['childCount'] = count($next['children']);
+            } else {
+                unset($next['children']);
+            }
+        }
+        $compacted[] = $next;
+    }
+
+    return $compacted;
+}
+
+function cmsCompactFolderRenderContext(array $context): array
+{
+    $allItems = is_array($context['allItems'] ?? null) ? $context['allItems'] : [];
+    $isRootFolder = trim((string) ($context['path'] ?? ''), '/\\') === '';
+    $isLargeFolder = count($allItems) > 250;
+    if (!$isRootFolder && !$isLargeFolder) {
+        return $context;
+    }
+
+    $tree = is_array($context['tree'] ?? null) ? $context['tree'] : [];
+    $compactedTree = cmsCompactFolderRenderTree($tree, 1);
+    $context['tree'] = $compactedTree;
+    $context['items'] = $compactedTree;
+
+    if (is_array($context['workTree'] ?? null)) {
+        unset($context['workTree']['children']);
+    }
+
+    foreach (['allItems', 'allFiles', 'allFolders', 'allImages', 'allVideos', 'allAudio', 'allPdfs', 'allTexts', 'allLinks', 'allOther'] as $key) {
+        if (is_array($context[$key] ?? null)) {
+            $context[$key] = array_slice($context[$key], 0, 250);
+        }
+    }
+
+    return $context;
+}
+
 function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullPath): array
 {
     $folderConfig = null;
@@ -37,7 +86,7 @@ function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullP
         'name' => $rawName,
         'title' => $folderConfig['title'] ?? $rawName,
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
-    ]);
+    ], trim($relativePath, '/\\') === '' ? ['maxDepth' => 0] : []);
     $tree = $folderViewData['tree'];
     $descriptionHtml = '';
     if (!empty($folderConfig['description'])) {
@@ -72,7 +121,6 @@ function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullP
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
         'folderName' => $folderConfig['folderName'] ?? $rawName,
         'tree' => $tree,
-        'items' => $tree,
         'workTree' => $folderViewData['workTree'],
         'allItems' => $folderViewData['allItems'],
         'allFiles' => $folderViewData['allFiles'],
@@ -89,6 +137,7 @@ function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullP
         'allItemCount' => count($folderViewData['allItems']),
         'work' => $work,
     ];
+    $context = cmsCompactFolderRenderContext($context);
     if ($isConverterWork) {
         $context['converter'] = [
             'id' => (string) ($converterDefinition['id'] ?? ''),

@@ -38,6 +38,27 @@ module.exports = {
 }
 
 describe('edit target paths', () => {
+  test('uses the containing folder config when the current selection is a configured link', () => {
+    const { getEditTargetPath } = loadPaths({
+      window: {
+        POFF_CONTEXT: {
+          currentPoffConfig: {
+            tree: [
+              { name: 'dominikeggermann.com', path: 'dominikeggermann.com', type: 'link' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(getEditTargetPath({
+      path: 'dominikeggermann.com',
+      previewPath: 'dominikeggermann.com',
+      previewIsFile: true,
+      isLayout: false,
+    })).toBe('');
+  });
+
   test('uses the active nav file path when the current hash is a slug', () => {
     const activeLink = {
       getAttribute(name) {

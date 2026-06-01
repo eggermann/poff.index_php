@@ -260,9 +260,12 @@ export function createSidebarController({
             window.open(relPath, '_blank');
             return;
         }
+        const hasExplicitFileFlag = Object.prototype.hasOwnProperty.call(target.dataset, 'isFile');
         const isFile = target.dataset.layoutPath
             ? false
-            : !(target.hasAttribute('href') && target.getAttribute('href').startsWith('?path='));
+            : (hasExplicitFileFlag
+                ? target.dataset.isFile === '1'
+                : !(target.hasAttribute('href') && target.getAttribute('href').startsWith('?path=')));
         navigateToPath(relPath, { isFile });
     }
 

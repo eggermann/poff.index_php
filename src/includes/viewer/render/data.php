@@ -116,7 +116,16 @@ function cmsFolderViewerCacheStore(string $fullPath, string $relativePath, array
     @file_put_contents($cachePath, json_encode($payload, JSON_UNESCAPED_SLASHES));
 }
 
-function buildFolderViewerData(string $relativePath, string $fullPath, ?array $folderConfig, array $rootMeta): array
+function cmsFolderViewerNormalizedMaxDepth(array $options): ?int
+{
+    if (!array_key_exists('maxDepth', $options) || $options['maxDepth'] === null || $options['maxDepth'] === '') {
+        return null;
+    }
+
+    return max(0, (int) $options['maxDepth']);
+}
+
+function buildFolderViewerData(string $relativePath, string $fullPath, ?array $folderConfig, array $rootMeta, array $options = []): array
 {
     $dependencies = [];
     cmsFolderViewerTrackDependency($dependencies, $fullPath);
@@ -127,9 +136,11 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
         }
     }
 
-    $cached = cmsFolderViewerCacheLoad($fullPath, $relativePath);
-    if (is_array($cached)) {
-        return $cached;
+    if ($options === []) {
+        $cached = cmsFolderViewerCacheLoad($fullPath, $relativePath);
+        if (is_array($cached)) {
+            return $cached;
+        }
     }
 
     $visited = [];
@@ -139,7 +150,15 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
     }
 
     $flatItems = [];
-    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig, $flatItems, $visited, $dependencies);
+    $tree = buildFolderViewerItems(
+        $relativePath,
+        $fullPath,
+        $folderConfig,
+        $flatItems,
+        $visited,
+        $dependencies,
+        cmsFolderViewerNormalizedMaxDepth($options)
+    );
     $allFiles = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFile'])));
     $allFolders = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFolder'])));
 
@@ -175,12 +194,14 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
         'allOther' => filterFolderViewerItemsByKind($allFiles, 'other'),
     ];
 
-    cmsFolderViewerCacheStore($fullPath, $relativePath, $data, $dependencies);
+    if ($options === []) {
+        cmsFolderViewerCacheStore($fullPath, $relativePath, $data, $dependencies);
+    }
 
     return $data;
 }
 
-function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited, array &$dependencies): array
+function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited, array &$dependencies, ?int $depthRemaining = null): array
 {
     $tree = resolveFolderViewerTree($fullPath, $folderConfig);
     $items = [];
@@ -265,11 +286,16 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             cmsTrackFolderViewerConfigPath($dependencies, class_exists('PoffConfig') ? PoffConfig::configPath($entryFullPath) : null);
             $children = [];
             $realChildPath = realpath($entryFullPath);
-            if (!is_string($realChildPath) || $realChildPath === '' || !isset($visited[$realChildPath])) {
+            $nextDepthRemaining = $depthRemaining === null ? null : max(0, $depthRemaining - 1);
+            $canDescend = $depthRemaining === null || $depthRemaining > 0;
+            if (
+                $canDescend
+                && (!is_string($realChildPath) || $realChildPath === '' || !isset($visited[$realChildPath]))
+            ) {
                 if (is_string($realChildPath) && $realChildPath !== '') {
                     $visited[$realChildPath] = true;
                 }
-                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited, $dependencies);
+                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited, $dependencies, $nextDepthRemaining);
             }
             $item['children'] = $children;
             $item['childCount'] = count($children);

@@ -2,7 +2,7 @@
     <header class="poff-text-editor-converter__header">
         <p class="poff-text-editor-converter__eyebrow">Text converter</p>
         <h2 class="poff-text-editor-converter__title">{{converter.label}}</h2>
-        <p class="poff-text-editor-converter__summary">Edit the source text in-browser, then save the generated result beside the original file.</p>
+        <p class="poff-text-editor-converter__summary">Edit the source text in-browser, then convert through local PHP and save the generated result beside the original file.</p>
     </header>
     <dl class="poff-text-editor-converter__meta">
         <div>
@@ -20,7 +20,7 @@
     </dl>
     <div class="poff-text-editor-converter__surface">
         <div class="poff-text-editor-converter__toolbar">
-            <span class="poff-text-editor-converter__badge">Ace via CDN</span>
+            <span class="poff-text-editor-converter__badge">Ace via CDN + local PHP</span>
             <span class="poff-text-editor-converter__status" data-poff-text-editor-status>Loading editor...</span>
         </div>
         <textarea class="poff-text-editor-converter__fallback" data-poff-text-editor-fallback spellcheck="false">{{textContent}}</textarea>

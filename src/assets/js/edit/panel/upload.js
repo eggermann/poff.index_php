@@ -2,7 +2,7 @@ import { uploadValidationError } from './shared.js';
 import { setStatusMessage } from '../status.js';
 import { registerEscapeClose } from '../../core/escape-stack.js';
 
-export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false }) {
+export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true }) {
     if (isFileTarget) {
         return '';
     }
@@ -24,7 +24,8 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                         </select>
                     </div>
         `;
-    return `
+    const launcherHtml = showLauncher
+        ? `
         <div class="edit-upload-launch ${isEmptyFolder ? 'edit-upload-launch-empty' : ''}">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Add work</div>
@@ -32,6 +33,10 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
             </div>
             <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">${externalOnly ? 'Submit link' : 'Add work'}</button>
         </div>
+        `
+        : `<button class="btn btn-secondary" type="button" id="editOpenUploadDialog" hidden>${externalOnly ? 'Submit link' : 'Add work'}</button>`;
+    return `
+        ${launcherHtml}
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">

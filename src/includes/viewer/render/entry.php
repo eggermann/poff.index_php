@@ -25,8 +25,9 @@ function renderViewer(string $baseDir, string $requestedPath): void
         $fullPath .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
     }
     if (!file_exists($fullPath)) {
+        $includeHiddenVirtualItems = (string) ($_GET['edit'] ?? '') === 'true';
         $virtualConfig = class_exists('PoffConfig')
-            ? cmsResolveConfiguredTreeItem($baseDir, $relativePath)
+            ? cmsResolveConfiguredTreeItem($baseDir, $relativePath, $includeHiddenVirtualItems)
             : null;
         $virtualType = strtolower(trim((string) (($virtualConfig['kind'] ?? ($virtualConfig['type'] ?? '')))));
         $virtualTarget = is_array($virtualConfig) ? cmsConfiguredTreeLinkTarget($virtualConfig) : '';

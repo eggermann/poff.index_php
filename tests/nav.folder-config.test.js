@@ -19,6 +19,19 @@ test('nav rendering uses folderPoffConfig instead of an undefined config variabl
   expect(result.stdout).toContain('nav-link-up');
 });
 
+test('nav ajax rendering tolerates missing directories without undefined variable warnings', () => {
+  const baseDir = path.join(ROOT, 'tests', 'poff-tests');
+  const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav_ajax.php'), baseDir, 'deg'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toContain('Error reading directory.');
+  expect(result.stdout).not.toContain('Undefined variable $folderPoffConfig');
+});
+
 test('nav edit rendering includes fast hide actions for tree items', () => {
   const baseDir = path.join(ROOT, 'tests', 'poff-tests');
   const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), baseDir, 'viewer-folder', 'edit'], {
@@ -146,6 +159,8 @@ test('pending external links stay hidden from visitors and show review state for
     expect(editorResult.stdout).toContain('nav-link-pending-approval');
     expect(editorResult.stdout).toContain('data-nav-action="review-external"');
     expect(editorResult.stdout).toContain('new</span>');
+    expect(editorResult.stdout).toContain('data-hidden="true"');
+    expect(editorResult.stdout).not.toContain('pointer-events:none;');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

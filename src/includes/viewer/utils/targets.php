@@ -68,7 +68,40 @@ function cmsResolveTarget(string $rootDir, string $relativePath): ?array
         ];
     }
 
-    return cmsResolvePhysicalTarget($rootDir, $trimmed);
+    $physical = cmsResolvePhysicalTarget($rootDir, $trimmed);
+    if ($physical !== null) {
+        return $physical;
+    }
+
+    $configured = cmsResolveConfiguredTreeItem($rootDir, $trimmed, true);
+    if (!is_array($configured)) {
+        return null;
+    }
+
+    $resolvedPath = trim((string) ($configured['resolvedPath'] ?? $configured['path'] ?? $trimmed), "/\\");
+    $configuredType = (string) ($configured['type'] ?? 'file');
+    if ($configuredType === 'folder' || $resolvedPath === '') {
+        return null;
+    }
+
+    $parentRelativePath = dirname($resolvedPath);
+    if ($parentRelativePath === '.' || $parentRelativePath === DIRECTORY_SEPARATOR) {
+        $parentRelativePath = '';
+    }
+
+    $parentTarget = cmsResolvePhysicalTarget($rootDir, $parentRelativePath);
+    if (!is_array($parentTarget) || ($parentTarget['type'] ?? '') !== 'folder') {
+        return null;
+    }
+
+    return [
+        'type' => 'file',
+        'dir' => (string) $parentTarget['dir'],
+        'file' => basename($resolvedPath),
+        'path' => rtrim($rootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $resolvedPath),
+        'virtual' => true,
+        'configured' => $configured,
+    ];
 }
 
 function cmsNormalizeRelativeViewerPath(string $relativePath): string
@@ -76,7 +109,7 @@ function cmsNormalizeRelativeViewerPath(string $relativePath): string
     return trim(str_replace('\\', '/', $relativePath), '/');
 }
 
-function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, string $prefix = ''): ?array
+function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, string $prefix = '', bool $includeHidden = false): ?array
 {
     $normalizedTarget = cmsNormalizeRelativeViewerPath($targetPath);
     if ($normalizedTarget === '') {
@@ -86,7 +119,7 @@ function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, str
     $bestMatch = null;
     $bestScore = PHP_INT_MIN;
     foreach ($tree as $item) {
-        if (!is_array($item) || (($item['visible'] ?? true) === false)) {
+        if (!is_array($item) || (!$includeHidden && (($item['visible'] ?? true) === false))) {
             continue;
         }
 
@@ -114,7 +147,7 @@ function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, str
         }
 
         if (is_array($item['children'] ?? null)) {
-            $found = cmsResolveConfiguredTreeItemInList($item['children'], $normalizedTarget, $resolvedPath);
+            $found = cmsResolveConfiguredTreeItemInList($item['children'], $normalizedTarget, $resolvedPath, $includeHidden);
             if (is_array($found)) {
                 $score = cmsConfiguredTreeItemScore($found);
                 if ($score > $bestScore) {
@@ -148,7 +181,7 @@ function cmsConfiguredTreeItemScore(array $item): int
     return $score;
 }
 
-function cmsResolveConfiguredTreeItem(string $rootDir, string $relativePath): ?array
+function cmsResolveConfiguredTreeItem(string $rootDir, string $relativePath, bool $includeHidden = false): ?array
 {
     if (!class_exists('PoffConfig')) {
         return null;
@@ -156,7 +189,7 @@ function cmsResolveConfiguredTreeItem(string $rootDir, string $relativePath): ?a
 
     $config = PoffConfig::ensure($rootDir);
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
-    $resolved = cmsResolveConfiguredTreeItemInList($tree, $relativePath);
+    $resolved = cmsResolveConfiguredTreeItemInList($tree, $relativePath, '', $includeHidden);
     if (!is_array($resolved)) {
         return null;
     }
@@ -182,7 +215,7 @@ function cmsRouteSlugFromPath(string $value): string
         : cmsNormalizeRouteSlug(basename($path));
 }
 
-function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string $slug, int $depth = 0): ?array
+function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string $slug, int $depth = 0, bool $includeHidden = false): ?array
 {
     if ($depth > 8 || !class_exists('PoffConfig')) {
         return null;
@@ -199,7 +232,7 @@ function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string 
     $config = PoffConfig::ensure($dir);
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
     foreach ($tree as $item) {
-        if (!is_array($item) || (($item['visible'] ?? true) === false)) {
+        if (!is_array($item) || (!$includeHidden && (($item['visible'] ?? true) === false))) {
             continue;
         }
 
@@ -230,7 +263,7 @@ function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string 
         }
 
         if ($type === 'folder') {
-            $found = cmsResolveSlugRouteInTree($rootDir, $relativePath, $slug, $depth + 1);
+            $found = cmsResolveSlugRouteInTree($rootDir, $relativePath, $slug, $depth + 1, $includeHidden);
             if ($found !== null) {
                 return $found;
             }
@@ -247,7 +280,10 @@ function cmsHandleResolveRoute(string $rootDir): void
         cmsJsonResponse(['resolved' => false, 'error' => 'Invalid route.'], 400);
     }
 
-    $resolved = cmsResolveSlugRouteInTree($rootDir, '', $slug);
+    $includeHidden = (string) ($_GET['edit'] ?? '') === 'true'
+        && function_exists('cmsIsEditorAuthenticated')
+        && cmsIsEditorAuthenticated($rootDir);
+    $resolved = cmsResolveSlugRouteInTree($rootDir, '', $slug, 0, $includeHidden);
     if ($resolved === null) {
         cmsJsonResponse(['resolved' => false, 'error' => 'Route not found.'], 404);
     }

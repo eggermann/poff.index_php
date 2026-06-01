@@ -1,0 +1,111 @@
+.poff-pageoff-remote-text {
+  --poff-pageoff-remote-border: rgba(94, 162, 255, 0.28);
+  --poff-pageoff-remote-surface: rgba(9, 17, 34, 0.94);
+  --poff-pageoff-remote-surface-soft: rgba(14, 24, 46, 0.9);
+  --poff-pageoff-remote-text: #ecf2ff;
+  --poff-pageoff-remote-muted: #8aa4c8;
+  --poff-pageoff-remote-accent: #8dd3ff;
+}
+
+.poff-pageoff-remote-text__panel,
+.poff-pageoff-remote-text__external {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  color: var(--poff-pageoff-remote-text);
+}
+
+.poff-pageoff-remote-text__header,
+.poff-pageoff-remote-text__meta,
+.poff-pageoff-remote-text__controls {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.poff-pageoff-remote-text__eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: var(--poff-pageoff-remote-accent);
+}
+
+.poff-pageoff-remote-text__title,
+.poff-pageoff-remote-text__summary {
+  margin: 0;
+}
+
+.poff-pageoff-remote-text__summary,
+.poff-pageoff-remote-text__meta dt,
+.poff-pageoff-remote-text__control span,
+.poff-pageoff-remote-text__status {
+  color: var(--poff-pageoff-remote-muted);
+}
+
+.poff-pageoff-remote-text__meta {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.poff-pageoff-remote-text__meta dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+}
+
+.poff-pageoff-remote-text__control {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 12rem;
+}
+
+.poff-pageoff-remote-text__control select {
+  border: 1px solid var(--poff-pageoff-remote-border);
+  border-radius: 0.75rem;
+  background: var(--poff-pageoff-remote-surface-soft);
+  color: var(--poff-pageoff-remote-text);
+  padding: 0.7rem 0.9rem;
+}
+
+.poff-pageoff-remote-text__surface {
+  border: 1px solid var(--poff-pageoff-remote-border);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--poff-pageoff-remote-surface);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.34);
+}
+
+.poff-pageoff-remote-text__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(180deg, rgba(28, 52, 87, 0.92) 0%, rgba(13, 25, 47, 0.96) 100%);
+  border-bottom: 1px solid var(--poff-pageoff-remote-border);
+}
+
+.poff-pageoff-remote-text__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(141, 211, 255, 0.12);
+  color: var(--poff-pageoff-remote-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.poff-pageoff-remote-text__editor {
+  display: block;
+  width: 100%;
+  min-height: 24rem;
+  margin: 0;
+  padding: 1rem;
+  border: 0;
+  resize: vertical;
+  background: var(--poff-pageoff-remote-surface-soft);
+  color: var(--poff-pageoff-remote-text);
+  font: 500 16px/1.65 "IBM Plex Mono", "SFMono-Regular", monospace;
+  white-space: pre;
+  tab-size: 2;
+  outline: none;
+}

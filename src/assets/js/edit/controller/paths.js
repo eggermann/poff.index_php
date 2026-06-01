@@ -82,6 +82,10 @@ export function getEditTargetPath(selection = getActiveSelection()) {
     if (selection?.isLayout) {
         return selection.path || '';
     }
+    const configuredItem = resolveConfiguredSelectionItem(selection);
+    if (configuredItem && configuredItem.type === 'link') {
+        return parentViewerPath(selection?.previewPath || selection?.path || '');
+    }
     const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
     const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
     const navLooksLikeFile = !!activeFileLink?.hasAttribute?.('data-file')

@@ -663,6 +663,20 @@
     root.__POFF_ESCAPE_STACK_BOUND__ = true;
     document.addEventListener("keydown", handleEscapeKeydown, true);
   }
+  function closeOpenDetailsTree(rootDetails) {
+    if (!rootDetails || typeof rootDetails !== "object") {
+      return;
+    }
+    if (typeof rootDetails.querySelectorAll === "function") {
+      const openDetails = Array.from(rootDetails.querySelectorAll("details[open]")).reverse();
+      openDetails.forEach((details) => {
+        if (details && typeof details === "object") {
+          details.open = false;
+        }
+      });
+    }
+    rootDetails.open = false;
+  }
   function registerEscapeClose(close, options = {}) {
     if (typeof close !== "function") {
       return () => {
@@ -678,6 +692,39 @@
       const index = escapeHandlers.indexOf(entry);
       if (index >= 0) {
         escapeHandlers.splice(index, 1);
+      }
+    };
+  }
+  function registerEscapeCloseDetails(detailsEl, options = {}) {
+    if (!detailsEl || typeof detailsEl.addEventListener !== "function") {
+      return () => {
+      };
+    }
+    let unregisterEscapeClose = null;
+    const label = typeof options.label === "string" ? options.label : "";
+    const syncEscapeState = () => {
+      if (detailsEl.open) {
+        if (typeof unregisterEscapeClose !== "function") {
+          unregisterEscapeClose = registerEscapeClose(() => {
+            closeOpenDetailsTree(detailsEl);
+            return true;
+          }, { label });
+        }
+        return;
+      }
+      closeOpenDetailsTree(detailsEl);
+      if (typeof unregisterEscapeClose === "function") {
+        unregisterEscapeClose();
+        unregisterEscapeClose = null;
+      }
+    };
+    detailsEl.addEventListener("toggle", syncEscapeState);
+    syncEscapeState();
+    return () => {
+      detailsEl.removeEventListener("toggle", syncEscapeState);
+      if (typeof unregisterEscapeClose === "function") {
+        unregisterEscapeClose();
+        unregisterEscapeClose = null;
       }
     };
   }
@@ -4512,6 +4559,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   var CATEGORY_PILLS_ID = "editWorkCategoryPills";
   var CATEGORY_ADD_ID = "editWorkCategoryAdd";
   var CATEGORY_CUSTOM_ADD_ID = "editWorkCategoryCustomAdd";
+  var CATEGORY_DETAILS_STORAGE_KEY = "category-details";
   var CATEGORY_MAX_LENGTH = 24;
   var CATEGORY_MAX_COUNT = 12;
   function normalizeCategoryValue(value) {
@@ -4581,43 +4629,43 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       ...categories
     ]));
     const selectedCategory = normalizeCategoryValue(options.find((option) => !categories.includes(option)) || options[0] || "");
-    return `
-        <div class="edit-work-category-section" data-work-category-section>
-            <div class="edit-work-category-header">
-                <div>
-                    <div class="edit-work-fields-title">Categories</div>
-                    <div class="small-note">Pick shared work categories for filtering and prompt context.</div>
+    return renderPersistentDetailsSection({
+      storageKey: CATEGORY_DETAILS_STORAGE_KEY,
+      defaultOpen: false,
+      id: "editWorkCategorySection",
+      className: "edit-work-fields edit-work-category-section",
+      summaryClassName: "edit-work-category-summary",
+      bodyClassName: "edit-work-category-controls",
+      titleHtml: "Categories",
+      noteHtml: "Pick shared work categories for filtering and prompt context.",
+      bodyHtml: `
+            <div class="edit-work-category-picker">
+                <label class="edit-label" for="${CATEGORY_SELECT_ID}">Add from works</label>
+                <div class="edit-work-category-picker-row">
+                    <select class="form-select" id="${CATEGORY_SELECT_ID}" name="work_category_select">
+                        ${renderCategoryOptions(options, selectedCategory)}
+                    </select>
+                    <button class="btn btn-secondary" type="button" id="${CATEGORY_ADD_ID}" aria-label="Add selected category">+</button>
                 </div>
+                <div class="small-note">The list comes from the shared worktype categories.</div>
             </div>
-            <div class="edit-work-category-controls">
-                <div class="edit-work-category-picker">
-                    <label class="edit-label" for="${CATEGORY_SELECT_ID}">Add from works</label>
-                    <div class="edit-work-category-picker-row">
-                        <select class="form-select" id="${CATEGORY_SELECT_ID}" name="work_category_select">
-                            ${renderCategoryOptions(options, selectedCategory)}
-                        </select>
-                        <button class="btn btn-secondary" type="button" id="${CATEGORY_ADD_ID}" aria-label="Add selected category">+</button>
-                    </div>
-                    <div class="small-note">The list comes from the shared worktype categories.</div>
+            <div class="edit-work-category-picker">
+                <label class="edit-label" for="${CATEGORY_CUSTOM_ID}">Custom category</label>
+                <div class="edit-work-category-picker-row">
+                    <input class="form-input" id="${CATEGORY_CUSTOM_ID}" type="text" maxlength="${CATEGORY_MAX_LENGTH}" placeholder="type a custom category">
+                    <button class="btn btn-secondary" type="button" id="${CATEGORY_CUSTOM_ADD_ID}" aria-label="Add custom category">+</button>
                 </div>
-                <div class="edit-work-category-picker">
-                    <label class="edit-label" for="${CATEGORY_CUSTOM_ID}">Custom category</label>
-                    <div class="edit-work-category-picker-row">
-                        <input class="form-input" id="${CATEGORY_CUSTOM_ID}" type="text" maxlength="${CATEGORY_MAX_LENGTH}" placeholder="type a custom category">
-                        <button class="btn btn-secondary" type="button" id="${CATEGORY_CUSTOM_ADD_ID}" aria-label="Add custom category">+</button>
-                    </div>
-                    <div class="small-note">Limit ${CATEGORY_MAX_LENGTH} chars, max ${CATEGORY_MAX_COUNT} categories.</div>
-                </div>
-                <div class="edit-work-category-current">
-                    <div class="edit-label">Current categories</div>
-                    <div class="edit-work-category-pills" id="${CATEGORY_PILLS_ID}">
-                        ${categories.length ? categories.map(renderCategoryPill).join("") : '<div class="small-note">No categories selected yet.</div>'}
-                    </div>
+                <div class="small-note">Limit ${CATEGORY_MAX_LENGTH} chars, max ${CATEGORY_MAX_COUNT} categories.</div>
+            </div>
+            <div class="edit-work-category-current">
+                <div class="edit-label">Current categories</div>
+                <div class="edit-work-category-pills" id="${CATEGORY_PILLS_ID}">
+                    ${categories.length ? categories.map(renderCategoryPill).join("") : '<div class="small-note">No categories selected yet.</div>'}
                 </div>
             </div>
             <input type="hidden" id="${CATEGORY_FIELD_ID}" data-work-config-field data-work-config-key="categories" data-work-config-kind="json" value="${escapeHtml(JSON.stringify(categories))}">
-        </div>
-    `;
+        `
+    });
   }
   function renderCategoryPills(editPanel, categories) {
     const pillsEl = editPanel.querySelector(`#${CATEGORY_PILLS_ID}`);
@@ -4679,6 +4727,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return () => {
       };
     }
+    const cleanupDetailsState = bindStoredDetailsState(sectionEl, CATEGORY_DETAILS_STORAGE_KEY);
     const onAddClick = () => {
       if (!(selectEl instanceof HTMLSelectElement)) {
         return;
@@ -4724,11 +4773,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         customAddEl.removeEventListener("click", onCustomAddClick);
       }
       sectionEl.removeEventListener("click", onSectionClick);
+      cleanupDetailsState();
     };
   }
 
   // src/assets/js/edit/panel/upload.js
-  function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false }) {
+  function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true }) {
     if (isFileTarget) {
       return "";
     }
@@ -4744,7 +4794,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         </select>
                     </div>
         `;
-    return `
+    const launcherHtml = showLauncher ? `
         <div class="edit-upload-launch ${isEmptyFolder ? "edit-upload-launch-empty" : ""}">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Add work</div>
@@ -4752,6 +4802,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             </div>
             <button class="btn btn-secondary" type="button" id="editOpenUploadDialog">${externalOnly ? "Submit link" : "Add work"}</button>
         </div>
+        ` : `<button class="btn btn-secondary" type="button" id="editOpenUploadDialog" hidden>${externalOnly ? "Submit link" : "Add work"}</button>`;
+    return `
+        ${launcherHtml}
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
@@ -5632,7 +5685,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return options.filter((option, index) => option && options.indexOf(option) === index).map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
   }
   function readMediaConfigFromForm(form, currentWork = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const typeField = (_a = form == null ? void 0 : form.elements) == null ? void 0 : _a.work_type;
     if (typeField && typeof typeField.value === "string") {
@@ -5690,6 +5743,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const converterName = String(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterName) || "").trim();
     const converterType = String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterType) || "converter").trim() || "converter";
     const converterEngine = String(((_g = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _g.converterEngine) || "").trim();
+    const converterPath = String(((_h = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _h.converterPath) || "").trim();
+    const converterViewerHref = String(((_i = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _i.converterViewerHref) || "").trim();
+    const converterUrl = String(((_j = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _j.converterUrl) || "").trim();
     const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
     if (converterId) {
       nextWork.converter = {
@@ -5698,10 +5754,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         name: converterName || String(existingConverter.name || converterId.split("/").pop() || "converter"),
         enabled: true,
         id: converterId,
+        path: converterPath,
+        viewerHref: converterViewerHref,
+        url: converterUrl,
         node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
-        quality: String(((_i = (_h = form == null ? void 0 : form.elements) == null ? void 0 : _h.converter_quality) == null ? void 0 : _i.value) || "default").trim() || "default",
-        format: String(((_k = (_j = form == null ? void 0 : form.elements) == null ? void 0 : _j.converter_format) == null ? void 0 : _k.value) || "webp").trim() || "webp",
-        saveMode: String(((_m = (_l = form == null ? void 0 : form.elements) == null ? void 0 : _l.converter_save_mode) == null ? void 0 : _m.value) || "new-hidden-work").trim() || "new-hidden-work",
+        quality: String(((_l = (_k = form == null ? void 0 : form.elements) == null ? void 0 : _k.converter_quality) == null ? void 0 : _l.value) || "default").trim() || "default",
+        format: String(((_n = (_m = form == null ? void 0 : form.elements) == null ? void 0 : _m.converter_format) == null ? void 0 : _n.value) || "").trim() || "source",
+        saveMode: String(((_p = (_o = form == null ? void 0 : form.elements) == null ? void 0 : _o.converter_save_mode) == null ? void 0 : _p.value) || "new-hidden-work").trim() || "new-hidden-work",
         hiddenByDefault: true
       };
     } else if (Object.prototype.hasOwnProperty.call(nextWork, "converter")) {
@@ -5781,24 +5840,33 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
     const converter = work.converter && typeof work.converter === "object" ? work.converter : {};
     const selectedId = String(converter.id || "").trim();
-    const selectedDefinition = available.find((item) => (item == null ? void 0 : item.id) === selectedId) || available[0] || null;
+    const selectedDefinition = selectedId ? available.find((item) => (item == null ? void 0 : item.id) === selectedId) || null : null;
     const defaults = (selectedDefinition == null ? void 0 : selectedDefinition.defaults) || {};
     const ui = (selectedDefinition == null ? void 0 : selectedDefinition.ui) && typeof selectedDefinition.ui === "object" ? selectedDefinition.ui : {};
     const selectedQuality = String(converter.quality || defaults.quality || "default");
-    const selectedFormat = String(converter.format || defaults.format || "webp");
+    const selectedFormat = String(converter.format || defaults.format || "");
     const selectedSaveMode = String(converter.saveMode || defaults.saveMode || "new-hidden-work");
+    const convertDisabled = selectedId === "";
     const unsupportedMessage = catalog && catalog.webReadable === false ? '<div class="edit-status">This file is not directly web-readable. Choose a converter to create a poff-standard work.</div>' : "";
     const options = [
       '<option value="">none</option>',
       ...available.map((item) => {
         const disabled = item.enabled === false;
         const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ""}`;
-        return `<option value="${escapeHtml(item.id || "")}" data-converter-type="${escapeHtml(item.type || "converter")}" data-converter-name="${escapeHtml(item.name || "")}" data-converter-engine="${escapeHtml(item.engine || "")}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(",") : "")}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(",") : "")}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}"${item.id === selectedId ? " selected" : ""}${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
+        return `<option value="${escapeHtml(item.id || "")}" data-converter-type="${escapeHtml(item.type || "converter")}" data-converter-name="${escapeHtml(item.name || "")}" data-converter-engine="${escapeHtml(item.engine || "")}" data-converter-path="${escapeHtml(item.path || "")}" data-converter-viewer-href="${escapeHtml(item.viewerHref || "")}" data-converter-url="${escapeHtml(item.url || "")}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(",") : "")}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(",") : "")}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? " selected" : ""}${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
       })
     ].join("");
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
-    const renderSelectOptions = (values, selected) => Array.isArray(values) ? values.map((value) => `<option value="${escapeHtml(String(value || ""))}"${String(value || "") === String(selected || "") ? " selected" : ""}>${escapeHtml(String(value || ""))}</option>`).join("") : "";
-    const formatOptions = Array.isArray((_a = ui == null ? void 0 : ui.format) == null ? void 0 : _a.options) && ui.format.options.length ? ui.format.options : Array.isArray(selectedDefinition == null ? void 0 : selectedDefinition.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ["webp", "jpeg", "png"];
+    const formatOptionLabel = (value) => {
+      const normalized = String(value || "");
+      return normalized === "source" ? "same as source" : normalized;
+    };
+    const renderSelectOptions = (values, selected, labeler = null) => Array.isArray(values) ? values.map((value) => {
+      const normalized = String(value || "");
+      const label = typeof labeler === "function" ? labeler(normalized) : normalized;
+      return `<option value="${escapeHtml(normalized)}"${normalized === String(selected || "") ? " selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("") : "";
+    const formatOptions = Array.isArray((_a = ui == null ? void 0 : ui.format) == null ? void 0 : _a.options) && ui.format.options.length ? ui.format.options : Array.isArray(selectedDefinition == null ? void 0 : selectedDefinition.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ["source"];
     const qualityOptions = Array.isArray((_b = ui == null ? void 0 : ui.quality) == null ? void 0 : _b.options) && ui.quality.options.length ? ui.quality.options : ["preview", "default", "archival", "small-web"];
     const saveModeOptions = Array.isArray((_c = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _c.options) && ui.saveMode.options.length ? ui.saveMode.options : ["new-hidden-work", "replace-generated-work", "temporary-preview-only"];
     const formatLabel = String(((_d = ui == null ? void 0 : ui.format) == null ? void 0 : _d.label) || "Output format");
@@ -5811,6 +5879,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <div class="edit-work-fields-title">Converter</div>
                     <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
                 </div>
+                <button class="btn btn-secondary" type="button" id="editCreateConverter">New converter</button>
             </div>
             ${unsupportedMessage}
             <div class="edit-grid edit-grid-cols">
@@ -5829,7 +5898,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <div>
                     <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
                     <select class="form-select" id="edit-converter-format" name="converter_format">
-                        ${renderSelectOptions(formatOptions, selectedFormat)}
+                        ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
                     </select>
                 </div>
                 <div>
@@ -5840,12 +5909,26 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </div>
             </div>
             <div class="edit-inline-actions">
-                <button class="btn btn-secondary" type="button" id="editConvertWork">Convert</button>
+                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? " disabled" : ""}>Convert</button>
             </div>
             <div class="small-note">
                 Generated works:
                 ${generated.length ? generated.map((item) => `[${escapeHtml(item.name || "")}] [show] [make visible] [delete] [regenerate]`).join(" ") : "none"}
             </div>
+        </div>
+    `;
+  }
+  function renderDirectFileLink(config = {}, status = {}) {
+    if ((status == null ? void 0 : status.target) !== "file") {
+      return "";
+    }
+    const directUrl = String((config == null ? void 0 : config.srcUrl) || "").trim();
+    if (!directUrl) {
+      return "";
+    }
+    return `
+        <div class="small-note">
+            <a href="${escapeHtml(directUrl)}" target="_blank" rel="noopener noreferrer">Open original file</a>
         </div>
     `;
   }
@@ -6156,7 +6239,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onResetFolderWork,
     onDeleteTarget,
     onChangePassword,
-    onConvertWork
+    onConvertWork,
+    onCreateConverter
   }) {
     var _a, _b;
     if (!editPanel) {
@@ -6175,7 +6259,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const uploadSectionHtml2 = renderUploadSectionHtml({
         isFileTarget: false,
         isEmptyFolder: treeItems2.length === 0,
-        externalOnly: true
+        externalOnly: true,
+        showLauncher: false
       });
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Submit external link</h3>
@@ -6243,10 +6328,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const uploadSectionHtml = renderUploadSectionHtml({
       isFileTarget,
       isEmptyFolder,
-      externalOnly: false
+      externalOnly: false,
+      showLauncher: false
     });
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
+        ${renderDirectFileLink(config, status)}
         <div class="edit-status" id="editInlineStatus"></div>
         ${renderPasswordChangeSection(status)}
         <form id="inlineEditForm" class="edit-inline">
@@ -6315,6 +6402,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const descInput = editPanel.querySelector("#edit-description");
     const addWorkFieldButton = editPanel.querySelector("#editWorkFieldAdd");
     const convertButton = editPanel.querySelector("#editConvertWork");
+    const createConverterButton = editPanel.querySelector("#editCreateConverter");
     const promptRoot = editPanel.querySelector("#promptLayer");
     syncPromptDock(promptRoot);
     if (passwordDetailsEl) {
@@ -6325,6 +6413,39 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       onMediaInput(readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}));
+    };
+    const syncConverterFormatOptions = () => {
+      var _a2, _b2, _c, _d, _e, _f;
+      const converterSelect = (_a2 = form == null ? void 0 : form.elements) == null ? void 0 : _a2.converter_id;
+      const formatSelect = (_b2 = form == null ? void 0 : form.elements) == null ? void 0 : _b2.converter_format;
+      if (!(converterSelect instanceof HTMLSelectElement) || !(formatSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedOption = converterSelect.selectedOptions && converterSelect.selectedOptions[0] ? converterSelect.selectedOptions[0] : null;
+      let ui = {};
+      let defaults = {};
+      try {
+        ui = JSON.parse(((_c = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _c.converterUi) || "{}");
+      } catch (e) {
+        ui = {};
+      }
+      try {
+        defaults = JSON.parse(((_d = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _d.converterDefaults) || "{}");
+      } catch (e) {
+        defaults = {};
+      }
+      const formats = Array.isArray((_e = ui == null ? void 0 : ui.format) == null ? void 0 : _e.options) && ui.format.options.length ? ui.format.options : String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean);
+      const nextOptions = formats.length ? formats : ["source"];
+      const selected = String(defaults.format || nextOptions[0] || "source");
+      formatSelect.innerHTML = nextOptions.map((item) => `<option value="${escapeHtml(item)}"${item === selected ? " selected" : ""}>${escapeHtml(item === "source" ? "same as source" : item)}</option>`).join("");
+    };
+    const syncConvertButtonState = () => {
+      var _a2;
+      const converterSelect = (_a2 = form == null ? void 0 : form.elements) == null ? void 0 : _a2.converter_id;
+      if (!(convertButton instanceof HTMLButtonElement) || !(converterSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      convertButton.disabled = String(converterSelect.value || "").trim() === "";
     };
     if (titleInput && typeof onTitleInput === "function") {
       titleInput.addEventListener("input", () => {
@@ -6346,12 +6467,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       input.addEventListener("input", syncMediaState);
-      input.addEventListener("change", syncMediaState);
+      input.addEventListener("change", () => {
+        if (input.id === "edit-converter-id") {
+          syncConverterFormatOptions();
+          syncConvertButtonState();
+        }
+        syncMediaState();
+      });
     });
     bindWorkCategoryControls({
       editPanel,
       onMediaInput
     });
+    syncConverterFormatOptions();
+    syncConvertButtonState();
+    syncMediaState();
     if (form && typeof onSubmit === "function") {
       form.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -6378,6 +6508,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     if (changeLayoutButton && typeof onOpenLayoutPage === "function") {
       changeLayoutButton.addEventListener("click", () => onOpenLayoutPage());
+    }
+    if (createConverterButton && typeof onCreateConverter === "function") {
+      createConverterButton.addEventListener("click", async () => {
+        await onCreateConverter({ statusEl, form });
+      });
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === "function") {
       resetFolderWorkButton.addEventListener("click", async () => {
@@ -6538,22 +6673,33 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return previewPath;
   }
   function getEditTargetPath(selection2 = getActiveSelection()) {
+    var _a, _b;
     if (selection2 == null ? void 0 : selection2.isLayout) {
       return selection2.path || "";
     }
-    if (selection2 == null ? void 0 : selection2.previewIsFile) {
-      const activeFileLink = document.querySelector("#navList a.nav-link-active[data-path]");
-      const navPath = ((activeFileLink == null ? void 0 : activeFileLink.getAttribute("data-path")) || "").trim();
-      if (navPath) {
-        return navPath;
-      }
+    const configuredItem = resolveConfiguredSelectionItem(selection2);
+    if (configuredItem && configuredItem.type === "link") {
+      return parentViewerPath((selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "");
+    }
+    const activeFileLink = document.querySelector("#navList a.nav-link-active[data-path]");
+    const navPath = ((activeFileLink == null ? void 0 : activeFileLink.getAttribute("data-path")) || "").trim();
+    const navLooksLikeFile = !!((_a = activeFileLink == null ? void 0 : activeFileLink.hasAttribute) == null ? void 0 : _a.call(activeFileLink, "data-file")) || !!((_b = activeFileLink == null ? void 0 : activeFileLink.hasAttribute) == null ? void 0 : _b.call(activeFileLink, "data-src")) || /\.[^\\/]+$/.test(navPath);
+    if (navPath && ((selection2 == null ? void 0 : selection2.previewIsFile) || navLooksLikeFile)) {
+      return navPath;
     }
     return (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
   }
 
   // src/assets/js/edit/controller.js
+  function buildConverterSaveAs(sourceName, format) {
+    const normalizedFormat = String(format || "").trim().toLowerCase();
+    if (!normalizedFormat || normalizedFormat === "source") {
+      return sourceName;
+    }
+    return `${sourceName.replace(/\.[^.]+$/, "")}.${normalizedFormat}`;
+  }
   function readMediaConfigFromElements(elements2, form, currentWork = {}) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const typeField = elements2.work_type;
     if (typeField && typeof typeField.value === "string") {
@@ -6608,6 +6754,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const converterName = String(((_a = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _a.converterName) || "").trim();
     const converterType = String(((_b = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _b.converterType) || "converter").trim() || "converter";
     const converterEngine = String(((_c = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _c.converterEngine) || "").trim();
+    const converterPath = String(((_d = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _d.converterPath) || "").trim();
+    const converterViewerHref = String(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterViewerHref) || "").trim();
+    const converterUrl = String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterUrl) || "").trim();
     const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
     if (converterId) {
       nextWork.converter = {
@@ -6616,10 +6765,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         name: converterName || String(existingConverter.name || converterId.split("/").pop() || "converter"),
         enabled: true,
         id: converterId,
+        path: converterPath,
+        viewerHref: converterViewerHref,
+        url: converterUrl,
         node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
-        quality: String(((_d = elements2.converter_quality) == null ? void 0 : _d.value) || "default").trim() || "default",
-        format: String(((_e = elements2.converter_format) == null ? void 0 : _e.value) || "webp").trim() || "webp",
-        saveMode: String(((_f = elements2.converter_save_mode) == null ? void 0 : _f.value) || "new-hidden-work").trim() || "new-hidden-work",
+        quality: String(((_g = elements2.converter_quality) == null ? void 0 : _g.value) || "default").trim() || "default",
+        format: String(((_h = elements2.converter_format) == null ? void 0 : _h.value) || "").trim() || "source",
+        saveMode: String(((_i = elements2.converter_save_mode) == null ? void 0 : _i.value) || "new-hidden-work").trim() || "new-hidden-work",
         hiddenByDefault: true
       };
     } else if (Object.prototype.hasOwnProperty.call(nextWork, "converter")) {
@@ -6631,6 +6783,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const {
       editPanel,
       editDrawer,
+      editActionsMenu,
       editAuthDetails,
       editToggle,
       editAddWork,
@@ -6644,6 +6797,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let folderConfig = currentPoffConfig;
     let editConfig = currentPoffConfig;
     let editTarget = "folder";
+    let uploadLimits = null;
     let drawerOpen = false;
     let authFormVisible = false;
     let unregisterDrawerEscapeClose = null;
@@ -6653,6 +6807,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       editModeAllowed: initialAuthState.editModeAllowed !== false,
       canEdit: !!initialAuthState.canEdit
     };
+    let previewRefreshHandler = null;
+    let activeConverterPreview = null;
     function annotateConfigPath(config, selection2 = getActiveSelection(), status = {}) {
       if (!config || typeof config !== "object") {
         return config;
@@ -6670,6 +6826,48 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       });
       return config;
+    }
+    function previewStateKey(previewState) {
+      if (!previewState || typeof previewState !== "object") {
+        return "";
+      }
+      return JSON.stringify({
+        path: previewState.path || "",
+        isFile: !!previewState.isFile,
+        params: previewState.params || {}
+      });
+    }
+    function buildConverterPreviewState(workState, selection2 = getActiveSelection()) {
+      if (!(selection2 == null ? void 0 : selection2.previewIsFile)) {
+        return null;
+      }
+      const sourcePath = getEditTargetPath(selection2);
+      const converter = (workState == null ? void 0 : workState.converter) && typeof workState.converter === "object" ? workState.converter : null;
+      const converterId = String((converter == null ? void 0 : converter.id) || "").trim();
+      if (!sourcePath || !converterId) {
+        return null;
+      }
+      return {
+        path: selection2.previewPath || sourcePath,
+        isFile: true,
+        params: {
+          converter_preview: "1",
+          converter_id: converterId,
+          converter_path: String(converter.path || "").trim(),
+          converter_url: String(converter.url || "").trim(),
+          converter_format: String(converter.format || "").trim() || "source",
+          converter_quality: String(converter.quality || "default").trim() || "default",
+          converter_save_mode: String(converter.saveMode || "new-hidden-work").trim() || "new-hidden-work"
+        }
+      };
+    }
+    function updateConverterPreviewState(nextState, { refresh = true } = {}) {
+      const previousKey = previewStateKey(activeConverterPreview);
+      const nextKey = previewStateKey(nextState);
+      activeConverterPreview = nextState;
+      if (refresh && previousKey !== nextKey && typeof previewRefreshHandler === "function") {
+        previewRefreshHandler();
+      }
     }
     function updateAuthState(nextAuth) {
       if (!nextAuth || typeof nextAuth !== "object") {
@@ -6759,6 +6957,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           editAuthPassword.focus();
         }
       });
+      registerEscapeCloseDetails(editAuthDetails, {
+        label: "edit-auth-details"
+      });
+      if (editActionsMenu) {
+        registerEscapeCloseDetails(editActionsMenu, {
+          label: "edit-actions-menu"
+        });
+      }
       editToggle == null ? void 0 : editToggle.addEventListener("click", async (event) => {
         if (!authState.authenticated) {
           return;
@@ -6789,11 +6995,159 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           openUploadDialogButton.click();
           return;
         }
+        if (editRequested2) {
+          let attempts = 0;
+          const maxAttempts = 24;
+          const openWhenReady = () => {
+            const delayedButton = document.getElementById("editOpenUploadDialog");
+            if (delayedButton instanceof HTMLButtonElement) {
+              delayedButton.click();
+              return;
+            }
+            attempts += 1;
+            if (attempts >= maxAttempts) {
+              return;
+            }
+            window.requestAnimationFrame(openWhenReady);
+          };
+          window.requestAnimationFrame(openWhenReady);
+          return;
+        }
         const url = new URL(window.location.href);
         url.searchParams.set("edit", "true");
         url.searchParams.set("add", authState.canEdit ? "work" : "url");
         window.location.href = url.toString();
       });
+    }
+    function bindSidebarFileDrop(sidebarEl) {
+      if (!sidebarEl || !editRequested2) {
+        return null;
+      }
+      const dropZone = document.createElement("div");
+      dropZone.className = "sidebar-file-drop-zone";
+      dropZone.setAttribute("aria-hidden", "true");
+      dropZone.innerHTML = '<div class="sidebar-file-drop-zone__inner"><strong>Drop files</strong><span>Add to current folder</span></div>';
+      sidebarEl.appendChild(dropZone);
+      let dragDepth = 0;
+      let uploading = false;
+      const syncDropZoneBounds = () => {
+        const rect = sidebarEl.getBoundingClientRect();
+        dropZone.style.left = `${Math.round(rect.left)}px`;
+        dropZone.style.top = `${Math.round(rect.top)}px`;
+        dropZone.style.width = `${Math.round(rect.width)}px`;
+        dropZone.style.height = `${Math.round(rect.height)}px`;
+      };
+      const clearDropZoneBounds = () => {
+        dropZone.style.left = "";
+        dropZone.style.top = "";
+        dropZone.style.width = "";
+        dropZone.style.height = "";
+      };
+      const hasDraggedFiles = (event) => {
+        var _a;
+        const types = Array.from(((_a = event.dataTransfer) == null ? void 0 : _a.types) || []);
+        return types.includes("Files");
+      };
+      const setDropActive = (active) => {
+        if (active) {
+          syncDropZoneBounds();
+        }
+        sidebarEl.classList.toggle("sidebar-file-drop-active", !!active);
+      };
+      const setDropBusy = (busy) => {
+        uploading = !!busy;
+        sidebarEl.classList.toggle("sidebar-file-drop-busy", uploading);
+      };
+      const setDropStatus = (message, success = false) => {
+        const inlineStatus = document.getElementById("editInlineStatus") || editAuthStatus;
+        if (inlineStatus) {
+          setStatusMessage(inlineStatus, message, success);
+        }
+      };
+      const onDragEnter = (event) => {
+        if (uploading || !hasDraggedFiles(event)) {
+          return;
+        }
+        event.preventDefault();
+        dragDepth += 1;
+        setDropActive(true);
+      };
+      const onDragOver = (event) => {
+        if (uploading || !hasDraggedFiles(event)) {
+          return;
+        }
+        event.preventDefault();
+        syncDropZoneBounds();
+        event.dataTransfer.dropEffect = authState.canEdit ? "copy" : "none";
+        setDropActive(true);
+      };
+      const onDragLeave = () => {
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) {
+          setDropActive(false);
+        }
+      };
+      const onDrop = async (event) => {
+        var _a;
+        if (!hasDraggedFiles(event)) {
+          return;
+        }
+        event.preventDefault();
+        dragDepth = 0;
+        setDropActive(false);
+        clearDropZoneBounds();
+        const files = Array.from(((_a = event.dataTransfer) == null ? void 0 : _a.files) || []);
+        if (!authState.canEdit) {
+          setDropStatus("Unlock edit mode before uploading files.");
+          return;
+        }
+        if (files.length === 0) {
+          setDropStatus("Drop at least one file.");
+          return;
+        }
+        const validationError = uploadValidationError(files, uploadLimits);
+        if (validationError) {
+          setDropStatus(validationError);
+          return;
+        }
+        const selection2 = getActiveSelection();
+        try {
+          setDropBusy(true);
+          setDropStatus("Uploading...");
+          const data = await requestEditUpload({
+            path: getContentTargetPath(selection2),
+            source: "upload",
+            files
+          });
+          if (!data || data.error) {
+            throw new Error((data == null ? void 0 : data.error) || "Upload failed.");
+          }
+          await refreshCurrentEditState(selection2);
+          const count = Array.isArray(data.uploaded) ? data.uploaded.length : files.length;
+          setDropStatus(count === 1 ? "Uploaded 1 file." : `Uploaded ${count} files.`, true);
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        } catch (err) {
+          setDropStatus(err.message || "Upload failed.");
+        } finally {
+          setDropBusy(false);
+        }
+      };
+      sidebarEl.addEventListener("dragenter", onDragEnter);
+      sidebarEl.addEventListener("dragover", onDragOver);
+      sidebarEl.addEventListener("dragleave", onDragLeave);
+      sidebarEl.addEventListener("drop", onDrop);
+      window.addEventListener("resize", syncDropZoneBounds);
+      return {
+        destroy() {
+          sidebarEl.removeEventListener("dragenter", onDragEnter);
+          sidebarEl.removeEventListener("dragover", onDragOver);
+          sidebarEl.removeEventListener("dragleave", onDragLeave);
+          sidebarEl.removeEventListener("drop", onDrop);
+          window.removeEventListener("resize", syncDropZoneBounds);
+          clearDropZoneBounds();
+          dropZone.remove();
+        }
+      };
     }
     function bindAuthForm() {
       if (editAuthForm) {
@@ -6885,6 +7239,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (refreshed == null ? void 0 : refreshed.config) {
         editConfig = annotateConfigPath(refreshed.config, selection2, refreshed);
         editTarget = refreshed.target || (selection2.isLayout ? "layout" : selection2.previewIsFile ? "file" : "folder");
+        updateConverterPreviewState(buildConverterPreviewState((editConfig == null ? void 0 : editConfig.work) || {}, selection2));
         if (editTarget === "folder" || editTarget === "layout" && refreshed.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
@@ -6902,6 +7257,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     function renderEditUI(config, status) {
       syncEditToggle();
       syncAuthDisclosure(false, status);
+      uploadLimits = (status == null ? void 0 : status.uploadLimits) || uploadLimits;
       const layoutNameForPreset = createLayoutNameForPreset(editConfig);
       const panelState = renderEditPanel({
         editPanel,
@@ -6946,6 +7302,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
           editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
+          updateConverterPreviewState(buildConverterPreviewState(editConfig.work));
         },
         onSubmit: async ({ elements: elements3, statusEl }) => {
           var _a, _b;
@@ -6958,7 +7315,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             title: (((_a = elements3.title) == null ? void 0 : _a.value) || "").trim(),
             description: (((_b = elements3.description) == null ? void 0 : _b.value) || "").trim()
           };
-          if ((editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object") {
+          if (mediaWork && typeof mediaWork === "object" && Object.keys(mediaWork).length > 0) {
             payload.work = materializeWorkFields(mediaWork);
           }
           await saveConfig(payload, statusEl);
@@ -7023,10 +7380,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             converter,
             target: {
               folder: sourcePath.split("/").slice(0, -1).join("/"),
-              saveAs: `${sourceName.replace(/\.[^.]+$/, "")}.${converter.format || "webp"}`,
+              saveAs: buildConverterSaveAs(sourceName, converter.format || "source"),
               mode: converter.saveMode || "new-hidden-work"
             }
           };
+          if (typeof window.poffConverterPayloadProvider === "function") {
+            const extraPayload = await Promise.resolve(window.poffConverterPayloadProvider({
+              sourcePath,
+              sourceName,
+              converter: { ...converter },
+              target: { ...payload.target }
+            }));
+            if (extraPayload && typeof extraPayload === "object") {
+              if (extraPayload.source && typeof extraPayload.source === "object") {
+                payload.source = { ...payload.source, ...extraPayload.source };
+              }
+              if (extraPayload.converter && typeof extraPayload.converter === "object") {
+                payload.converter = { ...payload.converter, ...extraPayload.converter };
+              }
+              if (extraPayload.target && typeof extraPayload.target === "object") {
+                payload.target = { ...payload.target, ...extraPayload.target };
+              }
+              if (extraPayload.editor && typeof extraPayload.editor === "object") {
+                payload.editor = { ...extraPayload.editor };
+              }
+            }
+          }
           const converted = await requestMcpRoute("convert", payload);
           if (!converted || converted.error || converted.ok === false) {
             throw new Error((converted == null ? void 0 : converted.error) || "Conversion failed.");
@@ -7042,6 +7421,55 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           window.alert("OK \u2014 this file was converted into a web-readable poff work and saved in the folder.");
           await refreshCurrentEditState(selection2);
+        },
+        onCreateConverter: async ({ statusEl, form }) => {
+          var _a, _b, _c;
+          const selection2 = getActiveSelection();
+          const sourcePath = getEditTargetPath(selection2);
+          const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
+          const suggestedBase = String(currentWork.type || (editConfig == null ? void 0 : editConfig.kind) || "image").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "converter";
+          const suggestedName = suggestedBase.startsWith("convert-") ? suggestedBase : `convert-${suggestedBase}`;
+          const requestedName = window.prompt("New converter folder name", suggestedName);
+          if (requestedName === null) {
+            return;
+          }
+          const name = requestedName.trim();
+          if (!name) {
+            setStatusMessage(statusEl, "Converter creation cancelled.");
+            return;
+          }
+          setStatusMessage(statusEl, "Creating converter...");
+          const created = await requestMcpRoute("create-converter", {
+            path: sourcePath,
+            name
+          });
+          if (!created || created.ok === false || created.error) {
+            throw new Error((created == null ? void 0 : created.error) || "Creating converter failed.");
+          }
+          const definition = created.definition && typeof created.definition === "object" ? created.definition : null;
+          const nextPath = String((definition == null ? void 0 : definition.path) || created.folder || "").trim().replace(/^\/+|\/+$/g, "");
+          if (nextPath) {
+            const nextHash = `#/${nextPath}`;
+            if (window.location.hash === nextHash) {
+              window.dispatchEvent(new Event("hashchange"));
+            } else {
+              window.location.hash = nextHash;
+            }
+            return;
+          }
+          await refreshCurrentEditState(selection2);
+          const refreshedForm = ((_a = editPanel == null ? void 0 : editPanel.querySelector) == null ? void 0 : _a.call(editPanel, "#inlineEditForm")) || form;
+          const refreshedSelect = ((_b = refreshedForm == null ? void 0 : refreshedForm.elements) == null ? void 0 : _b.converter_id) instanceof HTMLSelectElement ? refreshedForm.elements.converter_id : null;
+          if (definition && refreshedSelect) {
+            refreshedSelect.value = String(definition.id || "");
+            refreshedSelect.dispatchEvent(new Event("input", { bubbles: true }));
+            refreshedSelect.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          setStatusMessage(
+            ((_c = editPanel == null ? void 0 : editPanel.querySelector) == null ? void 0 : _c.call(editPanel, "#editInlineStatus")) || statusEl,
+            `Created converter ${(definition == null ? void 0 : definition.label) || (definition == null ? void 0 : definition.name) || name} at ${created.folder || ""}. Select it to continue.`,
+            true
+          );
         },
         onResetFolderWork: async ({ statusEl }) => {
           const selection2 = getActiveSelection();
@@ -7292,6 +7720,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         });
       }
       syncDrawerVisibility();
+      updateConverterPreviewState(buildConverterPreviewState((config == null ? void 0 : config.work) || {}));
       window.POFF_REVIEW_PENDING_LINK = ({ path = "" } = {}) => {
         drawerOpen = true;
         syncDrawerVisibility();
@@ -7338,6 +7767,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (data.config) {
         editConfig = annotateConfigPath(data.config, selection2, data);
         editTarget = data.target || (selection2.isFile ? "file" : "folder");
+        updateConverterPreviewState(buildConverterPreviewState((editConfig == null ? void 0 : editConfig.work) || {}, selection2));
         if (editTarget === "folder" || editTarget === "layout" && data.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
@@ -7371,8 +7801,22 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncEditToggle,
       bindEditToggle,
       bindAddWorkButton,
+      bindSidebarFileDrop,
       bindAuthForm,
-      initEditMode
+      initEditMode,
+      getPreviewParams({ path = "", isFile = false } = {}) {
+        if (!activeConverterPreview || !isFile) {
+          return null;
+        }
+        const targetPath = String(path || "").trim();
+        if (targetPath === "" || targetPath !== String(activeConverterPreview.path || "").trim()) {
+          return null;
+        }
+        return activeConverterPreview.params || null;
+      },
+      setPreviewRefreshHandler(handler) {
+        previewRefreshHandler = typeof handler === "function" ? handler : null;
+      }
     };
   }
 
@@ -7496,7 +7940,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     initialQueryPath = "",
     navigateToPath,
     setLoadingVisible,
-    getCurrentSelection
+    getCurrentSelection,
+    getPreviewParams
   }) {
     let previewRequestId = 0;
     let previewClickBound = false;
@@ -7554,12 +7999,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
       return rewritten;
     }
-    function extractPreferredPreviewMarkup(previewDocument, previewRoot) {
+    function isExternalPreviewUrl(url) {
+      const trimmed = String(url || "").trim();
+      if (!trimmed) {
+        return false;
+      }
+      try {
+        const resolved = new URL(trimmed, window.location.href);
+        return resolved.origin !== window.location.origin;
+      } catch (err) {
+        return false;
+      }
+    }
+    function extractPreferredPreviewMarkup(previewDocument, previewRoot, options = {}) {
       const candidateRoot = previewRoot && typeof previewRoot.cloneNode === "function" ? previewRoot.cloneNode(true) : previewDocument.body;
       if (!candidateRoot) {
         return "";
       }
       if (typeof candidateRoot.querySelector === "function") {
+        if (options.converterPreview) {
+          const converterRoot = candidateRoot.querySelector("[data-poff-text-editor-converter], .poff-text-editor-converter, [data-poff-converter], .converter-app");
+          if (converterRoot && typeof converterRoot.outerHTML === "string") {
+            return converterRoot.outerHTML.trim();
+          }
+        }
         const layout = candidateRoot.querySelector(".poff-default-layout");
         if (layout && typeof layout.outerHTML === "string") {
           return layout.outerHTML.trim();
@@ -7593,12 +8056,83 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return "";
     }
+    function isConverterPreviewUrl(url) {
+      try {
+        const parsed = new URL(url, window.location.href);
+        return parsed.searchParams.get("converter_preview") === "1";
+      } catch (err) {
+        return false;
+      }
+    }
+    function collectPreviewScripts(previewDocument, baseUrl, enabled = false) {
+      if (!enabled || !previewDocument || typeof previewDocument.querySelectorAll !== "function") {
+        return [];
+      }
+      return Array.from(previewDocument.querySelectorAll("script")).map((node) => {
+        const src = node.getAttribute("src") || "";
+        const text = node.textContent || "";
+        if (src) {
+          try {
+            return {
+              src: new URL(src, baseUrl).href,
+              text: ""
+            };
+          } catch (err) {
+            return null;
+          }
+        }
+        const trimmed = String(text || "").trim();
+        if (trimmed === "" || trimmed.includes("POFF_CONTEXT") || trimmed.includes("currentPoffConfig")) {
+          return null;
+        }
+        return {
+          src: "",
+          text: trimmed
+        };
+      }).filter(Boolean);
+    }
+    function executePreviewScripts(previewContainer, scripts = []) {
+      if (!previewContainer || !scripts.length) {
+        return;
+      }
+      scripts.forEach((scriptData) => {
+        try {
+          const script = document.createElement("script");
+          if (scriptData.src) {
+            script.src = scriptData.src;
+            script.async = false;
+          } else {
+            script.textContent = scriptData.text || "";
+          }
+          previewContainer.appendChild(script);
+        } catch (err) {
+        }
+      });
+    }
     function buildViewerUrl(path, isFile = false, forceRefresh = false) {
+      const currentUrl = new URL(window.location.href);
+      const editRequested2 = currentUrl.searchParams.get("edit") === "true";
       const url = new URL(window.location.href);
       url.search = "";
       url.hash = "";
+      if (editRequested2) {
+        url.searchParams.set("edit", "true");
+      }
       url.searchParams.set("view", "1");
       url.searchParams.set(isFile ? "file" : "path", path);
+      const previewParams = typeof getPreviewParams === "function" ? getPreviewParams({
+        path,
+        isFile
+      }) : null;
+      if (previewParams && typeof previewParams === "object") {
+        Object.entries(previewParams).forEach(([key, value]) => {
+          const normalizedKey = String(key || "").trim();
+          if (!normalizedKey || value === void 0 || value === null || value === "") {
+            return;
+          }
+          url.searchParams.set(normalizedKey, String(value));
+        });
+      }
       if (forceRefresh) {
         url.searchParams.set("_refresh", String(Date.now()));
       }
@@ -7786,6 +8320,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const parser = new DOMParser();
         const previewDocument = parser.parseFromString(html, "text/html");
         const previewRoot = previewDocument.querySelector("#contentFrame > .viewer") || previewDocument.querySelector(".viewer") || previewDocument.body;
+        const converterPreview = isConverterPreviewUrl(url);
         const previewContainer = contentFrame.shadowRoot || contentFrame;
         previewMountRoot = previewContainer;
         previewContainer.innerHTML = "";
@@ -7808,11 +8343,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           return link.outerHTML;
         }).filter(Boolean).join("");
         const previewMarkup = rewritePreviewMarkupUrls(
-          extractPreferredPreviewMarkup(previewDocument, previewRoot),
+          extractPreferredPreviewMarkup(previewDocument, previewRoot, { converterPreview }),
           response.url
         );
-        const fallbackMarkup = previewMarkup || `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`;
+        let previewScripts = [];
+        try {
+          previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview);
+        } catch (err) {
+          previewScripts = [];
+        }
+        const fallbackMarkup = previewMarkup || (isExternalPreviewUrl(response.url) ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>` : '<div class="viewer-error">Preview unavailable.</div>');
         previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
+        executePreviewScripts(previewContainer, previewScripts);
         syncPreviewDisabledState(previewDisabled);
         bindPreviewNavigation();
         lastPreviewKey = nextPreview.key;
@@ -7899,6 +8441,38 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   function createRouteResolver({ navList } = {}) {
     const slugToPathAliases = /* @__PURE__ */ new Map();
     const pathToSlugAliases = /* @__PURE__ */ new Map();
+    function configuredTree() {
+      var _a, _b;
+      const tree = (_b = (_a = window == null ? void 0 : window.POFF_CONTEXT) == null ? void 0 : _a.currentPoffConfig) == null ? void 0 : _b.tree;
+      return Array.isArray(tree) ? tree : [];
+    }
+    function resolveConfiguredTreePath(items = [], target = "", prefix = "") {
+      const normalizedTarget = normalizeHashPath(target);
+      if (!normalizedTarget || !Array.isArray(items)) {
+        return null;
+      }
+      for (const item of items) {
+        if (!item || typeof item !== "object") {
+          continue;
+        }
+        const name = normalizeHashPath(item.name || "");
+        const rawPath = normalizeHashPath(item.path || item.relativePath || name);
+        const resolvedPath = normalizeHashPath(prefix ? `${prefix}/${rawPath}` : rawPath);
+        const slug = normalizeHashPath(item.slug || "");
+        const routeSlug = normalizeHashPath(item.routeSlug || "");
+        const candidates = [resolvedPath, rawPath, name, slug, routeSlug].filter(Boolean);
+        if (candidates.includes(normalizedTarget)) {
+          return routeResolution(resolvedPath || rawPath || name, item.type !== "folder");
+        }
+        if (Array.isArray(item.children)) {
+          const found = resolveConfiguredTreePath(item.children, normalizedTarget, resolvedPath);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
+    }
     function rememberSlugPathAlias(detail = {}) {
       const path = normalizeHashPath((detail == null ? void 0 : detail.routePath) || (detail == null ? void 0 : detail.path) || (detail == null ? void 0 : detail.relativePath) || "");
       const slug = normalizeHashPath((detail == null ? void 0 : detail.routeSlug) || (detail == null ? void 0 : detail.slug) || "");
@@ -7924,17 +8498,31 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           });
           return routeResolution(targetPath, navTargetIsFile(link, targetPath));
         }
+        const configuredMatch = resolveConfiguredTreePath(configuredTree(), normalizedPath);
+        if (configuredMatch) {
+          rememberSlugPathAlias({
+            path: configuredMatch.path,
+            slug: normalizedPath
+          });
+          return configuredMatch;
+        }
       }
       return routeResolution(normalizedPath);
     }
     async function resolveHashPathAsync(path = "") {
       const resolved = resolveHashPath(path);
       const normalizedPath = normalizeHashPath(path);
-      if (!normalizedPath || normalizedPath.includes("/") || normalizedPath === ".layout" || normalizedPath.endsWith("/.layout") || inferFilePath(normalizedPath) || resolved.path !== normalizedPath) {
+      if (!normalizedPath || normalizedPath.includes("/") || normalizedPath === ".layout" || normalizedPath.endsWith("/.layout") || inferFilePath(normalizedPath) || resolved.isFile || resolved.path !== normalizedPath) {
         return resolved;
       }
       try {
-        const response = await fetch(`?ajax=resolve&slug=${encodeURIComponent(normalizedPath)}`, {
+        const requestUrl = new URL(window.location.pathname, window.location.origin);
+        requestUrl.searchParams.set("ajax", "resolve");
+        requestUrl.searchParams.set("slug", normalizedPath);
+        if (new URL(window.location.href).searchParams.get("edit") === "true") {
+          requestUrl.searchParams.set("edit", "true");
+        }
+        const response = await fetch(requestUrl.toString(), {
           credentials: "same-origin",
           headers: {
             "Accept": "application/json"
@@ -8238,7 +8826,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         window.open(relPath, "_blank");
         return;
       }
-      const isFile = target.dataset.layoutPath ? false : !(target.hasAttribute("href") && target.getAttribute("href").startsWith("?path="));
+      const hasExplicitFileFlag = Object.prototype.hasOwnProperty.call(target.dataset, "isFile");
+      const isFile = target.dataset.layoutPath ? false : hasExplicitFileFlag ? target.dataset.isFile === "1" : !(target.hasAttribute("href") && target.getAttribute("href").startsWith("?path="));
       navigateToPath(relPath, { isFile });
     }
     function bindNavClick() {
@@ -8260,7 +8849,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editQuery: editQuery2,
     currentPathForIframe: currentPathForIframe2,
     renderFolderMeta,
-    initEditMode
+    initEditMode,
+    getPreviewParams
   }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
     let ignoreNextHashSync = false;
@@ -8277,7 +8867,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return routeResolver.readHashPath();
     }
     function getCurrentSelection() {
-      return getSelectionFromPath(readHashPath() || initialQueryPath || "");
+      const hashPath = readHashPath();
+      if (hashPath) {
+        const resolved = routeResolver.resolveHashPath(hashPath);
+        return getSelectionFromPath(resolved.path, { isFile: resolved.isFile });
+      }
+      return getSelectionFromPath(initialQueryPath || "");
     }
     const previewController = createPreviewController({
       contentFrame,
@@ -8285,7 +8880,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       initialQueryPath,
       navigateToPath,
       setLoadingVisible,
-      getCurrentSelection
+      getCurrentSelection,
+      getPreviewParams
     });
     const sidebarController2 = createSidebarController({
       navList,
@@ -8321,7 +8917,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
       const {
         updateHash = true,
-        forceRefresh = false
+        forceRefresh = false,
+        skipSidebarReload = false,
+        skipEditInit = false
       } = options;
       const previewPath = selection2.previewPath || "";
       const previewIsFile = !!selection2.previewIsFile;
@@ -8335,7 +8933,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (updateHash) {
         writeHashPath(selection2.path || "");
       }
-      if (navList) {
+      if (navList && !skipSidebarReload) {
         setLoadingVisible(sidebarLoading, true);
         sidebarController2.loadNav(folderPath).then(() => {
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
@@ -8345,7 +8943,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           setLoadingVisible(sidebarLoading, false);
         });
       }
-      if (initEditMode) {
+      if (initEditMode && !skipEditInit) {
         initEditMode();
       }
     }
@@ -8359,23 +8957,42 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     async function syncFromLocation(options = {}) {
       var _a;
-      const { forceRefresh = false } = options;
+      const {
+        forceRefresh = false,
+        skipSidebarReload = false,
+        skipEditInit = false
+      } = options;
       const hashPath = readHashPath();
       if (hashPath || window.location.hash) {
         const resolved = await routeResolver.resolveHashPathAsync(hashPath);
         navigateToSelection(getSelectionFromPath(resolved.path, { isFile: resolved.isFile }), {
           updateHash: false,
-          forceRefresh
+          forceRefresh,
+          skipSidebarReload,
+          skipEditInit
         });
         return;
       }
       navigateToSelection(getSelectionFromPath((_a = currentPathForIframe2 != null ? currentPathForIframe2 : initialQueryPath) != null ? _a : ""), {
         updateHash: false,
-        forceRefresh
+        forceRefresh,
+        skipSidebarReload,
+        skipEditInit
       });
     }
     function refreshCurrentLocation() {
       syncFromLocation({ forceRefresh: true });
+    }
+    function refreshCurrentPreviewLocation() {
+      const hashPath = readHashPath();
+      const resolved = hashPath ? routeResolver.resolveHashPath(hashPath) : null;
+      const selection2 = resolved ? getSelectionFromPath(resolved.path, { isFile: resolved.isFile }) : getCurrentSelection();
+      navigateToSelection(selection2, {
+        updateHash: false,
+        forceRefresh: true,
+        skipSidebarReload: true,
+        skipEditInit: true
+      });
     }
     if (navList) {
       sidebarController2.bindNavClick();
@@ -8394,6 +9011,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       },
       loadCurrentFolderInIframe,
       refreshCurrentLocation,
+      refreshCurrentPreviewLocation,
       rememberSlugPathAlias: routeResolver.rememberSlugPathAlias,
       syncFromLocation,
       writeHashPath
@@ -8408,6 +9026,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     contentFrame: "contentFrame",
     editPanel: "editPanel",
     editDrawer: "editDrawer",
+    editActionsMenu: "editActionsMenu",
     editAuthDetails: "editAuthDetails",
     editToggle: "editToggle",
     editAddWork: "editAddWork",
@@ -8456,6 +9075,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (!appShell || !appSidebar || !sidebarToggle) {
       return null;
     }
+    let unregisterEscapeClose = null;
     const syncSidebarState = (isOpen) => {
       appShell.classList.toggle("sidebar-collapsed", !isOpen);
       appSidebar.hidden = !isOpen;
@@ -8464,7 +9084,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       sidebarToggle.setAttribute("aria-label", isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
       sidebarToggle.setAttribute("title", isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
     };
+    const bindEscapeClose = () => {
+      if (typeof unregisterEscapeClose === "function") {
+        return;
+      }
+      unregisterEscapeClose = registerEscapeClose(() => {
+        if (appShell.classList.contains("sidebar-collapsed")) {
+          return false;
+        }
+        syncSidebarState(false);
+        return true;
+      }, { label: "sidebar-toggle" });
+    };
     syncSidebarState(true);
+    bindEscapeClose();
     const onToggleClick = () => {
       const isOpen = !appShell.classList.contains("sidebar-collapsed");
       syncSidebarState(!isOpen);
@@ -8474,6 +9107,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncSidebarState,
       destroy() {
         sidebarToggle.removeEventListener("click", onToggleClick);
+        if (typeof unregisterEscapeClose === "function") {
+          unregisterEscapeClose();
+          unregisterEscapeClose = null;
+        }
       }
     };
   }
@@ -8505,7 +9142,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editQuery,
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
-    initEditMode: editController.initEditMode
+    initEditMode: editController.initEditMode,
+    getPreviewParams: editController.getPreviewParams
+  });
+  editController.setPreviewRefreshHandler(() => {
+    navigation.refreshCurrentPreviewLocation();
   });
   var sidebarController = bindSidebarToggle(elements);
   document.addEventListener("DOMContentLoaded", async () => {
@@ -8515,6 +9156,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();
+    editController.bindSidebarFileDrop(elements.appSidebar);
     editController.bindAuthForm();
     if (isPreviewHashActive()) {
       navigation.loadCurrentFolderInIframe();

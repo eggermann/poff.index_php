@@ -18,8 +18,21 @@ function createClassList() {
 }
 
 function createNavLink(attributes) {
+  const dataset = {};
+  Object.entries(attributes).forEach(([name, value]) => {
+    if (!name.startsWith('data-')) {
+      return;
+    }
+    const datasetKey = name
+      .slice(5)
+      .replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+    dataset[datasetKey] = value;
+  });
   return {
     attributes: { ...attributes },
+    dataset,
+    tagName: 'A',
+    parentElement: null,
     classList: createClassList(),
     scrollIntoView: jest.fn(),
     getAttribute(name) {
@@ -27,6 +40,9 @@ function createNavLink(attributes) {
     },
     hasAttribute(name) {
       return Object.prototype.hasOwnProperty.call(this.attributes, name);
+    },
+    closest() {
+      return null;
     },
   };
 }
@@ -163,6 +179,42 @@ describe('sidebar selection scroll', () => {
     controller.syncSidebarSelection('album/deep/file.mp4', true, false);
 
     expect(sidebar.scrollTop).toBe(1128);
+  });
+
+  test('uses explicit file metadata for extensionless virtual link items', () => {
+    const createSidebarController = loadSidebarController();
+    const navigateToPath = jest.fn();
+    const target = createNavLink({
+      href: '#',
+      'data-path': 'eggermann',
+      'data-is-file': '1',
+    });
+    const navList = {
+      addEventListener(type, handler) {
+        if (type === 'click') {
+          this.handler = handler;
+        }
+      },
+    };
+
+    const controller = createSidebarController({
+      navList,
+      editQuery: '',
+      navigateToPath,
+      getCurrentSelection() {
+        return null;
+      },
+      setLoadingVisible() {},
+    });
+
+    controller.bindNavClick();
+
+    navList.handler({
+      target,
+      preventDefault: jest.fn(),
+    });
+
+    expect(navigateToPath).toHaveBeenCalledWith('eggermann', { isFile: true });
   });
 
 });

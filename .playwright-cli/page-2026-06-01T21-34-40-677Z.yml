@@ -1,0 +1,5 @@
+- generic [active] [ref=e1]:
+  - heading "Internal Server Error" [level=1] [ref=e2]
+  - paragraph [ref=e3]: The server encountered an internal error or misconfiguration and was unable to complete your request.
+  - paragraph [ref=e4]: Please contact the server administrator at you@example.com to inform them of the time this error occurred, and the actions you performed just before this error.
+  - paragraph [ref=e5]: More information about this error may be available in the server error log.

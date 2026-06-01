@@ -1,0 +1,198 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ MAUSMAUS" [ref=e20] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=e21] [cursor=pointer]:
+          - img [ref=e23]
+      - listitem [ref=e25]:
+        - link "converters" [ref=e26] [cursor=pointer]:
+          - /url: "?path=converters&edit=true"
+          - img [ref=e27]
+          - text: converters
+        - button "Copy + paste" [ref=e29] [cursor=pointer]:
+          - img [ref=e31]
+        - button "Hide from sidebar" [ref=e33] [cursor=pointer]:
+          - img [ref=e35]
+      - listitem [ref=e37]:
+        - link "dasdasa" [ref=e38] [cursor=pointer]:
+          - /url: "?path=dasdasa&edit=true"
+          - img [ref=e39]
+          - text: dasdasa
+        - button "Copy + paste" [ref=e41] [cursor=pointer]:
+          - img [ref=e43]
+        - button "Hide from sidebar" [ref=e45] [cursor=pointer]:
+          - img [ref=e47]
+      - listitem [ref=e49]:
+        - link "ideas_to_find" [ref=e50] [cursor=pointer]:
+          - /url: "?path=ideas_to_find&edit=true"
+          - img [ref=e51]
+          - text: ideas_to_find
+        - button "Copy + paste" [ref=e53] [cursor=pointer]:
+          - img [ref=e55]
+        - button "Hide from sidebar" [ref=e57] [cursor=pointer]:
+          - img [ref=e59]
+      - listitem [ref=e61]:
+        - link "live-file-backed-scene-generation-creates-a-location-image-artifact" [ref=e62] [cursor=pointer]:
+          - /url: "?path=live-file-backed-scene-generation-creates-a-location-image-artifact&edit=true"
+          - img [ref=e63]
+          - text: live-file-backed-scene-generation-creates-a-location-image-artifact
+        - button "Copy + paste" [ref=e65] [cursor=pointer]:
+          - img [ref=e67]
+        - button "Hide from sidebar" [ref=e69] [cursor=pointer]:
+          - img [ref=e71]
+      - listitem [ref=e73]:
+        - link "ll-1er" [ref=e74] [cursor=pointer]:
+          - /url: "?path=ll-1er&edit=true"
+          - img [ref=e75]
+          - text: ll-1er
+        - button "Copy + paste" [ref=e77] [cursor=pointer]:
+          - img [ref=e79]
+        - button "Hide from sidebar" [ref=e81] [cursor=pointer]:
+          - img [ref=e83]
+      - listitem [ref=e85]:
+        - link "ll-AAA" [ref=e86] [cursor=pointer]:
+          - /url: "?path=ll-AAA&edit=true"
+          - img [ref=e87]
+          - text: ll-AAA
+        - button "Copy + paste" [ref=e89] [cursor=pointer]:
+          - img [ref=e91]
+        - button "Hide from sidebar" [ref=e93] [cursor=pointer]:
+          - img [ref=e95]
+      - listitem [ref=e97]:
+        - link "sadasdasdasd" [ref=e98] [cursor=pointer]:
+          - /url: "?path=sadasdasdasd&edit=true"
+          - img [ref=e99]
+          - text: sadasdasdasd
+        - button "Copy + paste" [ref=e101] [cursor=pointer]:
+          - img [ref=e103]
+        - button "Hide from sidebar" [ref=e105] [cursor=pointer]:
+          - img [ref=e107]
+      - listitem [ref=e109]:
+        - link "tests" [ref=e110] [cursor=pointer]:
+          - /url: "?path=tests&edit=true"
+          - img [ref=e111]
+          - text: tests
+        - button "Copy + paste" [ref=e113] [cursor=pointer]:
+          - img [ref=e115]
+        - button "Hide from sidebar" [ref=e117] [cursor=pointer]:
+          - img [ref=e119]
+      - listitem [ref=e121]:
+        - link "texte" [ref=e122] [cursor=pointer]:
+          - /url: "?path=texte&edit=true"
+          - img [ref=e123]
+          - text: texte
+        - button "Copy + paste" [ref=e125] [cursor=pointer]:
+          - img [ref=e127]
+        - button "Hide from sidebar" [ref=e129] [cursor=pointer]:
+          - img [ref=e131]
+      - listitem [ref=e133]:
+        - link "trudels" [ref=e134] [cursor=pointer]:
+          - /url: "?path=trudels&edit=true"
+          - img [ref=e135]
+          - text: trudels
+        - button "Copy + paste" [ref=e137] [cursor=pointer]:
+          - img [ref=e139]
+        - button "Hide from sidebar" [ref=e141] [cursor=pointer]:
+          - img [ref=e143]
+      - listitem [ref=e145]:
+        - link "worktypes" [ref=e146] [cursor=pointer]:
+          - /url: "?path=worktypes&edit=true"
+          - img [ref=e147]
+          - text: worktypes
+        - button "Copy + paste" [ref=e149] [cursor=pointer]:
+          - img [ref=e151]
+        - button "Hide from sidebar" [ref=e153] [cursor=pointer]:
+          - img [ref=e155]
+      - listitem [ref=e157]:
+        - link ".layout" [ref=e158] [cursor=pointer]:
+          - /url: "#/.layout"
+          - img [ref=e159]
+          - text: .layout
+        - button "Copy + paste" [ref=e161] [cursor=pointer]:
+          - img [ref=e163]
+      - listitem [ref=e165]:
+        - link ".htaccess hidden" [disabled]:
+          - /url: "#"
+          - img
+          - text: .htaccess
+          - generic: hidden
+        - button "Copy + paste" [ref=e166] [cursor=pointer]:
+          - img [ref=e168]
+        - button "Unhide in sidebar" [ref=e170] [cursor=pointer]:
+          - img [ref=e172]
+      - listitem [ref=e174]:
+        - link "1-2184 hidden" [disabled]:
+          - /url: "#"
+          - img
+          - text: 1-2184
+          - generic: hidden
+        - button "Copy + paste" [ref=e175] [cursor=pointer]:
+          - img [ref=e177]
+        - button "Unhide in sidebar" [ref=e179] [cursor=pointer]:
+          - img [ref=e181]
+      - listitem [ref=e183]:
+        - link "1-2184.json" [ref=e184] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e185]
+          - text: 1-2184.json
+        - button "Copy + paste" [ref=e187] [cursor=pointer]:
+          - img [ref=e189]
+        - button "Hide from sidebar" [ref=e191] [cursor=pointer]:
+          - img [ref=e193]
+      - listitem [ref=e195]:
+        - link "bak.htaccess" [ref=e196] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e197]
+          - text: bak.htaccess
+        - button "Copy + paste" [ref=e199] [cursor=pointer]:
+          - img [ref=e201]
+        - button "Hide from sidebar" [ref=e203] [cursor=pointer]:
+          - img [ref=e205]
+      - listitem [ref=e207]:
+        - link "Bild2_eggermann.tif" [ref=e208] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e209]
+          - text: Bild2_eggermann.tif
+        - button "Copy + paste" [ref=e211] [cursor=pointer]:
+          - img [ref=e213]
+        - button "Hide from sidebar" [ref=e215] [cursor=pointer]:
+          - img [ref=e217]
+      - listitem [ref=e219]:
+        - link "Bildschirmfoto-2025-11-24-um-14.37.10.png" [ref=e220] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e221]
+          - text: Bildschirmfoto-2025-11-24-um-14.37.10.png
+        - button "Copy + paste" [ref=e223] [cursor=pointer]:
+          - img [ref=e225]
+        - button "Hide from sidebar" [ref=e227] [cursor=pointer]:
+          - img [ref=e229]
+      - listitem [ref=e231]:
+        - link "dsfsdfsdfsdffsd hidden" [disabled]:
+          - /url: "#"
+          - img
+          - text: dsfsdfsdfsdffsd
+          - generic: hidden
+        - button "Copy + paste" [ref=e232] [cursor=pointer]:
+          - img [ref=e234]
+        - button "Unhide in sidebar" [ref=e236] [cursor=pointer]:
+          - img [ref=e238]
+      - listitem [ref=e240]:
+        - link "Scheiss-au-den-Fisch-by-eggman-Suno.webloc" [ref=e241] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e242]
+          - text: Scheiss-au-den-Fisch-by-eggman-Suno.webloc
+        - button "Copy + paste" [ref=e244] [cursor=pointer]:
+          - img [ref=e246]
+        - button "Hide from sidebar" [ref=e248] [cursor=pointer]:
+          - img [ref=e250]
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - document [ref=e254]

@@ -342,6 +342,25 @@ export function createEditController({ elements, context, editRequested }) {
                 return;
             }
 
+            if (editRequested) {
+                let attempts = 0;
+                const maxAttempts = 24;
+                const openWhenReady = () => {
+                    const delayedButton = document.getElementById('editOpenUploadDialog');
+                    if (delayedButton instanceof HTMLButtonElement) {
+                        delayedButton.click();
+                        return;
+                    }
+                    attempts += 1;
+                    if (attempts >= maxAttempts) {
+                        return;
+                    }
+                    window.requestAnimationFrame(openWhenReady);
+                };
+                window.requestAnimationFrame(openWhenReady);
+                return;
+            }
+
             const url = new URL(window.location.href);
             url.searchParams.set('edit', 'true');
             url.searchParams.set('add', authState.canEdit ? 'work' : 'url');

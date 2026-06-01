@@ -242,9 +242,10 @@
 .p-3{padding:0.75rem;}
 .p-4{padding:1rem;}
 .p-6{padding:1.5rem;}
+.px,
+.px-4{padding-left:1rem;padding-right:1rem;}
 .px-2\.5{padding-left:0.625rem;padding-right:0.625rem;}
 .px-3{padding-left:0.75rem;padding-right:0.75rem;}
-.px-4{padding-left:1rem;padding-right:1rem;}
 .px-6{padding-left:1.5rem;padding-right:1.5rem;}
 .py-1{padding-top:0.25rem;padding-bottom:0.25rem;}
 .py-2{padding-top:0.5rem;padding-bottom:0.5rem;}
@@ -795,6 +796,53 @@ body, html {
   z-index: 1;
 }
 
+#appSidebar .sidebar-file-drop-zone {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(37, 99, 235, 0.58);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.9);
+  color: #0f172a;
+  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  transform: scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+#appSidebar .sidebar-file-drop-zone__inner {
+  display: grid;
+  gap: 0.28rem;
+  text-align: center;
+}
+
+#appSidebar .sidebar-file-drop-zone__inner strong {
+  font-size: 1rem;
+  font-weight: 760;
+}
+
+#appSidebar .sidebar-file-drop-zone__inner span {
+  font-size: 0.78rem;
+  color: rgba(51, 65, 85, 0.82);
+}
+
+#appSidebar.sidebar-file-drop-active .sidebar-file-drop-zone,
+#appSidebar.sidebar-file-drop-busy .sidebar-file-drop-zone {
+  opacity: 1;
+  transform: scale(1);
+}
+
+#appSidebar.sidebar-file-drop-busy .sidebar-file-drop-zone {
+  border-color: rgba(249, 115, 22, 0.7);
+}
+
 #appSidebar[hidden] {
   display: none !important;
 }
@@ -864,13 +912,19 @@ body, html {
   z-index: 2;
   margin: 0 0 var(--poff-space-lg);
   overflow: visible;
+  padding: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(248, 250, 252, 0.56)), rgba(255, 255, 255, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 18px 32px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
 }
 
 #appSidebar .edit-actions-menu {
   position: relative;
-  display: block;
+  display: grid;
   width: 100%;
-  min-height: 48px;
+  gap: 0.7rem;
   border: 0;
   margin: 0;
   padding: 0;
@@ -888,25 +942,27 @@ body, html {
 #appSidebar .edit-actions-menu-toggle {
   position: relative;
   z-index: 2;
-  width: 48px;
-  min-width: 48px;
-  height: 48px;
+  width: 100%;
+  min-height: 50px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
   border: 0;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
+  border-radius: 18px;
+  padding: 0 0.95rem 0 0.9rem;
+  background: linear-gradient(135deg, #0f172a, #1f2937 54%, #312e81 100%);
   color: #ffffff;
-  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   cursor: pointer;
   box-sizing: border-box;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 #appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle {
-  background: linear-gradient(135deg, #fb923c, #f97316 56%, #fb7185);
-  color: #111827;
+  background: linear-gradient(135deg, #5b21b6, #7c3aed 52%, #a855f7);
+  color: #ffffff;
+  box-shadow: 0 18px 30px rgba(124, 58, 237, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 #appSidebar .edit-actions-menu-toggle:hover {
@@ -917,6 +973,7 @@ body, html {
   display: inline-grid;
   gap: 4px;
   width: 18px;
+  flex: 0 0 auto;
 }
 
 #appSidebar .edit-actions-menu-toggle__icon span {
@@ -927,6 +984,36 @@ body, html {
   background: currentColor;
   transform-origin: center;
   transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+#appSidebar .edit-actions-menu-toggle__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#appSidebar .edit-actions-menu-toggle__chevron {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: 0 0 auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  margin-left: auto;
+  opacity: 0.82;
+  transform: translateY(-1px) rotate(45deg);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle__chevron {
+  transform: translateY(1px) rotate(225deg);
+  opacity: 1;
 }
 
 #appSidebar .edit-actions-menu[open] .edit-actions-menu-toggle__icon span:nth-child(1) {
@@ -942,28 +1029,30 @@ body, html {
 }
 
 #appSidebar .edit-actions-menu__panel {
-  position: absolute;
-  inset: 0 0 auto 0;
+  position: static;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   gap: var(--poff-space-xs);
   min-width: 0;
   overflow: hidden;
   opacity: 0;
-  padding-left: calc(48px + var(--poff-space-xs));
-  transform: translateX(-0.75rem);
-  transform-origin: left center;
+  max-height: 0;
+  padding-left: 0;
+  transform: translateY(-0.35rem);
+  transform-origin: top center;
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.24s ease, filter 0.24s ease;
+  transition: opacity 0.2s ease, transform 0.24s ease, filter 0.24s ease, max-height 0.24s ease;
   filter: blur(1px);
   box-sizing: border-box;
 }
 
 #appSidebar .edit-actions-menu[open] .edit-actions-menu__panel {
   opacity: 1;
-  transform: translateX(0);
+  max-height: 40rem;
+  overflow: visible;
+  transform: translateY(0);
   filter: blur(0);
   pointer-events: auto;
 }
@@ -989,13 +1078,20 @@ body, html {
 #appSidebar .edit-auth-details > summary {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
   list-style: none;
   width: 100%;
   min-width: 0;
   min-height: 48px;
   margin: 0;
-  padding: 12px 18px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--app-shell-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #appSidebar .edit-auth-details > summary::-webkit-details-marker {
@@ -1007,8 +1103,8 @@ body, html {
   min-width: 0;
   width: auto;
   border: 0;
-  min-height: 48px;
-  border-radius: 999px;
+  min-height: 46px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #0f172a, #1e293b 58%, #334155);
   color: #ffffff;
   padding: 12px 14px;
@@ -1039,6 +1135,7 @@ body, html {
   opacity: 0;
   flex: 1 1 0;
   min-width: 0;
+  width: 100%;
 }
 
 #appSidebar .edit-actions-menu[open] .edit-toggle-secondary {
@@ -1047,9 +1144,9 @@ body, html {
 }
 
 #appSidebar .edit-auth-details[open] + .edit-toggle-secondary {
-  flex: 0 0 auto;
-  min-width: 8.5rem;
-  margin-left: calc(48px + var(--poff-space-xs));
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0;
 }
 
 #appSidebar .edit-toggle-secondary:hover {
@@ -1060,11 +1157,13 @@ body, html {
   display: grid;
   gap: var(--poff-space-xs);
   width: 100%;
+  max-width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: var(--poff-control-radius-xl);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
   padding: var(--poff-space-sm);
+  box-sizing: border-box;
   backdrop-filter: blur(12px);
   transform: translateX(-0.5rem);
   transform-origin: top left;
@@ -1105,10 +1204,23 @@ body, html {
   padding: 0;
 }
 
+#appSidebar .nav-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#appSidebar .nav-row-muted {
+  opacity: 0.48;
+  filter: grayscale(1);
+}
+
 #appSidebar .nav-link {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   margin: 0;
   padding: 12px 14px;
   border-radius: 18px;
@@ -1146,6 +1258,12 @@ body, html {
   color: #0f766e;
 }
 
+#appSidebar .nav-link-badge-converter {
+  background: var(--poff-color-surface-secondary);
+  color: var(--poff-color-text-secondary-accent);
+  box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary);
+}
+
 #appSidebar .edit-form {
   clear: both;
   display: grid;
@@ -1160,7 +1278,7 @@ body, html {
 }
 
 #appSidebar .edit-auth-details[open] .edit-form {
-  max-height: 280px;
+  max-height: 24rem;
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
@@ -1183,20 +1301,49 @@ body, html {
 }
 
 #appSidebar .edit-form .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
+  max-width: 100%;
   min-height: 42px;
   border-radius: 14px;
   font-size: var(--poff-font-size-sm);
+  box-sizing: border-box;
 }
 
 #appSidebar .edit-status {
   margin-top: 2px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+#appSidebar .edit-toggle,
+#appSidebar .edit-toggle-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (prefers-reduced-motion: reduce) {
   #appSidebar .edit-form {
     transition: none;
     transform: none;
+  }
+  #appSidebar .edit-actions-menu-toggle,
+  #appSidebar .edit-actions-menu-toggle__chevron,
+  #appSidebar .edit-actions-menu__panel,
+  #appSidebar .edit-auth-bubble,
+  #appSidebar .edit-toggle,
+  #appSidebar .edit-toggle-secondary {
+    transition: none;
   }
 }
 #appSidebar .nav-link:hover {
@@ -1222,6 +1369,24 @@ body, html {
   box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.14);
 }
 
+#appSidebar .nav-link-converter {
+  background: linear-gradient(180deg, var(--poff-color-surface) 0%, var(--poff-color-surface-secondary) 100%);
+  box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary);
+  color: var(--poff-color-text-secondary-accent);
+}
+
+#appSidebar .nav-link-converter .item-icon {
+  background: var(--poff-color-secondary-100);
+  box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary);
+  color: var(--poff-color-secondary-700);
+}
+
+#appSidebar .nav-link-converter:hover {
+  color: var(--poff-color-secondary-700);
+  background: linear-gradient(180deg, var(--poff-color-surface) 0%, var(--poff-color-secondary-100) 100%);
+  box-shadow: inset 0 0 0 1px var(--poff-color-border-secondary-strong), 0 14px 24px rgba(99, 102, 241, 0.12);
+}
+
 #appSidebar .nav-row-action-review {
   color: #b91c1c;
   background: rgba(254, 226, 226, 0.78);
@@ -1236,13 +1401,17 @@ body, html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 36px;
-  min-width: 36px;
+  gap: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  min-height: 2.2rem;
+  min-width: 2.2rem;
+  flex: 0 0 2.2rem;
   border: 0;
   border-radius: 999px;
-  padding: 6px 10px;
-  background: transparent;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
   color: var(--app-shell-text);
   cursor: pointer;
   font-size: 0.75rem;
@@ -1275,9 +1444,7 @@ body, html {
 }
 
 #appSidebar .nav-row-action__label {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
+  display: none;
 }
 
 #appSidebar .nav-link-up {
@@ -1309,11 +1476,11 @@ body, html {
 
 @media (max-width: 900px) {
   #appSidebar .nav-row-action {
-    padding: 6px;
     min-width: 30px;
-  }
-  #appSidebar .nav-row-action__label {
-    display: none;
+    min-height: 30px;
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
   }
 }
 #appSidebar .nav-link-up .item-icon {
@@ -1330,6 +1497,7 @@ body, html {
   }
   #appSidebar .app-edit-toggle-wrap {
     margin-bottom: 8px;
+    padding: 0.6rem;
   }
 }
 /* Edit mode */

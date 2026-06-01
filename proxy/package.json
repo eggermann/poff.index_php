@@ -1,0 +1,13 @@
+{
+  "name": "pageoff-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GitHub OAuth reverse proxy for pageoff.de",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

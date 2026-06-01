@@ -258,20 +258,24 @@ function cmsResolveFileViewerLinkState(string $fullPath, string $type, array $tr
         $linkUrl = null;
     }
 
-    $renderedHtml = cmsResolveRemoteRenderedHtml([
-        'linkUrl' => $linkUrl ?? '',
-        'pageLink' => $fileConfig['pageLink'] ?? '',
-        'pageUrl' => $fileConfig['pageUrl'] ?? '',
-        'baseUrl' => $configuredBaseUrl !== '' ? $configuredBaseUrl : ($fileConfig['baseUrl'] ?? ($linkUrl ?? '')),
-        'renderedHtml' => $configuredRenderedHtml !== '' ? $configuredRenderedHtml : trim((string) ($fileConfig['renderedHtml'] ?? '')),
-    ]);
-
     $previewUrl = '';
     if ($linkUrl !== null) {
         $trimmedLinkUrl = trim($linkUrl);
         if ($trimmedLinkUrl !== '' && (cmsIsExternalLinkTarget($trimmedLinkUrl) || cmsIsCmsQueryLinkTarget($trimmedLinkUrl))) {
             $previewUrl = $trimmedLinkUrl;
         }
+    }
+
+    $renderedHtml = '';
+    $shouldInlineRemoteHtml = $previewUrl === '' || $hasPhysicalFile;
+    if ($shouldInlineRemoteHtml) {
+        $renderedHtml = cmsResolveRemoteRenderedHtml([
+            'linkUrl' => $linkUrl ?? '',
+            'pageLink' => $fileConfig['pageLink'] ?? '',
+            'pageUrl' => $fileConfig['pageUrl'] ?? '',
+            'baseUrl' => $configuredBaseUrl !== '' ? $configuredBaseUrl : ($fileConfig['baseUrl'] ?? ($linkUrl ?? '')),
+            'renderedHtml' => $configuredRenderedHtml !== '' ? $configuredRenderedHtml : trim((string) ($fileConfig['renderedHtml'] ?? '')),
+        ]);
     }
 
     return [

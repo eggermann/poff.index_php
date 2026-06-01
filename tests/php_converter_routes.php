@@ -76,6 +76,17 @@ if ($mode === 'save') {
 }
 
 if ($mode === 'convert') {
+    $mockHttpPost = $payload['mockHttpPost'] ?? null;
+    if (is_array($mockHttpPost)) {
+        $GLOBALS['__poff_converter_http_post'] = static function (string $url, array $headers, array $requestPayload) use ($mockHttpPost): array {
+            return [
+                'ok' => (bool) ($mockHttpPost['ok'] ?? true),
+                'status' => (int) ($mockHttpPost['status'] ?? 200),
+                'body' => json_encode($mockHttpPost['body'] ?? [], JSON_UNESCAPED_SLASHES),
+            ];
+        };
+        unset($payload['mockHttpPost']);
+    }
     echo json_encode(handleConvert([
         'rootDir' => $rootDir,
         'payload' => $payload,

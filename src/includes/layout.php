@@ -63,12 +63,14 @@
     <aside id="appSidebar" class="sidebar" aria-label="Navigation">
         <div class="app-edit-toggle-wrap">
             <details id="editActionsMenu" class="edit-actions-menu">
-                <summary id="editActionsMenuToggle" class="edit-actions-menu-toggle" aria-label="Toggle edit actions">
+                <summary id="editActionsMenuToggle" class="edit-actions-menu-toggle" aria-label="Toggle editor tools">
                     <span class="edit-actions-menu-toggle__icon" aria-hidden="true">
                         <span></span>
                         <span></span>
                         <span></span>
                     </span>
+                    <span class="edit-actions-menu-toggle__label">Editor tools</span>
+                    <span class="edit-actions-menu-toggle__chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="edit-actions-menu__panel">
                     <details id="editAuthDetails" class="edit-auth-details">

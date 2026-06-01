@@ -1,0 +1,15 @@
+[     122ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/XXXXXX:0
+[     415ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?ajax=resolve&slug=XXXXXX:0
+[     437ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?view=1&file=XXXXXX:0
+[  165207ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/XXXXXX:0
+[  165485ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?ajax=resolve&slug=XXXXXX:0
+[  165522ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?view=1&file=XXXXXX:0
+[  172079ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/XXXXXX:0
+[  172363ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?ajax=resolve&slug=XXXXXX&edit=true:0
+[  172401ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?view=1&file=XXXXXX:0
+[  474781ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/XXXXXX:0
+[  475074ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?ajax=resolve&slug=XXXXXX&edit=true:0
+[  475114ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?view=1&file=XXXXXX:0
+[  640301ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/MAUSMAUS/?edit=true#/XXXXXX:0
+[  640592ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8888/MAUSMAUS/?ajax=resolve&slug=XXXXXX&edit=true:0
+[  670599ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8888/MAUSMAUS/?edit=true&view=1&file=XXXXXX:0

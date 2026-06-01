@@ -10,6 +10,13 @@ require_once __DIR__ . '/../src/includes/viewer/render.php';
 
 $baseDir = $argv[1] ?? '';
 $relativePath = $argv[2] ?? '';
+$options = [];
+if (isset($argv[3]) && trim((string) $argv[3]) !== '') {
+    $decodedOptions = json_decode((string) $argv[3], true);
+    if (is_array($decodedOptions)) {
+        $options = $decodedOptions;
+    }
+}
 
 if ($baseDir === '') {
     fwrite(STDERR, "Missing base dir\n");
@@ -31,7 +38,7 @@ $folderViewData = buildFolderViewerData($relativePath, $fullPath, $config, [
     'name' => (string) ($config['folderName'] ?? basename($fullPath)),
     'title' => (string) ($config['title'] ?? $config['folderName'] ?? basename($fullPath)),
     'slug' => (string) ($config['slug'] ?? PoffConfig::slugify((string) ($config['folderName'] ?? basename($fullPath)))),
-]);
+], $options);
 
 echo json_encode([
     'tree' => $folderViewData['tree'],

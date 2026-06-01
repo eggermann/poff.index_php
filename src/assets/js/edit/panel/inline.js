@@ -293,6 +293,7 @@ function renderConverterSection(config = {}) {
     const selectedQuality = String(converter.quality || defaults.quality || 'default');
     const selectedFormat = String(converter.format || defaults.format || '');
     const selectedSaveMode = String(converter.saveMode || defaults.saveMode || 'new-hidden-work');
+    const convertDisabled = selectedId === '';
     const unsupportedMessage = catalog && catalog.webReadable === false
         ? '<div class="edit-status">This file is not directly web-readable. Choose a converter to create a poff-standard work.</div>'
         : '';
@@ -361,7 +362,7 @@ function renderConverterSection(config = {}) {
                 </div>
             </div>
             <div class="edit-inline-actions">
-                <button class="btn btn-secondary" type="button" id="editConvertWork">Convert</button>
+                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>Convert</button>
             </div>
             <div class="small-note">
                 Generated works:
@@ -729,6 +730,7 @@ export function renderEditPanel({
             isFileTarget: false,
             isEmptyFolder: treeItems.length === 0,
             externalOnly: true,
+            showLauncher: false,
         });
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Submit external link</h3>
@@ -801,6 +803,7 @@ export function renderEditPanel({
         isFileTarget,
         isEmptyFolder,
         externalOnly: false,
+        showLauncher: false,
     });
 
     editPanel.innerHTML = `
@@ -922,6 +925,13 @@ export function renderEditPanel({
             .map((item) => `<option value="${escapeHtml(item)}"${item === selected ? ' selected' : ''}>${escapeHtml(item === 'source' ? 'same as source' : item)}</option>`)
             .join('');
     };
+    const syncConvertButtonState = () => {
+        const converterSelect = form?.elements?.converter_id;
+        if (!(convertButton instanceof HTMLButtonElement) || !(converterSelect instanceof HTMLSelectElement)) {
+            return;
+        }
+        convertButton.disabled = String(converterSelect.value || '').trim() === '';
+    };
 
     if (titleInput && typeof onTitleInput === 'function') {
         titleInput.addEventListener('input', () => {
@@ -946,6 +956,7 @@ export function renderEditPanel({
         input.addEventListener('change', () => {
             if (input.id === 'edit-converter-id') {
                 syncConverterFormatOptions();
+                syncConvertButtonState();
             }
             syncMediaState();
         });
@@ -955,6 +966,7 @@ export function renderEditPanel({
         onMediaInput,
     });
     syncConverterFormatOptions();
+    syncConvertButtonState();
     syncMediaState();
     if (form && typeof onSubmit === 'function') {
         form.addEventListener('submit', (event) => {

@@ -47,6 +47,11 @@ function cmsNavActionButton(string $label, string $title, string $class, string 
         . '</button>';
 }
 
+function cmsNavRowClass(bool $muted = false): string
+{
+    return 'nav-row' . ($muted ? ' nav-row-muted' : '');
+}
+
 function cmsNavIcon(string $name): string
 {
     return match ($name) {
@@ -160,26 +165,26 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $bas
     $isApprovedExternal = !empty($item['approvedExternal']);
     $isConverter = cmsNavIsConverterItem($item, $isFile, $baseDir);
     $displayName = (string) ($item['title'] ?? $item['name']);
+    $disableHiddenLink = $isHidden && !$isPendingApproval;
     $hiddenAttrs = $isHidden
-        ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
+        ? ($disableHiddenLink
+            ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
+            : ' data-hidden="true" style="opacity:.48;filter:grayscale(1);"')
         : '';
-    $rowStyle = $isHidden && !$isPendingApproval
-        ? 'display:flex;align-items:center;gap:.25rem;opacity:.48;filter:grayscale(1);'
-        : 'display:flex;align-items:center;gap:.25rem;';
     $navLinkClasses = 'nav-link'
         . ($isHidden ? ' nav-link-hidden' : '')
         . ($isPendingApproval ? ' nav-link-pending-approval' : '')
         . ($isApprovedExternal ? ' nav-link-approved-external' : '')
         . ($isConverter ? ' nav-link-converter' : '');
     $href = $isFile ? '#' : ($isHidden ? '#' : $item['link']);
-    $dataAttrs = ' data-tree-item="1" data-path="' . htmlspecialchars($item['path']) . '" data-slug="' . htmlspecialchars($item['slug']) . '"';
+    $dataAttrs = ' data-tree-item="1" data-path="' . htmlspecialchars($item['path']) . '" data-slug="' . htmlspecialchars($item['slug']) . '" data-is-file="' . ($isFile ? '1' : '0') . '"';
 
     if ($isFile) {
         $dataAttrs .= ' data-src="' . htmlspecialchars($item['data_src']) . '" data-file="' . htmlspecialchars($item['name']) . '"';
     }
 
-    return '<li style="' . $rowStyle . '">'
-        . '<a class="' . $navLinkClasses . '" style="flex:1;" href="' . htmlspecialchars($href) . '"' . $dataAttrs . ' title="' . htmlspecialchars((string) ($item['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>'
+    return '<li class="' . cmsNavRowClass($isHidden && !$isPendingApproval) . '">'
+        . '<a class="' . $navLinkClasses . '" href="' . htmlspecialchars($href) . '"' . $dataAttrs . ' title="' . htmlspecialchars((string) ($item['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>'
         . $item['icon'] . htmlspecialchars($displayName) . cmsNavBadgeForItem($isHidden, $isPendingApproval, $isApprovedExternal, $isConverter) . '</a>'
         . ($isPendingApproval ? cmsNavActionButton('Review', 'Review external link submission', 'nav-row-action-review', cmsNavIcon('pending'), ' data-nav-action="review-external" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '')
         . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr((string) ($item['copyText'] ?? $item['name']))) : '')
@@ -212,8 +217,8 @@ function cmsRenderNavListMarkup(array $context): string
             $parentRelativePath = '';
         }
         $upLink = '?path=' . urlencode($parentRelativePath) . $editQuery;
-        echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-            . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a>'
+        echo '<li class="' . cmsNavRowClass() . '">'
+            . '<a class="nav-link nav-link-up" href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a>'
             . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..')) : '')
             . '</li>';
     }
@@ -221,8 +226,8 @@ function cmsRenderNavListMarkup(array $context): string
     $currentNavConfig = is_array($folderPoffConfig ?? null) ? $folderPoffConfig : [];
     $currentNavName = (string) ($currentNavConfig['title'] ?? $currentNavConfig['folderName'] ?? basename($navFolder));
     $currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavConfig['folderName'] ?? $currentNavName)));
-    echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-        . '<a class="nav-link nav-link-up" style="flex:1;" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '" title="' . htmlspecialchars((string) ($currentNavConfig['folderName'] ?? $currentNavName)) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
+    echo '<li class="' . cmsNavRowClass() . '">'
+        . '<a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '" title="' . htmlspecialchars((string) ($currentNavConfig['folderName'] ?? $currentNavName)) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
         . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($currentNavName)) : '')
         . '</li>';
 
@@ -313,11 +318,11 @@ function cmsRenderNavListMarkup(array $context): string
     if ($editMode) {
         $layoutVirtualPath = $navFolder !== '' ? rtrim($navFolder, "/\\") . '/.layout' : '.layout';
         $layoutHash = '#/' . str_replace('%2F', '/', rawurlencode($layoutVirtualPath));
-        echo '<li style="display:flex;align-items:center;gap:.25rem;">'
-            . '<a class="nav-link nav-link-layout" style="flex:1;" href="' . htmlspecialchars($layoutHash) . '" data-layout-path="' . htmlspecialchars($layoutVirtualPath) . '">'
+        echo '<li class="' . cmsNavRowClass() . '">'
+            . '<a class="nav-link nav-link-layout" href="' . htmlspecialchars($layoutHash) . '" data-layout-path="' . htmlspecialchars($layoutVirtualPath) . '">'
             . '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zm2 1a.75.75 0 000 1.5h10a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h7a.75.75 0 000-1.5H5z" clip-rule="evenodd"/></svg>'
             . '.layout</a>'
-            . '<button type="button" title="Copy + paste" aria-label="Copy + paste"' . cmsNavCopyPasteAttr($layoutVirtualPath) . ' style="flex:0 0 auto;border:0;background:transparent;padding:.25rem .35rem;cursor:pointer;font-size:.78rem;line-height:1;opacity:.6;">Copy</button>'
+            . cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($layoutVirtualPath))
             . '</li>';
     }
 
