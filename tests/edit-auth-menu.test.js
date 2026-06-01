@@ -36,7 +36,9 @@ function createElementMock() {
     textContent: '',
     classList: createClassList(),
     addEventListener(type, handler) {
-      listeners.set(type, handler);
+      const handlers = listeners.get(type) || [];
+      handlers.push(handler);
+      listeners.set(type, handlers);
     },
     removeEventListener(type) {
       listeners.delete(type);
@@ -45,13 +47,53 @@ function createElementMock() {
       this[name] = String(value);
     },
     getListener(type) {
-      return listeners.get(type);
+      const handlers = listeners.get(type) || [];
+      return (...args) => {
+        for (const handler of handlers) {
+          handler(...args);
+        }
+      };
     },
     focus() {},
   };
 }
 
+function createDocumentEscapeMock() {
+  return {
+    keydownHandler: null,
+    getElementById() {
+      return null;
+    },
+    querySelector() {
+      return null;
+    },
+    addEventListener(type, handler) {
+      if (type === 'keydown') {
+        this.keydownHandler = handler;
+      }
+    },
+    dispatchEscape() {
+      if (typeof this.keydownHandler !== 'function') {
+        throw new Error('keydown handler not registered');
+      }
+      const event = {
+        key: 'Escape',
+        defaultPrevented: false,
+        preventDefault() {
+          this.defaultPrevented = true;
+        },
+        stopPropagation() {},
+      };
+      this.keydownHandler(event);
+      return event;
+    },
+  };
+}
+
 function loadEditController(documentMock = null, overrides = {}) {
+  const escapeStackPath = path.join(__dirname, '..', 'src/assets/js/core/escape-stack.js');
+  const escapeStackSource = fs.readFileSync(escapeStackPath, 'utf8')
+    .replace(/export function /g, 'function ');
   const filePath = path.join(__dirname, '..', 'src/assets/js/edit/controller.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/^import .*$/gm, '')
@@ -135,6 +177,7 @@ function loadEditController(documentMock = null, overrides = {}) {
     setStatusMessage: overrides.setStatusMessage || function setStatusMessage() {},
   });
 
+  vm.runInContext(escapeStackSource, context);
   vm.runInContext(`${source}
 module.exports = {
   createEditController,
@@ -259,6 +302,57 @@ describe('edit auth disclosure', () => {
     expect(typeof editAddWork.listener).toBe('function');
     editAddWork.listener();
     expect(openUploadDialogButton.clickCalled).toBe(true);
+  });
+
+  test('Escape closes the inner auth details before the outer edit menu', () => {
+    const documentMock = createDocumentEscapeMock();
+    const { createEditController } = loadEditController(documentMock);
+    const editActionsMenu = createElementMock();
+    const editAuthDetails = createElementMock();
+    const editToggle = createElementMock();
+    editActionsMenu.querySelectorAll = () => [editAuthDetails];
+
+    const controller = createEditController({
+      elements: {
+        editPanel: null,
+        editDrawer: null,
+        editActionsMenu,
+        editAuthDetails,
+        editToggle,
+        editAddWork: null,
+        editAuthForm: createElementMock(),
+        editAuthPassword: createElementMock(),
+        editAuthSubmit: createElementMock(),
+        editAuthStatus: createElementMock(),
+      },
+      context: {
+        currentPoffConfig: null,
+        cmsAuth: {
+          configured: true,
+          authenticated: false,
+          editModeAllowed: true,
+          canEdit: false,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindEditToggle();
+
+    editActionsMenu.open = true;
+    editActionsMenu.getListener('toggle')();
+    editAuthDetails.open = true;
+    editAuthDetails.getListener('toggle')();
+
+    const firstEscape = documentMock.dispatchEscape();
+    expect(firstEscape.defaultPrevented).toBe(true);
+    expect(editAuthDetails.open).toBe(false);
+    expect(editActionsMenu.open).toBe(true);
+    editAuthDetails.getListener('toggle')();
+
+    const secondEscape = documentMock.dispatchEscape();
+    expect(secondEscape.defaultPrevented).toBe(true);
+    expect(editActionsMenu.open).toBe(false);
   });
 });
 
@@ -447,7 +541,7 @@ test('saving a selected converter persists converter work config even without ex
     dataset: {
       converterName: 'convert-text-editor',
       converterType: 'converter',
-      converterEngine: 'text-copy',
+      converterEngine: 'remote-node',
       converterPath: 'worktypes/templates/converter/convert-text-editor',
       converterViewerHref: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
       converterUrl: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',

@@ -46,6 +46,22 @@ function ensureEscapeListener() {
     document.addEventListener('keydown', handleEscapeKeydown, true);
 }
 
+function closeOpenDetailsTree(rootDetails) {
+    if (!rootDetails || typeof rootDetails !== 'object') {
+        return;
+    }
+
+    if (typeof rootDetails.querySelectorAll === 'function') {
+        const openDetails = Array.from(rootDetails.querySelectorAll('details[open]')).reverse();
+        openDetails.forEach((details) => {
+            if (details && typeof details === 'object') {
+                details.open = false;
+            }
+        });
+    }
+    rootDetails.open = false;
+}
+
 export function registerEscapeClose(close, options = {}) {
     if (typeof close !== 'function') {
         return () => {};
@@ -63,6 +79,44 @@ export function registerEscapeClose(close, options = {}) {
         const index = escapeHandlers.indexOf(entry);
         if (index >= 0) {
             escapeHandlers.splice(index, 1);
+        }
+    };
+}
+
+export function registerEscapeCloseDetails(detailsEl, options = {}) {
+    if (!detailsEl || typeof detailsEl.addEventListener !== 'function') {
+        return () => {};
+    }
+
+    let unregisterEscapeClose = null;
+    const label = typeof options.label === 'string' ? options.label : '';
+
+    const syncEscapeState = () => {
+        if (detailsEl.open) {
+            if (typeof unregisterEscapeClose !== 'function') {
+                unregisterEscapeClose = registerEscapeClose(() => {
+                    closeOpenDetailsTree(detailsEl);
+                    return true;
+                }, { label });
+            }
+            return;
+        }
+
+        closeOpenDetailsTree(detailsEl);
+        if (typeof unregisterEscapeClose === 'function') {
+            unregisterEscapeClose();
+            unregisterEscapeClose = null;
+        }
+    };
+
+    detailsEl.addEventListener('toggle', syncEscapeState);
+    syncEscapeState();
+
+    return () => {
+        detailsEl.removeEventListener('toggle', syncEscapeState);
+        if (typeof unregisterEscapeClose === 'function') {
+            unregisterEscapeClose();
+            unregisterEscapeClose = null;
         }
     };
 }

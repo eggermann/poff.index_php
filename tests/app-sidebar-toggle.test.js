@@ -4,15 +4,19 @@ const vm = require('vm');
 
 function loadAppHelpers() {
   const constantsPath = path.join(__dirname, '..', 'src/assets/js/app/constants.js');
+  const escapeStackPath = path.join(__dirname, '..', 'src/assets/js/core/escape-stack.js');
   const helpersPath = path.join(__dirname, '..', 'src/assets/js/app/helpers.js');
   const constantsSource = fs.readFileSync(constantsPath, 'utf8')
     .replace(/export const /g, 'const ');
+  const escapeStackSource = fs.readFileSync(escapeStackPath, 'utf8')
+    .replace(/export function /g, 'function ');
   const helpersSource = fs.readFileSync(helpersPath, 'utf8')
     .replace(/^import .*$/gm, '')
     .replace(/export function /g, 'function ');
 
   const listeners = new Map();
   const documentElements = new Map();
+  let keydownHandler = null;
 
   const createClassList = () => {
     const classes = new Set();
@@ -69,6 +73,11 @@ function loadAppHelpers() {
       }
       return documentElements.get(id);
     },
+    addEventListener(type, handler) {
+      if (type === 'keydown') {
+        keydownHandler = handler;
+      }
+    },
   };
 
   const module = { exports: {} };
@@ -83,6 +92,7 @@ function loadAppHelpers() {
   });
 
   vm.runInContext(`${constantsSource}
+${escapeStackSource}
 ${helpersSource}
 module.exports = {
   APP_ELEMENT_IDS,
@@ -96,6 +106,21 @@ module.exports = {
     ...module.exports,
     documentElements,
     listeners,
+    dispatchEscape() {
+      if (typeof keydownHandler !== 'function') {
+        throw new Error('keydown handler not registered');
+      }
+      const event = {
+        key: 'Escape',
+        defaultPrevented: false,
+        preventDefault() {
+          this.defaultPrevented = true;
+        },
+        stopPropagation() {},
+      };
+      keydownHandler(event);
+      return event;
+    },
   };
 }
 
@@ -107,6 +132,7 @@ describe('app sidebar toggle wiring', () => {
     createAppElements,
     documentElements,
     listeners,
+    dispatchEscape,
   } = loadAppHelpers();
 
   test('createAppElements exposes the appShell element required by the sidebar toggle helper', () => {
@@ -141,5 +167,24 @@ describe('app sidebar toggle wiring', () => {
     expect(appSidebar.getAttribute('aria-hidden')).toBe('true');
     expect(sidebarToggle.getAttribute('aria-expanded')).toBe('false');
     expect(sidebarToggle.getAttribute('aria-label')).toBe(APP_LABELS.openNavigation);
+  });
+
+  test('Escape closes the sidebar when it is the only open layer', () => {
+    const elements = createAppElements();
+    const controller = bindSidebarToggle(elements);
+
+    expect(controller).not.toBeNull();
+    const { appShell, appSidebar, sidebarToggle } = elements;
+
+    expect(appShell.classList.contains('sidebar-collapsed')).toBe(false);
+    expect(appSidebar.hidden).toBe(false);
+    expect(sidebarToggle.getAttribute('aria-expanded')).toBe('true');
+
+    const event = dispatchEscape();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(appShell.classList.contains('sidebar-collapsed')).toBe(true);
+    expect(appSidebar.hidden).toBe(true);
+    expect(sidebarToggle.getAttribute('aria-expanded')).toBe('false');
   });
 });

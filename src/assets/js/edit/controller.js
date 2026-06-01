@@ -1,6 +1,6 @@
 import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditReset, requestEditUpload, requestMcpRoute, requestPromptTemplate } from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
-import { registerEscapeClose } from '../core/escape-stack.js';
+import { registerEscapeClose, registerEscapeCloseDetails } from '../core/escape-stack.js';
 import { bindPromptWindow } from './prompt.js';
 import { renderEditDrawer } from './drawer.js';
 import { renderEditPanel } from './panel.js';
@@ -107,6 +107,7 @@ export function createEditController({ elements, context, editRequested }) {
     const {
         editPanel,
         editDrawer,
+        editActionsMenu,
         editAuthDetails,
         editToggle,
         editAddWork,
@@ -301,6 +302,14 @@ export function createEditController({ elements, context, editRequested }) {
                 editAuthPassword.focus();
             }
         });
+        registerEscapeCloseDetails(editAuthDetails, {
+            label: 'edit-auth-details',
+        });
+        if (editActionsMenu) {
+            registerEscapeCloseDetails(editActionsMenu, {
+                label: 'edit-actions-menu',
+            });
+        }
         editToggle?.addEventListener('click', async (event) => {
             if (!authState.authenticated) {
                 return;
