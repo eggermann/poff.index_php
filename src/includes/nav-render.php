@@ -165,11 +165,8 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $bas
     $isApprovedExternal = !empty($item['approvedExternal']);
     $isConverter = cmsNavIsConverterItem($item, $isFile, $baseDir);
     $displayName = (string) ($item['title'] ?? $item['name']);
-    $disableHiddenLink = $isHidden && !$isPendingApproval;
     $hiddenAttrs = $isHidden
-        ? ($disableHiddenLink
-            ? ' aria-disabled="true" tabindex="-1" data-hidden="true" style="opacity:.48;filter:grayscale(1);cursor:not-allowed;pointer-events:none;"'
-            : ' data-hidden="true" style="opacity:.48;filter:grayscale(1);"')
+        ? ' data-hidden="true" style="opacity:.48;filter:grayscale(1);"'
         : '';
     $navLinkClasses = 'nav-link'
         . ($isHidden ? ' nav-link-hidden' : '')
@@ -204,6 +201,7 @@ function cmsRenderNavListMarkup(array $context): string
     $navEditorAuthenticated = cmsIsEditorAuthenticated($baseDir);
     $navFolder = $currentRelativePath;
     $folderIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>';
+    $homeIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.2 2.5 9v8.5h5.5V12h4v5.5h5.5V9L10 3.2zm0 2.5 5 4v5.8h-2.5V10.5h-5V15.5H5V9.7l5-4z"/></svg>';
     $fileIcon = '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L12 1.586A2 2 0 0010.586 1H4zm6 10a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>';
 
     ob_start();
@@ -212,6 +210,17 @@ function cmsRenderNavListMarkup(array $context): string
     }
 
     if ($navFolder !== '') {
+        $homeNavConfig = is_dir($baseDir) ? PoffConfig::ensure($baseDir) : [];
+        $homeNavName = trim((string) ($homeNavConfig['title'] ?? $homeNavConfig['folderName'] ?? 'Home'));
+        if ($homeNavName === '') {
+            $homeNavName = 'Home';
+        }
+        $homeNavSlug = trim((string) ($homeNavConfig['slug'] ?? cmsNavSlug($homeNavName)), '-') ?: 'home';
+        $homeLink = '?path=' . urlencode('') . $editQuery;
+        echo '<li class="' . cmsNavRowClass() . '">'
+            . '<a class="nav-link nav-link-home" href="' . htmlspecialchars($homeLink) . '" data-path="" data-slug="' . htmlspecialchars($homeNavSlug) . '" title="' . htmlspecialchars($homeNavName) . '">' . $homeIcon . htmlspecialchars($homeNavName) . '</a>'
+            . '</li>';
+
         $parentRelativePath = dirname($navFolder);
         if ($parentRelativePath === '.') {
             $parentRelativePath = '';

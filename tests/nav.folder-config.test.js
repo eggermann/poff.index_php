@@ -19,6 +19,50 @@ test('nav rendering uses folderPoffConfig instead of an undefined config variabl
   expect(result.stdout).toContain('nav-link-up');
 });
 
+test('home navigation appears only when viewing a subfolder and uses the root title', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-home-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'home-root',
+      slug: 'home-root',
+      title: 'My Home',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'section',
+          slug: 'section',
+          type: 'folder',
+          path: 'section',
+          visible: true,
+        },
+      ],
+    }, null, 2), 'utf8');
+    fs.mkdirSync(path.join(tempRoot, 'section'));
+
+    const rootResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    expect(rootResult.status).toBe(0);
+    expect(rootResult.stderr).toBe('');
+    expect(rootResult.stdout).not.toContain('nav-link-home');
+
+    const childResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, 'section'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    expect(childResult.status).toBe(0);
+    expect(childResult.stderr).toBe('');
+    expect(childResult.stdout).toContain('nav-link-home');
+    expect(childResult.stdout).toContain('My Home');
+    expect(childResult.stdout).toContain('data-path=""');
+    expect(childResult.stdout).toContain('?path=');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('nav ajax rendering tolerates missing directories without undefined variable warnings', () => {
   const baseDir = path.join(ROOT, 'tests', 'poff-tests');
   const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav_ajax.php'), baseDir, 'deg'], {
@@ -114,6 +158,8 @@ test('renders .htaccess as a hidden normal file entry in edit mode', () => {
     expect(result.stdout).toContain('data-file=".htaccess"');
     expect(result.stdout).toContain('data-hidden="true"');
     expect(result.stdout).toContain('nav-link-hidden');
+    expect(result.stdout).not.toContain('aria-disabled="true"');
+    expect(result.stdout).not.toContain('pointer-events:none;');
     expect(result.stdout).not.toContain('Create embed policy');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -160,6 +206,7 @@ test('pending external links stay hidden from visitors and show review state for
     expect(editorResult.stdout).toContain('data-nav-action="review-external"');
     expect(editorResult.stdout).toContain('new</span>');
     expect(editorResult.stdout).toContain('data-hidden="true"');
+    expect(editorResult.stdout).not.toContain('aria-disabled="true"');
     expect(editorResult.stdout).not.toContain('pointer-events:none;');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
