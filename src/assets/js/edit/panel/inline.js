@@ -391,6 +391,13 @@ function renderPasswordChangeSection(status = {}) {
     if (!status?.auth?.canEdit) {
         return '';
     }
+    if (status?.target !== 'folder') {
+        return '';
+    }
+    const relativePath = String(status?.relativePath || '').trim();
+    if (relativePath !== '') {
+        return '';
+    }
 
     const configPath = String(status?.auth?.configPath || '').trim();
     return renderPersistentDetailsSection({
@@ -734,7 +741,7 @@ export function renderEditPanel({
         });
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Submit external link</h3>
-            <div class="edit-status" id="editInlineStatus">${escapeHtml(status?.error || 'External links stay hidden until an editor confirms them.')}</div>
+            <div class="edit-status" id="editInlineStatus">${escapeHtml(status?.error || '')}</div>
             ${uploadSectionHtml}
         `;
         const statusEl = editPanel.querySelector('#editInlineStatus');
@@ -805,12 +812,16 @@ export function renderEditPanel({
         externalOnly: false,
         showLauncher: false,
     });
+    const relativePath = String(config?.__poffRelativePath || '').trim();
 
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
         ${renderDirectFileLink(config, status)}
         <div class="edit-status" id="editInlineStatus"></div>
-        ${renderPasswordChangeSection(status)}
+        ${renderPasswordChangeSection({
+            ...status,
+            relativePath,
+        })}
         <form id="inlineEditForm" class="edit-inline">
             <div>
                 <label class="edit-label" for="edit-title">Title</label>

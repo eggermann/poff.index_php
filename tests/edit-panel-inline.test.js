@@ -256,6 +256,32 @@ test('convert button renders disabled when no converter is selected', () => {
   expect(editPanel.innerHTML).toContain('id="editConvertWork" disabled');
 });
 
+test('password section only renders for the main folder', () => {
+  const renderEditPanel = loadRenderEditPanel();
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: {
+      __poffRelativePath: 'nested/folder',
+      title: 'Nested folder',
+      description: '',
+    },
+    status: {
+      allowed: true,
+      target: 'folder',
+      auth: {
+        canEdit: true,
+      },
+    },
+  });
+
+  expect(editPanel.innerHTML).toContain('Edit mode (folder)');
+  expect(editPanel.innerHTML).not.toContain('Change password');
+  expect(editPanel.innerHTML).not.toContain('Current password');
+});
+
 test('guest edit mode still binds the external link upload dialog', () => {
   let bindUploadDialogArgs = null;
   let renderUploadSectionArgs = null;
