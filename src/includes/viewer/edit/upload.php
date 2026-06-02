@@ -143,11 +143,14 @@ function cmsDefaultHtaccessContents(): string
 # Edit this file to control which sites may embed this CMS in an <iframe>.
 
 <IfModule mod_headers.c>
-    Header always set Content-Security-Policy "frame-ancestors 'self'"
+    Header always unset X-Frame-Options
+    Header always set Content-Security-Policy "frame-ancestors *;"
 </IfModule>
 
-# To allow embedding from every origin, replace the policy above with:
-# Header always set Content-Security-Policy "frame-ancestors *"
+# To restrict embedding, replace the policy above with something like:
+# <IfModule mod_headers.c>
+#     Header always set Content-Security-Policy "frame-ancestors 'self'"
+# </IfModule>
 HTACCESS;
 }
 

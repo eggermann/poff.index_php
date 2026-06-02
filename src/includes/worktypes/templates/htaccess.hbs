@@ -7,10 +7,13 @@
 # Edit this file to control which sites may embed this CMS in an &lt;iframe&gt;.
 
 &lt;IfModule mod_headers.c&gt;
-    Header always set Content-Security-Policy "frame-ancestors 'self'"
+    Header always unset X-Frame-Options
+    Header always set Content-Security-Policy "frame-ancestors *;"
 &lt;/IfModule&gt;
 
-# To allow embedding from every origin, replace the policy above with:
-# Header always set Content-Security-Policy "frame-ancestors *"</pre>
+# To restrict embedding, replace the policy above with something like:
+# &lt;IfModule mod_headers.c&gt;
+#     Header always set Content-Security-Policy "frame-ancestors 'self'"
+# &lt;/IfModule&gt;</pre>
     {{/if}}
 </div>

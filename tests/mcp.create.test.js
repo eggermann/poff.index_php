@@ -3563,14 +3563,15 @@ describe('Worktype HBS renderer', () => {
       expect(fs.existsSync(filePath)).toBe(true);
       const contents = fs.readFileSync(filePath, 'utf8');
       expect(contents).toContain('Poff iframe policy');
+      expect(contents).toContain('Header always unset X-Frame-Options');
       expect(contents).toContain('Content-Security-Policy');
-      expect(contents).toContain("frame-ancestors 'self'");
+      expect(contents).toContain('frame-ancestors *;');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
-  test('saving an external link adds the remote origin to the folder htaccess frame-ancestors policy', async () => {
+  test('saving an external link creates the default permissive folder htaccess policy', async () => {
     const tempDir = path.join(POFF_DIR, `htaccess-external-link-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
@@ -3579,13 +3580,14 @@ describe('Worktype HBS renderer', () => {
 
       expect(result.result.errors).toEqual([]);
       expect(result.htaccessExists).toBe(true);
-      expect(result.htaccess).toContain("frame-ancestors 'self' https://client.example");
+      expect(result.htaccess).toContain('Header always unset X-Frame-Options');
+      expect(result.htaccess).toContain('frame-ancestors *;');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
-  test('saving multiple external links for the same origin keeps a single htaccess frame-ancestors entry', async () => {
+  test('saving multiple external links keeps the default permissive htaccess policy unchanged', async () => {
     const tempDir = path.join(POFF_DIR, `htaccess-external-link-dedupe-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
@@ -3593,9 +3595,9 @@ describe('Worktype HBS renderer', () => {
       await runCreateLink(tempDir, 'Client Work 1', 'https://client.example/one');
       const result = await runCreateLink(tempDir, 'Client Work 2', 'https://client.example/two');
 
-      const matches = result.htaccess.match(/https:\/\/client\.example/g) || [];
       expect(result.result.errors).toEqual([]);
-      expect(matches).toHaveLength(1);
+      expect(result.htaccess).toContain('frame-ancestors *;');
+      expect(result.htaccess).not.toContain('https://client.example');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -3609,7 +3611,8 @@ describe('Worktype HBS renderer', () => {
       name: 'client-link',
       linkUrl: 'https://client.example/path/to/work',
     }));
-    expect(result.rootHtaccess).toContain("frame-ancestors 'self' https://client.example");
+    expect(result.rootHtaccess).toContain('Header always unset X-Frame-Options');
+    expect(result.rootHtaccess).toContain('frame-ancestors *;');
     expect(result.nestedHtaccessExists).toBe(false);
     expect(result.nestedConfig.tree).toEqual(expect.arrayContaining([
       expect.objectContaining({
