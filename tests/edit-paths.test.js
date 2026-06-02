@@ -38,7 +38,7 @@ module.exports = {
 }
 
 describe('edit target paths', () => {
-  test('uses the containing folder config when the current selection is a configured link', () => {
+  test('keeps the configured link path as the edit target', () => {
     const { getEditTargetPath } = loadPaths({
       window: {
         POFF_CONTEXT: {
@@ -56,7 +56,7 @@ describe('edit target paths', () => {
       previewPath: 'dominikeggermann.com',
       previewIsFile: true,
       isLayout: false,
-    })).toBe('');
+    })).toBe('dominikeggermann.com');
   });
 
   test('uses the active nav file path when the current hash is a slug', () => {

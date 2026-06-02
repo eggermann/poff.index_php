@@ -31,6 +31,7 @@ function loadPathsModule(windowMock = {}) {
   vm.runInContext(`${source}
 module.exports = {
   getContentTargetPath,
+  getAddWorkTargetPath,
   getEditTargetPath,
 };`, context);
 
@@ -38,8 +39,8 @@ module.exports = {
 }
 
 describe('edit controller target path helpers', () => {
-  test('uses the parent folder when the current selection is a configured link', () => {
-    const { getContentTargetPath } = loadPathsModule({
+  test('keeps the configured link path as the edit target', () => {
+    const { getEditTargetPath } = loadPathsModule({
       POFF_CONTEXT: {
         currentPoffConfig: {
           tree: [
@@ -49,7 +50,7 @@ describe('edit controller target path helpers', () => {
       },
     });
 
-    expect(getContentTargetPath({ path: 'plim', previewPath: 'plim', previewIsFile: false, isLayout: false })).toBe('');
+    expect(getEditTargetPath({ path: 'plim', previewPath: 'plim', previewIsFile: true, isLayout: false })).toBe('plim');
   });
 
   test('keeps folder targets unchanged', () => {
@@ -68,8 +69,9 @@ describe('edit controller target path helpers', () => {
   });
 
   test('uses the containing folder for file previews', () => {
-    const { getContentTargetPath } = loadPathsModule();
+    const { getAddWorkTargetPath, getContentTargetPath } = loadPathsModule();
 
     expect(getContentTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder');
+    expect(getAddWorkTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder/file');
   });
 });

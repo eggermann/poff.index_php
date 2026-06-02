@@ -15,6 +15,23 @@ function parentViewerPath(path = '') {
     return normalized.split('/').slice(0, -1).join('/');
 }
 
+function fileInboxViewerPath(path = '') {
+    const normalized = normalizeViewerPath(path);
+    if (!normalized) {
+        return '';
+    }
+
+    const parentPath = parentViewerPath(normalized);
+    const name = normalized.split('/').pop() || '';
+    const extensionIndex = name.lastIndexOf('.');
+    const baseName = extensionIndex > 0 ? name.slice(0, extensionIndex) : name;
+    if (!baseName) {
+        return parentPath;
+    }
+
+    return normalizeViewerPath(parentPath ? `${parentPath}/${baseName}` : baseName);
+}
+
 function findConfiguredSelectionItem(items = [], targetPath = '', prefix = '') {
     const normalizedTarget = normalizeViewerPath(targetPath);
     if (!normalizedTarget || !Array.isArray(items)) {
@@ -78,13 +95,23 @@ export function getContentTargetPath(selection = getActiveSelection()) {
     return previewPath;
 }
 
+export function getAddWorkTargetPath(selection = getActiveSelection()) {
+    if (selection?.isLayout) {
+        return getContentTargetPath(selection);
+    }
+
+    const configuredItem = resolveConfiguredSelectionItem(selection);
+    const previewPath = selection?.previewPath || selection?.path || '';
+    if (selection?.previewIsFile || (configuredItem && configuredItem.type === 'file')) {
+        return fileInboxViewerPath(previewPath) || parentViewerPath(previewPath);
+    }
+
+    return getContentTargetPath(selection);
+}
+
 export function getEditTargetPath(selection = getActiveSelection()) {
     if (selection?.isLayout) {
         return selection.path || '';
-    }
-    const configuredItem = resolveConfiguredSelectionItem(selection);
-    if (configuredItem && configuredItem.type === 'link') {
-        return parentViewerPath(selection?.previewPath || selection?.path || '');
     }
     const activeFileLink = document.querySelector('#navList a.nav-link-active[data-path]');
     const navPath = (activeFileLink?.getAttribute('data-path') || '').trim();
