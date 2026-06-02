@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function loadRenderEditPanel() {
+function loadRenderEditPanel(overrides = {}) {
   const filePath = path.join(__dirname, '..', 'src', 'assets', 'js', 'edit', 'panel', 'inline.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/import[\s\S]*?from\s+['"][^'"]+['"];\n/g, '')
@@ -13,7 +13,7 @@ function loadRenderEditPanel() {
     module,
     exports: module.exports,
     console,
-    window: {
+    window: overrides.window || {
       prompt() { return null; },
       confirm() { return false; },
     },
@@ -74,8 +74,8 @@ function loadRenderEditPanel() {
         displayMode: 'poff-layout',
       };
     },
-    renderPersistentDetailsSection() {
-      return '';
+    renderPersistentDetailsSection(options = {}) {
+      return `${options.titleHtml || ''}${options.noteHtml || ''}${options.bodyHtml || ''}`;
     },
     syncPromptDock() {},
     bindUploadDialog() {},
@@ -105,7 +105,7 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     module,
     exports: module.exports,
     console,
-    window: {
+    window: overrides.window || {
       prompt() { return null; },
       confirm() { return false; },
     },
@@ -166,8 +166,8 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
         displayMode: 'poff-layout',
       };
     },
-    renderPersistentDetailsSection() {
-      return '';
+    renderPersistentDetailsSection(options = {}) {
+      return `${options.titleHtml || ''}${options.noteHtml || ''}${options.bodyHtml || ''}`;
     },
     syncPromptDock() {},
     bindUploadDialog: overrides.bindUploadDialog || (() => {}),
@@ -256,16 +256,58 @@ test('convert button renders disabled when no converter is selected', () => {
   expect(editPanel.innerHTML).toContain('id="editConvertWork" disabled');
 });
 
-test('password section only renders for the main folder', () => {
-  const renderEditPanel = loadRenderEditPanel();
+test('password section renders for a homefolder mounted under a subpath', () => {
+  const renderEditPanel = loadRenderEditPanel({
+    window: {
+      location: {
+        pathname: '/MAUSMAUS/',
+      },
+      prompt() { return null; },
+      confirm() { return false; },
+    },
+  });
   const editPanel = createEditPanel();
 
   renderEditPanel({
     editPanel,
     editRequested: true,
     config: {
-      __poffRelativePath: 'nested/folder',
-      title: 'Nested folder',
+      __poffRelativePath: '',
+      title: 'Root folder',
+      description: '',
+    },
+    status: {
+      allowed: true,
+      target: 'folder',
+      auth: {
+        canEdit: true,
+      },
+    },
+  });
+
+  expect(editPanel.innerHTML).toContain('Edit mode (folder)');
+  expect(editPanel.innerHTML).toContain('Change password');
+  expect(editPanel.innerHTML).toContain('Current password');
+});
+
+test('password section stays hidden on the main site root', () => {
+  const renderEditPanel = loadRenderEditPanel({
+    window: {
+      location: {
+        pathname: '/',
+      },
+      prompt() { return null; },
+      confirm() { return false; },
+    },
+  });
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: {
+      __poffRelativePath: '',
+      title: 'Root folder',
       description: '',
     },
     status: {
@@ -341,4 +383,65 @@ test('guest edit mode still binds the external link upload dialog', () => {
     externalOnly: true,
   }));
   expect(result.statusEl).toBe(statusEl);
+});
+
+test('file edit mode still renders and binds the add work upload dialog', () => {
+  let bindUploadDialogArgs = null;
+  let renderUploadSectionArgs = null;
+  const renderEditPanel = loadRenderEditPanelWithHooks({
+    renderUploadSectionHtml(args) {
+      renderUploadSectionArgs = args;
+      return '<button id="editOpenUploadDialog" hidden type="button">Add work</button><dialog id="editUploadDialog"></dialog>';
+    },
+    bindUploadDialog(args) {
+      bindUploadDialogArgs = args;
+    },
+  });
+  const statusEl = { id: 'editInlineStatus' };
+  const editPanel = {
+    hidden: false,
+    innerHTML: '',
+    querySelector(selector) {
+      if (selector === '#editInlineStatus') {
+        return statusEl;
+      }
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: {
+      title: 'Example',
+      description: '',
+      work: {
+        type: 'text',
+      },
+    },
+    status: {
+      allowed: true,
+      target: 'file',
+      auth: {
+        canEdit: true,
+      },
+    },
+    onUploadFiles() {},
+    onCreateBlankFile() {},
+    onCreateFolder() {},
+    onCreateLink() {},
+  });
+
+  expect(renderUploadSectionArgs).toEqual(expect.objectContaining({
+    isFileTarget: true,
+    showLauncher: false,
+  }));
+  expect(bindUploadDialogArgs).toEqual(expect.objectContaining({
+    editPanel,
+    statusEl,
+    externalOnly: false,
+  }));
 });

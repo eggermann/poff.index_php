@@ -398,6 +398,13 @@ function renderPasswordChangeSection(status = {}) {
     if (relativePath !== '') {
         return '';
     }
+    const pathname = typeof window?.location?.pathname === 'string'
+        ? window.location.pathname.trim()
+        : '';
+    const normalizedPathname = pathname.replace(/\/+$/, '') || '/';
+    if (normalizedPathname === '/') {
+        return '';
+    }
 
     const configPath = String(status?.auth?.configPath || '').trim();
     return renderPersistentDetailsSection({
