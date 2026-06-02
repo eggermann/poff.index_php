@@ -7,7 +7,7 @@ import { renderEditPanel } from './panel.js';
 import { uploadValidationError } from './panel/shared.js';
 import { materializeWorkFields } from './work-fields.js';
 import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layout.js';
-import { getContentTargetPath, getEditTargetPath } from './controller/paths.js';
+import { getAddWorkTargetPath, getContentTargetPath, getEditTargetPath } from './controller/paths.js';
 import { setStatusMessage } from './status.js';
 
 function buildConverterSaveAs(sourceName, format) {
@@ -16,6 +16,29 @@ function buildConverterSaveAs(sourceName, format) {
         return sourceName;
     }
     return `${sourceName.replace(/\.[^.]+$/, '')}.${normalizedFormat}`;
+}
+
+function resolveConverterPayloadProvider() {
+    if (typeof window.poffConverterPayloadProvider === 'function') {
+        return window.poffConverterPayloadProvider;
+    }
+
+    if (typeof document?.getElementById !== 'function') {
+        return null;
+    }
+
+    const contentFrame = document.getElementById('contentFrame');
+    const previewRoot = contentFrame?.shadowRoot || contentFrame;
+    if (!previewRoot || typeof previewRoot.querySelector !== 'function') {
+        return null;
+    }
+
+    const providerHost = previewRoot.querySelector('[data-poff-converter-provider="true"]');
+    if (providerHost && typeof providerHost.__poffConverterPayloadProvider === 'function') {
+        return providerHost.__poffConverterPayloadProvider;
+    }
+
+    return null;
 }
 
 function readMediaConfigFromElements(elements, form, currentWork = {}) {
@@ -111,6 +134,7 @@ export function createEditController({ elements, context, editRequested }) {
         editAuthDetails,
         editToggle,
         editAddWork,
+        editJumpToSection,
         editAuthForm,
         editAuthPassword,
         editAuthSubmit,
@@ -279,6 +303,20 @@ export function createEditController({ elements, context, editRequested }) {
         return folderConfig;
     }
 
+    function buildAddWorkRequestPayload(selection, extra = {}) {
+        const contentTargetPath = getContentTargetPath(selection);
+        const addWorkTargetPath = getAddWorkTargetPath(selection);
+        const usesFileInbox = !!selection?.previewIsFile
+            && addWorkTargetPath !== ''
+            && addWorkTargetPath !== contentTargetPath;
+
+        return {
+            path: addWorkTargetPath || contentTargetPath,
+            hideTargetFolder: usesFileInbox,
+            ...extra,
+        };
+    }
+
     function syncEditToggle() {
         if (!editToggle) {
             return;
@@ -366,6 +404,55 @@ export function createEditController({ elements, context, editRequested }) {
             url.searchParams.set('add', authState.canEdit ? 'work' : 'url');
             window.location.href = url.toString();
         });
+    }
+
+    function bindJumpToSectionButton() {
+        if (!editJumpToSection) {
+            return;
+        }
+
+        const resolveScrollTarget = () => ((editDrawer && !editDrawer.hidden)
+            ? editDrawer
+            : ((editPanel && !editPanel.hidden) ? editPanel : null));
+        const resolveToolsTarget = () => editActionsMenu || editJumpToSection;
+        let lastJumpTarget = 'tools';
+
+        const syncJumpLabel = () => {
+            const title = lastJumpTarget === 'edit'
+                ? 'Jump to editor tools'
+                : 'Jump to edit section';
+            editJumpToSection.setAttribute('aria-label', title);
+            editJumpToSection.setAttribute('title', title);
+        };
+
+        editJumpToSection.addEventListener('click', () => {
+            const editTarget = resolveScrollTarget();
+            const toolsTarget = resolveToolsTarget();
+
+            if (lastJumpTarget === 'edit' && toolsTarget && typeof toolsTarget.scrollIntoView === 'function') {
+                toolsTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                lastJumpTarget = 'tools';
+                syncJumpLabel();
+                return;
+            }
+
+            if (editTarget && typeof editTarget.scrollIntoView === 'function') {
+                editTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const focusTarget = editTarget.querySelector?.('input, textarea, select, button');
+                if (focusTarget && typeof focusTarget.focus === 'function') {
+                    focusTarget.focus({ preventScroll: true });
+                }
+                lastJumpTarget = 'edit';
+                syncJumpLabel();
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('edit', 'true');
+            window.location.href = url.toString() + '#editPanel';
+        });
+
+        syncJumpLabel();
     }
 
     function bindSidebarFileDrop(sidebarEl) {
@@ -752,8 +839,9 @@ export function createEditController({ elements, context, editRequested }) {
                         mode: converter.saveMode || 'new-hidden-work',
                     },
                 };
-                if (typeof window.poffConverterPayloadProvider === 'function') {
-                    const extraPayload = await Promise.resolve(window.poffConverterPayloadProvider({
+                const payloadProvider = resolveConverterPayloadProvider();
+                if (typeof payloadProvider === 'function') {
+                    const extraPayload = await Promise.resolve(payloadProvider({
                         sourcePath,
                         sourceName,
                         converter: { ...converter },
@@ -900,11 +988,10 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onUploadFiles: async ({ source, files }) => {
                 const selection = getActiveSelection();
-                const data = await requestEditUpload({
-                    path: getContentTargetPath(selection),
+                const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
                     files,
-                });
+                }));
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Upload failed.');
                 }
@@ -918,12 +1005,11 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onCreateBlankFile: async ({ source, fileName }) => {
                 const selection = getActiveSelection();
-                const data = await requestEditUpload({
-                    path: getContentTargetPath(selection),
+                const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
                     fileName,
                     files: [],
-                });
+                }));
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create blank file failed.');
                 }
@@ -939,12 +1025,11 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onCreateFolder: async ({ source, folderName }) => {
                 const selection = getActiveSelection();
-                const data = await requestEditUpload({
-                    path: getContentTargetPath(selection),
+                const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
                     fileName: folderName,
                     files: [],
-                });
+                }));
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create folder failed.');
                 }
@@ -960,14 +1045,13 @@ export function createEditController({ elements, context, editRequested }) {
             },
             onCreateLink: async ({ source, linkName, linkUrl }) => {
                 const selection = getActiveSelection();
-                const data = await requestEditUpload({
-                    path: getContentTargetPath(selection),
+                const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
                     linkName,
                     fileName: linkName,
                     linkUrl,
                     files: [],
-                });
+                }));
                 if (data?.auth) {
                     updateAuthState(data.auth);
                 }
@@ -1183,6 +1267,7 @@ export function createEditController({ elements, context, editRequested }) {
         syncEditToggle,
         bindEditToggle,
         bindAddWorkButton,
+        bindJumpToSectionButton,
         bindSidebarFileDrop,
         bindAuthForm,
         initEditMode,

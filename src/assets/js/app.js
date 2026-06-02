@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();
+    editController.bindJumpToSectionButton();
     editController.bindSidebarFileDrop(elements.appSidebar);
     editController.bindAuthForm();
 

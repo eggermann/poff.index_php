@@ -184,6 +184,9 @@
     const url = buildCmsUrl("upload", payload.path || "");
     const formData = new FormData();
     formData.set("source", payload.source || "upload");
+    if (payload.hideTargetFolder) {
+      formData.set("hideTargetFolder", "1");
+    }
     if (typeof payload.fileName === "string") {
       formData.set("fileName", payload.fileName);
     }
@@ -829,7 +832,7 @@
     if (provider === "gemini") {
       return "gemini-1.5-flash";
     }
-    return "gemma4";
+    return "";
   }
   var sharedWorkSystemPromptLead = shared_work_prompt_default.lead;
   var sharedWorkSystemPrompt = [
@@ -3350,6 +3353,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           state.isSending = false;
           return;
         }
+        if (providerValue === "local" && modelValue === "") {
+          setGeneratingState(false);
+          setPromptStatus("Select a local model before sending prompts.");
+          state.isSending = false;
+          return;
+        }
         setHistory([...state.promptHistory, { role: "user", content: userPrompt }].slice(-12));
         setHistory([...state.promptHistory, { role: "assistant", content: "Generating answer..." }].slice(-12));
         pendingAssistantIndex = state.promptHistory.length - 1;
@@ -4779,10 +4788,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
 
   // src/assets/js/edit/panel/upload.js
   function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true }) {
-    if (isFileTarget) {
+    const allowFileTarget = !externalOnly && isFileTarget;
+    if (isFileTarget && !allowFileTarget) {
       return "";
     }
-    const launcherCopy = externalOnly ? "Submit a Poff link from another system. It stays hidden until an editor confirms it." : isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder.";
+    const launcherCopy = externalOnly ? "Submit a Poff link from another system. It stays hidden until an editor confirms it." : allowFileTarget ? "Add related work into this work inbox folder. Upload a file, create a blank file, create a folder, or add a link." : isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder.";
     const sourceFieldHtml = externalOnly ? '<input type="hidden" name="upload_source" value="url">' : `
                     <div>
                         <label class="edit-label" for="edit-upload-source">Source</label>
@@ -5933,11 +5943,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     `;
   }
   function renderPasswordChangeSection(status = {}) {
-    var _a, _b;
+    var _a, _b, _c;
     if (!((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit)) {
       return "";
     }
-    const configPath = String(((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.configPath) || "").trim();
+    if ((status == null ? void 0 : status.target) !== "folder") {
+      return "";
+    }
+    const relativePath = String((status == null ? void 0 : status.relativePath) || "").trim();
+    if (relativePath !== "") {
+      return "";
+    }
+    const pathname = typeof ((_b = window == null ? void 0 : window.location) == null ? void 0 : _b.pathname) === "string" ? window.location.pathname.trim() : "";
+    const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
+    if (normalizedPathname === "/") {
+      return "";
+    }
+    const configPath = String(((_c = status == null ? void 0 : status.auth) == null ? void 0 : _c.configPath) || "").trim();
     return renderPersistentDetailsSection({
       storageKey: PASSWORD_DETAILS_STORAGE_KEY,
       defaultOpen: true,
@@ -6264,7 +6286,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Submit external link</h3>
-            <div class="edit-status" id="editInlineStatus">${escapeHtml((status == null ? void 0 : status.error) || "External links stay hidden until an editor confirms them.")}</div>
+            <div class="edit-status" id="editInlineStatus">${escapeHtml((status == null ? void 0 : status.error) || "")}</div>
             ${uploadSectionHtml2}
         `;
       const statusEl2 = editPanel.querySelector("#editInlineStatus");
@@ -6331,11 +6353,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       externalOnly: false,
       showLauncher: false
     });
+    const relativePath = String((config == null ? void 0 : config.__poffRelativePath) || "").trim();
     editPanel.innerHTML = `
         <h3 class="edit-panel-title">${label}</h3>
         ${renderDirectFileLink(config, status)}
         <div class="edit-status" id="editInlineStatus"></div>
-        ${renderPasswordChangeSection(status)}
+        ${renderPasswordChangeSection({
+      ...status,
+      relativePath
+    })}
         <form id="inlineEditForm" class="edit-inline">
             <div>
                 <label class="edit-label" for="edit-title">Title</label>
@@ -6620,6 +6646,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return normalized.split("/").slice(0, -1).join("/");
   }
+  function fileInboxViewerPath(path = "") {
+    const normalized = normalizeViewerPath(path);
+    if (!normalized) {
+      return "";
+    }
+    const parentPath = parentViewerPath(normalized);
+    const name = normalized.split("/").pop() || "";
+    if (name.startsWith(".")) {
+      return parentPath;
+    }
+    const extensionIndex = name.lastIndexOf(".");
+    const baseName = extensionIndex > 0 ? name.slice(0, extensionIndex) : name;
+    if (!baseName) {
+      return parentPath;
+    }
+    return normalizeViewerPath(parentPath ? `${parentPath}/${baseName}` : baseName);
+  }
   function findConfiguredSelectionItem(items = [], targetPath = "", prefix = "") {
     const normalizedTarget = normalizeViewerPath(targetPath);
     if (!normalizedTarget || !Array.isArray(items)) {
@@ -6672,14 +6715,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return previewPath;
   }
+  function getAddWorkTargetPath(selection2 = getActiveSelection()) {
+    if (selection2 == null ? void 0 : selection2.isLayout) {
+      return getContentTargetPath(selection2);
+    }
+    const configuredItem = resolveConfiguredSelectionItem(selection2);
+    const previewPath = (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
+    if ((selection2 == null ? void 0 : selection2.previewIsFile) || configuredItem && configuredItem.type === "file") {
+      return fileInboxViewerPath(previewPath) || parentViewerPath(previewPath);
+    }
+    return getContentTargetPath(selection2);
+  }
   function getEditTargetPath(selection2 = getActiveSelection()) {
     var _a, _b;
     if (selection2 == null ? void 0 : selection2.isLayout) {
       return selection2.path || "";
-    }
-    const configuredItem = resolveConfiguredSelectionItem(selection2);
-    if (configuredItem && configuredItem.type === "link") {
-      return parentViewerPath((selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "");
     }
     const activeFileLink = document.querySelector("#navList a.nav-link-active[data-path]");
     const navPath = ((activeFileLink == null ? void 0 : activeFileLink.getAttribute("data-path")) || "").trim();
@@ -6697,6 +6747,24 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return sourceName;
     }
     return `${sourceName.replace(/\.[^.]+$/, "")}.${normalizedFormat}`;
+  }
+  function resolveConverterPayloadProvider() {
+    if (typeof window.poffConverterPayloadProvider === "function") {
+      return window.poffConverterPayloadProvider;
+    }
+    if (typeof (document == null ? void 0 : document.getElementById) !== "function") {
+      return null;
+    }
+    const contentFrame = document.getElementById("contentFrame");
+    const previewRoot = (contentFrame == null ? void 0 : contentFrame.shadowRoot) || contentFrame;
+    if (!previewRoot || typeof previewRoot.querySelector !== "function") {
+      return null;
+    }
+    const providerHost = previewRoot.querySelector('[data-poff-converter-provider="true"]');
+    if (providerHost && typeof providerHost.__poffConverterPayloadProvider === "function") {
+      return providerHost.__poffConverterPayloadProvider;
+    }
+    return null;
   }
   function readMediaConfigFromElements(elements2, form, currentWork = {}) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i;
@@ -6787,6 +6855,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       editAuthDetails,
       editToggle,
       editAddWork,
+      editJumpToSection,
       editAuthForm,
       editAuthPassword,
       editAuthSubmit,
@@ -6935,6 +7004,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     function renderFolderMeta() {
       return folderConfig;
     }
+    function buildAddWorkRequestPayload(selection2, extra = {}) {
+      const contentTargetPath = getContentTargetPath(selection2);
+      const addWorkTargetPath = getAddWorkTargetPath(selection2);
+      const usesFileInbox = !!(selection2 == null ? void 0 : selection2.previewIsFile) && addWorkTargetPath !== "" && addWorkTargetPath !== contentTargetPath;
+      return {
+        path: addWorkTargetPath || contentTargetPath,
+        hideTargetFolder: usesFileInbox,
+        ...extra
+      };
+    }
     function syncEditToggle() {
       if (!editToggle) {
         return;
@@ -7018,6 +7097,44 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         url.searchParams.set("add", authState.canEdit ? "work" : "url");
         window.location.href = url.toString();
       });
+    }
+    function bindJumpToSectionButton() {
+      if (!editJumpToSection) {
+        return;
+      }
+      const resolveScrollTarget = () => editDrawer && !editDrawer.hidden ? editDrawer : editPanel && !editPanel.hidden ? editPanel : null;
+      const resolveToolsTarget = () => editActionsMenu || editJumpToSection;
+      let lastJumpTarget = "tools";
+      const syncJumpLabel = () => {
+        const title = lastJumpTarget === "edit" ? "Jump to editor tools" : "Jump to edit section";
+        editJumpToSection.setAttribute("aria-label", title);
+        editJumpToSection.setAttribute("title", title);
+      };
+      editJumpToSection.addEventListener("click", () => {
+        var _a;
+        const editTarget2 = resolveScrollTarget();
+        const toolsTarget = resolveToolsTarget();
+        if (lastJumpTarget === "edit" && toolsTarget && typeof toolsTarget.scrollIntoView === "function") {
+          toolsTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+          lastJumpTarget = "tools";
+          syncJumpLabel();
+          return;
+        }
+        if (editTarget2 && typeof editTarget2.scrollIntoView === "function") {
+          editTarget2.scrollIntoView({ behavior: "smooth", block: "start" });
+          const focusTarget = (_a = editTarget2.querySelector) == null ? void 0 : _a.call(editTarget2, "input, textarea, select, button");
+          if (focusTarget && typeof focusTarget.focus === "function") {
+            focusTarget.focus({ preventScroll: true });
+          }
+          lastJumpTarget = "edit";
+          syncJumpLabel();
+          return;
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.set("edit", "true");
+        window.location.href = url.toString() + "#editPanel";
+      });
+      syncJumpLabel();
     }
     function bindSidebarFileDrop(sidebarEl) {
       if (!sidebarEl || !editRequested2) {
@@ -7384,8 +7501,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               mode: converter.saveMode || "new-hidden-work"
             }
           };
-          if (typeof window.poffConverterPayloadProvider === "function") {
-            const extraPayload = await Promise.resolve(window.poffConverterPayloadProvider({
+          const payloadProvider = resolveConverterPayloadProvider();
+          if (typeof payloadProvider === "function") {
+            const extraPayload = await Promise.resolve(payloadProvider({
               sourcePath,
               sourceName,
               converter: { ...converter },
@@ -7527,11 +7645,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         },
         onUploadFiles: async ({ source, files }) => {
           const selection2 = getActiveSelection();
-          const data = await requestEditUpload({
-            path: getContentTargetPath(selection2),
+          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
             source,
             files
-          });
+          }));
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Upload failed.");
           }
@@ -7546,12 +7663,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onCreateBlankFile: async ({ source, fileName }) => {
           var _a;
           const selection2 = getActiveSelection();
-          const data = await requestEditUpload({
-            path: getContentTargetPath(selection2),
+          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
             source,
             fileName,
             files: []
-          });
+          }));
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Create blank file failed.");
           }
@@ -7566,12 +7682,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onCreateFolder: async ({ source, folderName }) => {
           var _a;
           const selection2 = getActiveSelection();
-          const data = await requestEditUpload({
-            path: getContentTargetPath(selection2),
+          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
             source,
             fileName: folderName,
             files: []
-          });
+          }));
           if (!data || data.error) {
             throw new Error((data == null ? void 0 : data.error) || "Create folder failed.");
           }
@@ -7586,14 +7701,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onCreateLink: async ({ source, linkName, linkUrl }) => {
           var _a;
           const selection2 = getActiveSelection();
-          const data = await requestEditUpload({
-            path: getContentTargetPath(selection2),
+          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
             source,
             linkName,
             fileName: linkName,
             linkUrl,
             files: []
-          });
+          }));
           if (data == null ? void 0 : data.auth) {
             updateAuthState(data.auth);
           }
@@ -7801,6 +7915,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncEditToggle,
       bindEditToggle,
       bindAddWorkButton,
+      bindJumpToSectionButton,
       bindSidebarFileDrop,
       bindAuthForm,
       initEditMode,
@@ -8756,6 +8871,35 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         await loadNav(currentFolderPath);
       }
     }
+    async function deleteNavEntry(link) {
+      if (!link) {
+        return;
+      }
+      const targetPath = link.getAttribute("data-path") || link.getAttribute("data-src") || "";
+      if (!targetPath) {
+        return;
+      }
+      const confirmed = window.confirm("Delete this item? This cannot be undone.");
+      if (!confirmed) {
+        return;
+      }
+      const response = await requestEditDelete({
+        path: targetPath
+      });
+      if (!response || response.error) {
+        window.alert((response == null ? void 0 : response.error) || "Delete failed.");
+        return;
+      }
+      const nextPath = targetPath.split("/").slice(0, -1).join("/");
+      if (typeof navigateToPath === "function") {
+        navigateToPath(nextPath, {
+          isFile: false,
+          forceRefresh: true
+        });
+        return;
+      }
+      await loadNav(currentFolderPath);
+    }
     function syncSidebarSelection(path = "", isFile = false, isLayout = false) {
       if (isLayout) {
         setActiveLayoutLink(path);
@@ -8768,7 +8912,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       setActiveFileLink(path);
     }
     function handleNavClick(event) {
-      var _a, _b, _c, _d, _e;
+      var _a, _b, _c, _d, _e, _f, _g, _h;
       if (!navList) {
         return;
       }
@@ -8791,6 +8935,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         event.stopPropagation();
         const rowLink = (_e = fastAction.closest("li")) == null ? void 0 : _e.querySelector('a[data-tree-item="1"]');
         toggleNavEntry(rowLink).catch(() => {
+        });
+        return;
+      }
+      const deleteAction = (_g = (_f = event.target).closest) == null ? void 0 : _g.call(_f, '[data-nav-action="delete-target"]');
+      if (deleteAction) {
+        event.preventDefault();
+        event.stopPropagation();
+        const rowLink = (_h = deleteAction.closest("li")) == null ? void 0 : _h.querySelector('a[data-tree-item="1"]');
+        deleteNavEntry(rowLink).catch(() => {
         });
         return;
       }
@@ -9030,6 +9183,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editAuthDetails: "editAuthDetails",
     editToggle: "editToggle",
     editAddWork: "editAddWork",
+    editJumpToSection: "editJumpToSection",
     editAuthForm: "editAuthForm",
     editAuthPassword: "editAuthPassword",
     editAuthSubmit: "editAuthSubmit",
@@ -9156,6 +9310,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();
+    editController.bindJumpToSectionButton();
     editController.bindSidebarFileDrop(elements.appSidebar);
     editController.bindAuthForm();
     if (isPreviewHashActive()) {

@@ -53,6 +53,10 @@ function cmsHandleEditUploadAction(array $ctx): void
         cmsJsonResponse(['allowed' => true, 'error' => $result['errors'][0] ?? 'Upload failed.'], 400);
     }
 
+    if (!empty($data['hideTargetFolder'])) {
+        cmsSetFolderVisibleState(dirname($targetDir), basename($targetDir), false);
+    }
+
     $updatedConfig = $ctx['subjectType'] === 'file'
         ? PoffConfig::ensureFileConfig($ctx['targetDir'], (string) $ctx['targetFile'])
         : PoffConfig::ensure($ctx['targetDir']);

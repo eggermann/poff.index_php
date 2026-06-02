@@ -1335,6 +1335,20 @@ describe('MCP create route helper (CLI)', () => {
     expect(captured.payload.messages[3].content).not.toContain('Make it smaller.');
   });
 
+  test('rejects local prompt-template requests without an explicit model', async () => {
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const result = await runPromptTemplateLocal(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: '',
+      endpoint,
+      prompt: 'Create a compact image card.',
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.error).toBe('Select a local model before sending prompts.');
+    expect(result.model).toBeUndefined();
+  });
+
   test('rejects prompt-template CSS with unsafe global styles', async () => {
     const result = await runPromptTemplateLocal(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
       provider: 'local',
@@ -1832,6 +1846,20 @@ describe('MCP create route helper (CLI)', () => {
 
     expect(viewerResult.allowed).toBe(true);
     expect(viewerResult.error).toBe('Template was empty.');
+    expect(viewerResult.template).toBeUndefined();
+  });
+
+  test('rejects viewer local prompts without an explicit model', async () => {
+    const endpoint = 'http://127.0.0.1:1234/v1/chat/completions';
+    const viewerResult = await runViewerPrompt(POFF_DIR, path.relative(POFF_DIR, VIEWER_FOLDER_DIR), {
+      provider: 'local',
+      model: '',
+      endpoint,
+      prompt: 'Make it smaller.',
+    });
+
+    expect(viewerResult.allowed).toBe(true);
+    expect(viewerResult.error).toBe('Select a local model before sending prompts.');
     expect(viewerResult.template).toBeUndefined();
   });
 
@@ -2443,6 +2471,61 @@ describe('Poff converters', () => {
     }
   });
 
+  test('pageoff local converter.php endpoint stays allowed on localhost when the app is mounted under a path prefix', async () => {
+    const tempRoot = path.join(POFF_DIR, `pageoff-remote-prefix-allow-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    const draftPath = path.join(tempRoot, 'draft.txt');
+    fs.writeFileSync(draftPath, 'Allow localhost prefixed route');
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          path: 'draft.txt',
+          name: 'draft.txt',
+          mimeType: 'text/plain',
+          extension: 'txt',
+          size: fs.statSync(draftPath).size,
+        },
+        converter: {
+          id: 'converter/convert-pageoff-remote-text',
+          format: 'html',
+          node: {
+            id: 'pageoff-local-php',
+            endpoint: 'http://localhost:8888/MAUSMAUS/worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
+          },
+        },
+        target: {
+          saveAs: 'draft.html',
+        },
+        editor: {
+          content: 'Trusted localhost route with prefix',
+        },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'draft.html',
+              mimeType: 'text/html',
+              kind: 'text',
+              size: 23,
+              bodyBase64: Buffer.from('mock prefixed remote body', 'utf8').toString('base64'),
+            },
+          },
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.name).toBe('draft.html');
+      expect(Buffer.from(result.output.bodyBase64, 'base64').toString('utf8')).toBe('mock prefixed remote body');
+      expect(result.generatedBy.endpoint).toContain('/MAUSMAUS/worktypes/templates/converter/convert-pageoff-remote-text/converter.php');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('offers the text editor converter for application/rtf as plain text', async () => {
     const result = await runConverterRoute('available', POFF_DIR, {
       mimeType: 'application/rtf',
@@ -2568,6 +2651,64 @@ describe('Poff converters', () => {
       expect(result.output.mimeType).toBe('text/plain');
       expect(Buffer.from(result.output.bodyBase64, 'base64').toString('utf8')).toBe('Edited plain text');
       expect(result.generatedBy.endpoint).toContain('worktypes/templates/converter/convert-text-editor/converter.php');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('text editor converter localhost converter.php endpoint stays allowed when the app is mounted under a path prefix', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-text-editor-prefix-allow-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    const draftPath = path.join(tempRoot, 'draft.txt');
+    fs.writeFileSync(draftPath, 'Original text');
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'draft.txt',
+          path: 'draft.txt',
+          mimeType: 'text/plain',
+          extension: 'txt',
+          size: fs.statSync(draftPath).size,
+        },
+        converter: {
+          id: 'converter/convert-text-editor',
+          format: 'source',
+          quality: 'default',
+          node: {
+            id: 'text-editor-local-php',
+            endpoint: 'http://localhost:8888/MAUSMAUS/worktypes/templates/converter/convert-text-editor/converter.php',
+          },
+        },
+        target: {
+          folder: '',
+          saveAs: 'draft.txt',
+          mode: 'new-hidden-work',
+        },
+        editor: {
+          content: 'Edited plain text with prefix',
+        },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'draft.txt',
+              mimeType: 'text/plain',
+              kind: 'text',
+              size: 29,
+              bodyBase64: Buffer.from('Edited plain text with prefix', 'utf8').toString('base64'),
+            },
+          },
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('text/plain');
+      expect(Buffer.from(result.output.bodyBase64, 'base64').toString('utf8')).toBe('Edited plain text with prefix');
+      expect(result.generatedBy.endpoint).toContain('/MAUSMAUS/worktypes/templates/converter/convert-text-editor/converter.php');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

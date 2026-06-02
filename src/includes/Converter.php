@@ -1554,10 +1554,15 @@ HTML;
             return false;
         }
         $path = str_replace('\\', '/', trim((string) (parse_url($url, PHP_URL_PATH) ?? ''), '/'));
-        return in_array($path, [
+        foreach ([
             'worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
             'worktypes/templates/converter/convert-text-editor/converter.php',
-        ], true);
+        ] as $trustedPath) {
+            if ($path === $trustedPath || str_ends_with($path, '/' . $trustedPath)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static function httpGet(string $url): array

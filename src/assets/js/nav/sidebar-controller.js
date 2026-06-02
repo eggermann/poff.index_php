@@ -1,4 +1,4 @@
-import { requestEditConfig } from '../api/edit.js';
+import { requestEditConfig, requestEditDelete } from '../api/edit.js';
 import { extractNavHtml } from '../core/utils.js';
 
 export function createSidebarController({
@@ -191,6 +191,36 @@ export function createSidebarController({
         }
     }
 
+    async function deleteNavEntry(link) {
+        if (!link) {
+            return;
+        }
+        const targetPath = link.getAttribute('data-path') || link.getAttribute('data-src') || '';
+        if (!targetPath) {
+            return;
+        }
+        const confirmed = window.confirm('Delete this item? This cannot be undone.');
+        if (!confirmed) {
+            return;
+        }
+        const response = await requestEditDelete({
+            path: targetPath,
+        });
+        if (!response || response.error) {
+            window.alert(response?.error || 'Delete failed.');
+            return;
+        }
+        const nextPath = targetPath.split('/').slice(0, -1).join('/');
+        if (typeof navigateToPath === 'function') {
+            navigateToPath(nextPath, {
+                isFile: false,
+                forceRefresh: true,
+            });
+            return;
+        }
+        await loadNav(currentFolderPath);
+    }
+
     function syncSidebarSelection(path = '', isFile = false, isLayout = false) {
         if (isLayout) {
             setActiveLayoutLink(path);
@@ -226,6 +256,14 @@ export function createSidebarController({
             event.stopPropagation();
             const rowLink = fastAction.closest('li')?.querySelector('a[data-tree-item="1"]');
             toggleNavEntry(rowLink).catch(() => {});
+            return;
+        }
+        const deleteAction = event.target.closest?.('[data-nav-action="delete-target"]');
+        if (deleteAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const rowLink = deleteAction.closest('li')?.querySelector('a[data-tree-item="1"]');
+            deleteNavEntry(rowLink).catch(() => {});
             return;
         }
         let target = event.target;

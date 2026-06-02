@@ -3,11 +3,14 @@ import { setStatusMessage } from '../status.js';
 import { registerEscapeClose } from '../../core/escape-stack.js';
 
 export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true }) {
-    if (isFileTarget) {
+    const allowFileTarget = !externalOnly && isFileTarget;
+    if (isFileTarget && !allowFileTarget) {
         return '';
     }
     const launcherCopy = externalOnly
         ? 'Submit a Poff link from another system. It stays hidden until an editor confirms it.'
+        : allowFileTarget
+            ? 'Add related work into this work inbox folder. Upload a file, create a blank file, create a folder, or add a link.'
         : (isEmptyFolder
             ? 'This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start.'
             : 'Upload files, create a blank file, create a folder, or add a link in this folder.');

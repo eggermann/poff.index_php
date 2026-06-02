@@ -11,7 +11,7 @@ export function getDefaultModelForProvider(provider = 'local') {
     if (provider === 'gemini') {
         return 'gemini-1.5-flash';
     }
-    return 'gemma4';
+    return '';
 }
 
 export const sharedWorkSystemPromptLead = sharedWorkPrompt.lead;

@@ -74,4 +74,11 @@ describe('edit controller target path helpers', () => {
     expect(getContentTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder');
     expect(getAddWorkTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder/file');
   });
+
+  test('uses the parent folder for hidden dotfiles', () => {
+    const { getAddWorkTargetPath, getContentTargetPath } = loadPathsModule();
+
+    expect(getContentTargetPath({ path: 'folder/.htaccess', previewPath: 'folder/.htaccess', previewIsFile: true, isLayout: false })).toBe('folder');
+    expect(getAddWorkTargetPath({ path: 'folder/.htaccess', previewPath: 'folder/.htaccess', previewIsFile: true, isLayout: false })).toBe('folder');
+  });
 });

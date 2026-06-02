@@ -47,6 +47,16 @@ function cmsNavActionButton(string $label, string $title, string $class, string 
         . '</button>';
 }
 
+function cmsNavActionGroup(string ...$buttons): string
+{
+    $buttons = array_values(array_filter($buttons, static fn($button) => trim((string) $button) !== ''));
+    if ($buttons === []) {
+        return '';
+    }
+
+    return '<div class="nav-row-actions">' . implode('', $buttons) . '</div>';
+}
+
 function cmsNavRowClass(bool $muted = false): string
 {
     return 'nav-row' . ($muted ? ' nav-row-muted' : '');
@@ -56,6 +66,7 @@ function cmsNavIcon(string $name): string
 {
     return match ($name) {
         'copy' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 2a2 2 0 00-2 2v8h2V4h6V2H7zm3 4a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V8a2 2 0 00-2-2h-6zm0 2h6v8h-6V8z"/></svg>',
+        'delete' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.5 2a1.5 1.5 0 00-1.5 1.5V4H4.75a.75.75 0 000 1.5h.51l.62 8.19A2 2 0 007.87 16h4.26a2 2 0 001.99-1.81l.62-8.19h.51a.75.75 0 000-1.5H13V3.5A1.5 1.5 0 0011.5 2h-3zm3 2V3.5a.5.5 0 00-.5-.5h-3a.5.5 0 00-.5.5V4h4zm-3 3.25a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0V6a.75.75 0 01.75-.75zm3.25.75a.75.75 0 10-1.5 0v4.5a.75.75 0 001.5 0V6z" clip-rule="evenodd"/></svg>',
         'hide' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4c-4.5 0-8 3.5-8 6 0 1.1.5 2.4 1.4 3.5l1.5-1.5C4.4 11 4 10.2 4 10c0-1.2 2.7-4 6-4 .7 0 1.4.1 2 .3l1.6-1.6C12.5 4.2 11.3 4 10 4zm7.2 2.2-1.5 1.5C16.5 8.8 16 9.6 16 10c0 1.2-2.7 4-6 4-.7 0-1.4-.1-2-.3l-1.6 1.6c1.1.5 2.3.7 3.6.7 4.5 0 8-3.5 8-6 0-1.1-.5-2.4-1.4-3.5zM6.7 8.3l4.9 4.9c.6-.3 1.1-.8 1.4-1.4L8.1 6.9c-.6.3-1.1.8-1.4 1.4z"/></svg>',
         'show' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 4c-4.5 0-8 3.5-8 6s3.5 6 8 6 8-3.5 8-6-3.5-6-8-6zm0 10c-3 0-5.8-2.2-6.9-4 1.1-1.8 3.9-4 6.9-4s5.8 2.2 6.9 4c-1.1 1.8-3.9 4-6.9 4zm0-6a2 2 0 100 4 2 2 0 000-4z"/></svg>',
         'pending' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm.75 4.25a.75.75 0 00-1.5 0v4.19c0 .2.08.39.22.53l2.5 2.5a.75.75 0 101.06-1.06l-2.28-2.28V6.25z"/></svg>',
@@ -183,9 +194,12 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $bas
     return '<li class="' . cmsNavRowClass($isHidden && !$isPendingApproval) . '">'
         . '<a class="' . $navLinkClasses . '" href="' . htmlspecialchars($href) . '"' . $dataAttrs . ' title="' . htmlspecialchars((string) ($item['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>'
         . $item['icon'] . htmlspecialchars($displayName) . cmsNavBadgeForItem($isHidden, $isPendingApproval, $isApprovedExternal, $isConverter) . '</a>'
-        . ($isPendingApproval ? cmsNavActionButton('Review', 'Review external link submission', 'nav-row-action-review', cmsNavIcon('pending'), ' data-nav-action="review-external" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '')
-        . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr((string) ($item['copyText'] ?? $item['name']))) : '')
-        . ($editMode && !$isPendingApproval ? cmsNavActionButton($isHidden ? 'Unhide' : 'Hide', $isHidden ? 'Unhide in sidebar' : 'Hide from sidebar', 'nav-row-action-toggle', $isHidden ? cmsNavIcon('show') : cmsNavIcon('hide'), ' data-nav-action="toggle-visibility" data-nav-path="' . htmlspecialchars($item['path']) . '" data-nav-hidden="' . ($isHidden ? '1' : '0') . '"') : '')
+        . cmsNavActionGroup(
+            $isPendingApproval ? cmsNavActionButton('Review', 'Review external link submission', 'nav-row-action-review', cmsNavIcon('pending'), ' data-nav-action="review-external" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '',
+            $editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr((string) ($item['copyText'] ?? $item['name']))) : '',
+            $editMode && !$isPendingApproval ? cmsNavActionButton($isHidden ? 'Unhide' : 'Hide', $isHidden ? 'Unhide in sidebar' : 'Hide from sidebar', 'nav-row-action-toggle', $isHidden ? cmsNavIcon('show') : cmsNavIcon('hide'), ' data-nav-action="toggle-visibility" data-nav-path="' . htmlspecialchars($item['path']) . '" data-nav-hidden="' . ($isHidden ? '1' : '0') . '"') : '',
+            $editMode && !$isPendingApproval ? cmsNavActionButton('Delete', 'Delete item', 'nav-row-action-delete', cmsNavIcon('delete'), ' data-nav-action="delete-target" data-nav-path="' . htmlspecialchars($item['path']) . '"') : ''
+        )
         . '</li>';
 }
 
@@ -228,7 +242,9 @@ function cmsRenderNavListMarkup(array $context): string
         $upLink = '?path=' . urlencode($parentRelativePath) . $editQuery;
         echo '<li class="' . cmsNavRowClass() . '">'
             . '<a class="nav-link nav-link-up" href="' . htmlspecialchars($upLink) . '"><svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.7a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" transform="rotate(180 10 10)"/></svg> Go Up</a>'
-            . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..')) : '')
+            . cmsNavActionGroup(
+                $editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($parentRelativePath !== '' ? $parentRelativePath : '..')) : ''
+            )
             . '</li>';
     }
 
@@ -237,7 +253,9 @@ function cmsRenderNavListMarkup(array $context): string
     $currentNavSlug = (string) ($currentNavConfig['slug'] ?? cmsNavSlug((string) ($currentNavConfig['title'] ?? $currentNavConfig['folderName'] ?? $currentNavName)));
     echo '<li class="' . cmsNavRowClass() . '">'
         . '<a class="nav-link nav-link-up" href="' . htmlspecialchars('?path=' . urlencode($navFolder) . $editQuery) . '" data-path="' . htmlspecialchars($navFolder) . '" data-slug="' . htmlspecialchars($currentNavSlug) . '" title="' . htmlspecialchars((string) ($currentNavConfig['folderName'] ?? $currentNavName)) . '">./ ' . htmlspecialchars($currentNavName) . '</a>'
-        . ($editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($currentNavName)) : '')
+        . cmsNavActionGroup(
+            $editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($currentNavName)) : ''
+        )
         . '</li>';
 
     $navAbsolutePath = $currentAbsolutePath !== '' ? $currentAbsolutePath : $baseDir . ($navFolder ? DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $navFolder) : '');
@@ -331,7 +349,9 @@ function cmsRenderNavListMarkup(array $context): string
             . '<a class="nav-link nav-link-layout" href="' . htmlspecialchars($layoutHash) . '" data-layout-path="' . htmlspecialchars($layoutVirtualPath) . '">'
             . '<svg class="item-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h10.5A1.75 1.75 0 0117 4.75v10.5A1.75 1.75 0 0115.25 17H4.75A1.75 1.75 0 013 15.25V4.75zm2 1a.75.75 0 000 1.5h10a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H5zm0 3.5a.75.75 0 000 1.5h7a.75.75 0 000-1.5H5z" clip-rule="evenodd"/></svg>'
             . '.layout</a>'
-            . cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($layoutVirtualPath))
+            . cmsNavActionGroup(
+                cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr($layoutVirtualPath))
+            )
             . '</li>';
     }
 

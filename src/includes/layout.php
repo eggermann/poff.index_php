@@ -82,7 +82,21 @@
                             <div id="editAuthStatus" class="edit-status" aria-live="polite"></div>
                         </form>
                     </details>
-                    <button id="editAddWork" class="edit-toggle edit-toggle-secondary" type="button">Add work</button>
+                    <div class="edit-actions-menu__quick-row">
+                        <button id="editAddWork" class="edit-toggle edit-toggle-secondary" type="button">Add work</button>
+                        <button
+                            id="editJumpToSection"
+                            class="nav-row-action edit-actions-menu__jump"
+                            type="button"
+                            aria-label="Jump to edit section"
+                            title="Jump to edit section"
+                        >
+                            <span class="nav-row-action__icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v10.69l2.72-2.72a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-1.06 0l-4-4a.75.75 0 111.06-1.06l2.72 2.72V2.75A.75.75 0 0110 2z" clip-rule="evenodd"/></svg>
+                            </span>
+                            <span class="nav-row-action__label">Jump to edit section</span>
+                        </button>
+                    </div>
                 </div>
             </details>
         </div>

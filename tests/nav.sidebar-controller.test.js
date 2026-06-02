@@ -54,8 +54,11 @@ function loadSidebarController() {
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
+  const requestEditDeleteMock = jest.fn();
   const windowMock = {
     dispatchEvent: jest.fn(),
+    confirm: jest.fn(() => true),
+    alert: jest.fn(),
   };
   const context = vm.createContext({
     module,
@@ -63,6 +66,7 @@ function loadSidebarController() {
     console,
     require,
     window: windowMock,
+    requestEditDelete: requestEditDeleteMock,
     CustomEvent: class CustomEvent {
       constructor(type, init = {}) {
         this.type = type;
@@ -78,6 +82,7 @@ module.exports = {
 `, context);
 
   module.exports.createSidebarController.__windowMock = windowMock;
+  module.exports.createSidebarController.__requestEditDeleteMock = requestEditDeleteMock;
   return module.exports.createSidebarController;
 }
 
@@ -215,6 +220,81 @@ describe('sidebar selection scroll', () => {
     });
 
     expect(navigateToPath).toHaveBeenCalledWith('eggermann', { isFile: true });
+  });
+
+  test('delete actions call the delete endpoint and refresh to the parent folder', async () => {
+    const createSidebarController = loadSidebarController();
+    const navigateToPath = jest.fn();
+    const requestEditDeleteMock = createSidebarController.__requestEditDeleteMock;
+    const windowMock = createSidebarController.__windowMock;
+    requestEditDeleteMock.mockResolvedValue({ deleted: [{ path: 'album/second.mp4' }] });
+
+    const targetLink = createNavLink({
+      'data-path': 'album/second.mp4',
+      'data-is-file': '1',
+    });
+    const row = {
+      querySelector(selector) {
+        if (selector === 'a[data-tree-item="1"]') {
+          return targetLink;
+        }
+        return null;
+      },
+    };
+    const deleteButton = {
+      closest(selector) {
+        if (selector === '[data-nav-action="delete-target"]') {
+          return this;
+        }
+        if (selector === 'li') {
+          return row;
+        }
+        return null;
+      },
+      getAttribute(name) {
+        if (name === 'data-nav-path') {
+          return 'album/second.mp4';
+        }
+        return null;
+      },
+    };
+    const navList = {
+      addEventListener(type, handler) {
+        if (type === 'click') {
+          this.handler = handler;
+        }
+      },
+    };
+
+    const controller = createSidebarController({
+      navList,
+      editQuery: '',
+      navigateToPath,
+      getCurrentSelection() {
+        return null;
+      },
+      setLoadingVisible() {},
+    });
+
+    controller.bindNavClick();
+
+    await navList.handler({
+      target: deleteButton,
+      preventDefault: jest.fn(),
+      stopPropagation: jest.fn(),
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(windowMock.confirm).toHaveBeenCalledWith('Delete this item? This cannot be undone.');
+    expect(requestEditDeleteMock).toHaveBeenCalledWith({
+      path: 'album/second.mp4',
+    });
+    expect(navigateToPath).toHaveBeenCalledWith('album', {
+      isFile: false,
+      forceRefresh: true,
+    });
   });
 
 });

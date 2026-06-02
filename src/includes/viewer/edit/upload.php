@@ -254,6 +254,11 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
 
     $baseUrl = cmsNormalizeRemoteBaseUrl($target);
 
+    $dirError = cmsEnsureUploadDirectory($targetDir);
+    if ($dirError !== null) {
+        return $dirError;
+    }
+
     $config = PoffConfig::ensure($targetDir);
     $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
     if ($pendingApproval && cmsCountPendingExternalLinks($tree) >= cmsPendingExternalLinkLimit()) {
@@ -334,6 +339,40 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
         'baseUrl' => $baseUrl !== '' ? $baseUrl : $target,
         'pendingApproval' => $pendingApproval,
     ]);
+}
+
+function cmsSetFolderVisibleState(string $parentDir, string $folderName, bool $visible): void
+{
+    $name = cmsUploadSafeName($folderName);
+    if ($name === '' || !is_dir($parentDir)) {
+        return;
+    }
+
+    $config = PoffConfig::ensure($parentDir);
+    if (!is_array($config['tree'] ?? null)) {
+        return;
+    }
+
+    $changed = false;
+    foreach ($config['tree'] as &$item) {
+        if (!is_array($item) || (string) ($item['name'] ?? '') !== $name) {
+            continue;
+        }
+        if (!array_key_exists('visible', $item) || (bool) $item['visible'] !== $visible) {
+            $item['visible'] = $visible;
+            $changed = true;
+        }
+        break;
+    }
+    unset($item);
+
+    if (!$changed) {
+        return;
+    }
+
+    $config['treeHash'] = hash('sha256', json_encode($config['tree']));
+    $config['updatedAt'] = date('c');
+    file_put_contents(PoffConfig::configPath($parentDir), json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }
 
 function cmsNormalizeRemoteBaseUrl(string $url): string

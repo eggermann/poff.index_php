@@ -97,12 +97,18 @@
       return fallback.value;
     };
 
-    const buildEndpoint = () => new URL(
-      'worktypes/templates/converter/convert-text-editor/converter.php',
-      `${window.location.origin}${window.location.pathname}`
-    ).toString();
+    const buildEndpoint = () => {
+      const pathname = String(window.location.pathname || '/');
+      const normalizedBasePath = pathname.endsWith('/')
+        ? pathname
+        : `${pathname}/`;
+      return new URL(
+        'worktypes/templates/converter/convert-text-editor/converter.php',
+        `${window.location.origin}${normalizedBasePath}`
+      ).toString();
+    };
 
-    window.poffConverterPayloadProvider = ({ converter = {} } = {}) => ({
+    const payloadProvider = ({ converter = {} } = {}) => ({
       converter: {
         ...converter,
         node: {
@@ -115,6 +121,16 @@
         editorKind: editor ? 'ace-cdn' : 'textarea-fallback',
       },
     });
+    window.poffConverterPayloadProvider = payloadProvider;
+    root.__poffConverterPayloadProvider = payloadProvider;
+    root.dataset.poffConverterProvider = 'true';
+    try {
+      if (window.top && window.top !== window) {
+        window.top.poffConverterPayloadProvider = payloadProvider;
+      }
+    } catch (error) {
+      // Ignore cross-window registration failures and keep the local provider.
+    }
 
     formatFallbackContent();
     root.dataset.editorFallbackReady = 'true';

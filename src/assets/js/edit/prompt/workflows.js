@@ -191,6 +191,12 @@ export function createPromptWindowWorkflows({
                 state.isSending = false;
                 return;
             }
+            if (providerValue === 'local' && modelValue === '') {
+                setGeneratingState(false);
+                setPromptStatus('Select a local model before sending prompts.');
+                state.isSending = false;
+                return;
+            }
             setHistory([...state.promptHistory, { role: 'user', content: userPrompt }].slice(-12));
             setHistory([...state.promptHistory, { role: 'assistant', content: 'Generating answer...' }].slice(-12));
             pendingAssistantIndex = state.promptHistory.length - 1;

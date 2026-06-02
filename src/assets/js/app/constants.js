@@ -9,6 +9,7 @@ export const APP_ELEMENT_IDS = {
     editAuthDetails: 'editAuthDetails',
     editToggle: 'editToggle',
     editAddWork: 'editAddWork',
+    editJumpToSection: 'editJumpToSection',
     editAuthForm: 'editAuthForm',
     editAuthPassword: 'editAuthPassword',
     editAuthSubmit: 'editAuthSubmit',

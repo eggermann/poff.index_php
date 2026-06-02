@@ -1159,7 +1159,10 @@ function mcpPromptGenerateLocal(
     array $config
 ): array {
     $usedEndpoint = $endpoint !== '' ? $endpoint : 'http://127.0.0.1:1234/v1/chat/completions';
-    $usedModel = $model !== '' ? $model : 'gemma4';
+    $usedModel = trim($model);
+    if ($usedModel === '') {
+        return mcpPromptProviderResult('', '', false, 'Select a local model before sending prompts.');
+    }
     if (mcpPromptIsOpenAiCompatibleEndpoint($usedEndpoint)) {
         $payload = [
             'model' => $usedModel,

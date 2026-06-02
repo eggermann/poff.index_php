@@ -171,6 +171,9 @@ export async function requestEditUpload(payload) {
     const url = buildCmsUrl('upload', payload.path || '');
     const formData = new FormData();
     formData.set('source', payload.source || 'upload');
+    if (payload.hideTargetFolder) {
+        formData.set('hideTargetFolder', '1');
+    }
     if (typeof payload.fileName === 'string') {
         formData.set('fileName', payload.fileName);
     }

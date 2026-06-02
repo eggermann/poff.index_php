@@ -23,6 +23,9 @@ function fileInboxViewerPath(path = '') {
 
     const parentPath = parentViewerPath(normalized);
     const name = normalized.split('/').pop() || '';
+    if (name.startsWith('.')) {
+        return parentPath;
+    }
     const extensionIndex = name.lastIndexOf('.');
     const baseName = extensionIndex > 0 ? name.slice(0, extensionIndex) : name;
     if (!baseName) {

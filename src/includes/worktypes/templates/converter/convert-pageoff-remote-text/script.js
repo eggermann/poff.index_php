@@ -23,12 +23,18 @@
       updateStatus(`Remote PHP preview ready. Font size ${fontSizeSelect.value || '16px'}.`);
     };
 
-    const buildEndpoint = () => new URL(
-      'worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
-      `${window.location.origin}${window.location.pathname}`
-    ).toString();
+    const buildEndpoint = () => {
+      const pathname = String(window.location.pathname || '/');
+      const normalizedBasePath = pathname.endsWith('/')
+        ? pathname
+        : `${pathname}/`;
+      return new URL(
+        'worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
+        `${window.location.origin}${normalizedBasePath}`
+      ).toString();
+    };
 
-    window.poffConverterPayloadProvider = ({ converter = {} } = {}) => ({
+    const payloadProvider = ({ converter = {} } = {}) => ({
       converter: {
         ...converter,
         fontSize: String(fontSizeSelect.value || '16px'),
@@ -43,6 +49,16 @@
         editorKind: 'pageoff-remote-textarea',
       },
     });
+    window.poffConverterPayloadProvider = payloadProvider;
+    root.__poffConverterPayloadProvider = payloadProvider;
+    root.dataset.poffConverterProvider = 'true';
+    try {
+      if (window.top && window.top !== window) {
+        window.top.poffConverterPayloadProvider = payloadProvider;
+      }
+    } catch (error) {
+      // Ignore cross-window registration failures and keep the local provider.
+    }
 
     fontSizeSelect.addEventListener('change', applyFontSize);
     editor.addEventListener('input', () => {

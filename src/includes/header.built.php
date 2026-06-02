@@ -920,6 +920,12 @@ body, html {
   backdrop-filter: blur(12px);
 }
 
+@supports (position: sticky) {
+  #appSidebar .app-edit-toggle-wrap {
+    position: sticky;
+    top: var(--poff-space-sm);
+  }
+}
 #appSidebar .edit-actions-menu {
   position: relative;
   display: grid;
@@ -1048,6 +1054,13 @@ body, html {
   box-sizing: border-box;
 }
 
+#appSidebar .edit-actions-menu__quick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--poff-space-xs);
+}
+
 #appSidebar .edit-actions-menu[open] .edit-actions-menu__panel {
   opacity: 1;
   max-height: 40rem;
@@ -1138,7 +1151,31 @@ body, html {
   width: 100%;
 }
 
+#appSidebar .edit-actions-menu__jump {
+  align-self: stretch;
+  width: 2.9rem;
+  height: auto;
+  min-width: 2.9rem;
+  min-height: 46px;
+  flex: 0 0 2.9rem;
+  transform: translateX(-0.75rem);
+  opacity: 0;
+  color: #0f766e;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.18);
+}
+
+#appSidebar .edit-actions-menu__jump:hover {
+  color: #0f5f59;
+  background: rgba(236, 253, 245, 0.96);
+}
+
 #appSidebar .edit-actions-menu[open] .edit-toggle-secondary {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+#appSidebar .edit-actions-menu[open] .edit-actions-menu__jump {
   opacity: 1;
   transform: translateX(0);
 }
@@ -1206,9 +1243,20 @@ body, html {
 
 #appSidebar .nav-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
+}
+
+#appSidebar .nav-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: end;
+  flex: 0 0 auto;
 }
 
 #appSidebar .nav-row-muted {
@@ -1342,7 +1390,8 @@ body, html {
   #appSidebar .edit-actions-menu__panel,
   #appSidebar .edit-auth-bubble,
   #appSidebar .edit-toggle,
-  #appSidebar .edit-toggle-secondary {
+  #appSidebar .edit-toggle-secondary,
+  #appSidebar .edit-actions-menu__jump {
     transition: none;
   }
 }
@@ -1395,6 +1444,16 @@ body, html {
 #appSidebar .nav-row-action-review:hover {
   color: #7f1d1d;
   background: rgba(254, 202, 202, 0.96);
+}
+
+#appSidebar .nav-row-action-delete {
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.82);
+}
+
+#appSidebar .nav-row-action-delete:hover {
+  color: #7f1d1d;
+  background: rgba(254, 226, 226, 0.98);
 }
 
 #appSidebar .nav-row-action {
