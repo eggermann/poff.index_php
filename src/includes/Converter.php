@@ -671,7 +671,9 @@ JS,
             $converter['name'] = self::normalizeConverterName((string) ($converter['id'] ?? ''));
         }
         if (!isset($converter['saveMode'])) {
-            $converter['saveMode'] = 'new-hidden-work';
+            $converter['saveMode'] = (string) ($converter['id'] ?? '') === 'converter/convert-text-editor'
+                ? 'replace-source-file'
+                : 'new-hidden-work';
         }
         if (!array_key_exists('hiddenByDefault', $converter)) {
             $converter['hiddenByDefault'] = true;
@@ -828,7 +830,10 @@ JS,
         }
 
         $output = $conversion['output'];
-        $outputName = self::sanitizeOutputName((string) ($output['name'] ?? 'converted.webp'));
+        $target = is_array($conversion['target'] ?? null) ? $conversion['target'] : [];
+        $saveMode = self::normalizeSaveMode((string) ($target['mode'] ?? 'new-hidden-work'));
+        $rawOutputName = basename(str_replace('\\', '/', trim((string) ($output['name'] ?? 'converted.webp'))));
+        $outputName = self::sanitizeOutputName($rawOutputName);
         $outputMime = strtolower(trim((string) ($output['mimeType'] ?? '')));
         if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png', 'application/json', 'text/plain', 'text/markdown', 'text/html'])) {
             return self::error('Converted MIME type is not allowed.');
@@ -849,6 +854,23 @@ JS,
             $body = (string) ($download['body'] ?? '');
         } else {
             return self::error('Converted response has no body.');
+        }
+
+        if ($saveMode === 'replace-source-file') {
+            if ($rawOutputName !== basename($sourcePath)) {
+                return self::error('Replace source file requires output format "same as source".');
+            }
+            if (!self::mimeAccepted($outputMime, ['application/json', 'text/plain', 'text/markdown', 'text/html'])) {
+                return self::error('Replace source file only supports text-like outputs.');
+            }
+            if (file_put_contents($sourceFullPath, $body) === false) {
+                return self::error('Failed to write source file.');
+            }
+            return [
+                'ok' => true,
+                'type' => 'saved-source-file',
+                'path' => $sourcePath,
+            ];
         }
 
         $folderDir = dirname($sourceFullPath);
@@ -1254,7 +1276,7 @@ HTML;
     private static function normalizeSaveMode(string $mode): string
     {
         $mode = strtolower(trim($mode));
-        return in_array($mode, ['new-hidden-work', 'replace-generated-work', 'temporary-preview-only'], true) ? $mode : 'new-hidden-work';
+        return in_array($mode, ['new-hidden-work', 'replace-generated-work', 'replace-source-file', 'temporary-preview-only'], true) ? $mode : 'new-hidden-work';
     }
 
     private static function qualityPreset(string $quality): array

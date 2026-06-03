@@ -127,6 +127,10 @@
     align-items: center;
     gap: var(--poff-space-xs-plus);
 }
+.edit-panel .edit-panel-stack {
+    display: grid;
+    gap: var(--poff-space-sm);
+}
 .edit-panel .edit-work-fields {
     display: grid;
     gap: var(--poff-space-sm);
@@ -453,6 +457,10 @@
     border: 1px solid var(--poff-color-border-warning);
     border-radius: var(--poff-control-radius-lg);
     background: linear-gradient(135deg, var(--poff-color-surface-warning) 0%, var(--poff-color-warning-100) 100%);
+}
+.edit-panel .edit-panel-stack .edit-layout-launch,
+.edit-panel .edit-panel-stack .edit-upload-launch {
+    margin-top: 0;
 }
 .edit-panel .edit-upload-launch {
     display: flex;

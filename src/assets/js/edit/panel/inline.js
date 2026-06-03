@@ -338,25 +338,25 @@ function renderConverterSection(config = {}) {
             <div class="edit-grid edit-grid-cols">
                 <div>
                     <label class="edit-label" for="edit-converter-id">Converter</label>
-                    <select class="form-select" id="edit-converter-id" name="converter_id">
+                    <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
-                    <select class="form-select" id="edit-converter-quality" name="converter_quality">
+                    <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
                         ${renderSelectOptions(qualityOptions, selectedQuality)}
                     </select>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
-                    <select class="form-select" id="edit-converter-format" name="converter_format">
+                    <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
                         ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
                     </select>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
-                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode">
+                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
                         ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
                     </select>
                 </div>
@@ -841,7 +841,6 @@ export function renderEditPanel({
             ${status?.target === 'file' || status?.target === 'folder' || (config?.work && typeof config.work === 'object' && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === 'type'))
                 ? renderWorkConfigFieldsSection(config)
                 : ''}
-            ${status?.target === 'file' ? renderConverterSection(config) : ''}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -854,6 +853,7 @@ export function renderEditPanel({
                     ${workFieldEditor.renderRows()}
                 </div>
             </div>
+       
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
@@ -864,25 +864,29 @@ export function renderEditPanel({
                 </button>
                 ` : ''}
             </div>
+
         </form>
-        <div class="edit-layout-launch">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Layout</div>
-                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+        <div class="edit-panel-stack">
+            <div class="edit-layout-launch">
+                <div class="edit-layout-copy">
+                    <div class="edit-layout-title">Layout</div>
+                    <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
+                    <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
+                    <div class="small-note">Current mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+                </div>
+                <div class="edit-inline-actions">
+                    ${!isFileTarget && typeof onResetFolderWork === 'function' ? `
+                    <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
+                        Reset work
+                    </button>
+                    ` : ''}
+                    <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+                </div>
             </div>
-            <div class="edit-inline-actions">
-                ${!isFileTarget && typeof onResetFolderWork === 'function' ? `
-                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
-                    Reset work
-                </button>
-                ` : ''}
-                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-            </div>
+            ${uploadSectionHtml}
+            ${status?.target === 'file' ? renderConverterSection(config) : ''}
+            ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
         </div>
-        ${uploadSectionHtml}
-        ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
     `;
 
     const form = editPanel.querySelector('#inlineEditForm');
@@ -912,10 +916,12 @@ export function renderEditPanel({
         }
         onMediaInput(readMediaConfigFromForm(form, config?.work || {}));
     };
-    const syncConverterFormatOptions = () => {
+    const syncConverterDependentOptions = ({ preserveCurrentValues = false } = {}) => {
         const converterSelect = form?.elements?.converter_id;
         const formatSelect = form?.elements?.converter_format;
-        if (!(converterSelect instanceof HTMLSelectElement) || !(formatSelect instanceof HTMLSelectElement)) {
+        const qualitySelect = form?.elements?.converter_quality;
+        const saveModeSelect = form?.elements?.converter_save_mode;
+        if (!(converterSelect instanceof HTMLSelectElement)) {
             return;
         }
         const selectedOption = converterSelect.selectedOptions && converterSelect.selectedOptions[0] ? converterSelect.selectedOptions[0] : null;
@@ -937,11 +943,47 @@ export function renderEditPanel({
                 .split(',')
                 .map((item) => item.trim())
                 .filter(Boolean);
-        const nextOptions = formats.length ? formats : ['source'];
-        const selected = String(defaults.format || nextOptions[0] || 'source');
-        formatSelect.innerHTML = nextOptions
-            .map((item) => `<option value="${escapeHtml(item)}"${item === selected ? ' selected' : ''}>${escapeHtml(item === 'source' ? 'same as source' : item)}</option>`)
-            .join('');
+        const qualityOptions = Array.isArray(ui?.quality?.options) && ui.quality.options.length
+            ? ui.quality.options
+            : ['preview', 'default', 'archival', 'small-web'];
+        const saveModeOptions = Array.isArray(ui?.saveMode?.options) && ui.saveMode.options.length
+            ? ui.saveMode.options
+            : ['new-hidden-work', 'replace-generated-work', 'temporary-preview-only'];
+        const syncSelectOptions = (select, options, preferredValue, labeler = null) => {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+            const nextOptions = Array.isArray(options) && options.length ? options : [''];
+            const currentValue = String(select.value || '').trim();
+            const normalizedPreferred = String(preferredValue || '').trim();
+            const selected = preserveCurrentValues && nextOptions.includes(currentValue)
+                ? currentValue
+                : (nextOptions.includes(normalizedPreferred) ? normalizedPreferred : String(nextOptions[0] || ''));
+            select.innerHTML = nextOptions
+                .map((item) => {
+                    const value = String(item || '');
+                    const label = typeof labeler === 'function' ? labeler(value) : value;
+                    return `<option value="${escapeHtml(value)}"${value === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+                })
+                .join('');
+        };
+
+        syncSelectOptions(
+            formatSelect,
+            formats.length ? formats : ['source'],
+            defaults.format || 'source',
+            (item) => item === 'source' ? 'same as source' : item
+        );
+        syncSelectOptions(
+            qualitySelect,
+            qualityOptions,
+            defaults.quality || 'default'
+        );
+        syncSelectOptions(
+            saveModeSelect,
+            saveModeOptions,
+            defaults.saveMode || 'new-hidden-work'
+        );
     };
     const syncConvertButtonState = () => {
         const converterSelect = form?.elements?.converter_id;
@@ -973,7 +1015,7 @@ export function renderEditPanel({
         input.addEventListener('input', syncMediaState);
         input.addEventListener('change', () => {
             if (input.id === 'edit-converter-id') {
-                syncConverterFormatOptions();
+                syncConverterDependentOptions({ preserveCurrentValues: false });
                 syncConvertButtonState();
             }
             syncMediaState();
@@ -983,7 +1025,7 @@ export function renderEditPanel({
         editPanel,
         onMediaInput,
     });
-    syncConverterFormatOptions();
+    syncConverterDependentOptions({ preserveCurrentValues: true });
     syncConvertButtonState();
     syncMediaState();
     if (form && typeof onSubmit === 'function') {

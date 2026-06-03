@@ -882,3 +882,151 @@ test('convert work uses a preview-root payload provider when no global provider 
     content: 'Edited plain text with provider host',
   });
 });
+
+test('convert work reports source-file save when text editor overwrite mode is selected', async () => {
+  let capturedPanelOptions = null;
+  const alerts = [];
+  let refreshCount = 0;
+  let savedPayload = null;
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+  const windowMock = {
+    location: {
+      href: 'http://example.test/MAUSMAUS/?edit=true',
+      search: '?edit=true',
+      hash: '',
+      pathname: '/MAUSMAUS/',
+    },
+    dispatchEvent() {},
+    addEventListener() {},
+    alert(message) {
+      alerts.push(message);
+    },
+    prompt() { return null; },
+    history: {
+      replaceState() {},
+    },
+  };
+
+  const { createEditController } = loadEditController(null, {
+    window: windowMock,
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async (action, payload) => {
+      if (action === 'save') {
+        savedPayload = payload;
+        return {
+          auth,
+          allowed: true,
+          saved: true,
+          target: 'file',
+          subjectTarget: 'file',
+          routePath: 'notes.txt',
+          config: {
+            kind: 'text',
+            mimeType: 'text/plain',
+            size: 12,
+            title: payload.title || '',
+            description: payload.description || '',
+            work: payload.work,
+          },
+        };
+      }
+      return {
+        auth,
+        allowed: true,
+        target: 'file',
+        subjectTarget: 'file',
+        config: {
+          kind: 'text',
+          mimeType: 'text/plain',
+          size: 12,
+          work: {
+            type: 'text',
+          },
+        },
+      };
+    },
+    requestMcpRoute: async (route) => {
+      if (route === 'convert') {
+        return {
+          ok: true,
+          target: {
+            mode: 'replace-source-file',
+          },
+          output: {
+            name: 'notes.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            size: 17,
+            bodyBase64: Buffer.from('Edited plain text', 'utf8').toString('base64'),
+          },
+        };
+      }
+      if (route === 'save-converted-work') {
+        return { ok: true, type: 'saved-source-file', path: 'notes.txt' };
+      }
+      throw new Error(`Unexpected MCP route: ${route}`);
+    },
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel: { querySelector() { return null; } },
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  controller.setPreviewRefreshHandler(() => {
+    refreshCount += 1;
+  });
+
+  await controller.initEditMode();
+  await capturedPanelOptions.onConvertWork({
+    statusEl: { textContent: '' },
+    converter: {
+      id: 'converter/convert-text-editor',
+      format: 'source',
+      saveMode: 'replace-source-file',
+      node: 'local',
+    },
+  });
+
+  expect(alerts).toEqual([
+    'OK — the edited preview content was saved back into the source file.',
+  ]);
+  expect(refreshCount).toBe(1);
+  expect(savedPayload).toBeTruthy();
+  expect(savedPayload.work.converter).toEqual(expect.objectContaining({
+    id: 'converter/convert-text-editor',
+    format: 'source',
+    saveMode: 'replace-source-file',
+  }));
+});

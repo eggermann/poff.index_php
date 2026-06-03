@@ -256,6 +256,44 @@ test('convert button renders disabled when no converter is selected', () => {
   expect(editPanel.innerHTML).toContain('id="editConvertWork" disabled');
 });
 
+test('converter controls stay attached to inline edit form after being moved below it', () => {
+  const renderEditPanel = loadRenderEditPanel();
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: {
+      title: 'Example',
+      description: '',
+      work: {
+        type: 'text',
+      },
+      converterCatalog: {
+        available: [
+          {
+            id: 'converter/convert-text-editor',
+            label: 'Convert Text Editor',
+          },
+        ],
+      },
+    },
+    status: {
+      allowed: true,
+      target: 'file',
+      auth: {
+        canEdit: true,
+      },
+    },
+  });
+
+  expect(editPanel.innerHTML).toContain('id="edit-converter-id" name="converter_id" form="inlineEditForm"');
+  expect(editPanel.innerHTML).toContain('id="edit-converter-quality" name="converter_quality" form="inlineEditForm"');
+  expect(editPanel.innerHTML).toContain('id="edit-converter-format" name="converter_format" form="inlineEditForm"');
+  expect(editPanel.innerHTML).toContain('id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"');
+  expect(editPanel.innerHTML).toContain('class="edit-panel-stack"');
+});
+
 test('password section renders for a homefolder mounted under a subpath', () => {
   const renderEditPanel = loadRenderEditPanel({
     window: {

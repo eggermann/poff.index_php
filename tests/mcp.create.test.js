@@ -2598,6 +2598,57 @@ describe('Poff converters', () => {
     }
   });
 
+  test('text editor converter can save edited source content back into the source file', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-text-editor-source-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempRoot, 'bak.htaccess'), "Header set X-Test original\n");
+
+    try {
+      const result = await runTextEditorRemoteConverter({
+        source: {
+          name: 'bak.htaccess',
+          path: 'bak.htaccess',
+          mimeType: 'text/plain',
+        },
+        converter: {
+          id: 'converter/convert-text-editor',
+          format: 'source',
+          quality: 'default',
+          saveMode: 'replace-source-file',
+        },
+        target: {
+          folder: '',
+          saveAs: 'bak.htaccess',
+          mode: 'replace-source-file',
+        },
+        editor: {
+          content: "Header set X-Test updated\n",
+        },
+      });
+
+      const saved = await runConverterRoute('save', tempRoot, {
+        sourcePath: 'bak.htaccess',
+        conversion: {
+          ...result,
+          target: {
+            mode: 'replace-source-file',
+          },
+        },
+      });
+
+      expect(saved).toEqual(expect.objectContaining({
+        ok: true,
+        type: 'saved-source-file',
+        path: 'bak.htaccess',
+      }));
+      expect(fs.readFileSync(path.join(tempRoot, 'bak.htaccess'), 'utf8')).toBe("Header set X-Test updated\n");
+      expect(fs.existsSync(path.join(tempRoot, 'poff.config.json'))).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('text editor converter localhost converter.php endpoint is allowed for remote converter requests', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-text-editor-allow-${Date.now()}`);
     fs.mkdirSync(tempRoot, { recursive: true });
@@ -4398,6 +4449,21 @@ describe('Worktype HBS renderer', () => {
     expect(result.config).toEqual(expect.objectContaining({
       name: 'dominikeggermann.com',
       path: 'dominikeggermann.com',
+      type: 'file',
+    }));
+  });
+
+  test('resolves file slugs as editable file targets', async () => {
+    const result = await runPhpJson('php_file_slug_edit_target.php');
+
+    expect(result.resolved).toEqual(expect.objectContaining({
+      type: 'file',
+      file: 'bak.htaccess',
+      virtual: true,
+    }));
+    expect(result.config).toEqual(expect.objectContaining({
+      name: 'bak.htaccess',
+      path: 'bak.htaccess',
       type: 'file',
     }));
   });

@@ -130,11 +130,19 @@ function cmsResolveConfiguredTreeItemInList(array $tree, string $targetPath, str
 
         $rawPath = trim((string) ($item['path'] ?? $item['relativePath'] ?? $name), "/\\");
         $resolvedPath = cmsJoinBaseRelativePath($prefix, $rawPath);
+        $slug = trim((string) ($item['slug'] ?? ''));
+        $routeSlug = trim((string) ($item['routeSlug'] ?? ''));
+        if ($routeSlug === '') {
+            $routeBase = $resolvedPath !== '' ? $resolvedPath : ($rawPath !== '' ? $rawPath : $name);
+            $routeSlug = cmsRouteSlugFromPath($routeBase);
+        }
         $candidates = array_values(array_unique(array_filter([
             cmsNormalizeRelativeViewerPath($resolvedPath),
             cmsNormalizeRelativeViewerPath($rawPath),
             cmsNormalizeRelativeViewerPath($name),
             cmsNormalizeRelativeViewerPath(basename($rawPath)),
+            cmsNormalizeRelativeViewerPath($slug),
+            cmsNormalizeRelativeViewerPath($routeSlug),
         ])));
 
         if (in_array($normalizedTarget, $candidates, true)) {

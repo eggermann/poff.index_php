@@ -9,7 +9,7 @@
   "defaults": {
     "format": "source",
     "quality": "default",
-    "saveMode": "new-hidden-work",
+    "saveMode": "replace-source-file",
     "hiddenByDefault": true
   },
   "ui": {
@@ -26,7 +26,7 @@
     "saveMode": {
       "type": "select",
       "label": "Save mode",
-      "options": ["new-hidden-work", "temporary-preview-only"]
+      "options": ["replace-source-file", "new-hidden-work", "temporary-preview-only"]
     }
   }
 }

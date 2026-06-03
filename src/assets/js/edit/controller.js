@@ -222,11 +222,11 @@ export function createEditController({ elements, context, editRequested }) {
         };
     }
 
-    function updateConverterPreviewState(nextState, { refresh = true } = {}) {
+    function updateConverterPreviewState(nextState, { refresh = true, force = false } = {}) {
         const previousKey = previewStateKey(activeConverterPreview);
         const nextKey = previewStateKey(nextState);
         activeConverterPreview = nextState;
-        if (refresh && previousKey !== nextKey && typeof previewRefreshHandler === 'function') {
+        if (refresh && (force || previousKey !== nextKey) && typeof previewRefreshHandler === 'function') {
             previewRefreshHandler();
         }
     }
@@ -305,16 +305,35 @@ export function createEditController({ elements, context, editRequested }) {
 
     function buildAddWorkRequestPayload(selection, extra = {}) {
         const contentTargetPath = getContentTargetPath(selection);
-        const addWorkTargetPath = getAddWorkTargetPath(selection);
-        const usesFileInbox = !!selection?.previewIsFile
-            && addWorkTargetPath !== ''
-            && addWorkTargetPath !== contentTargetPath;
 
         return {
-            path: addWorkTargetPath || contentTargetPath,
-            hideTargetFolder: usesFileInbox,
+            path: getAddWorkTargetPath(selection) || contentTargetPath,
             ...extra,
         };
+    }
+
+    function describeAddWorkTarget(selection) {
+        const addWorkTargetPath = getAddWorkTargetPath(selection);
+        return addWorkTargetPath ? ` in ${addWorkTargetPath}` : '';
+    }
+
+    function formatStoredNames(uploaded = []) {
+        if (!Array.isArray(uploaded) || uploaded.length === 0) {
+            return '';
+        }
+        const names = uploaded
+            .map((entry) => String(entry?.name || '').trim())
+            .filter(Boolean);
+        if (names.length === 0) {
+            return '';
+        }
+        if (names.length === 1) {
+            return names[0];
+        }
+        if (names.length === 2) {
+            return `${names[0]} and ${names[1]}`;
+        }
+        return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
     }
 
     function syncEditToggle() {
@@ -661,6 +680,26 @@ export function createEditController({ elements, context, editRequested }) {
         }
     }
 
+    async function persistSelectedConverter(selection, converter, statusEl) {
+        if (!selection?.previewIsFile || !converter?.id || !editConfig || typeof editConfig !== 'object') {
+            return;
+        }
+        const currentWork = (editConfig.work && typeof editConfig.work === 'object') ? editConfig.work : {};
+        const nextWork = materializeWorkFields({
+            ...currentWork,
+            converter: {
+                ...(currentWork.converter && typeof currentWork.converter === 'object' ? currentWork.converter : {}),
+                ...converter,
+            },
+        });
+        await saveConfig({
+            path: getEditTargetPath(selection),
+            title: String(editConfig.title || '').trim(),
+            description: String(editConfig.description || '').trim(),
+            work: nextWork,
+        }, statusEl);
+    }
+
     function syncDrawerVisibility() {
         if (!editDrawer) {
             return;
@@ -685,7 +724,7 @@ export function createEditController({ elements, context, editRequested }) {
         }
     }
 
-    async function refreshCurrentEditState(selection = getActiveSelection()) {
+    async function refreshCurrentEditState(selection = getActiveSelection(), { forcePreviewRefresh = false } = {}) {
         const refreshed = await requestEditConfig('config', { path: getEditTargetPath(selection) });
         if (refreshed?.auth) {
             updateAuthState(refreshed.auth);
@@ -693,7 +732,7 @@ export function createEditController({ elements, context, editRequested }) {
         if (refreshed?.config) {
             editConfig = annotateConfigPath(refreshed.config, selection, refreshed);
             editTarget = refreshed.target || (selection.isLayout ? 'layout' : (selection.previewIsFile ? 'file' : 'folder'));
-            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection));
+            updateConverterPreviewState(buildConverterPreviewState(editConfig?.work || {}, selection), { force: forcePreviewRefresh });
             if (editTarget === 'folder' || (editTarget === 'layout' && refreshed.subjectTarget === 'folder')) {
                 folderConfig = editConfig;
                 renderFolderMeta();
@@ -866,13 +905,23 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!converted || converted.error || converted.ok === false) {
                     throw new Error(converted?.error || 'Conversion failed.');
                 }
-                if ((converter.saveMode || 'new-hidden-work') !== 'temporary-preview-only') {
+                const saveMode = converter.saveMode || 'new-hidden-work';
+                if (saveMode !== 'temporary-preview-only') {
                     const saved = await requestMcpRoute('save-converted-work', {
                         sourcePath,
-                        conversion: converted,
+                        conversion: {
+                            ...converted,
+                            target: { ...(converted?.target && typeof converted.target === 'object' ? converted.target : {}), ...payload.target },
+                        },
                     });
                     if (!saved || saved.error || saved.ok === false) {
                         throw new Error(saved?.error || 'Saving converted work failed.');
+                    }
+                    await persistSelectedConverter(selection, converter, statusEl);
+                    if (saveMode === 'replace-source-file' || saved.type === 'saved-source-file') {
+                        window.alert('OK — the edited preview content was saved back into the source file.');
+                        await refreshCurrentEditState(selection, { forcePreviewRefresh: true });
+                        return;
                     }
                 }
                 window.alert('OK — this file was converted into a web-readable poff work and saved in the folder.');
@@ -986,7 +1035,7 @@ export function createEditController({ elements, context, editRequested }) {
                     },
                 }, statusEl);
             },
-            onUploadFiles: async ({ source, files }) => {
+            onUploadFiles: async ({ source, files, closeDialog }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
@@ -995,15 +1044,24 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Upload failed.');
                 }
+                if (typeof closeDialog === 'function') {
+                    closeDialog();
+                }
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
-                    const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
-                    setStatusMessage(inlineStatus, count === 1 ? 'Uploaded 1 file.' : `Uploaded ${count} files.`, true);
+                    const uploaded = Array.isArray(data.uploaded) ? data.uploaded : [];
+                    const names = formatStoredNames(uploaded);
+                    const targetLabel = describeAddWorkTarget(selection);
+                    const fallbackCount = uploaded.length || files.length;
+                    const message = names
+                        ? `Uploaded ${names}${targetLabel}.`
+                        : (fallbackCount === 1 ? `Uploaded 1 file${targetLabel}.` : `Uploaded ${fallbackCount} files${targetLabel}.`);
+                    setStatusMessage(inlineStatus, message, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateBlankFile: async ({ source, fileName }) => {
+            onCreateBlankFile: async ({ source, fileName, closeDialog }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
@@ -1013,17 +1071,20 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create blank file failed.');
                 }
+                if (typeof closeDialog === 'function') {
+                    closeDialog();
+                }
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : fileName;
-                    setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
+                    setStatusMessage(inlineStatus, `Created ${createdName}${describeAddWorkTarget(selection)}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateFolder: async ({ source, folderName }) => {
+            onCreateFolder: async ({ source, folderName, closeDialog }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
@@ -1033,17 +1094,20 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create folder failed.');
                 }
+                if (typeof closeDialog === 'function') {
+                    closeDialog();
+                }
                 await refreshCurrentEditState(selection);
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : folderName;
-                    setStatusMessage(inlineStatus, `Created folder ${createdName}.`, true);
+                    setStatusMessage(inlineStatus, `Created folder ${createdName}${describeAddWorkTarget(selection)}.`, true);
                 }
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             },
-            onCreateLink: async ({ source, linkName, linkUrl }) => {
+            onCreateLink: async ({ source, linkName, linkUrl, closeDialog }) => {
                 const selection = getActiveSelection();
                 const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                     source,
@@ -1058,14 +1122,17 @@ export function createEditController({ elements, context, editRequested }) {
                 if (!data || data.error) {
                     throw new Error(data?.error || 'Create link failed.');
                 }
+                if (typeof closeDialog === 'function') {
+                    closeDialog();
+                }
                 const inlineStatus = document.getElementById('editInlineStatus');
                 if (inlineStatus) {
                     const createdName = Array.isArray(data.uploaded) && data.uploaded[0]?.name
                         ? data.uploaded[0].name
                         : (linkName || linkUrl);
                     const message = data.pendingApproval
-                        ? `Submitted ${createdName} for approval.`
-                        : `Created link ${createdName}.`;
+                        ? `Submitted ${createdName} for approval${describeAddWorkTarget(selection)}.`
+                        : `Created link ${createdName}${describeAddWorkTarget(selection)}.`;
                     setStatusMessage(inlineStatus, message, true);
                 }
                 if (!(data.pendingApproval && !authState.canEdit)) {
