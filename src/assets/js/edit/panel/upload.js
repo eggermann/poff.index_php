@@ -2,7 +2,16 @@ import { uploadValidationError } from './shared.js';
 import { setStatusMessage } from '../status.js';
 import { registerEscapeClose } from '../../core/escape-stack.js';
 
-export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true }) {
+function escapeUploadHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true, activeWorkName = '' }) {
     const allowFileTarget = !externalOnly && isFileTarget;
     if (isFileTarget && !allowFileTarget) {
         return '';
@@ -10,7 +19,7 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
     const launcherCopy = externalOnly
         ? 'Submit a Poff link from another system. It stays hidden until an editor confirms it.'
         : allowFileTarget
-            ? 'Add related work into this work inbox folder. Upload a file, create a blank file, create a folder, or add a link.'
+            ? 'Add related work into the containing folder. Upload a file, create a blank file, create a folder, or add a link.'
         : (isEmptyFolder
             ? 'This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start.'
             : 'Upload files, create a blank file, create a folder, or add a link in this folder.');
@@ -24,6 +33,21 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
                             <option value="url">Poff link</option>
+                        </select>
+                    </div>
+        `;
+    const activeWorkLabel = String(activeWorkName || '').trim();
+    const titleText = externalOnly
+        ? 'Submit external link'
+        : (activeWorkLabel ? `Add work: ${activeWorkLabel}` : 'Add work');
+    const saveTargetHtml = externalOnly
+        ? ''
+        : `
+                    <div id="editUploadSaveTargetWrap">
+                        <label class="edit-label" for="edit-upload-save-target">Save in</label>
+                        <select class="form-select" id="edit-upload-save-target" name="upload_save_target">
+                            <option value="current" selected>This folder</option>
+                            <option value="work-folder">Folder with active work title</option>
                         </select>
                     </div>
         `;
@@ -43,14 +67,19 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">${externalOnly ? 'Submit external link' : 'Add work'}</h4>
+                    <h4 class="drawer-title">${escapeUploadHtml(titleText)}</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
                     ${sourceFieldHtml}
+                    ${saveTargetHtml}
                     <div id="editUploadFilesWrap">
                         <label class="edit-label" for="edit-upload-files">Files</label>
-                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
+                        <div class="edit-upload-file-picker">
+                            <label class="btn btn-secondary edit-upload-file-trigger" id="editUploadChooseFiles" for="edit-upload-files" role="button" tabindex="0">Choose files</label>
+                            <input class="edit-upload-file-input" id="edit-upload-files" type="file" name="files" multiple>
+                            <span class="edit-upload-file-picker-name" id="editUploadFilePickerName">No files selected.</span>
+                        </div>
                     </div>
                     <div id="editBlankFileWrap" hidden>
                         <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
@@ -87,7 +116,11 @@ export function bindUploadDialog({
     const uploadCancelButton = editPanel.querySelector('#editUploadCancel');
     const uploadSubmitButton = editPanel.querySelector('#editUploadSubmit');
     const uploadSourceEl = editPanel.querySelector('#edit-upload-source');
+    const uploadSaveTargetEl = editPanel.querySelector('#edit-upload-save-target');
+    const uploadSaveTargetWrapEl = editPanel.querySelector('#editUploadSaveTargetWrap');
+    const uploadChooseFilesButtonEl = editPanel.querySelector('#editUploadChooseFiles');
     const uploadFilesEl = editPanel.querySelector('#edit-upload-files');
+    const uploadFilePickerNameEl = editPanel.querySelector('#editUploadFilePickerName');
     const uploadSummaryEl = editPanel.querySelector('#editUploadSummary');
     const uploadFilesWrapEl = editPanel.querySelector('#editUploadFilesWrap');
     const blankFileWrapEl = editPanel.querySelector('#editBlankFileWrap');
@@ -104,6 +137,7 @@ export function bindUploadDialog({
         url: '',
     };
     const readUploadMode = () => (externalOnly ? 'url' : (uploadSourceEl?.value || 'upload'));
+    const readSaveTarget = () => (externalOnly ? 'current' : (uploadSaveTargetEl?.value || 'current'));
     let uploadMode = readUploadMode();
     let unregisterEscapeClose = null;
 
@@ -117,16 +151,18 @@ export function bindUploadDialog({
             return;
         }
         const mode = readUploadMode();
+        const saveTarget = readSaveTarget();
+        const saveSuffix = saveTarget === 'work-folder' ? ' in a new active-work folder' : '';
         if (mode === 'blank' || mode === 'folder') {
             const name = blankFileNameEl?.value?.trim() || '';
-            uploadSummaryEl.textContent = name ? `Will create: ${name}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
+            uploadSummaryEl.textContent = name ? `Will create: ${name}${mode === 'folder' ? '' : saveSuffix}` : (mode === 'folder' ? 'Enter a folder name.' : 'Enter a file name.');
             return;
         }
         if (mode === 'url') {
             const linkName = blankFileNameEl?.value?.trim() || '';
             const linkUrl = linkUrlEl?.value?.trim() || '';
             uploadSummaryEl.textContent = linkUrl
-                ? (externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}`)
+                ? (externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}${saveSuffix}`)
                 : 'Enter a link URL.';
             return;
         }
@@ -135,7 +171,15 @@ export function bindUploadDialog({
             uploadSummaryEl.textContent = validationError;
             return;
         }
-        uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(', ') : 'No files selected.';
+        const fileSummary = files.length
+            ? files.map((file) => file.name).join(', ')
+            : 'No files selected.';
+        if (uploadFilePickerNameEl) {
+            uploadFilePickerNameEl.textContent = fileSummary;
+        }
+        uploadSummaryEl.textContent = files.length
+            ? `${files.map((file) => file.name).join(', ')}${saveSuffix}`
+            : (saveTarget === 'work-folder' ? 'Will create folder with the active work fullview.' : 'No files selected.');
     };
 
     const syncUploadMode = () => {
@@ -158,6 +202,9 @@ export function bindUploadDialog({
         }
         if (linkWrapEl) {
             linkWrapEl.hidden = mode !== 'url';
+        }
+        if (uploadSaveTargetWrapEl) {
+            uploadSaveTargetWrapEl.hidden = mode === 'folder';
         }
         if (blankFileLabelEl) {
             blankFileLabelEl.textContent = mode === 'folder'
@@ -233,6 +280,23 @@ export function bindUploadDialog({
         return true;
     };
 
+    const openFilePicker = () => {
+        if (!uploadFilesEl || uploadMode !== 'upload') {
+            return;
+        }
+        if (typeof uploadFilesEl.showPicker === 'function') {
+            try {
+                uploadFilesEl.showPicker();
+                return;
+            } catch (err) {
+                // Fall back to the legacy click path below.
+            }
+        }
+        if (typeof uploadFilesEl.click === 'function') {
+            uploadFilesEl.click();
+        }
+    };
+
     openUploadDialogButton.addEventListener('click', openUploadDialog);
     if (uploadCloseButton) {
         uploadCloseButton.addEventListener('click', closeUploadDialog);
@@ -243,8 +307,20 @@ export function bindUploadDialog({
     if (uploadSourceEl) {
         uploadSourceEl.addEventListener('change', syncUploadMode);
     }
+    if (uploadSaveTargetEl) {
+        uploadSaveTargetEl.addEventListener('change', setUploadSummary);
+    }
     if (uploadFilesEl) {
         uploadFilesEl.addEventListener('change', setUploadSummary);
+    }
+    if (uploadChooseFilesButtonEl) {
+        uploadChooseFilesButtonEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+            event.preventDefault();
+            openFilePicker();
+        });
     }
     if (blankFileNameEl) {
         blankFileNameEl.addEventListener('input', setUploadSummary);
@@ -263,7 +339,9 @@ export function bindUploadDialog({
                     await onCreateBlankFile({
                         source,
                         fileName,
+                        saveTarget: readSaveTarget(),
                         statusEl,
+                        closeDialog: closeUploadDialog,
                     });
                 } else if (source === 'folder') {
                         const folderName = blankFileNameEl?.value?.trim() || '';
@@ -274,7 +352,9 @@ export function bindUploadDialog({
                     await onCreateFolder({
                         source,
                         folderName,
+                        saveTarget: 'current',
                         statusEl,
+                        closeDialog: closeUploadDialog,
                     });
                 } else if (source === 'url') {
                         const linkName = blankFileNameEl?.value?.trim() || '';
@@ -287,11 +367,13 @@ export function bindUploadDialog({
                         source,
                         linkName,
                         linkUrl,
+                        saveTarget: readSaveTarget(),
                         statusEl,
+                        closeDialog: closeUploadDialog,
                     });
                 } else {
                         const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
-                        if (files.length === 0) {
+                        if (files.length === 0 && readSaveTarget() !== 'work-folder') {
                             setStatusMessage(statusEl, 'Choose at least one file.');
                             return;
                         }
@@ -303,10 +385,11 @@ export function bindUploadDialog({
                     await onUploadFiles({
                         source,
                         files,
+                        saveTarget: readSaveTarget(),
                         statusEl,
+                        closeDialog: closeUploadDialog,
                     });
                 }
-                closeUploadDialog();
                 } catch (err) {
                     setStatusMessage(statusEl, err.message || 'Upload failed.');
                 } finally {

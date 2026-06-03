@@ -26,6 +26,10 @@
     display: flex;
     justify-content: flex-start;
     align-items: flex-start;
+    pointer-events: none;
+}
+.prompt-layer .prompt-window,
+.prompt-layer .prompt-layer-toggle {
     pointer-events: auto;
 }
 .prompt-layer-toggle {
