@@ -68,11 +68,11 @@ describe('edit controller target path helpers', () => {
     expect(getContentTargetPath({ path: 'trudels', previewPath: 'trudels', previewIsFile: false, isLayout: false })).toBe('trudels');
   });
 
-  test('uses the containing folder for file previews', () => {
+  test('uses the containing folder for file previews and add-work targets', () => {
     const { getAddWorkTargetPath, getContentTargetPath } = loadPathsModule();
 
     expect(getContentTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder');
-    expect(getAddWorkTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder/file');
+    expect(getAddWorkTargetPath({ path: 'folder/file.mp4', previewPath: 'folder/file.mp4', previewIsFile: true, isLayout: false })).toBe('folder');
   });
 
   test('uses the parent folder for hidden dotfiles', () => {

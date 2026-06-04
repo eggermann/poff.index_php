@@ -94,6 +94,14 @@ function loadEditController(documentMock = null, overrides = {}) {
   const escapeStackPath = path.join(__dirname, '..', 'src/assets/js/core/escape-stack.js');
   const escapeStackSource = fs.readFileSync(escapeStackPath, 'utf8')
     .replace(/export function /g, 'function ');
+  const mediaConfigPath = path.join(__dirname, '..', 'src/assets/js/edit/controller/media-config.js');
+  const mediaConfigSource = fs.readFileSync(mediaConfigPath, 'utf8')
+    .replace(/^import .*$/gm, '')
+    .replace(/export function /g, 'function ');
+  const panelActionsPath = path.join(__dirname, '..', 'src/assets/js/edit/controller/panel-actions.js');
+  const panelActionsSource = fs.readFileSync(panelActionsPath, 'utf8')
+    .replace(/^import .*$/gm, '')
+    .replace(/export function /g, 'function ');
   const filePath = path.join(__dirname, '..', 'src/assets/js/edit/controller.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/^import .*$/gm, '')
@@ -172,12 +180,15 @@ function loadEditController(documentMock = null, overrides = {}) {
       return { layoutPayload: {} };
     },
     createLayoutNameForPreset: () => () => 'layout',
+    getAddWorkTargetPath: overrides.getAddWorkTargetPath || (() => ''),
     getContentTargetPath: overrides.getContentTargetPath || (() => ''),
     getEditTargetPath: overrides.getEditTargetPath || (() => ''),
     setStatusMessage: overrides.setStatusMessage || function setStatusMessage() {},
   });
 
   vm.runInContext(escapeStackSource, context);
+  vm.runInContext(mediaConfigSource, context);
+  vm.runInContext(panelActionsSource, context);
   vm.runInContext(`${source}
 module.exports = {
   createEditController,

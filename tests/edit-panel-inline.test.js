@@ -9,6 +9,7 @@ function loadRenderEditPanel(overrides = {}) {
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
+  const reservedKeys = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
   const context = vm.createContext({
     module,
     exports: module.exports,
@@ -35,6 +36,8 @@ function loadRenderEditPanel(overrides = {}) {
     renderPromptWindow() {
       return '';
     },
+    PASSWORD_DETAILS_STORAGE_KEY: 'password-details',
+    RESERVED_WORK_CONFIG_KEYS: reservedKeys,
     applyWorkFieldTypeDefaults(value) {
       return value;
     },
@@ -67,6 +70,13 @@ function loadRenderEditPanel(overrides = {}) {
       return '';
     },
     bindStoredDetailsState() {},
+    createWorkFieldEditor() {
+      return {
+        renderRows() { return ''; },
+        syncWorkFieldsFromDom() {},
+        addWorkField() {},
+      };
+    },
     layoutOverlayState() {
       return {
         wrapperSourceLabel: 'PHP built-in poff-layout',
@@ -76,6 +86,51 @@ function loadRenderEditPanel(overrides = {}) {
     },
     renderPersistentDetailsSection(options = {}) {
       return `${options.titleHtml || ''}${options.noteHtml || ''}${options.bodyHtml || ''}`;
+    },
+    readMediaConfigFromForm(form, currentWork = {}) {
+      return currentWork;
+    },
+    renderWorkConfigFieldsSection() {
+      return '';
+    },
+    renderConverterSection(config = {}) {
+      const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
+      const selected = String(config?.work?.converter?.id || '').trim();
+      const disabled = selected === '';
+      const options = ['<option value="">none</option>']
+        .concat(available.map((item) => `<option value="${item.id || ''}"${item.id === selected ? ' selected' : ''}>${item.label || item.id || ''}</option>`))
+        .join('');
+      return `
+        <div class="edit-work-fields edit-work-converter">
+          <select id="edit-converter-id" name="converter_id" form="inlineEditForm">${options}</select>
+          <select id="edit-converter-quality" name="converter_quality" form="inlineEditForm"></select>
+          <select id="edit-converter-format" name="converter_format" form="inlineEditForm"></select>
+          <select id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"></select>
+          <button id="editConvertWork"${disabled ? ' disabled' : ''}>Convert</button>
+          <button id="editCreateConverter">New converter</button>
+        </div>
+      `;
+    },
+    renderDirectFileLink(config = {}, status = {}) {
+      if (status?.target !== 'file' || !config?.srcUrl) {
+        return '';
+      }
+      return `<div class="small-note"><a href="${config.srcUrl}" target="_blank" rel="noopener noreferrer">Open original file</a></div>`;
+    },
+    renderPasswordChangeSection(status = {}) {
+      if (!status?.auth?.canEdit || status?.target !== 'folder') {
+        return '';
+      }
+      const relativePath = String(status?.relativePath || '').trim();
+      if (relativePath !== '') {
+        return '';
+      }
+      const pathname = typeof context.window?.location?.pathname === 'string' ? context.window.location.pathname.trim() : '';
+      const normalizedPathname = pathname.replace(/\/+$/, '') || '/';
+      if (normalizedPathname === '/') {
+        return '';
+      }
+      return '<div>Change password</div><form id="editPasswordForm" class="edit-inline"><label>Current password</label><input id="edit-current-password" type="password"></form>';
     },
     syncPromptDock() {},
     bindUploadDialog() {},
@@ -101,6 +156,7 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
+  const reservedKeys = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
   const context = vm.createContext({
     module,
     exports: module.exports,
@@ -127,6 +183,8 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     renderPromptWindow() {
       return '';
     },
+    PASSWORD_DETAILS_STORAGE_KEY: 'password-details',
+    RESERVED_WORK_CONFIG_KEYS: reservedKeys,
     applyWorkFieldTypeDefaults(value) {
       return value;
     },
@@ -159,6 +217,13 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
       return '';
     },
     bindStoredDetailsState() {},
+    createWorkFieldEditor() {
+      return {
+        renderRows() { return ''; },
+        syncWorkFieldsFromDom() {},
+        addWorkField() {},
+      };
+    },
     layoutOverlayState() {
       return {
         wrapperSourceLabel: 'PHP built-in poff-layout',
@@ -168,6 +233,51 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     },
     renderPersistentDetailsSection(options = {}) {
       return `${options.titleHtml || ''}${options.noteHtml || ''}${options.bodyHtml || ''}`;
+    },
+    readMediaConfigFromForm(form, currentWork = {}) {
+      return currentWork;
+    },
+    renderWorkConfigFieldsSection() {
+      return '';
+    },
+    renderConverterSection(config = {}) {
+      const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
+      const selected = String(config?.work?.converter?.id || '').trim();
+      const disabled = selected === '';
+      const options = ['<option value="">none</option>']
+        .concat(available.map((item) => `<option value="${item.id || ''}"${item.id === selected ? ' selected' : ''}>${item.label || item.id || ''}</option>`))
+        .join('');
+      return `
+        <div class="edit-work-fields edit-work-converter">
+          <select id="edit-converter-id" name="converter_id" form="inlineEditForm">${options}</select>
+          <select id="edit-converter-quality" name="converter_quality" form="inlineEditForm"></select>
+          <select id="edit-converter-format" name="converter_format" form="inlineEditForm"></select>
+          <select id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"></select>
+          <button id="editConvertWork"${disabled ? ' disabled' : ''}>Convert</button>
+          <button id="editCreateConverter">New converter</button>
+        </div>
+      `;
+    },
+    renderDirectFileLink(config = {}, status = {}) {
+      if (status?.target !== 'file' || !config?.srcUrl) {
+        return '';
+      }
+      return `<div class="small-note"><a href="${config.srcUrl}" target="_blank" rel="noopener noreferrer">Open original file</a></div>`;
+    },
+    renderPasswordChangeSection(status = {}) {
+      if (!status?.auth?.canEdit || status?.target !== 'folder') {
+        return '';
+      }
+      const relativePath = String(status?.relativePath || '').trim();
+      if (relativePath !== '') {
+        return '';
+      }
+      const pathname = typeof context.window?.location?.pathname === 'string' ? context.window.location.pathname.trim() : '';
+      const normalizedPathname = pathname.replace(/\/+$/, '') || '/';
+      if (normalizedPathname === '/') {
+        return '';
+      }
+      return '<div>Change password</div><form id="editPasswordForm" class="edit-inline"><label>Current password</label><input id="edit-current-password" type="password"></form>';
     },
     syncPromptDock() {},
     bindUploadDialog: overrides.bindUploadDialog || (() => {}),
