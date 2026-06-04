@@ -258,70 +258,20 @@ class Converter
     private static function defaultGrainFiles(): ?array
     {
         $grainDir = __DIR__ . '/worktypes/templates/converter/default';
-        if (is_dir($grainDir)) {
-            return [
-                'template.hbs' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'template.hbs'),
-                'work.hbs' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'work.hbs'),
-                'external.hbs' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'external.hbs'),
-                'style.css' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'style.css'),
-                'script.js' => (string) file_get_contents($grainDir . DIRECTORY_SEPARATOR . 'script.js'),
-            ];
+        if (!is_dir($grainDir)) {
+            return null;
         }
 
-        return [
-            'template.hbs' => <<<'HBS'
-<section class="poff-converter-work">
-    <h2>{{title}}</h2>
-    <p>Converter work accepts source payloads and produces generated poff works.</p>
-    {{#if work.accepts}}
-        <div class="poff-converter-work__meta">Accepts configured source MIME patterns.</div>
-    {{/if}}
-</section>
-HBS,
-            'work.hbs' => <<<'HBS'
-<section class="poff-converter-work">
-    <header class="poff-converter-work__header">
-        <p class="poff-converter-work__eyebrow">Converter app</p>
-        <h2 class="poff-converter-work__title">{{converter.label}}</h2>
-    </header>
-    <dl class="poff-converter-work__details">
-        <div class="poff-converter-work__row">
-            <dt>Source</dt>
-            <dd>{{source.name}}</dd>
-        </div>
-        <div class="poff-converter-work__row">
-            <dt>Format</dt>
-            <dd>{{converter.format}}</dd>
-        </div>
-        <div class="poff-converter-work__row">
-            <dt>Status</dt>
-            <dd>{{status.state}}</dd>
-        </div>
-    </dl>
-</section>
-HBS,
-            'external.hbs' => <<<'HBS'
-<section class="poff-converter-external">
-    <h2>{{title}}</h2>
-    {{#if external.sourceWork.path}}
-        <p>Converted from <code>{{external.sourceWork.path}}</code>.</p>
-    {{/if}}
-    {{#if external.resultWork.srcUrl}}
-        <a href="{{external.resultWork.srcUrl}}">{{external.resultWork.name}}</a>
-    {{/if}}
-</section>
-HBS,
-            'style.css' => <<<'CSS'
-.poff-converter-work,
-.poff-converter-external {
-    display: grid;
-    gap: 0.75rem;
-}
-CSS,
-            'script.js' => <<<'JS'
-document.documentElement.dataset.poffConverterTemplate = 'default';
-JS,
-        ];
+        $files = [];
+        foreach (['template.hbs', 'work.hbs', 'external.hbs', 'style.css', 'script.js'] as $file) {
+            $path = $grainDir . DIRECTORY_SEPARATOR . $file;
+            if (!is_file($path)) {
+                return null;
+            }
+            $files[$file] = (string) file_get_contents($path);
+        }
+
+        return $files;
     }
 
     private static function legacyDefinitions(): array
