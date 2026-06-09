@@ -1,10 +1,86 @@
 const PROMPT_REQUEST_TIMEOUT_MS = 300000;
+const EDIT_AUTH_TOKEN_STORAGE_KEY = 'poff.editorAuthToken';
+
+function safeLocalStorage() {
+    try {
+        return window.localStorage || null;
+    } catch (err) {
+        return null;
+    }
+}
+
+export function getEditorAuthToken() {
+    const storage = safeLocalStorage();
+    if (!storage) {
+        return '';
+    }
+    try {
+        return String(storage.getItem(EDIT_AUTH_TOKEN_STORAGE_KEY) || '').trim();
+    } catch (err) {
+        return '';
+    }
+}
+
+export function setEditorAuthToken(token) {
+    const storage = safeLocalStorage();
+    if (!storage) {
+        return;
+    }
+    const value = String(token || '').trim();
+    try {
+        if (value === '') {
+            storage.removeItem(EDIT_AUTH_TOKEN_STORAGE_KEY);
+        } else {
+            storage.setItem(EDIT_AUTH_TOKEN_STORAGE_KEY, value);
+        }
+    } catch (err) {
+        // Ignore storage failures in privacy-restricted browsers.
+    }
+}
+
+export function clearEditorAuthToken() {
+    setEditorAuthToken('');
+}
+
+function withEditorAuthHeaders(headers = {}) {
+    const token = getEditorAuthToken();
+    if (token === '') {
+        return { ...headers };
+    }
+    return {
+        ...headers,
+        'X-Poff-Editor-Auth': token,
+    };
+}
+
+function appendFormValue(formBody, key, value) {
+    if (value === undefined || value === null) {
+        return;
+    }
+    if (Array.isArray(value)) {
+        value.forEach((item, index) => {
+            appendFormValue(formBody, `${key}[${index}]`, item);
+        });
+        return;
+    }
+    if (typeof value === 'object') {
+        Object.entries(value).forEach(([childKey, childValue]) => {
+            appendFormValue(formBody, `${key}[${childKey}]`, childValue);
+        });
+        return;
+    }
+    formBody.set(key, String(value));
+}
 
 export function buildCmsUrl(action, path) {
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set('edit', action);
     if (path) {
         url.searchParams.set('path', path);
+    }
+    const token = getEditorAuthToken();
+    if (token !== '') {
+        url.searchParams.set('authToken', token);
     }
     return url.toString();
 }
@@ -81,14 +157,28 @@ export async function requestLocalPromptModels(endpoint = '') {
 
 export async function requestEditConfig(action, payload) {
     const url = buildCmsUrl(action, payload.path || '');
+    const isSaveAction = action === 'save';
     try {
         const res = await fetch(url, {
             method: action === 'config' ? 'GET' : 'POST',
             headers: {
                 'Accept': 'application/json',
-                ...(action === 'config' ? {} : { 'Content-Type': 'application/json' }),
+                ...(action === 'config' ? {} : isSaveAction
+                    ? { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+                    : { 'Content-Type': 'application/json' }),
+                ...withEditorAuthHeaders(),
             },
-            body: action === 'config' ? undefined : JSON.stringify(payload),
+            body: action === 'config'
+                ? undefined
+                : isSaveAction
+                    ? (() => {
+                        const formBody = new URLSearchParams();
+                        Object.entries(payload || {}).forEach(([key, value]) => {
+                            appendFormValue(formBody, key, value);
+                        });
+                        return formBody.toString();
+                    })()
+                    : JSON.stringify(payload),
         });
         if (!res.ok) {
             return { allowed: false, error: 'Edit endpoint unavailable.' };
@@ -109,6 +199,7 @@ export async function requestMcpRoute(route, payload = {}) {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
+                ...withEditorAuthHeaders(),
             },
             body: JSON.stringify(payload),
         });
@@ -133,14 +224,21 @@ export async function requestEditAuth(payload = {}) {
     const method = payload.method === 'GET' ? 'GET' : 'POST';
     const bodyPayload = { ...payload };
     delete bodyPayload.method;
+    const formBody = new URLSearchParams();
+    Object.entries(bodyPayload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+            formBody.set(key, String(value));
+        }
+    });
     try {
         const res = await fetch(url, {
             method,
             headers: {
                 'Accept': 'application/json',
-                ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+                ...withEditorAuthHeaders(),
+                ...(method === 'GET' ? {} : { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }),
             },
-            body: method === 'GET' ? undefined : JSON.stringify(bodyPayload),
+            body: method === 'GET' ? undefined : formBody.toString(),
         });
         const responseText = await res.text();
         let data = null;
@@ -206,6 +304,7 @@ export async function requestEditUpload(payload) {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
+                ...withEditorAuthHeaders(),
             },
             body: formData,
         });
@@ -242,6 +341,7 @@ export async function requestEditDelete(payload) {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
+                ...withEditorAuthHeaders(),
             },
             body: JSON.stringify(payload),
         });
@@ -278,6 +378,7 @@ export async function requestEditReset(payload) {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
+                ...withEditorAuthHeaders(),
             },
             body: JSON.stringify(payload),
         });
@@ -320,6 +421,7 @@ export async function requestPromptTemplate(payload) {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
+                ...withEditorAuthHeaders(),
             },
             body: JSON.stringify(payload),
             signal: controller ? controller.signal : undefined,
@@ -443,6 +545,7 @@ export async function requestPromptTemplateStream(payload, { onDelta } = {}) {
             headers: {
                 'Accept': 'text/event-stream, application/json',
                 'Content-Type': 'application/json',
+                ...withEditorAuthHeaders(),
             },
             body: JSON.stringify({ ...payload, stream: true }),
             signal: controller ? controller.signal : undefined,

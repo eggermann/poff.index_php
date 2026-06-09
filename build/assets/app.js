@@ -48,11 +48,80 @@
 
   // src/assets/js/api/edit.js
   var PROMPT_REQUEST_TIMEOUT_MS = 3e5;
+  var EDIT_AUTH_TOKEN_STORAGE_KEY = "poff.editorAuthToken";
+  function safeLocalStorage() {
+    try {
+      return window.localStorage || null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function getEditorAuthToken() {
+    const storage = safeLocalStorage();
+    if (!storage) {
+      return "";
+    }
+    try {
+      return String(storage.getItem(EDIT_AUTH_TOKEN_STORAGE_KEY) || "").trim();
+    } catch (err) {
+      return "";
+    }
+  }
+  function setEditorAuthToken(token) {
+    const storage = safeLocalStorage();
+    if (!storage) {
+      return;
+    }
+    const value = String(token || "").trim();
+    try {
+      if (value === "") {
+        storage.removeItem(EDIT_AUTH_TOKEN_STORAGE_KEY);
+      } else {
+        storage.setItem(EDIT_AUTH_TOKEN_STORAGE_KEY, value);
+      }
+    } catch (err) {
+    }
+  }
+  function clearEditorAuthToken() {
+    setEditorAuthToken("");
+  }
+  function withEditorAuthHeaders(headers = {}) {
+    const token = getEditorAuthToken();
+    if (token === "") {
+      return { ...headers };
+    }
+    return {
+      ...headers,
+      "X-Poff-Editor-Auth": token
+    };
+  }
+  function appendFormValue(formBody, key, value) {
+    if (value === void 0 || value === null) {
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        appendFormValue(formBody, `${key}[${index}]`, item);
+      });
+      return;
+    }
+    if (typeof value === "object") {
+      Object.entries(value).forEach(([childKey, childValue]) => {
+        appendFormValue(formBody, `${key}[${childKey}]`, childValue);
+      });
+      return;
+    }
+    formBody.set(key, String(value));
+  }
   function buildCmsUrl(action, path) {
     const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set("edit", action);
     if (path) {
       url.searchParams.set("path", path);
+    }
+    const token = getEditorAuthToken();
+    if (token !== "") {
+      url.searchParams.set("authToken", token);
     }
     return url.toString();
   }
@@ -97,14 +166,22 @@
   }
   async function requestEditConfig(action, payload) {
     const url = buildCmsUrl(action, payload.path || "");
+    const isSaveAction = action === "save";
     try {
       const res = await fetch(url, {
         method: action === "config" ? "GET" : "POST",
         headers: {
           "Accept": "application/json",
-          ...action === "config" ? {} : { "Content-Type": "application/json" }
+          ...action === "config" ? {} : isSaveAction ? { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" } : { "Content-Type": "application/json" },
+          ...withEditorAuthHeaders()
         },
-        body: action === "config" ? void 0 : JSON.stringify(payload)
+        body: action === "config" ? void 0 : isSaveAction ? (() => {
+          const formBody = new URLSearchParams();
+          Object.entries(payload || {}).forEach(([key, value]) => {
+            appendFormValue(formBody, key, value);
+          });
+          return formBody.toString();
+        })() : JSON.stringify(payload)
       });
       if (!res.ok) {
         return { allowed: false, error: "Edit endpoint unavailable." };
@@ -123,7 +200,8 @@
         method: "POST",
         headers: {
           "Accept": "application/json",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...withEditorAuthHeaders()
         },
         body: JSON.stringify(payload)
       });
@@ -147,14 +225,21 @@
     const method = payload.method === "GET" ? "GET" : "POST";
     const bodyPayload = { ...payload };
     delete bodyPayload.method;
+    const formBody = new URLSearchParams();
+    Object.entries(bodyPayload).forEach(([key, value]) => {
+      if (value !== void 0 && value !== null) {
+        formBody.set(key, String(value));
+      }
+    });
     try {
       const res = await fetch(url, {
         method,
         headers: {
           "Accept": "application/json",
-          ...method === "GET" ? {} : { "Content-Type": "application/json" }
+          ...withEditorAuthHeaders(),
+          ...method === "GET" ? {} : { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }
         },
-        body: method === "GET" ? void 0 : JSON.stringify(bodyPayload)
+        body: method === "GET" ? void 0 : formBody.toString()
       });
       const responseText = await res.text();
       let data = null;
@@ -218,7 +303,8 @@
       const res = await fetch(url, {
         method: "POST",
         headers: {
-          "Accept": "application/json"
+          "Accept": "application/json",
+          ...withEditorAuthHeaders()
         },
         body: formData
       });
@@ -253,7 +339,8 @@
         method: "POST",
         headers: {
           "Accept": "application/json",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...withEditorAuthHeaders()
         },
         body: JSON.stringify(payload)
       });
@@ -288,7 +375,8 @@
         method: "POST",
         headers: {
           "Accept": "application/json",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...withEditorAuthHeaders()
         },
         body: JSON.stringify(payload)
       });
@@ -329,7 +417,8 @@
         method: "POST",
         headers: {
           "Accept": "application/json",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...withEditorAuthHeaders()
         },
         body: JSON.stringify(payload),
         signal: controller ? controller.signal : void 0
@@ -442,7 +531,8 @@
         method: "POST",
         headers: {
           "Accept": "text/event-stream, application/json",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...withEditorAuthHeaders()
         },
         body: JSON.stringify({ ...payload, stream: true }),
         signal: controller ? controller.signal : void 0
@@ -6488,33 +6578,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
-    const canRenderPublicExternalSubmission = !((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit) && ((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.editModeAllowed) !== false && (status == null ? void 0 : status.target) !== "file";
     editPanel.hidden = false;
-    if (canRenderPublicExternalSubmission) {
-      const treeItems2 = Array.isArray(config == null ? void 0 : config.tree) ? config.tree : [];
-      const uploadSectionHtml2 = renderUploadSectionHtml({
-        isFileTarget: false,
-        isEmptyFolder: treeItems2.length === 0,
-        externalOnly: true,
-        showLauncher: false,
-        activeWorkName
-      });
+    if (!((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit) && ((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.editModeAllowed) !== false && (status == null ? void 0 : status.target) !== "file") {
       editPanel.innerHTML = `
-            <h3 class="edit-panel-title">Submit external link</h3>
+            <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status" id="editInlineStatus">${escapeHtml((status == null ? void 0 : status.error) || "")}</div>
-            ${uploadSectionHtml2}
+            <div class="small-note">Enter the editor password to unlock editing.</div>
         `;
       const statusEl2 = editPanel.querySelector("#editInlineStatus");
-      bindUploadDialog({
-        editPanel,
-        statusEl: statusEl2,
-        uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
-        externalOnly: true,
-        onUploadFiles,
-        onCreateBlankFile,
-        onCreateFolder,
-        onCreateLink
-      });
       syncPromptDock();
       return { statusEl: statusEl2, promptRoot: null };
     }
@@ -7752,6 +7823,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           path: getEditTargetPath(selection2),
           intent: "logout"
         });
+        clearEditorAuthToken();
         if (data == null ? void 0 : data.auth) {
           updateAuthState(data.auth);
         }
@@ -7977,6 +8049,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           });
           if (data == null ? void 0 : data.auth) {
             updateAuthState(data.auth);
+          }
+          if (typeof (data == null ? void 0 : data.authToken) === "string" && data.authToken.trim() !== "") {
+            setEditorAuthToken(data.authToken);
           }
           if (!data || data.allowed === false || !((_a = data.auth) == null ? void 0 : _a.authenticated)) {
             syncEditToggle();
