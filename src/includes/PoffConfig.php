@@ -10,7 +10,7 @@ require_once __DIR__ . '/PoffConfig/bootstrap.php';
 class PoffConfig
 {
     private const DEFAULT_LAYOUT_FOLDER = '.layout';
-    private const EDIT_ONLY_TREE_ENTRIES = ['.layout', '.htaccess'];
+    private const EDIT_ONLY_TREE_ENTRIES = ['.layout'];
     private const LAYOUT_TEMPLATE_FILE = 'template.hbs';
     private const LAYOUT_STYLE_FILE = 'style.css';
     private const LAYOUT_SCRIPT_FILE = 'script.js';

@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/edit-mode.php';
+
 function mcpPoffDirOverride(): ?string
 {
     $poffBase = getenv('POFF_BASE');
@@ -73,7 +76,7 @@ function mcpBuildFileTree(string $dir, string $base): array
         if ($entry === '.' || $entry === '..') {
             continue;
         }
-        if (in_array($entry, ['.git', '.DS_Store', 'node_modules', '.works', '.layout'], true)) {
+        if (cmsIsHiddenSystemEntry($entry)) {
             continue;
         }
 
@@ -234,4 +237,23 @@ function mcpResolveFileInsideRoot(string $rootDir, string $relativePath): ?strin
 {
     $path = mcpResolvePathInsideRoot($rootDir, $relativePath);
     return $path !== null && is_file($path) ? $path : null;
+}
+
+function mcpEditorAccessState(string $rootDir, ?string $path = null): array
+{
+    $candidateDir = $rootDir;
+    if (is_string($path) && trim($path) !== '') {
+        $resolved = mcpResolvePathInsideRoot($rootDir, $path);
+        if (is_string($resolved) && $resolved !== '') {
+            $candidateDir = is_dir($resolved) ? $resolved : dirname($resolved);
+        }
+    }
+
+    $editModeAllowed = cmsEditModeAllowedForDirectory($candidateDir, $rootDir);
+    return [
+        'allowed' => $editModeAllowed && cmsIsEditorAuthenticated($rootDir),
+        'editModeAllowed' => $editModeAllowed,
+        'auth' => cmsBuildEditorAuthView($rootDir, $editModeAllowed),
+        'error' => cmsEditorAuthError($rootDir, $editModeAllowed),
+    ];
 }

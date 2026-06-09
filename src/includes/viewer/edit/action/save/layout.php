@@ -1,5 +1,30 @@
 <?php
 
+function cmsEditSavePruneLayoutState(array $layout, string $layoutPreset): array
+{
+    foreach ([
+        'storage',
+        'directory',
+        'inheritedDirectory',
+        'baseHref',
+        'sectionDirectory',
+        'sectionBaseHref',
+        'cssHref',
+        'jsHref',
+        'assets',
+        'files',
+        'assetCount',
+    ] as $runtimeKey) {
+        unset($layout[$runtimeKey]);
+    }
+
+    if ($layoutPreset !== 'shared') {
+        unset($layout['source'], $layout['sharedName']);
+    }
+
+    return $layout;
+}
+
 function cmsEditSaveApplyLayoutFields(array &$config, array $data, string $subjectType, string $targetDir, ?string $targetFile): void
 {
     $layoutPayload = isset($data['layout']) && is_array($data['layout']) ? $data['layout'] : null;
@@ -167,8 +192,9 @@ function cmsEditSaveApplyLayoutFields(array &$config, array $data, string $subje
             if (!$wasProvided && array_key_exists($layoutFileKey, $layout) && trim((string) $layout[$layoutFileKey]) === '') {
                 unset($layout[$layoutFileKey]);
             }
-            }
-            $config['work']['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
+        }
+        $layout = cmsEditSavePruneLayoutState($layout, (string) ($layout['preset'] ?? ''));
+        $config['work']['layout'] = Worktype::normalizeLayout($layout, $layoutSection);
         } elseif ($workLayout !== '') {
             $config['work']['layout'] = Worktype::normalizeLayout($workLayout, $layoutSection);
         }

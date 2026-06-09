@@ -36,6 +36,37 @@ function loadCategoryHelpers() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;'),
+    bindStoredDetailsState() {
+      return () => {};
+    },
+    renderPersistentDetailsSection({
+      defaultOpen = true,
+      id = '',
+      className = '',
+      summaryClassName = '',
+      bodyClassName = '',
+      titleHtml = '',
+      noteHtml = '',
+      bodyHtml = '',
+    } = {}) {
+      const detailsClasses = ['edit-collapsible-details', className].filter(Boolean).join(' ');
+      const summaryClasses = ['edit-work-fields-header', 'edit-collapsible-summary', summaryClassName].filter(Boolean).join(' ');
+      const bodyClasses = ['edit-collapsible-details-body', bodyClassName].filter(Boolean).join(' ');
+
+      return `
+        <details class="${detailsClasses}"${id ? ` id="${id}"` : ''}${defaultOpen ? ' open' : ''}>
+            <summary class="${summaryClasses}">
+                <div>
+                    ${titleHtml ? `<div class="edit-work-fields-title">${titleHtml}</div>` : ''}
+                    ${noteHtml ? `<div class="small-note">${noteHtml}</div>` : ''}
+                </div>
+            </summary>
+            <div class="${bodyClasses}">
+                ${bodyHtml}
+            </div>
+        </details>
+    `;
+    },
   });
 
   vm.runInContext(`${source}
@@ -163,6 +194,9 @@ describe('work category edit helpers', () => {
     });
 
     expect(getWorkCategoryOptions({ categories: ['image', 'media', 'visual'] })).toEqual(['image', 'media', 'visual']);
+    expect(html).toContain('class="edit-collapsible-details edit-work-fields edit-work-category-section"');
+    expect(html).toContain('<summary class="edit-work-fields-header edit-collapsible-summary edit-work-category-summary">');
+    expect(html).not.toContain('<details class="edit-collapsible-details edit-work-fields edit-work-category-section" open>');
     expect(html).toContain('id="edit-work-category-select"');
     expect(html).toContain('id="editWorkCategoryAdd"');
     expect(html).toContain('data-work-config-key="categories"');

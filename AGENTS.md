@@ -9,3 +9,4 @@ do not commit changes to poff.config.json or poff.config.toon unless explicitly 
 keep <!-- NAV_PLACEHOLDER --> in src/includes/layout.php (used by build injection)
 run npm run test:mcp and php -l on changed PHP files after edits
 run npm run build only when user explicitly asks for rebuild
+the local browser runtime is served by a watch task and usually reflects current source changes; do not assume a rebuild mismatch unless a live response proves otherwise

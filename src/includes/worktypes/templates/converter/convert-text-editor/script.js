@@ -1,0 +1,213 @@
+(function () {
+  const initTextEditorConverter = () => {
+    const root = document.querySelector('[data-poff-text-editor-converter], .poff-text-editor-converter');
+    if (!root) {
+      return;
+    }
+
+    const host = root.querySelector('[data-poff-text-editor-host]');
+    const fallback = root.querySelector('[data-poff-text-editor-fallback]');
+    const status = root.querySelector('[data-poff-text-editor-status]');
+    if (!(host instanceof HTMLElement) || !(fallback instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    const aceSources = [
+      'https://cdn.jsdelivr.net/npm/ace-builds@1.43.4/src-min-noconflict/ace.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/ace/1.43.4/ace.js',
+    ];
+    let editor = null;
+    let settled = false;
+    const extension = String(root.dataset.sourceExtension || '').toLowerCase();
+    const mime = String(root.dataset.sourceMime || '').toLowerCase();
+    const converterFormat = String(root.dataset.converterFormat || '').toLowerCase();
+
+    const resolveEffectiveFormat = () => {
+      if (converterFormat && converterFormat !== 'source') {
+        return converterFormat;
+      }
+      if (extension) {
+        return extension;
+      }
+      if (mime === 'application/json') {
+        return 'json';
+      }
+      if (mime === 'text/markdown') {
+        return 'md';
+      }
+      if (mime === 'text/html') {
+        return 'html';
+      }
+      if (mime === 'text/css') {
+        return 'css';
+      }
+      if (mime === 'application/javascript') {
+        return 'js';
+      }
+      return 'txt';
+    };
+
+    const effectiveFormat = resolveEffectiveFormat();
+    const isJsonSource = effectiveFormat === 'json';
+
+    const resolveAceMode = () => {
+      if (effectiveFormat === 'json') {
+        return 'ace/mode/json';
+      }
+      if (effectiveFormat === 'md' || effectiveFormat === 'markdown') {
+        return 'ace/mode/markdown';
+      }
+      if (effectiveFormat === 'html' || effectiveFormat === 'htm') {
+        return 'ace/mode/html';
+      }
+      if (effectiveFormat === 'css') {
+        return 'ace/mode/css';
+      }
+      if (effectiveFormat === 'js' || effectiveFormat === 'mjs' || effectiveFormat === 'cjs' || effectiveFormat === 'javascript') {
+        return 'ace/mode/javascript';
+      }
+      if (effectiveFormat === 'rtf') {
+        return 'ace/mode/text';
+      }
+      return 'ace/mode/text';
+    };
+
+    const updateStatus = (message) => {
+      if (status instanceof HTMLElement) {
+        status.textContent = message;
+      }
+    };
+
+    const formatFallbackContent = () => {
+      if (!isJsonSource) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(fallback.value);
+        fallback.value = JSON.stringify(parsed, null, 2);
+      } catch {
+        // Keep invalid JSON editable exactly as-is.
+      }
+    };
+
+    const currentValue = () => {
+      if (editor && typeof editor.getValue === 'function') {
+        return editor.getValue();
+      }
+      return fallback.value;
+    };
+
+    const buildEndpoint = () => {
+      const pathname = String(window.location.pathname || '/');
+      const normalizedBasePath = pathname.endsWith('/')
+        ? pathname
+        : `${pathname}/`;
+      return new URL(
+        'worktypes/templates/converter/convert-text-editor/converter.php',
+        `${window.location.origin}${normalizedBasePath}`
+      ).toString();
+    };
+
+    const payloadProvider = ({ converter = {} } = {}) => ({
+      converter: {
+        ...converter,
+        node: {
+          id: 'text-editor-local-php',
+          endpoint: buildEndpoint(),
+        },
+      },
+      editor: {
+        content: currentValue(),
+        editorKind: editor ? 'ace-cdn' : 'textarea-fallback',
+      },
+    });
+    window.poffConverterPayloadProvider = payloadProvider;
+    root.__poffConverterPayloadProvider = payloadProvider;
+    root.dataset.poffConverterProvider = 'true';
+    try {
+      if (window.top && window.top !== window) {
+        window.top.poffConverterPayloadProvider = payloadProvider;
+      }
+    } catch (error) {
+      // Ignore cross-window registration failures and keep the local provider.
+    }
+
+    formatFallbackContent();
+    root.dataset.editorFallbackReady = 'true';
+    updateStatus(isJsonSource ? 'Textarea editor active. JSON formatted.' : 'Textarea editor active.');
+
+    const attachEditor = () => {
+      if (!window.ace || typeof window.ace.edit !== 'function') {
+        updateStatus('Editor unavailable. Textarea fallback is active.');
+        return false;
+      }
+
+      root.dataset.editorReady = 'true';
+      editor = window.ace.edit(host);
+      editor.setTheme('ace/theme/monokai');
+      editor.session.setMode(resolveAceMode());
+      editor.session.setUseWrapMode(true);
+      editor.setValue(fallback.value || '', -1);
+      editor.setOptions({
+        fontSize: '14px',
+        showPrintMargin: false,
+        useSoftTabs: true,
+        tabSize: 2,
+      });
+      updateStatus('Editor ready. Convert will send the current editor content to local PHP.');
+      return true;
+    };
+
+    if (window.ace && typeof window.ace.edit === 'function') {
+      attachEditor();
+      return;
+    }
+
+    const loadAce = (index) => {
+      if (index >= aceSources.length) {
+        settled = true;
+        updateStatus('CDN editor unavailable. Textarea fallback is active.');
+        return;
+      }
+
+      updateStatus(index === 0 ? 'Textarea editor active. Loading Ace upgrade...' : 'Textarea editor active. Trying backup editor CDN...');
+      const script = document.createElement('script');
+      script.src = aceSources[index];
+      script.async = true;
+      let timeoutId = window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        script.remove();
+        loadAce(index + 1);
+      }, 5000);
+
+      script.onload = () => {
+        window.clearTimeout(timeoutId);
+        if (settled) {
+          return;
+        }
+        settled = attachEditor();
+        if (!settled) {
+          loadAce(index + 1);
+        }
+      };
+      script.onerror = () => {
+        window.clearTimeout(timeoutId);
+        if (!settled) {
+          loadAce(index + 1);
+        }
+      };
+      document.head.appendChild(script);
+    };
+
+    loadAce(0);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTextEditorConverter, { once: true });
+    return;
+  }
+
+  initTextEditorConverter();
+})();

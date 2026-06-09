@@ -1,0 +1,32 @@
+{
+  "type": "converter",
+  "name": "convert-pageoff-remote-text",
+  "label": "Convert Pageoff Remote Text",
+  "description": "Pageoff-only demo converter: previews locally, converts through a local remote PHP endpoint, then saves the response as a generated work.",
+  "accepts": ["text/plain", "text/*", "application/json"],
+  "outputs": ["text/html", "text/plain"],
+  "engine": "remote-node",
+  "defaults": {
+    "format": "html",
+    "quality": "default",
+    "saveMode": "new-hidden-work",
+    "hiddenByDefault": true
+  },
+  "ui": {
+    "format": {
+      "type": "select",
+      "label": "Output format",
+      "options": ["html", "txt"]
+    },
+    "quality": {
+      "type": "select",
+      "label": "Quality",
+      "options": ["preview", "default"]
+    },
+    "saveMode": {
+      "type": "select",
+      "label": "Save mode",
+      "options": ["new-hidden-work", "temporary-preview-only"]
+    }
+  }
+}

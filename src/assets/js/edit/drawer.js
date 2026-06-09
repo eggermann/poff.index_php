@@ -8,6 +8,7 @@ export function renderEditDrawer({
     status,
     onClose,
     onSubmit,
+    onDeleteTarget,
 }) {
     if (!editDrawer) {
         return { drawerForm: null, drawerStatus: null };
@@ -23,12 +24,19 @@ export function renderEditDrawer({
     }
 
     const treeHtml = renderDrawerTreeHtml(config, status);
-    editDrawer.innerHTML = renderEditDrawerMarkup({ config, status, treeHtml, treeItems: config?.tree || [] });
+    editDrawer.innerHTML = renderEditDrawerMarkup({
+        config,
+        status,
+        treeHtml,
+        treeItems: config?.tree || [],
+        showDeleteAction: typeof onDeleteTarget === 'function',
+    });
 
     return bindEditDrawerInteractions({
         editDrawer,
         status,
         onClose,
         onSubmit,
+        onDeleteTarget,
     });
 }

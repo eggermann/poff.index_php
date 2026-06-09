@@ -1,0 +1,344 @@
+import { escapeHtml } from '../../core/utils.js';
+import {
+    applyWorkFieldTypeDefaults,
+    createDefaultWorkField,
+    getWorkFieldSchemaProfile,
+    normalizeWorkField,
+    schemaFieldTypeOptions,
+} from '../work-fields.js';
+
+function readRowText(row, selector) {
+    const field = row.querySelector(selector);
+    return field && typeof field.value === 'string' ? field.value : '';
+}
+
+function readRowNumber(row, selector) {
+    const value = readRowText(row, selector).trim();
+    return value === '' ? '' : Number(value);
+}
+
+function readRowList(row, selector) {
+    const value = readRowText(row, selector);
+    return value
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function readRowBool(row, selector) {
+    const field = row.querySelector(selector);
+    return !!field?.checked;
+}
+
+function readRowValue(row, selector) {
+    const field = row.querySelector(selector);
+    if (!field) {
+        return '';
+    }
+    if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+        return field.checked;
+    }
+    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+        return field.value;
+    }
+    return '';
+}
+
+function renderValueControl(field, index) {
+    const value = field.value;
+    if (field.type === 'checkbox') {
+        return `
+            <label class="edit-work-field-value-toggle">
+                <input class="edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="checkbox"${value ? ' checked' : ''}>
+            </label>
+        `;
+    }
+    if (field.type === 'number') {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="number" step="any" value="${escapeHtml(value ?? '')}" placeholder="Value">`;
+    }
+    if (field.type === 'select') {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="text" value="${escapeHtml(typeof value === 'string' ? value : String(value ?? ''))}" placeholder="Selected value">`;
+    }
+    if (field.type === 'color') {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="color" value="${escapeHtml(value || '#000000')}">`;
+    }
+    if (field.type === 'date') {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="date" value="${escapeHtml(typeof value === 'string' ? value : String(value ?? ''))}">`;
+    }
+    if (field.type === 'url') {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="url" value="${escapeHtml(typeof value === 'string' ? value : String(value ?? ''))}" placeholder="https://example.com">`;
+    }
+    if (field.type === 'email') {
+        return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="email" value="${escapeHtml(typeof value === 'string' ? value : String(value ?? ''))}" placeholder="name@example.com">`;
+    }
+    return `<textarea class="form-textarea edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value rows="${field.type === 'textarea' ? '5' : '2'}" placeholder="Value">${escapeHtml(typeof value === 'string' ? value : String(value ?? ''))}</textarea>`;
+}
+
+function renderSchemaControl(field, key, html) {
+    return getWorkFieldSchemaProfile(field.type).visibleControls.has(key) ? html : '';
+}
+
+function renderSchemaGroup(field, keys, html) {
+    const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
+    return visible ? html : '';
+}
+
+function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
+    if (!fields.length) {
+        return '<div class="small-note edit-work-fields-empty">No extra work fields yet.</div>';
+    }
+
+    return fields.map((field, index) => `
+        <div class="edit-work-field-row" data-work-field-row="${index}">
+            <div class="edit-work-field-main">
+                <div class="edit-work-field-head">
+                    <div>
+                        <label class="edit-label" for="edit-work-field-type-${index}">Type</label>
+                        <select class="form-select edit-work-field-type" id="edit-work-field-type-${index}" data-work-field-type>
+                            ${typeOptions.map((option) => `<option value="${option}" ${field.type === option ? 'selected' : ''}>${option}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="edit-work-field-name-wrap">
+                        <label class="edit-label" for="edit-work-field-name-${index}">Name</label>
+                        <input class="form-input edit-work-field-name" id="edit-work-field-name-${index}" data-work-field-name type="text" value="${escapeHtml(field.name || '')}" placeholder="text1">
+                        <div class="small-note">Use <code>work.${escapeHtml(field.name || 'text1')}</code> or <code>{{${escapeHtml(field.name || 'text1')}}}</code> in templates.</div>
+                    </div>
+                    <button class="btn btn-secondary edit-work-field-remove" type="button" data-work-field-remove aria-label="Remove work field">×</button>
+                </div>
+                <div class="edit-work-field-value-row">
+                    <div class="edit-work-field-value-wrap">
+                        <label class="edit-label" for="edit-work-field-value-${index}">Value</label>
+                        ${renderValueControl(field, index)}
+                    </div>
+                </div>
+                <details class="edit-work-field-advanced">
+                    <summary>Schema options</summary>
+                    <div class="edit-work-field-advanced-grid">
+                        ${renderSchemaGroup(field, ['title', 'description', 'placeholder', 'const', 'default'], `
+                        <section class="edit-work-field-schema-group">
+                            <div class="edit-work-field-schema-group-title">Text</div>
+                            <div class="edit-work-field-schema-group-grid">
+                                ${renderSchemaControl(field, 'title', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-title-${index}">Title</label>
+                                    <input class="form-input edit-work-field-title" id="edit-work-field-title-${index}" data-work-field-title type="text" value="${escapeHtml(field.title || '')}" placeholder="Label title">
+                                </div>
+                                `)}
+                                ${renderSchemaControl(field, 'description', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-description-${index}">Description</label>
+                                    <textarea class="form-textarea edit-work-field-description" id="edit-work-field-description-${index}" data-work-field-description rows="2" placeholder="Short help text">${escapeHtml(field.description || '')}</textarea>
+                                </div>
+                                `)}
+                                ${renderSchemaControl(field, 'placeholder', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-placeholder-${index}">Placeholder</label>
+                                    <input class="form-input edit-work-field-placeholder" id="edit-work-field-placeholder-${index}" data-work-field-placeholder type="text" value="${escapeHtml(field.placeholder || '')}" placeholder="Placeholder">
+                                </div>
+                                `)}
+                                ${renderSchemaControl(field, 'const', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-const-${index}">Const</label>
+                                    ${field.type === 'checkbox'
+            ? `<input class="form-input edit-work-field-const" id="edit-work-field-const-${index}" data-work-field-const type="checkbox"${field.const ? ' checked' : ''}>`
+            : field.type === 'number'
+                ? `<input class="form-input edit-work-field-const" id="edit-work-field-const-${index}" data-work-field-const type="number" step="any" value="${escapeHtml(field.const ?? '')}" placeholder="Locked value">`
+                : `<textarea class="form-textarea edit-work-field-const" id="edit-work-field-const-${index}" data-work-field-const rows="2" placeholder="Locked value">${escapeHtml(typeof field.const === 'string' ? field.const : String(field.const ?? ''))}</textarea>`}
+                                </div>
+                                `)}
+                                ${renderSchemaControl(field, 'default', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-default-${index}">Default</label>
+                                    ${field.type === 'checkbox'
+            ? `<input class="form-input edit-work-field-default" id="edit-work-field-default-${index}" data-work-field-default type="checkbox"${field.default ? ' checked' : ''}>`
+            : field.type === 'number'
+                ? `<input class="form-input edit-work-field-default" id="edit-work-field-default-${index}" data-work-field-default type="number" step="any" value="${escapeHtml(field.default ?? '')}" placeholder="Default value">`
+                : `<textarea class="form-textarea edit-work-field-default" id="edit-work-field-default-${index}" data-work-field-default rows="2" placeholder="Default value">${escapeHtml(typeof field.default === 'string' ? field.default : String(field.default ?? ''))}</textarea>`}
+                                </div>
+                                `)}
+                            </div>
+                        </section>
+                        `)}
+                        ${renderSchemaGroup(field, ['format', 'pattern', 'minLength', 'maxLength', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'step'], `
+                        <section class="edit-work-field-schema-group">
+                            <div class="edit-work-field-schema-group-title">Constraints</div>
+                            <div class="edit-work-field-schema-group-grid">
+                                ${renderSchemaControl(field, 'format', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-format-${index}">Format</label>
+                                    <input class="form-input edit-work-field-format" id="edit-work-field-format-${index}" data-work-field-format type="text" value="${escapeHtml(field.format || '')}" placeholder="date-time, uri, email">
+                                </div>
+                                `)}
+                                ${renderSchemaControl(field, 'pattern', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-pattern-${index}">Pattern</label>
+                                    <input class="form-input edit-work-field-pattern" id="edit-work-field-pattern-${index}" data-work-field-pattern type="text" value="${escapeHtml(field.pattern || '')}" placeholder="Regex">
+                                </div>
+                                `)}
+                                <div class="edit-work-field-small-grid">
+                                    ${renderSchemaControl(field, 'minLength', `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-minLength-${index}">Min length</label>
+                                        <input class="form-input edit-work-field-minLength" id="edit-work-field-minLength-${index}" data-work-field-minLength type="number" step="1" value="${escapeHtml(field.minLength ?? '')}" placeholder="0">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, 'maxLength', `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-maxLength-${index}">Max length</label>
+                                        <input class="form-input edit-work-field-maxLength" id="edit-work-field-maxLength-${index}" data-work-field-maxLength type="number" step="1" value="${escapeHtml(field.maxLength ?? '')}" placeholder="0">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, 'minimum', `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-minimum-${index}">Minimum</label>
+                                        <input class="form-input edit-work-field-minimum" id="edit-work-field-minimum-${index}" data-work-field-minimum type="number" step="any" value="${escapeHtml(field.minimum ?? '')}" placeholder="0">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, 'maximum', `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-maximum-${index}">Maximum</label>
+                                        <input class="form-input edit-work-field-maximum" id="edit-work-field-maximum-${index}" data-work-field-maximum type="number" step="any" value="${escapeHtml(field.maximum ?? '')}" placeholder="0">
+                                    </div>
+                                    `)}
+                                    ${renderSchemaControl(field, 'step', `
+                                    <div>
+                                        <label class="edit-label" for="edit-work-field-step-${index}">Step</label>
+                                        <input class="form-input edit-work-field-step" id="edit-work-field-step-${index}" data-work-field-step type="number" step="any" value="${escapeHtml(field.step ?? '')}" placeholder="1">
+                                    </div>
+                                    `)}
+                                </div>
+                            </div>
+                        </section>
+                        `)}
+                        ${renderSchemaGroup(field, ['enum', 'examples'], `
+                        <section class="edit-work-field-schema-group">
+                            <div class="edit-work-field-schema-group-title">Values</div>
+                            <div class="edit-work-field-schema-group-grid">
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-enum-${index}">Enum</label>
+                                    <textarea class="form-textarea edit-work-field-enum" id="edit-work-field-enum-${index}" data-work-field-enum rows="2" placeholder="One option per line">${escapeHtml(Array.isArray(field.enum) ? field.enum.join('\n') : '')}</textarea>
+                                </div>
+                                ${renderSchemaControl(field, 'examples', `
+                                <div>
+                                    <label class="edit-label" for="edit-work-field-examples-${index}">Examples</label>
+                                    <textarea class="form-textarea edit-work-field-examples" id="edit-work-field-examples-${index}" data-work-field-examples rows="2" placeholder="One example per line">${escapeHtml(Array.isArray(field.examples) ? field.examples.join('\n') : '')}</textarea>
+                                </div>
+                                `)}
+                            </div>
+                        </section>
+                        `)}
+                        ${renderSchemaGroup(field, ['required', 'readOnly', 'writeOnly', 'deprecated', 'nullable'], `
+                        <section class="edit-work-field-schema-group">
+                            <div class="edit-work-field-schema-group-title">Flags</div>
+                            <div class="edit-work-field-bools">
+                                <label class="edit-work-field-check"><input type="checkbox" data-work-field-required${field.required ? ' checked' : ''}><span>required</span></label>
+                                <label class="edit-work-field-check"><input type="checkbox" data-work-field-readOnly${field.readOnly ? ' checked' : ''}><span>readOnly</span></label>
+                                <label class="edit-work-field-check"><input type="checkbox" data-work-field-writeOnly${field.writeOnly ? ' checked' : ''}><span>writeOnly</span></label>
+                                <label class="edit-work-field-check"><input type="checkbox" data-work-field-deprecated${field.deprecated ? ' checked' : ''}><span>deprecated</span></label>
+                                <label class="edit-work-field-check"><input type="checkbox" data-work-field-nullable${field.nullable ? ' checked' : ''}><span>nullable</span></label>
+                            </div>
+                        </section>
+                        `)}
+                    </div>
+                </details>
+            </div>
+        </div>
+    `).join('');
+}
+
+export function createWorkFieldEditor({ editPanel, onWorkFieldsInput, initialState = [] }) {
+    const typeOptions = schemaFieldTypeOptions();
+    let workFieldState = initialState;
+
+    const commitWorkFieldState = () => {
+        if (typeof onWorkFieldsInput !== 'function') {
+            return;
+        }
+        workFieldState = workFieldState.map((field, index) => normalizeWorkField(field, index));
+        onWorkFieldsInput(workFieldState);
+    };
+
+    const syncWorkFieldsFromDom = () => {
+        const rows = Array.from(editPanel.querySelectorAll('[data-work-field-row]'));
+        workFieldState = rows.map((row, index) => {
+            const previous = workFieldState[index] && typeof workFieldState[index] === 'object' ? workFieldState[index] : {};
+            const candidate = {
+                ...previous,
+                type: readRowText(row, '[data-work-field-type]') || 'text',
+                name: readRowText(row, '[data-work-field-name]') || '',
+                title: readRowText(row, '[data-work-field-title]') || '',
+                description: readRowText(row, '[data-work-field-description]') || '',
+                placeholder: readRowText(row, '[data-work-field-placeholder]') || '',
+                const: readRowText(row, '[data-work-field-const]') || '',
+                value: readRowValue(row, '[data-work-field-value]'),
+                default: readRowValue(row, '[data-work-field-default]'),
+                format: readRowText(row, '[data-work-field-format]') || '',
+                pattern: readRowText(row, '[data-work-field-pattern]') || '',
+                required: readRowBool(row, '[data-work-field-required]'),
+                readOnly: readRowBool(row, '[data-work-field-readOnly]'),
+                writeOnly: readRowBool(row, '[data-work-field-writeOnly]'),
+                deprecated: readRowBool(row, '[data-work-field-deprecated]'),
+                nullable: readRowBool(row, '[data-work-field-nullable]'),
+                minLength: readRowNumber(row, '[data-work-field-minLength]'),
+                maxLength: readRowNumber(row, '[data-work-field-maxLength]'),
+                minimum: readRowNumber(row, '[data-work-field-minimum]'),
+                maximum: readRowNumber(row, '[data-work-field-maximum]'),
+                step: readRowNumber(row, '[data-work-field-step]'),
+                enum: readRowList(row, '[data-work-field-enum]'),
+                examples: readRowList(row, '[data-work-field-examples]'),
+            };
+            return applyWorkFieldTypeDefaults(normalizeWorkField(candidate, index), candidate.type);
+        });
+        commitWorkFieldState();
+    };
+
+    const rerenderWorkFields = () => {
+        const listEl = editPanel.querySelector('#editWorkFieldsList');
+        if (!listEl) {
+            return;
+        }
+        listEl.innerHTML = renderWorkFieldRows(workFieldState, typeOptions);
+        listEl.querySelectorAll('[data-work-field-row]').forEach((row) => {
+            const typeEl = row.querySelector('[data-work-field-type]');
+            const nameEl = row.querySelector('[data-work-field-name]');
+            const valueEl = row.querySelector('[data-work-field-value]');
+            const removeEl = row.querySelector('[data-work-field-remove]');
+            const updateFromRow = () => syncWorkFieldsFromDom();
+            if (typeEl) {
+                typeEl.addEventListener('change', () => {
+                    syncWorkFieldsFromDom();
+                    rerenderWorkFields();
+                });
+                typeEl.addEventListener('input', updateFromRow);
+            }
+            if (nameEl) {
+                nameEl.addEventListener('input', updateFromRow);
+            }
+            if (valueEl) {
+                valueEl.addEventListener('input', updateFromRow);
+            }
+            if (removeEl) {
+                removeEl.addEventListener('click', () => {
+                    const index = Number(row.getAttribute('data-work-field-row') || '0');
+                    workFieldState.splice(index, 1);
+                    rerenderWorkFields();
+                    commitWorkFieldState();
+                });
+            }
+        });
+    };
+
+    const addWorkField = () => {
+        workFieldState = [...workFieldState, createDefaultWorkField(workFieldState)];
+        rerenderWorkFields();
+        commitWorkFieldState();
+    };
+
+    return {
+        getFields: () => workFieldState,
+        renderRows: () => renderWorkFieldRows(workFieldState, typeOptions),
+        syncWorkFieldsFromDom,
+        rerenderWorkFields,
+        addWorkField,
+    };
+}

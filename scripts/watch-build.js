@@ -7,6 +7,7 @@ const rootDir = path.resolve(__dirname, '..');
 const mampHtdocs = '/Applications/MAMP/htdocs';
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
 const standaloneCopyTargets = ['MAUSMAUS'];
+const bundledLayoutAsset = path.join(rootDir, 'src', 'includes', 'worktypes', 'templates', 'layout', 'default', 'poff.profile.jpg');
 
 function logBrowseUrl(linkName) {
   if (!linkName) return;
@@ -92,8 +93,68 @@ function ensureStandaloneCopies(outputDir, outputFile) {
     const targetFile = path.join(targetDir, outputFile);
     fs.mkdirSync(targetDir, { recursive: true });
     fs.copyFileSync(sourceFile, targetFile);
+    removeGeneratedEntrypointsFromSubdirectories(targetDir, outputFile);
+    if (fs.existsSync(bundledLayoutAsset)) {
+      copyFileToLayoutDirectories(bundledLayoutAsset, targetDir);
+    }
     console.log(`[watch] Copied standalone build ${sourceFile} -> ${targetFile}.`);
     logBrowseUrl(targetName);
+  });
+}
+
+function findAllDirectories(rootDir) {
+  const dirs = [];
+  const stack = [rootDir];
+
+  while (stack.length > 0) {
+    const currentDir = stack.pop();
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+
+    entries.forEach((entry) => {
+      if (!entry.isDirectory()) {
+        return;
+      }
+
+      const fullPath = path.join(currentDir, entry.name);
+      if (
+        entry.name.startsWith('.')
+        || entry.name === 'build'
+        || entry.name === 'vendor'
+        || entry.name === 'node_modules'
+      ) {
+        return;
+      }
+
+      dirs.push(fullPath);
+      stack.push(fullPath);
+    });
+  }
+
+  return dirs;
+}
+
+function copyFileToLayoutDirectories(sourceFile, targetRoot, layoutDirName = '.layout') {
+  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
+    const destinationDir = path.join(dir, layoutDirName);
+    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.copyFileSync(sourceFile, path.join(destinationDir, path.basename(sourceFile)));
+  });
+}
+
+function removeGeneratedEntrypointsFromSubdirectories(targetRoot, fileName = 'index.php') {
+  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
+    const candidate = path.join(dir, fileName);
+    if (dir === targetRoot || !fs.existsSync(candidate)) {
+      return;
+    }
+
+    const stat = fs.statSync(candidate);
+    if (!stat.isFile()) {
+      return;
+    }
+
+    fs.unlinkSync(candidate);
+    console.log(`[watch] Removed subdirectory entrypoint: ${candidate}`);
   });
 }
 

@@ -1,6 +1,55 @@
 <?php
 
-function renderFolderViewer(string $relativePath, string $fullPath): void
+function cmsCompactFolderRenderTree(array $items, int $depthRemaining): array
+{
+    $compacted = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $next = $item;
+        if (isset($next['children']) && is_array($next['children'])) {
+            if ($depthRemaining > 0) {
+                $next['children'] = cmsCompactFolderRenderTree($next['children'], $depthRemaining - 1);
+                $next['childCount'] = count($next['children']);
+            } else {
+                unset($next['children']);
+            }
+        }
+        $compacted[] = $next;
+    }
+
+    return $compacted;
+}
+
+function cmsCompactFolderRenderContext(array $context): array
+{
+    $allItems = is_array($context['allItems'] ?? null) ? $context['allItems'] : [];
+    $isRootFolder = trim((string) ($context['path'] ?? ''), '/\\') === '';
+    $isLargeFolder = count($allItems) > 250;
+    if (!$isRootFolder && !$isLargeFolder) {
+        return $context;
+    }
+
+    $tree = is_array($context['tree'] ?? null) ? $context['tree'] : [];
+    $compactedTree = cmsCompactFolderRenderTree($tree, 1);
+    $context['tree'] = $compactedTree;
+    $context['items'] = $compactedTree;
+
+    if (is_array($context['workTree'] ?? null)) {
+        unset($context['workTree']['children']);
+    }
+
+    foreach (['allItems', 'allFiles', 'allFolders', 'allImages', 'allVideos', 'allAudio', 'allPdfs', 'allTexts', 'allLinks', 'allOther'] as $key) {
+        if (is_array($context[$key] ?? null)) {
+            $context[$key] = array_slice($context[$key], 0, 250);
+        }
+    }
+
+    return $context;
+}
+
+function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullPath): array
 {
     $folderConfig = null;
     if (class_exists('PoffConfig')) {
@@ -21,8 +70,10 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         $work['template'] = $workTemplateKey !== '' ? $workTemplateKey : 'folder';
     }
     $work['type'] = $work['type'] ?? 'folder';
+    $isConverterWork = strtolower(trim((string) ($work['type'] ?? ''))) === 'converter'
+        || strtolower(trim((string) ($work['template'] ?? ''))) === 'converter';
     if (class_exists('PoffConfig')) {
-        $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, false, 'works');
+        $work['layout'] = PoffConfig::prepareLayoutForView($work['layout'] ?? null, $relativePath, false, $isConverterWork ? 'work' : 'works');
     }
 
     $rawName = $folderConfig['folderName'] ?? basename($fullPath);
@@ -35,7 +86,7 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'name' => $rawName,
         'title' => $folderConfig['title'] ?? $rawName,
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
-    ]);
+    ], trim($relativePath, '/\\') === '' ? ['maxDepth' => 0] : []);
     $tree = $folderViewData['tree'];
     $descriptionHtml = '';
     if (!empty($folderConfig['description'])) {
@@ -48,7 +99,13 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         $browseHref .= rawurlencode($relativePath);
     }
 
-    $bodyContent = Worktype::render('folder', [
+    $converterDefinition = null;
+    if ($isConverterWork && class_exists('Converter')) {
+        $converterRootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir($fullPath) : dirname($fullPath);
+        $converterDefinition = Converter::definitionFromFolder($converterRootDir, $relativePath);
+    }
+
+    $context = [
         'path' => $relativePath,
         'viewerHref' => $viewerHref,
         'viewUrl' => $viewerHref,
@@ -64,7 +121,6 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
         'folderName' => $folderConfig['folderName'] ?? $rawName,
         'tree' => $tree,
-        'items' => $tree,
         'workTree' => $folderViewData['workTree'],
         'allItems' => $folderViewData['allItems'],
         'allFiles' => $folderViewData['allFiles'],
@@ -80,15 +136,66 @@ function renderFolderViewer(string $relativePath, string $fullPath): void
         'itemCount' => count($tree),
         'allItemCount' => count($folderViewData['allItems']),
         'work' => $work,
-    ]);
+    ];
+    $context = cmsCompactFolderRenderContext($context);
+    if ($isConverterWork) {
+        $context['converter'] = [
+            'id' => (string) ($converterDefinition['id'] ?? ''),
+            'name' => (string) ($converterDefinition['name'] ?? basename($relativePath)),
+            'label' => (string) ($converterDefinition['label'] ?? ($folderConfig['title'] ?? $rawName)),
+            'accepts' => $converterDefinition['accepts'] ?? [],
+            'outputs' => $converterDefinition['outputs'] ?? [],
+            'formats' => $converterDefinition['formats'] ?? [],
+            'engine' => (string) ($converterDefinition['engine'] ?? ''),
+            'path' => (string) ($converterDefinition['path'] ?? $relativePath),
+            'folder' => (string) ($converterDefinition['folder'] ?? $relativePath),
+            'viewerHref' => (string) ($converterDefinition['viewerHref'] ?? $viewerHref),
+            'url' => (string) ($converterDefinition['url'] ?? $viewerHref),
+            'format' => (string) (($converterDefinition['defaults']['format'] ?? '')),
+            'quality' => (string) (($converterDefinition['defaults']['quality'] ?? '')),
+        ];
+        $context['source'] = [
+            'name' => '',
+            'path' => '',
+            'mimeType' => '',
+        ];
+        $context['target'] = [
+            'saveAs' => '',
+            'mode' => (string) (($converterDefinition['defaults']['saveMode'] ?? 'new-hidden-work')),
+        ];
+        $context['status'] = [
+            'state' => 'ready',
+        ];
+    }
 
-    renderViewerShell([
-        'type' => 'folder',
+    $viewerType = $isConverterWork ? 'converter' : 'folder';
+    $bodyContent = Worktype::render($viewerType, $context);
+
+    return [
+        'type' => $viewerType,
         'name' => $rawName,
+        'title' => $folderConfig['title'] ?? $rawName,
         'path' => $relativePath,
         'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,
         'openHref' => $browseHref,
         'openLabel' => 'Open Folder',
+        'snapshotContext' => $context,
+        'renderedHtml' => $bodyContent,
+    ];
+}
+
+function renderFolderViewer(string $relativePath, string $fullPath): void
+{
+    $payload = cmsBuildFolderViewerSnapshotPayload($relativePath, $fullPath);
+    renderViewerShell([
+        'type' => $payload['type'],
+        'name' => $payload['name'],
+        'title' => $payload['title'],
+        'path' => $payload['path'],
+        'layout' => $payload['layout'],
+        'bodyContent' => $payload['bodyContent'],
+        'openHref' => $payload['openHref'],
+        'openLabel' => $payload['openLabel'],
     ]);
 }

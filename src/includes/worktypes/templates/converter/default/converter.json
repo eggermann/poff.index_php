@@ -1,0 +1,32 @@
+{
+  "type": "converter",
+  "name": "convert-image",
+  "label": "Convert Image",
+  "description": "Converts incoming files into browser-readable poff works.",
+  "accepts": ["image/tiff", "image/*"],
+  "outputs": ["image/webp", "image/jpeg", "image/png"],
+  "engine": "imagemagick",
+  "defaults": {
+    "format": "webp",
+    "quality": "default",
+    "saveMode": "new-hidden-work",
+    "hiddenByDefault": true
+  },
+  "ui": {
+    "format": {
+      "type": "select",
+      "label": "Output format",
+      "options": ["webp", "jpeg", "png"]
+    },
+    "quality": {
+      "type": "select",
+      "label": "Quality",
+      "options": ["preview", "default", "archival", "small-web"]
+    },
+    "saveMode": {
+      "type": "select",
+      "label": "Save mode",
+      "options": ["new-hidden-work", "temporary-preview-only"]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+- generic [ref=e2]:
+  - text: 500 Internal Server Error The server encountered an internal error or mis- configuration and was unable to complete your request. if you are this site's ... | ... visitor | ... owner | contact the owner | visit
+  - link "[the manual]" [ref=e3] [cursor=pointer]:
+    - /url: https://manual.uberspace.de/web-logs
+  - text: to about their site | learn how to enable or try to reach | and find the error the site later. | log. For web backends | check the
+  - link "[service logs]" [ref=e4] [cursor=pointer]:
+    - /url: https://manual.uberspace.de/daemons-supervisord#logging
+  - text: . | disable this site using
+  - link "[[uberspace web errorpage]]" [ref=e5] [cursor=pointer]:
+    - /url: https://manual.uberspace.de/web-errorpage
+  - text: . hosted on
+  - link "[asteroids]" [ref=e6] [cursor=pointer]:
+    - /url: https://uberspace.de

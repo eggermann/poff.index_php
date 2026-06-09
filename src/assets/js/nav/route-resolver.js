@@ -12,6 +12,44 @@ export function createRouteResolver({ navList } = {}) {
     const slugToPathAliases = new Map();
     const pathToSlugAliases = new Map();
 
+    function configuredTree() {
+        const tree = window?.POFF_CONTEXT?.currentPoffConfig?.tree;
+        return Array.isArray(tree) ? tree : [];
+    }
+
+    function resolveConfiguredTreePath(items = [], target = '', prefix = '') {
+        const normalizedTarget = normalizeHashPath(target);
+        if (!normalizedTarget || !Array.isArray(items)) {
+            return null;
+        }
+
+        for (const item of items) {
+            if (!item || typeof item !== 'object') {
+                continue;
+            }
+
+            const name = normalizeHashPath(item.name || '');
+            const rawPath = normalizeHashPath(item.path || item.relativePath || name);
+            const resolvedPath = normalizeHashPath(prefix ? `${prefix}/${rawPath}` : rawPath);
+            const slug = normalizeHashPath(item.slug || '');
+            const routeSlug = normalizeHashPath(item.routeSlug || '');
+            const candidates = [resolvedPath, rawPath, name, slug, routeSlug].filter(Boolean);
+
+            if (candidates.includes(normalizedTarget)) {
+                return routeResolution(resolvedPath || rawPath || name, item.type !== 'folder');
+            }
+
+            if (Array.isArray(item.children)) {
+                const found = resolveConfiguredTreePath(item.children, normalizedTarget, resolvedPath);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+
+        return null;
+    }
+
     function rememberSlugPathAlias(detail = {}) {
         const path = normalizeHashPath(detail?.routePath || detail?.path || detail?.relativePath || '');
         const slug = normalizeHashPath(detail?.routeSlug || detail?.slug || '');
@@ -30,14 +68,24 @@ export function createRouteResolver({ navList } = {}) {
             return routeResolution(aliasPath);
         }
         if (!normalizedPath.includes('/')) {
-            const link = findNavLinkByAttribute(navList, 'data-slug', normalizedPath);
+            const link = findNavLinkByAttribute(navList, 'data-route-slug', normalizedPath)
+                || findNavLinkByAttribute(navList, 'data-slug', normalizedPath);
             const targetPath = navTargetPath(link);
             if (targetPath) {
                 rememberSlugPathAlias({
                     path: targetPath,
-                    slug: normalizedPath,
+                    slug: link?.getAttribute('data-route-slug') || normalizedPath,
                 });
                 return routeResolution(targetPath, navTargetIsFile(link, targetPath));
+            }
+
+            const configuredMatch = resolveConfiguredTreePath(configuredTree(), normalizedPath);
+            if (configuredMatch) {
+                rememberSlugPathAlias({
+                    path: configuredMatch.path,
+                    slug: normalizedPath,
+                });
+                return configuredMatch;
             }
         }
         return routeResolution(normalizedPath);
@@ -52,13 +100,20 @@ export function createRouteResolver({ navList } = {}) {
             || normalizedPath === '.layout'
             || normalizedPath.endsWith('/.layout')
             || inferFilePath(normalizedPath)
+            || resolved.isFile
             || resolved.path !== normalizedPath
         ) {
             return resolved;
         }
 
         try {
-            const response = await fetch(`?ajax=resolve&slug=${encodeURIComponent(normalizedPath)}`, {
+            const requestUrl = new URL(window.location.pathname, window.location.origin);
+            requestUrl.searchParams.set('ajax', 'resolve');
+            requestUrl.searchParams.set('slug', normalizedPath);
+            if (new URL(window.location.href).searchParams.get('edit') === 'true') {
+                requestUrl.searchParams.set('edit', 'true');
+            }
+            const response = await fetch(requestUrl.toString(), {
                 credentials: 'same-origin',
                 headers: {
                     'Accept': 'application/json',
@@ -90,8 +145,9 @@ export function createRouteResolver({ navList } = {}) {
         if (aliasSlug) {
             return aliasSlug;
         }
-        const link = findNavLinkByAttribute(navList, 'data-path', normalizedPath);
-        const slug = link?.getAttribute('data-slug') || '';
+        const link = findNavLinkByAttribute(navList, 'data-path', normalizedPath)
+            || findNavLinkByAttribute(navList, 'data-route-path', normalizedPath);
+        const slug = link?.getAttribute('data-route-slug') || link?.getAttribute('data-slug') || '';
         if (slug && !slug.includes('/')) {
             rememberSlugPathAlias({
                 path: normalizedPath,

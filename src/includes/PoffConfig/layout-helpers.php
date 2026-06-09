@@ -87,10 +87,14 @@ trait PoffConfigLayoutHelpers
             'section' => $resolved['section'],
         ];
 
-        foreach (['preset', 'source', 'sharedName', 'storage', 'model', 'stylePrompt'] as $key) {
+        foreach (['preset', 'model', 'stylePrompt'] as $key) {
             if (array_key_exists($key, $resolved)) {
                 $serialized[$key] = $resolved[$key];
             }
+        }
+
+        if (($resolved['preset'] ?? '') === 'shared' && array_key_exists('sharedName', $resolved)) {
+            $serialized['sharedName'] = $resolved['sharedName'];
         }
 
         return $serialized;

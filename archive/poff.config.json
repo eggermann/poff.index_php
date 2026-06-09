@@ -1,0 +1,541 @@
+{
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "folderName": "archive",
+    "slug": "archive",
+    "title": "archive",
+    "description": "",
+    "type": "folder",
+    "id": "poff_e0a67dccdadb3607",
+    "tree": [
+        {
+            "name": "scan-001.tiff",
+            "slug": "scan-001-tiff",
+            "type": "file",
+            "path": "scan-001.tiff",
+            "modifiedAt": "2026-05-22T12:53:02+00:00",
+            "visible": true
+        },
+        {
+            "name": "scan-001.webp",
+            "slug": "scan-001-webp",
+            "type": "file",
+            "path": "scan-001.webp",
+            "modifiedAt": "2026-05-22T12:53:52+00:00",
+            "visible": false,
+            "title": "scan-001",
+            "kind": "image",
+            "mimeType": "image/webp",
+            "generated": true,
+            "sourceWork": "scan-001.tiff",
+            "generatedBy": {
+                "type": "converter",
+                "name": "convert-image",
+                "id": "converter/convert-image",
+                "folder": "poff/converters/convert-image",
+                "node": "local",
+                "engine": "imagemagick",
+                "quality": "default",
+                "format": "webp",
+                "convertedAt": "2026-05-22T12:53:42+00:00"
+            },
+            "external": {
+                "type": "node-work",
+                "relation": "converted-from",
+                "visible": false,
+                "sourceWork": {
+                    "path": "archive/scan-001.tiff",
+                    "mimeType": "image/tiff"
+                },
+                "resultWork": {
+                    "name": "scan-001.webp",
+                    "mimeType": "image/webp",
+                    "kind": "image",
+                    "srcUrl": "scan-001.webp"
+                },
+                "generatedBy": {
+                    "type": "converter",
+                    "name": "convert-image",
+                    "id": "converter/convert-image",
+                    "folder": "poff/converters/convert-image",
+                    "node": "local",
+                    "engine": "imagemagick",
+                    "quality": "default",
+                    "format": "webp",
+                    "convertedAt": "2026-05-22T12:53:42+00:00"
+                }
+            }
+        }
+    ],
+    "treeHash": "be4117b498de28d2429b86887c24ff10b4aa67d642af29a4600e50503dc726f8",
+    "updatedAt": "2026-05-22T12:53:52+00:00",
+    "work": {
+        "type": "folder",
+        "layout": {
+            "mode": "list",
+            "name": "list",
+            "engine": "lightncandy",
+            "section": "works",
+            "phpTemplate": "",
+            "sharedLayouts": [
+                {
+                    "name": "pages/dominikeggermann.comX/1er/.layout",
+                    "folderName": "1er",
+                    "label": "1er",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/1er/.layout",
+                    "template": "<div class=\"poff-default-layout\"><header class=\"poff-default-layout__header\" style=\"position: sticky; top: 0; z-index: 1000;\"> <div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"> <h1 class=\"poff-default-layout__logo\">Domnik eggermann</h1> <nav class=\"poff-default-layout__nav\"> <ul> <li><a href=\"{{pageLink}}?view=1&path=linkone\">Portfolio</a></li> <li><a href=\"{{pageLink}}?view=1&path=linktwo\">About</a></li> <li><a href=\"{{pageLink}}?view=1&path=linkthree\">Contact</a></li> </ul> </nav> </div> </header> <main class=\"poff-default-layout__main\"> {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}} </main></div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }",
+                    "js": "",
+                    "sectionTemplate": "<div class=\"poff-folder-layout poff-default-layout--grid\" style=\"--poff-shell-bg: purple; --grid-columns: 2;\"> <header class=\"poff-folder-layout__header\"> <h1 class=\"poff-folder-layout__title\">formsofttime</h1> <p class=\"poff-folder-layout__description\">generative art ~ 2004/2006 /records ~1min/ Code: realbasic /</p> </header> <div class=\"poff-folder-layout__content\"> {{#each items}} {{#if (eq kind \"video\")}} <div class=\"poff-folder-layout__item\"> <video controls poster=\"{{#if (lookup ../items (replace name \".mp4\" \".png\"))}}{{lookup ../items (replace name \".mp4\" \".png\")}}{{else}}{{srcUrl}}{{/if}}\"> <source src=\"{{srcUrl}}\" type=\"video/mp4\"> Your browser does not support the video tag. </video> <h2 class=\"poff-folder-layout__item-title\">{{title}}</h2> <a href=\"{{pageLink}}\" class=\"poff-folder-layout__item-link\">View Video</a> </div> {{/if}} {{/each}} </div> </div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 875,
+                            "updatedAt": "2026-04-20T22:19:37+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/AAA/.layout",
+                    "folderName": "AAA",
+                    "label": "AAA",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/AAA/.layout",
+                    "template": "<div class=\"folder\">\n    <h2>{{title}}</h2>\n    <p>{{description}}</p>\n    <ul>\n        {{#each items}}\n            {{#if isFolder}}\n                <li><a href=\"{{pageLink}}\">{{title}}</a></li>\n            {{/if}}\n        {{/each}}\n    </ul>\n</div>",
+                    "css": "",
+                    "js": "",
+                    "sectionTemplate": "<div>{{#each items}}<div><a href=\"{{pageLink}}\"><img src=\"{{srcUrl}}\" alt=\"{{name}}\" style=\"max-width:100%; height:auto; transform: rotate(0deg); transition: transform 0.5s;\" onmouseover=\"this.style.transform='rotate(15deg)';\" onmouseout=\"this.style.transform='rotate(0deg)';\"></a></div>{{/each}}</div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 302,
+                            "updatedAt": "2026-04-14T21:15:37+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/asasdasdadasd/.layout",
+                    "folderName": "asasdasdadasd",
+                    "label": "asasdasdadasd",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/asasdasdadasd/.layout",
+                    "template": "<div class=\"poff-default-layout\"><header class=\"poff-default-layout__header\" style=\"position: sticky; top: 0; z-index: 1000;\"><div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"><h1 class=\"poff-default-layout__logo animate-marquee\">moving band</h1><nav class=\"poff-default-layout__nav\"><ul><li><a href=\"{{pageLink}}?view=1&path=linkone\">Portfolio</a></li><li><a href=\"{{pageLink}}?view=1&path=linktwo\">About</a></li><li><a href=\"{{pageLink}}?view=1&path=linkthree\">Contact</a></li></ul></nav></div></header><div class=\"attention\" onclick=\"window.location.href='{{pageLink}}';\" style=\"cursor: pointer; padding: 20px; background-color: #ffcc00; text-align: center;\">Attention</div><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>",
+                    "css": ".animate-marquee { overflow: hidden; white-space: nowrap; animation: marquee 10s linear infinite; } @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';",
+                    "sectionTemplate": "<div class=\"poff-default-layout__content\"> <h2 class=\"text-white\">{{folderName}}</h2> <p>{{description}}</p> <ul class=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\"> {{#each items}} {{#if (eq kind \"image\")}} <li class=\"poff-default-layout__item\"> <a href=\"{{pageLink}}\" class=\"block border rounded-lg shadow-md overflow-hidden\"> <img src=\"{{srcUrl}}\" alt=\"{{name}}\" class=\"w-full h-auto\"> <div class=\"p-2\"> <span class=\"text-sm text-gray-700\">{{name}}</span> </div> </a> </li> {{/if}} {{/each}} </ul> </div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 516,
+                            "updatedAt": "2026-05-01T20:36:22+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/dont-be-a-chat-bot/bilder/.layout",
+                    "folderName": "bilder",
+                    "label": "bilder",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/dont-be-a-chat-bot/bilder/.layout",
+                    "template": "<div class=\"poff-default-layout min-h-screen\"><header class=\"poff-default-layout__header\"><div class=\"poff-default-layout__content\"><h1 class=\"poff-default-layout__logo text-red-500\">Domnik eggermann</h1><nav class=\"poff-default-layout__nav\"><ul><li><a href=\"?view=1&path=linkone\">Portfolio</a></li><li><a href=\"?view=1&path=linktwo\">About</a></li><li><a href=\"?view=1&path=linkthree\">Contact</a></li><li><a href=\"?view=1&path=dont-be-a-chat-bot%2Fbilder\">Bilder</a></li></ul></nav></div></header><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';",
+                    "sectionTemplate": "<div class=\"poff-default-layout__content\" style=\"display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 1200px; margin: auto;\">\n  {{#each items}}\n    {{#if isFolder}}\n      <div class=\"folder-item\" style=\"padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;\">\n        <h2 style=\"font-size: 1.5em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h2>\n      </div>\n    {{else if isFile}}\n      <div class=\"file-item\" style=\"padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px;\">\n        <h3 style=\"font-size: 1.2em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h3>\n      </div>\n    {{/if}}\n  {{/each}}\n</div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 696,
+                            "updatedAt": "2026-05-02T23:17:19+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "poff/converters/convert-image/.layout",
+                    "folderName": "convert-image",
+                    "label": "convert-image",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "poff/converters/convert-image/.layout",
+                    "template": "<section class=\"converter-app\">\n  {{> work}}\n</section>\n",
+                    "css": "\n",
+                    "js": "\n",
+                    "sectionTemplate": "",
+                    "assets": [
+                        {
+                            "name": "external.hbs",
+                            "path": "external.hbs",
+                            "size": 146,
+                            "updatedAt": "2026-05-22T12:52:28+00:00"
+                        },
+                        {
+                            "name": "work.hbs",
+                            "path": "work.hbs",
+                            "size": 144,
+                            "updatedAt": "2026-05-22T12:52:28+00:00"
+                        }
+                    ],
+                    "files": {
+                        "work.hbs": "work.hbs",
+                        "external.hbs": "external.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/.layout",
+                    "folderName": "dominikeggermann.comX",
+                    "label": "dominikeggermann.comX",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/.layout",
+                    "template": "<div class=\"poff-default-layout\"><header class=\"poff-default-layout__header\" style=\"position: sticky; top: 0; z-index: 1000;\"> <div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"> <h1 class=\"poff-default-layout__logo\">Domnik eggermann</h1> <nav class=\"poff-default-layout__nav\"> <ul> <li><a href=\"{{pageLink}}?view=1&path=linkone\">Portfolio</a></li> <li><a href=\"{{pageLink}}?view=1&path=linktwo\">About</a></li> <li><a href=\"{{pageLink}}?view=1&path=linkthree\">Contact</a></li> </ul> </nav> </div> </header> <main class=\"poff-default-layout__main\"> {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}} </main></div>\n",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }\n",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';\n",
+                    "sectionTemplate": "<div class=\"poff-default-layout__content\" style=\"display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 1200px; margin: auto;\">\n  {{#each items}}\n    {{#if isFolder}}\n      <div class=\"folder-item\" style=\"padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;\">\n        <h2 style=\"font-size: 1.5em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h2>\n      </div>\n    {{else if isFile}}\n      <div class=\"file-item\" style=\"padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px;\">\n        <h3 style=\"font-size: 1.2em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h3>\n      </div>\n    {{/if}}\n  {{/each}}\n</div>\n",
+                    "assets": [
+                        {
+                            "name": "eggman_profile-image.jpg",
+                            "path": "eggman_profile-image.jpg",
+                            "size": 42894,
+                            "updatedAt": "2026-05-12T20:13:32+00:00"
+                        },
+                        {
+                            "name": "poff.config.json",
+                            "path": "poff.config.json",
+                            "size": 1302,
+                            "updatedAt": "2026-04-27T22:31:48+00:00"
+                        },
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 697,
+                            "updatedAt": "2026-04-29T19:56:31+00:00"
+                        }
+                    ],
+                    "files": {
+                        "eggman_profile-image.jpg": "eggman_profile-image.jpg",
+                        "works.hbs": "works.hbs",
+                        "poff.config.json": "poff.config.json"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/dont-be-a-chat-bot/.layout",
+                    "folderName": "dont-be-a-chat-bot",
+                    "label": "dont-be-a-chat-bot",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/dont-be-a-chat-bot/.layout",
+                    "template": "<div class=\"poff-default-layout min-h-screen\"><header class=\"poff-default-layout__header\"><div class=\"poff-default-layout__content\"><h1 class=\"poff-default-layout__logo text-red-500\">Domnik eggermann</h1><nav class=\"poff-default-layout__nav\"><ul><li><a href=\"?view=1&path=linkone\">Portfolio</a></li><li><a href=\"?view=1&path=linktwo\">About</a></li><li><a href=\"?view=1&path=linkthree\">Contact</a></li><li><a href=\"?view=1&path=dont-be-a-chat-bot%2Fbilder\">Bilder</a></li></ul></nav></div></header><main class=\"poff-default-layout__main\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main></div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';",
+                    "sectionTemplate": "<div class=\"poff-default-layout__content\" style=\"display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 1200px; margin: auto;\">\n  {{#each items}}\n    {{#if isFolder}}\n      <div class=\"folder-item\" style=\"padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;\">\n        <h2 style=\"font-size: 1.5em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h2>\n      </div>\n    {{else if isFile}}\n      <div class=\"file-item\" style=\"padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px;\">\n        <h3 style=\"font-size: 1.2em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h3>\n      </div>\n    {{/if}}\n  {{/each}}\n</div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 696,
+                            "updatedAt": "2026-05-02T23:57:37+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/HrMueller/.layout",
+                    "folderName": "HrMueller",
+                    "label": "HrMueller",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/HrMueller/.layout",
+                    "template": "<div class=\"poff-default-layout\"><header class=\"poff-default-layout__header\" style=\"position: sticky; top: 0; z-index: 1000;\"> <div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"> <h1 class=\"poff-default-layout__logo\">Domnik eggermann</h1> <nav class=\"poff-default-layout__nav\"> <ul> <li><a href=\"{{pageLink}}?view=1&path=linkone\">Portfolio</a></li> <li><a href=\"{{pageLink}}?view=1&path=linktwo\">About</a></li> <li><a href=\"{{pageLink}}?view=1&path=linkthree\">Contact</a></li> </ul> </nav> </div> </header> <main class=\"poff-default-layout__main\"> {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}} </main></div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }\n",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';\n",
+                    "sectionTemplate": "<h1 class=\"folder-title text-white\">{{title}}</h1> <p class=\"folder-description text-white text-lg mb-4\">{{work.text1}}</p> <div class=\"grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4\"> {{#each items}} {{#if isFile}} <div class=\"image-item\"> <a href=\"{{pageLink}}\" class=\"block\"> <img src=\"{{srcUrl}}\" alt=\"{{title}}\" class=\"rounded shadow-md w-full h-auto\" /> </a> </div> {{/if}} {{/each}} </div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 402,
+                            "updatedAt": "2026-05-01T20:30:23+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "tests/poff-tests/invalid-json-template/.layout",
+                    "folderName": "invalid-json-template",
+                    "label": "invalid-json-template",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "tests/poff-tests/invalid-json-template/.layout",
+                    "template": "<div class=\"invalid-json-layout\"><main>{{> works}}</main></div>",
+                    "css": "",
+                    "js": "",
+                    "sectionTemplate": "```json\n{\n  \"template\": \"<article class=\"artifact-card\">\n    <h2>{{title}}</h2>\n    <p>{{description}}</p>\n  </article>\"\n}\n```",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 126,
+                            "updatedAt": "2026-05-22T12:52:42+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/KI-workshop/.layout",
+                    "folderName": "KI-workshop",
+                    "label": "KI-workshop",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/KI-workshop/.layout",
+                    "template": "<style> .poff-default-layout { --poff-shell-bg: red; } </style><div>{{#each allItems}}<div class=\"item\"><h2><a href=\"{{pageLink}}\">{{title}}</a></h2></div>{{/each}}</div>",
+                    "css": ".poff-default-layout {\n    --poff-shell-bg:\n        radial-gradient(circle at top right, rgba(73, 114, 255, 0.18), transparent 24rem),\n        linear-gradient(180deg, #0c1220 0%, #111827 100%);\n    --poff-shell-color: #e5e7eb;\n    --poff-shell-header-border: rgba(255, 255, 255, 0.08);\n    --poff-shell-footer-border: rgba(255, 255, 255, 0.08);\n    --poff-shell-eyebrow-color: #8fb3ff;\n    --poff-shell-title-color: #f8fafc;\n    --poff-shell-description-color: rgba(226, 232, 240, 0.86);\n    --poff-shell-footer-color: rgba(226, 232, 240, 0.7);\n    --poff-shell-card-bg: rgba(9, 15, 28, 0.72);\n    --poff-shell-card-border: rgba(255, 255, 255, 0.08);\n    --poff-shell-profile-bg: rgba(255, 255, 255, 0.06);\n    --poff-shell-profile-border: rgba(255, 255, 255, 0.14);\n    --poff-shell-main-padding: 1.5rem 1.75rem 2rem;\n    --poff-work-max-height: calc(100dvh - 11.5rem);\n    min-height: 100dvh;\n    height: 100dvh;\n    display: grid;\n    grid-template-rows: auto 1fr auto;\n    background: var(--poff-shell-bg);\n    color: var(--poff-shell-color);\n}\n\n.poff-default-layout__header {\n    display: flex;\n    align-items: flex-start;\n    justify-content: space-between;\n    gap: 1.5rem;\n    padding: 1.5rem 1.75rem 1.25rem;\n    border-bottom: 1px solid var(--poff-shell-header-border);\n}\n\n.poff-default-layout__header-copy {\n    display: grid;\n    gap: 0.5rem;\n    max-width: 44rem;\n}\n\n.poff-default-layout__eyebrow {\n    margin: 0;\n    font-size: 0.72rem;\n    letter-spacing: 0.24em;\n    text-transform: uppercase;\n    color: var(--poff-shell-eyebrow-color);\n}\n\n.poff-default-layout__title {\n    margin: 0;\n    font-size: clamp(2rem, 3vw, 3.4rem);\n    line-height: 0.95;\n    color: var(--poff-shell-title-color);\n}\n\n.poff-default-layout__description {\n    margin: 0;\n    max-width: 38rem;\n    font-size: 1rem;\n    line-height: 1.5;\n    color: var(--poff-shell-description-color);\n}\n\n.poff-default-layout__header-art {\n    flex-shrink: 0;\n}\n\n.poff-default-layout__profile {\n    width: 3.5rem;\n    height: 3.5rem;\n    object-fit: cover;\n    border-radius: 999px;\n    border: 1px solid var(--poff-shell-profile-border);\n    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);\n    background: var(--poff-shell-profile-bg);\n}\n\n.poff-default-layout__main {\n    padding: var(--poff-shell-main-padding);\n    min-height: 0;\n    overflow-x: hidden;\n    overflow-y: auto;\n    display: flex;\n    flex-direction: column;\n    gap: 1.25rem;\n}\n\n.poff-default-layout__main > * {\n    width: 100%;\n    max-width: 100%;\n    box-sizing: border-box;\n}\n\n.poff-default-layout__main img,\n.poff-default-layout__main video,\n.poff-default-layout__main iframe,\n.poff-default-layout__main canvas,\n.poff-default-layout__main svg {\n    display: block;\n    max-width: 100%;\n    max-height: var(--poff-work-max-height);\n    margin-inline: auto;\n}\n\n.poff-default-layout__footer {\n    display: flex;\n    align-items: center;\n    justify-content: flex-end;\n    padding: 1rem 1.75rem 1.5rem;\n    border-top: 1px solid var(--poff-shell-footer-border);\n    color: var(--poff-shell-footer-color);\n    font-size: 0.82rem;\n    letter-spacing: 0.08em;\n    text-transform: uppercase;\n}\n\n.poff-default-layout .folder-view {\n    gap: 1.5rem;\n}\n\n.poff-default-layout .folder-view-summary {\n    color: rgba(226, 232, 240, 0.72);\n}\n\n.poff-default-layout .folder-view-grid {\n    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));\n}\n\n.poff-default-layout .folder-view-card {\n    border: 1px solid var(--poff-shell-card-border);\n    background: var(--poff-shell-card-bg);\n}\n\n@media (max-width: 720px) {\n    .poff-default-layout__header {\n        padding: 1.2rem 1.1rem 1rem;\n        flex-direction: column-reverse;\n        align-items: flex-start;\n    }\n\n    .poff-default-layout__main {\n        --poff-shell-main-padding: 1rem 1.1rem 1.5rem;\n    }\n\n    .poff-default-layout__footer {\n        justify-content: flex-start;\n        padding: 1rem 1.1rem 1.2rem;\n    }\n}\n",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';\n",
+                    "sectionTemplate": "{\n  \"id\": \"chatcmpl-md9dsfuuobyyebhpfelhd\",\n  \"object\": \"chat.completion\",\n  \"created\": 1776458336,\n  \"model\": \"google/gemma-4-e4b\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"\",\n        \"reasoning_content\": \"\\nThe user wants to apply a red background to the layout again, but this time I must follow the standard structure and use the provided scaffold logic for the outer wrapper.\\n\\n1.  **Goal:** Create a red backgrounded layout.\\n2.  **Scaffold:** Use `src/includes/worktypes/templates/layout/default/template.hbs` as the base, keeping the required `<main class=\\\"poff-default-layout__main\\\">` structure and wrapping logic (`{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}`).\\n3.  **Modification:** Inject CSS variables to set `--poff-shell-bg: red;`.\\n\\nI will modify the `template` field in the JSON response, ensuring I keep the necessary wrapper structure around the content partials (`{{> works}}` or `{{> work}}`). Since this is a folder view context (implied by previous interactions and standard CMS layout), I'll assume the full default template structure.\\n\\n*Self-Correction/Refinement:* The user previously provided a\",\n        \"tool_calls\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"length\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 3870,\n    \"completion_tokens\": 226,\n    \"total_tokens\": 4096,\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 223\n    }\n  },\n  \"stats\": {},\n  \"system_fingerprint\": \"google/gemma-4-e4b\"\n}",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 1540,
+                            "updatedAt": "2026-04-17T20:39:07+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/onlyLowCode/.layout",
+                    "folderName": "onlyLowCode",
+                    "label": "onlyLowCode",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/onlyLowCode/.layout",
+                    "template": "<div class=\"poff-default-layout\"><header class=\"poff-default-layout__header\" style=\"position: sticky; top: 0; z-index: 1000;\"> <div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"> <h1 class=\"poff-default-layout__logo\">Domnik eggermann</h1> <nav class=\"poff-default-layout__nav\"> <ul> <li><a href=\"{{pageLink}}?view=1&path=linkone\">Portfolio</a></li> <li><a href=\"{{pageLink}}?view=1&path=linktwo\">About</a></li> <li><a href=\"{{pageLink}}?view=1&path=linkthree\">Contact</a></li> </ul> </nav> </div> </header> <main class=\"poff-default-layout__main\"> {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}} </main></div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }\n",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';\n",
+                    "sectionTemplate": "<div class=\"poff-default-layout__content\">\n    <h2 class=\"poff-default-layout__folder-title\">onlyLowCode</h2>\n    <div class=\"poff-default-layout__folder-items\">\n        {{#each items}}\n            {{#if isFile}}\n                <div class=\"poff-default-layout__file-item\">\n                    <a href=\"{{pageLink}}\" class=\"poff-default-layout__file-link\">\n                        <img src=\"{{srcUrl}}\" alt=\"{{title}}\" class=\"poff-default-layout__file-image\" style=\"transition: transform 0.5s; display: block; margin: auto; max-width: 100%;\">\n                        <span class=\"poff-default-layout__file-name\">{{title}}</span>\n                    </a>\n                </div>\n            {{/if}}\n        {{/each}}\n    </div>\n</div>\n<style>\n    .poff-default-layout__file-item {\n        margin: 20px 0;\n        text-align: center;\n    }\n    .poff-default-layout__file-image {\n        animation: rotate 5s linear infinite;\n    }\n    @keyframes rotate {\n        0% { transform: rotate(0deg); }\n        100% { transform: rotate(360deg); }\n    }\n</style>\n<script>\n    document.addEventListener(\"DOMContentLoaded\", function() {\n        // Additional JS can be added here if needed\n    });\n</script>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 1193,
+                            "updatedAt": "2026-04-30T20:41:40+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "tests/poff-tests/persist-layout/.layout",
+                    "folderName": "persist-layout",
+                    "label": "persist-layout",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "tests/poff-tests/persist-layout/.layout",
+                    "template": "<div class=\"saved-custom-layout\">{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</div>",
+                    "css": ".saved-custom-layout{color:#123;}",
+                    "js": "window.__savedCustomLayout = true;",
+                    "sectionTemplate": "<section class=\"persisted-section\">{{title}}</section>",
+                    "assets": [
+                        {
+                            "name": "work.hbs",
+                            "path": "work.hbs",
+                            "size": 48,
+                            "updatedAt": "2026-05-22T12:52:46+00:00"
+                        },
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 54,
+                            "updatedAt": "2026-05-22T12:52:47+00:00"
+                        }
+                    ],
+                    "files": {
+                        "work.hbs": "work.hbs",
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "tests/poff-tests/.layout",
+                    "folderName": "poff-tests",
+                    "label": "poff-tests",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "tests/poff-tests/.layout",
+                    "template": "<div class=\"default-fs-layout default-fs-layout--edited\"><header>{{title}}</header><main>{{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}</main><footer><img src=\"{{layout.baseHref}}/poff.profile.jpg\" alt=\"profile\"></footer></div>",
+                    "css": ".default-fs-layout--edited{color:#ff5f5f;}",
+                    "js": "window.__editedDefaultFsLayout = true;",
+                    "sectionTemplate": "{{#each items}}<span class=\"item\">{{name}}</span>{{/each}}",
+                    "assets": [
+                        {
+                            "name": "poff.profile.jpg",
+                            "path": "poff.profile.jpg",
+                            "size": 16,
+                            "updatedAt": "2026-05-22T12:52:37+00:00"
+                        },
+                        {
+                            "name": "work.hbs",
+                            "path": "work.hbs",
+                            "size": 39,
+                            "updatedAt": "2026-05-22T12:52:37+00:00"
+                        },
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 58,
+                            "updatedAt": "2026-05-22T12:52:37+00:00"
+                        }
+                    ],
+                    "files": {
+                        "poff.profile.jpg": "poff.profile.jpg",
+                        "work.hbs": "work.hbs",
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/test/.layout",
+                    "folderName": "test",
+                    "label": "test",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/test/.layout",
+                    "template": "<div class=\"poff-default-layout poff-default-layout--folder\" style=\"max-width: 1200px; margin: 0 auto; padding: 20px;\">\n    <aside class=\"poff-default-layout__sidebar\">\n        <nav class=\"poff-default-layout__nav\" aria-label=\"Current work navigation\">\n            {{#if parentPageLink}}\n                <a class=\"poff-default-layout__nav-link poff-default-layout__nav-link--up\" href=\"{{parentPageLink}}\">\n                    <span class=\"poff-default-layout__nav-icon\">\u2191</span>\n                    <span class=\"poff-default-layout__nav-name\">Go Up</span>\n                </a>\n            {{/if}}\n\n            {{#if showDirectoryPageLink}}\n                <a class=\"poff-default-layout__nav-link {{#if isFolder}}poff-default-layout__nav-link--current{{/if}}\" href=\"{{directoryPageLink}}\">\n                    <span class=\"poff-default-layout__nav-icon\">./</span>\n                    <span class=\"poff-default-layout__nav-name\">{{name}}</span>\n                </a>\n            {{/if}}\n\n            {{#if isFolder}}\n                {{#each items}}\n                    <a class=\"poff-default-layout__nav-link\" href=\"{{pageLink}}\">\n                        <span class=\"poff-default-layout__nav-icon\">{{#if isFolder}}\u25a3{{else}}\u25e7{{/if}}</span>\n                        <span class=\"poff-default-layout__nav-name\">{{name}}</span>\n                    </a>\n                {{/each}}\n            {{else}}\n                <a class=\"poff-default-layout__nav-link poff-default-layout__nav-link--current\" href=\"{{pageLink}}\">\n                    <span class=\"poff-default-layout__nav-icon\">\u25e7</span>\n                    <span class=\"poff-default-layout__nav-name\">{{name}}</span>\n                </a>\n            {{/if}}\n        </nav>\n    </aside>\n\n    <div class=\"poff-default-layout__stage\">\n        <header class=\"poff-default-layout__header\">\n            <div class=\"poff-default-layout__header-copy\">\n                <p class=\"poff-default-layout__eyebrow\">{{#if isFolder}}Folder{{else}}Work{{/if}}</p>\n                <h1 class=\"poff-default-layout__title\">{{title}}</h1>\n                {{#if description}}\n                    <p class=\"poff-default-layout__description\">{{description}}</p>\n                {{/if}}\n            </div>\n        </header>\n\n        <main class=\"poff-default-layout__main\">\n            {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}}\n        </main>\n\n        <footer class=\"poff-default-layout__footer\">\n            <span>{{#if isFolder}}Directory{{else}}File{{/if}}: {{name}}</span>\n        </footer>\n    </div>\n</div>",
+                    "css": ".poff-default-layout__nav {\n    position: sticky;\n    top: 0;\n    background: white;\n    z-index: 1000;\n}\n.slideshow {\n    position: relative;\n    max-width: 100%;\n    overflow: hidden;\n}\n.slideshow img {\n    width: 100%;\n    display: none;\n}\n.slideshow img.active {\n    display: block;\n}\n.pooff-default-layout {\n    max-width: 1200px;\n    margin: 0 auto;\n    padding: 20px;\n}",
+                    "js": "document.addEventListener('DOMContentLoaded', function() {\n    const slides = document.querySelectorAll('.slideshow img');\n    let currentSlide = 0;\n    slides[currentSlide].classList.add('active');\n\n    setInterval(function() {\n        slides[currentSlide].classList.remove('active');\n        currentSlide = (currentSlide + 1) % slides.length;\n        slides[currentSlide].classList.add('active');\n    }, 3000);\n});",
+                    "sectionTemplate": "<div class=\"poff-default-layout poff-default-layout--folder\"> <aside class=\"poff-default-layout__sidebar\"> <nav class=\"poff-default-layout__nav\" aria-label=\"Current work navigation\"> {{#if parentPageLink}} <a class=\"poff-default-layout__nav-link poff-default-layout__nav-link--up\" href=\"{{parentPageLink}}\"> <span class=\"poff-default-layout__nav-icon\">\u2191</span> <span class=\"poff-default-layout__nav-name\">Go Up</span> </a> {{/if}} {{#if showDirectoryPageLink}} <a class=\"poff-default-layout__nav-link {{#if isFolder}}poff-default-layout__nav-link--current{{/if}}\" href=\"{{directoryPageLink}}\"> <span class=\"poff-default-layout__nav-icon\">./</span> <span class=\"poff-default-layout__nav-name\">./</span> </a> {{/if}} {{#if isFolder}} {{#each items}} <div class=\"poff-default-layout__item\"> <a class=\"poff-default-layout__nav-link\" href=\"{{pageLink}}\"> <span class=\"poff-default-layout__nav-icon\">{{#if isFolder}}\u2630{{else}}\u27a1\ufe0f{{/if}}</span> <span class=\"poff-default-layout__nav-name\">{{name}}</span> </a> <div class=\"poff-item__preview\"> {{#if (eq type \"file\")}} {{#if (or (eq slug \"pastedgraphic-1-png\") (eq slug \"eggman-profile-image-jpg\"))}} <img src=\"{{path}}\" alt=\"{{name}}\" class=\"poff-item__image\" /> {{else if (eq slug \"formsofttime2008-mp4\")}} <video controls autoplay muted class=\"poff-item__video\"> <source src=\"{{path}}\" type=\"video/mp4\"> Your browser does not support the video tag. </video> {{else if (eq slug \"debug-txt\")}} <pre class=\"poff-item__text\">{{readFileContent path}}</pre> {{else}} <span class=\"poff-item__other\">{{name}}</span> {{/if}} {{/if}} </div> </div> {{/each}} </div> {{else}} {{> work}} {{/if}} </main> <footer class=\"poff-default-layout__footer\"> <span>{{#if isFolder}}Directory{{else}}File{{/if}}: {{name}}</span> </footer> </div> </div> <style> .poff-item { margin: 10px 0; } .poff-item__preview { margin-bottom: 5px; } .poff-item__image, .poff-item__video { max-width: 100%; height: auto; } .poff-item__text { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 5px; } </style> <script> document.addEventListener('DOMContentLoaded', function() { // Additional JavaScript can be added here if needed }); </script>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 2177,
+                            "updatedAt": "2026-04-16T23:10:44+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/v1/.layout",
+                    "folderName": "v1",
+                    "label": "v1",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/v1/.layout",
+                    "template": "<div class=\"poff-default-layout\"><header class=\"poff-default-layout__header\" style=\"position: sticky; top: 0; z-index: 1000;\"> <div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"> <h1 class=\"poff-default-layout__logo\">Domnik eggermann</h1> <nav class=\"poff-default-layout__nav\"> <ul> <li><a href=\"?view=1&path=linkone\">Portfolio</a></li> <li><a href=\"?view=1&path=linktwo\">About</a></li> <li><a href=\"?view=1&path=linkthree\">Contact</a></li> </ul> </nav> </div> </header> <main class=\"poff-default-layout__main\"> {{#if isFolder}}{{> works}}{{else}}{{> work}}{{/if}} </main></div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); position: sticky; top: 0; z-index: 1000; } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; }\n",
+                    "js": "document.documentElement.dataset.poffDefaultLayout = 'active';\n",
+                    "sectionTemplate": "<div class=\"poff-default-layout__content\" style=\"display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 1200px; margin: auto;\">\n  {{#each items}}\n    {{#if isFolder}}\n      <div class=\"folder-item\" style=\"padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;\">\n        <h2 style=\"font-size: 1.5em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h2>\n      </div>\n    {{else if isFile}}\n      <div class=\"file-item\" style=\"padding: 20px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px;\">\n        <h3 style=\"font-size: 1.2em; margin: 0;\"><a href=\"{{pageLink}}\">{{title}}</a></h3>\n      </div>\n    {{/if}}\n  {{/each}}\n</div>",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 696,
+                            "updatedAt": "2026-05-02T23:35:54+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "tests/poff-tests/viewer-folder/.layout",
+                    "folderName": "viewer-folder",
+                    "label": "viewer-folder",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "tests/poff-tests/viewer-folder/.layout",
+                    "template": "<div class=\"folder-custom\" data-layout=\"{{layout.directory}}\">{{title}}|{{#each tree}}{{#if isFolder}}<span class=\"branch\">{{name}}</span>{{#each children}}{{#if (contains name \".mp4\")}}<span class=\"child\">{{path}}</span><span class=\"child-view\">{{pageLink}}</span>{{/if}}{{/each}}{{/if}}{{#if (eq type \"file\")}}<span class=\"entry\">{{name}}:{{type}}</span><span class=\"entry-view\">{{pageLink}}</span>{{/if}}{{/each}}{{#each allVideos}}<span class=\"video\">{{path}}</span>{{/each}}{{#each layout.assets}}<span class=\"asset\">{{href}}</span>{{/each}}</div>",
+                    "css": ".folder-custom{color:#8ec5ff;}",
+                    "js": "window.__folderLayout = true;",
+                    "sectionTemplate": "",
+                    "assets": [
+                        {
+                            "name": "background.txt",
+                            "path": "background.txt",
+                            "size": 17,
+                            "updatedAt": "2026-05-22T12:52:37+00:00"
+                        }
+                    ],
+                    "files": {
+                        "background.txt": "background.txt"
+                    }
+                },
+                {
+                    "name": "pages/dominikeggermann.comX/tests/poff-tests/viewer-folder/.layout",
+                    "folderName": "viewer-folder",
+                    "label": "viewer-folder",
+                    "source": "collection",
+                    "section": "works",
+                    "directory": "pages/dominikeggermann.comX/tests/poff-tests/viewer-folder/.layout",
+                    "template": "<div class=\"poff-default-layout\"> <header class=\"poff-default-layout__header\"> <div class=\"poff-default-layout__content\" style=\"display: flex; justify-content: space-between; align-items: center;\"> <h1 class=\"poff-default-layout__logo\">Domnik eggermann</h1> <nav class=\"poff-default-layout__nav\"> <ul> <li><a href=\"?view=1&path=linkone\">Portfolio</a></li> <li><a href=\"?view=1&path=linktwo\">About</a></li> <li><a href=\"?view=1&path=linkthree\">Contact</a></li> </ul> </nav> </div> </header> <main class=\"poff-default-layout__main\"> {{#if isFolder}}{{> works}}{{else}}{{> work}} <div class=\"thumbnail-preview\"><img src=\"{{srcUrl}}\" alt=\"Thumbnail for {{name}}\" style=\"width: 100px; height: auto;\" /></div>{{/if}} </main> </div>",
+                    "css": "/* Custom layout styles for a typical artist portfolio */ .poff-default-layout { min-height: 100vh; display: flex; flex-direction: column; } /* Header Styling */ .poff-default-layout__header { background-color: #fff; border-bottom: 1px solid #eee; padding: 20px 40px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); } .poff-default-layout__content { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: auto; } .poff-default-layout__logo { font-size: 1.8em; font-weight: 300; letter-spacing: -1px; cursor: pointer; } /* Navigation Styling */ .poff-default-layout__nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 30px; } .poff-default-layout__nav li a { text-decoration: none; color: #333; font-size: 1em; transition: color 0.2s ease; } .poff-default-layout__nav li a:hover { color: #888; /* Subtle hover effect */ } /* Main Content Area */ .poff-default-layout__main { flex-grow: 1; padding: 40px 20px; max-width: 1200px; margin: auto; } /* Thumbnail Preview */ .thumbnail-preview { margin-top: 20px; } .thumbnail-preview img { border: 1px solid #ddd; border-radius: 4px; }",
+                    "js": "",
+                    "sectionTemplate": "<style>\n    body {\n        background-color: purple;\n        animation: blink 1s infinite;\n    }\n    @keyframes blink {\n        0% { background-color: purple; }\n        50% { background-color: violet; }\n        100% { background-color: purple; }\n    }\n</style>\n{{#each items}} {{#if isFile}} <div class=\"poff-default-layout__item poff-default-layout__item--file\"> <a href=\"{{pageLink}}\" class=\"poff-default-layout__item-link\"> <img src=\"{{srcUrl}}\" alt=\"{{title}}\" class=\"poff-default-layout__item-thumbnail\" style=\"width: 100px; height: auto; border: 2px solid red;\"> <span class=\"poff-default-layout__item-name\">{{name}}</span> </a> </div> {{/if}} {{/each}}",
+                    "assets": [
+                        {
+                            "name": "works.hbs",
+                            "path": "works.hbs",
+                            "size": 659,
+                            "updatedAt": "2026-05-02T23:34:22+00:00"
+                        }
+                    ],
+                    "files": {
+                        "works.hbs": "works.hbs"
+                    }
+                },
+                {
+                    "name": "default",
+                    "folderName": "default",
+                    "label": "default",
+                    "section": "works",
+                    "directory": "/Users/eggermann/Desktop/speedProjects/poff.index_php/src/includes/Worktype/../worktypes/templates/layout/default",
+                    "template": "<div class=\"poff-default-layout poff-default-layout--{{kind}}\">\n    <header class=\"poff-default-layout__header\">\n        <div class=\"poff-default-layout__header-art\">\n            <img\n                class=\"poff-default-layout__profile\"\n                src=\"{{layout.baseHref}}/poff.profile.jpg\"\n                alt=\"Poff profile\"\n            >\n        </div>\n        <div class=\"poff-default-layout__header-copy\">\n            <h1 class=\"poff-default-layout__title\">{{title}}</h1>\n            {{#if categories}}\n                <div class=\"poff-default-layout__categories\" aria-label=\"Categories\">\n                    {{#each categories}}\n                        <span class=\"poff-default-layout__category-pill\">{{this}}</span>\n                    {{/each}}\n                </div>\n            {{/if}}\n            {{#if description}}\n                <p class=\"poff-default-layout__description\">{{description}}</p>\n            {{/if}}\n        </div>\n    </header>\n\n    <main class=\"poff-default-layout__main\">\n        {{#if isFolder}}\n            {{> works}}\n        {{else}}\n            {{> work}}\n        {{/if}}\n    </main>\n\n    <footer class=\"poff-default-layout__footer\">\n        {{#unless isFolder}}\n            <a\n                class=\"poff-default-layout__download\"\n                href=\"{{sourceUrl}}\"\n                download=\"{{name}}\"\n            >\n                <span class=\"poff-default-layout__download-icon\" aria-hidden=\"true\">\n                    <svg viewBox=\"0 0 20 20\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\">\n                        <path d=\"M10 2a1 1 0 011 1v7.59l2.3-2.3a1 1 0 111.4 1.42l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.42L9 10.59V3a1 1 0 011-1z\"/>\n                        <path d=\"M4 14a1 1 0 011 1v1h10v-1a1 1 0 112 0v1.5A1.5 1.5 0 0115.5 18h-11A1.5 1.5 0 013 16.5V15a1 1 0 011-1z\"/>\n                    </svg>\n                </span>\n                <span class=\"poff-default-layout__download-label\">Download original</span>\n            </a>\n        {{/unless}}\n        <span>Copyright eggman</span>\n    </footer>\n</div>\n",
+                    "css": ".poff-default-layout {\n    --poff-shell-bg:\n        radial-gradient(circle at top right, rgba(73, 114, 255, 0.18), transparent 24rem),\n        linear-gradient(180deg, #0c1220 0%, #111827 100%);\n    --poff-shell-color: #e5e7eb;\n    --poff-shell-header-border: rgba(255, 255, 255, 0.08);\n    --poff-shell-footer-border: rgba(255, 255, 255, 0.08);\n    --poff-shell-eyebrow-color: #8fb3ff;\n    --poff-shell-title-color: #f8fafc;\n    --poff-shell-description-color: rgba(226, 232, 240, 0.86);\n    --poff-shell-footer-color: rgba(226, 232, 240, 0.7);\n    --poff-shell-card-bg: rgba(9, 15, 28, 0.72);\n    --poff-shell-card-border: rgba(255, 255, 255, 0.08);\n    --poff-shell-profile-bg: rgba(255, 255, 255, 0.06);\n    --poff-shell-profile-border: rgba(255, 255, 255, 0.14);\n    --poff-shell-main-padding-block-start: 1.5rem;\n    --poff-shell-main-padding-inline: 1.75rem;\n    --poff-shell-main-padding-block-end: 2rem;\n    --poff-work-max-height: calc(100dvh - 11.5rem);\n    min-height: 100dvh;\n    height: 100dvh;\n    display: grid;\n    grid-template-rows: auto 1fr auto;\n    background: var(--poff-shell-bg);\n    color: var(--poff-shell-color);\n}\n\n.poff-default-layout__header {\n    display: flex;\n    align-items: flex-start;\n    justify-content: space-between;\n    gap: 1.5rem;\n    padding: 1.5rem 1.75rem 1.25rem;\n    border-bottom: 1px solid var(--poff-shell-header-border);\n}\n\n.poff-default-layout__header-copy {\n    display: grid;\n    gap: 0.5rem;\n    max-width: 44rem;\n}\n\n.poff-default-layout__eyebrow {\n    margin: 0;\n    font-size: 0.72rem;\n    letter-spacing: 0.24em;\n    text-transform: uppercase;\n    color: var(--poff-shell-eyebrow-color);\n}\n\n.poff-default-layout__title {\n    margin: 0;\n    font-size: clamp(2rem, 3vw, 3.4rem);\n    line-height: 0.95;\n    color: var(--poff-shell-title-color);\n}\n\n.poff-default-layout__description {\n    margin: 0;\n    max-width: 38rem;\n    font-size: 1rem;\n    line-height: 1.5;\n    color: var(--poff-shell-description-color);\n}\n\n.poff-default-layout__categories {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 0.5rem;\n}\n\n.poff-default-layout__category-pill {\n    display: inline-flex;\n    align-items: center;\n    min-height: 1.6rem;\n    padding: 0.2rem 0.65rem;\n    border-radius: 999px;\n    border: 1px solid rgba(143, 179, 255, 0.32);\n    background: rgba(143, 179, 255, 0.12);\n    color: var(--poff-shell-title-color);\n    font-size: 0.74rem;\n    line-height: 1;\n    letter-spacing: 0.08em;\n    text-transform: uppercase;\n}\n\n.poff-default-layout__header-art {\n    flex-shrink: 0;\n}\n\n.poff-default-layout__profile {\n    width: 3.5rem;\n    height: 3.5rem;\n    object-fit: cover;\n    border-radius: 999px;\n    border: 1px solid var(--poff-shell-profile-border);\n    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);\n    background: var(--poff-shell-profile-bg);\n}\n\n.poff-default-layout__main {\n    box-sizing: border-box;\n    padding:\n        var(--poff-shell-main-padding-block-start)\n        var(--poff-shell-main-padding-inline)\n        var(--poff-shell-main-padding-block-end);\n    min-height: 0;\n    overflow-x: hidden;\n    overflow-y: auto;\n    display: flex;\n    flex-direction: column;\n    gap: 1.25rem;\n}\n\n.poff-default-layout__main > * {\n    width: 100%;\n    max-width: 100%;\n    box-sizing: border-box;\n}\n\n.poff-default-layout__main img,\n.poff-default-layout__main video,\n.poff-default-layout__main iframe,\n.poff-default-layout__main canvas,\n.poff-default-layout__main svg {\n    display: block;\n    max-width: 100%;\n    max-height: var(--poff-work-max-height);\n    margin-inline: auto;\n}\n\n.poff-default-layout__footer {\n    display: flex;\n    align-items: center;\n    justify-content: space-between;\n    gap: 1rem;\n    padding: 1rem 1.75rem 1.5rem;\n    border-top: 1px solid var(--poff-shell-footer-border);\n    color: var(--poff-shell-footer-color);\n    font-size: 0.82rem;\n    letter-spacing: 0.08em;\n    text-transform: uppercase;\n}\n\n.poff-default-layout__download {\n    display: inline-flex;\n    align-items: center;\n    gap: 0.5rem;\n    color: var(--poff-shell-title-color);\n    text-decoration: none;\n    letter-spacing: 0.08em;\n    text-transform: uppercase;\n    transition: opacity 0.18s ease, transform 0.18s ease, color 0.18s ease;\n}\n\n.poff-default-layout__download:hover {\n    color: #ffffff;\n    opacity: 1;\n    transform: translateY(-1px);\n}\n\n.poff-default-layout__download-icon {\n    display: inline-flex;\n    width: 1rem;\n    height: 1rem;\n    flex: 0 0 auto;\n}\n\n.poff-default-layout__download-icon svg {\n    width: 1rem;\n    height: 1rem;\n    display: block;\n}\n\n.poff-default-layout .folder-view {\n    gap: 1.5rem;\n}\n\n.poff-default-layout .folder-view-summary {\n    color: rgba(226, 232, 240, 0.72);\n}\n\n.poff-default-layout .folder-view-grid {\n    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));\n}\n\n.poff-default-layout .folder-view-card {\n    border: 1px solid var(--poff-shell-card-border);\n    background: var(--poff-shell-card-bg);\n}\n\n@media (max-width: 720px) {\n    .poff-default-layout__header {\n        padding: 1.2rem 1.1rem 1rem;\n        flex-direction: column-reverse;\n        align-items: flex-start;\n    }\n\n    .poff-default-layout__main {\n        --poff-shell-main-padding-block-start: 1rem;\n        --poff-shell-main-padding-inline: 1.1rem;\n        --poff-shell-main-padding-block-end: 1.5rem;\n    }\n\n    .poff-default-layout__footer {\n        justify-content: space-between;\n        padding: 1rem 1.1rem 1.2rem;\n        gap: 0.75rem;\n        font-size: 0.7rem;\n    }\n\n    .poff-default-layout__download-label {\n        display: none;\n    }\n}\n",
+                    "js": "(function () {\n   \n    const initDefaultLayout = () => {\n        const root = document.querySelector('.poff-default-layout');\n        if (!root) {\n            return;\n        }\n\n        root.setAttribute('data-poff-default-layout-ready', 'true');\n    };\n\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', initDefaultLayout, { once: true });\n        return;\n    }\n\n    initDefaultLayout();\n})();\n",
+                    "sectionTemplate": "\nXXX",
+                    "source": "shared"
+                }
+            ],
+            "directory": ".layout",
+            "localDirectory": ".layout",
+            "sectionDirectory": "",
+            "storage": "default",
+            "assets": [],
+            "files": [],
+            "assetCount": 0,
+            "defaultSectionTemplate": "<div class=\"folder-view flex flex-col gap-4\">\n    <div class=\"folder-view-summary flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400\">\n        <span>{{displayPath}}</span>\n        <span>{{itemCount}} entries</span>\n    </div>\n    {{#if hasItems}}\n        <div class=\"folder-view-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3\">\n            {{#each items}}\n                <article class=\"folder-view-card folder-view-card--{{type}} rounded-2xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl\">\n                    <span class=\"folder-view-card-label inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-2.5 py-1 text-xs uppercase tracking-wide text-blue-300\">{{#if isFolder}}Folder{{else}}File{{/if}}</span>\n                    <strong class=\"folder-view-card-name mt-3.5 block break-words text-base font-semibold text-slate-50\">\n                        <a class=\"folder-view-card-link text-inherit no-underline hover:underline focus-visible:underline\" href=\"{{pageLink}}\">{{name}}</a>\n                    </strong>\n                    <span class=\"folder-view-card-path mt-2 block break-words text-xs text-slate-400\">{{path}}</span>\n                </article>\n            {{/each}}\n        </div>\n    {{else}}\n        <div class=\"message\">This folder is empty.</div>\n    {{/if}}\n</div>\n"
+        },
+        "categories": [
+            "folder",
+            "collection"
+        ],
+        "template": "folder"
+    }
+}

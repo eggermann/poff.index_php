@@ -1,0 +1,1043 @@
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const HTMLButtonElement = function HTMLButtonElement() {};
+
+function createClassList() {
+  const classes = new Set();
+  return {
+    toggle(name, force) {
+      if (force === undefined) {
+        if (classes.has(name)) {
+          classes.delete(name);
+          return false;
+        }
+        classes.add(name);
+        return true;
+      }
+      if (force) {
+        classes.add(name);
+        return true;
+      }
+      classes.delete(name);
+      return false;
+    },
+    contains(name) {
+      return classes.has(name);
+    },
+  };
+}
+
+function createElementMock() {
+  const listeners = new Map();
+  return {
+    hidden: false,
+    open: false,
+    textContent: '',
+    classList: createClassList(),
+    addEventListener(type, handler) {
+      const handlers = listeners.get(type) || [];
+      handlers.push(handler);
+      listeners.set(type, handlers);
+    },
+    removeEventListener(type) {
+      listeners.delete(type);
+    },
+    setAttribute(name, value) {
+      this[name] = String(value);
+    },
+    getListener(type) {
+      const handlers = listeners.get(type) || [];
+      return (...args) => {
+        for (const handler of handlers) {
+          handler(...args);
+        }
+      };
+    },
+    focus() {},
+  };
+}
+
+function createDocumentEscapeMock() {
+  return {
+    keydownHandler: null,
+    getElementById() {
+      return null;
+    },
+    querySelector() {
+      return null;
+    },
+    addEventListener(type, handler) {
+      if (type === 'keydown') {
+        this.keydownHandler = handler;
+      }
+    },
+    dispatchEscape() {
+      if (typeof this.keydownHandler !== 'function') {
+        throw new Error('keydown handler not registered');
+      }
+      const event = {
+        key: 'Escape',
+        defaultPrevented: false,
+        preventDefault() {
+          this.defaultPrevented = true;
+        },
+        stopPropagation() {},
+      };
+      this.keydownHandler(event);
+      return event;
+    },
+  };
+}
+
+function loadEditController(documentMock = null, overrides = {}) {
+  const escapeStackPath = path.join(__dirname, '..', 'src/assets/js/core/escape-stack.js');
+  const escapeStackSource = fs.readFileSync(escapeStackPath, 'utf8')
+    .replace(/export function /g, 'function ');
+  const mediaConfigPath = path.join(__dirname, '..', 'src/assets/js/edit/controller/media-config.js');
+  const mediaConfigSource = fs.readFileSync(mediaConfigPath, 'utf8')
+    .replace(/^import .*$/gm, '')
+    .replace(/export function /g, 'function ');
+  const panelActionsPath = path.join(__dirname, '..', 'src/assets/js/edit/controller/panel-actions.js');
+  const panelActionsSource = fs.readFileSync(panelActionsPath, 'utf8')
+    .replace(/^import .*$/gm, '')
+    .replace(/export function /g, 'function ');
+  const filePath = path.join(__dirname, '..', 'src/assets/js/edit/controller.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/^import .*$/gm, '')
+    .replace(/export function /g, 'function ');
+
+  const module = { exports: {} };
+  const window = overrides.window || {
+    location: {
+      href: 'http://example.test/MAUSMAUS/?edit=true',
+      search: '?edit=true',
+      hash: '',
+      pathname: '/MAUSMAUS/',
+    },
+    dispatchEvent() {},
+    addEventListener() {},
+    prompt() { return null; },
+    history: {
+      replaceState() {},
+    },
+  };
+  const document = documentMock || overrides.document || {
+    getElementById() {
+      return null;
+    },
+    querySelector() {
+      return null;
+    },
+  };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    require,
+    window,
+    document,
+    URL,
+    CustomEvent,
+    HTMLButtonElement,
+    HTMLInputElement: function HTMLInputElement() {},
+    HTMLTextAreaElement: function HTMLTextAreaElement() {},
+    HTMLSelectElement: function HTMLSelectElement() {},
+    requestEditAuth: overrides.requestEditAuth || function requestEditAuth() {
+      throw new Error('requestEditAuth should not be called in this test');
+    },
+    requestEditConfig: overrides.requestEditConfig || function requestEditConfig() {
+      throw new Error('requestEditConfig should not be called in this test');
+    },
+    requestEditDelete() {
+      throw new Error('requestEditDelete should not be called in this test');
+    },
+    requestEditReset() {
+      throw new Error('requestEditReset should not be called in this test');
+    },
+    requestEditUpload() {
+      throw new Error('requestEditUpload should not be called in this test');
+    },
+    requestPromptTemplate() {
+      throw new Error('requestPromptTemplate should not be called in this test');
+    },
+    requestMcpRoute: overrides.requestMcpRoute || function requestMcpRoute() {
+      throw new Error('requestMcpRoute should not be called in this test');
+    },
+    buildVirtualLayoutPath: (value) => value,
+    getActiveSelection: overrides.getActiveSelection || (() => ({ path: '', previewPath: '', previewIsFile: false, isFile: false, isLayout: false })),
+    bindPromptWindow() {
+      return {};
+    },
+    renderEditDrawer() {
+      return { drawerForm: null };
+    },
+    renderEditPanel: overrides.renderEditPanel || function renderEditPanel() {
+      return { statusEl: null, promptRoot: null };
+    },
+    materializeWorkFields: (value) => value,
+    buildLayoutPayload() {
+      return { layoutPayload: {} };
+    },
+    createLayoutNameForPreset: () => () => 'layout',
+    getAddWorkTargetPath: overrides.getAddWorkTargetPath || (() => ''),
+    getContentTargetPath: overrides.getContentTargetPath || (() => ''),
+    getEditTargetPath: overrides.getEditTargetPath || (() => ''),
+    setStatusMessage: overrides.setStatusMessage || function setStatusMessage() {},
+  });
+
+  vm.runInContext(escapeStackSource, context);
+  vm.runInContext(mediaConfigSource, context);
+  vm.runInContext(panelActionsSource, context);
+  vm.runInContext(`${source}
+module.exports = {
+  createEditController,
+};
+`, context);
+
+  return {
+    createEditController: module.exports.createEditController,
+    HTMLButtonElement,
+  };
+}
+
+describe('edit auth disclosure', () => {
+  test('can be closed after opening when edit mode is unavailable', () => {
+    const { createEditController } = loadEditController();
+    const editAuthDetails = createElementMock();
+    const editToggle = createElementMock();
+    const editAuthForm = createElementMock();
+    const editAuthPassword = createElementMock();
+    const editAuthSubmit = createElementMock();
+    const editAuthStatus = createElementMock();
+
+    const controller = createEditController({
+      elements: {
+        editPanel: null,
+        editDrawer: null,
+        editAuthDetails,
+        editToggle,
+        editAddWork: null,
+        editAuthForm,
+        editAuthPassword,
+        editAuthSubmit,
+        editAuthStatus,
+      },
+      context: {
+        currentPoffConfig: null,
+        cmsAuth: {
+          configured: true,
+          authenticated: false,
+          editModeAllowed: true,
+          canEdit: false,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindEditToggle();
+
+    const onToggle = editAuthDetails.getListener('toggle');
+    expect(typeof onToggle).toBe('function');
+
+    editAuthDetails.open = true;
+    onToggle();
+
+    expect(editAuthDetails.open).toBe(true);
+    expect(editAuthForm.hidden).toBe(false);
+    expect(editAuthPassword.hidden).toBe(false);
+
+    editAuthDetails.open = false;
+    onToggle();
+
+    expect(editAuthDetails.open).toBe(false);
+    expect(editAuthForm.hidden).toBe(true);
+    expect(editAuthStatus.textContent).toBe('');
+  });
+
+  test('edit add work button opens the upload dialog trigger', () => {
+    const openUploadDialogButton = Object.assign(Object.create(HTMLButtonElement.prototype), {
+      clickCalled: false,
+      addEventListener() {},
+      click() {
+        this.clickCalled = true;
+      },
+    });
+    const documentMock = {
+      getElementById(id) {
+        if (id === 'editOpenUploadDialog') {
+          return openUploadDialogButton;
+        }
+        return null;
+      },
+      querySelector() {
+        return null;
+      },
+    };
+    const { createEditController } = loadEditController(documentMock);
+    const editAddWork = Object.assign(Object.create(HTMLButtonElement.prototype), {
+      addEventListener(type, handler) {
+        this.listener = handler;
+      },
+      clickCalled: false,
+      click() {
+        this.clickCalled = true;
+      },
+    });
+
+    const controller = createEditController({
+      elements: {
+        editPanel: null,
+        editDrawer: null,
+        editAuthDetails: null,
+        editToggle: null,
+        editAddWork,
+        editAuthForm: null,
+        editAuthPassword: null,
+        editAuthSubmit: null,
+        editAuthStatus: null,
+      },
+      context: {
+        currentPoffConfig: null,
+        cmsAuth: {
+          configured: true,
+          authenticated: true,
+          editModeAllowed: true,
+          canEdit: true,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindAddWorkButton();
+    expect(typeof editAddWork.listener).toBe('function');
+    editAddWork.listener();
+    expect(openUploadDialogButton.clickCalled).toBe(true);
+  });
+
+  test('jump to section button scrolls to the visible edit surface', () => {
+    const editActionsMenu = {
+      scrollCalls: [],
+      scrollIntoView(options) {
+        this.scrollCalls.push(options);
+      },
+    };
+    const editPanel = {
+      hidden: false,
+      scrollCalls: [],
+      focusCalls: 0,
+      scrollIntoView(options) {
+        this.scrollCalls.push(options);
+      },
+      querySelector() {
+        return {
+          focus: () => {
+            this.focusCalls += 1;
+          },
+        };
+      },
+    };
+    const editDrawer = {
+      hidden: true,
+    };
+    const { createEditController } = loadEditController();
+    const editJumpToSection = Object.assign(Object.create(HTMLButtonElement.prototype), {
+      attrs: {},
+      addEventListener(type, handler) {
+        this.listener = handler;
+      },
+      setAttribute(name, value) {
+        this.attrs[name] = String(value);
+      },
+    });
+
+    const controller = createEditController({
+      elements: {
+        editPanel,
+        editDrawer,
+        editActionsMenu,
+        editAuthDetails: null,
+        editToggle: null,
+        editAddWork: null,
+        editJumpToSection,
+        editAuthForm: null,
+        editAuthPassword: null,
+        editAuthSubmit: null,
+        editAuthStatus: null,
+      },
+      context: {
+        currentPoffConfig: null,
+        cmsAuth: {
+          configured: true,
+          authenticated: true,
+          editModeAllowed: true,
+          canEdit: true,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindJumpToSectionButton();
+    expect(typeof editJumpToSection.listener).toBe('function');
+    editJumpToSection.listener();
+    editJumpToSection.listener();
+
+    expect(editPanel.scrollCalls).toEqual([{ behavior: 'smooth', block: 'start' }]);
+    expect(editPanel.focusCalls).toBe(1);
+    expect(editActionsMenu.scrollCalls).toEqual([{ behavior: 'smooth', block: 'start' }]);
+  });
+
+  test('Escape closes the inner auth details before the outer edit menu', () => {
+    const documentMock = createDocumentEscapeMock();
+    const { createEditController } = loadEditController(documentMock);
+    const editActionsMenu = createElementMock();
+    const editAuthDetails = createElementMock();
+    const editToggle = createElementMock();
+    editActionsMenu.querySelectorAll = () => [editAuthDetails];
+
+    const controller = createEditController({
+      elements: {
+        editPanel: null,
+        editDrawer: null,
+        editActionsMenu,
+        editAuthDetails,
+        editToggle,
+        editAddWork: null,
+        editAuthForm: createElementMock(),
+        editAuthPassword: createElementMock(),
+        editAuthSubmit: createElementMock(),
+        editAuthStatus: createElementMock(),
+      },
+      context: {
+        currentPoffConfig: null,
+        cmsAuth: {
+          configured: true,
+          authenticated: false,
+          editModeAllowed: true,
+          canEdit: false,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindEditToggle();
+
+    editActionsMenu.open = true;
+    editActionsMenu.getListener('toggle')();
+    editAuthDetails.open = true;
+    editAuthDetails.getListener('toggle')();
+
+    const firstEscape = documentMock.dispatchEscape();
+    expect(firstEscape.defaultPrevented).toBe(true);
+    expect(editAuthDetails.open).toBe(false);
+    expect(editActionsMenu.open).toBe(true);
+    editAuthDetails.getListener('toggle')();
+
+    const secondEscape = documentMock.dispatchEscape();
+    expect(secondEscape.defaultPrevented).toBe(true);
+    expect(editActionsMenu.open).toBe(false);
+  });
+});
+
+test('creating a converter navigates to the new converter folder path', async () => {
+  let capturedPanelOptions = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+  const windowMock = {
+    location: {
+      href: 'http://example.test/MAUSMAUS/?edit=true',
+      search: '?edit=true',
+      hash: '#/bild2-eggermann-tif',
+      pathname: '/MAUSMAUS/',
+    },
+    dispatchEvent() {},
+    prompt() {
+      return 'convert-image';
+    },
+    history: {
+      replaceState() {},
+    },
+    addEventListener() {},
+  };
+
+  const { createEditController } = loadEditController(null, {
+    window: windowMock,
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'file',
+      subjectTarget: 'file',
+      config: {
+        kind: 'image',
+        work: {
+          type: 'image',
+        },
+      },
+    }),
+    requestMcpRoute: async (route) => {
+      expect(route).toBe('create-converter');
+      return {
+        ok: true,
+        folder: 'converters/convert-image',
+        definition: {
+          id: 'converter/convert-image',
+          path: 'converters/convert-image',
+          name: 'convert-image',
+          label: 'Convert Image',
+        },
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'bild2-eggermann.tif',
+      previewPath: 'bild2-eggermann.tif',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'bild2-eggermann.tif',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  expect(capturedPanelOptions).toBeTruthy();
+  await capturedPanelOptions.onCreateConverter({
+    statusEl: { textContent: '' },
+    form: null,
+  });
+
+  expect(windowMock.location.hash).toBe('#/converters/convert-image');
+});
+
+test('saving a selected converter persists converter work config even without existing work config', async () => {
+  let capturedPanelOptions = null;
+  let savedPayload = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async (action, payload) => {
+      if (action === 'save') {
+        savedPayload = payload;
+        return {
+          auth,
+          allowed: true,
+          saved: true,
+          target: 'file',
+          subjectTarget: 'file',
+          routePath: 'notes.txt',
+          config: {
+            kind: 'text',
+            work: payload.work,
+          },
+        };
+      }
+      return {
+        auth,
+        allowed: true,
+        target: 'file',
+        subjectTarget: 'file',
+        config: {
+          kind: 'text',
+          mimeType: 'text/plain',
+        },
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  expect(capturedPanelOptions).toBeTruthy();
+
+  const converterOption = {
+    dataset: {
+      converterName: 'convert-text-editor',
+      converterType: 'converter',
+      converterEngine: 'remote-node',
+      converterPath: 'worktypes/templates/converter/convert-text-editor',
+      converterViewerHref: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
+      converterUrl: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
+    },
+  };
+  const form = {
+    elements: {
+      form: null,
+      title: { value: 'Notes' },
+      description: { value: '' },
+      work_type: { value: 'text' },
+      converter_id: {
+        value: 'converter/convert-text-editor',
+        selectedOptions: [converterOption],
+      },
+      converter_quality: { value: 'default' },
+      converter_format: { value: 'html' },
+      converter_save_mode: { value: 'new-hidden-work' },
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+  form.elements.form = form;
+
+  await capturedPanelOptions.onSubmit({
+    elements: form.elements,
+    form,
+    statusEl: { textContent: '' },
+  });
+
+  expect(savedPayload).toBeTruthy();
+  expect(savedPayload.path).toBe('notes.txt');
+  expect(savedPayload.work.converter).toEqual(expect.objectContaining({
+    id: 'converter/convert-text-editor',
+    name: 'convert-text-editor',
+    format: 'html',
+    quality: 'default',
+    saveMode: 'new-hidden-work',
+  }));
+});
+
+test('init edit mode refreshes preview when a file already has a selected converter', async () => {
+  let refreshCount = 0;
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'file',
+      subjectTarget: 'file',
+      config: {
+        kind: 'text',
+        mimeType: 'text/plain',
+        work: {
+          type: 'text',
+          converter: {
+            id: 'converter/convert-text-editor',
+            path: 'worktypes/templates/converter/convert-text-editor',
+            url: '?view=1&path=worktypes%2Ftemplates%2Fconverter%2Fconvert-text-editor',
+            format: 'html',
+            quality: 'default',
+            saveMode: 'new-hidden-work',
+          },
+        },
+      },
+    }),
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel() {
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel: { querySelector() { return null; } },
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  controller.setPreviewRefreshHandler(() => {
+    refreshCount += 1;
+  });
+
+  await controller.initEditMode();
+
+  expect(refreshCount).toBe(1);
+  expect(controller.getPreviewParams({ path: 'notes.txt', isFile: true })).toEqual(expect.objectContaining({
+    converter_preview: '1',
+    converter_id: 'converter/convert-text-editor',
+    converter_format: 'html',
+  }));
+});
+
+test('convert work uses a preview-root payload provider when no global provider is registered', async () => {
+  let capturedPanelOptions = null;
+  let convertPayload = null;
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+  const providerHost = {
+    __poffConverterPayloadProvider({ converter }) {
+      return {
+        converter: {
+          ...converter,
+          node: {
+            id: 'text-editor-local-php',
+            endpoint: 'http://localhost:8888/MAUSMAUS/worktypes/templates/converter/convert-text-editor/converter.php',
+          },
+        },
+        editor: {
+          content: 'Edited plain text with provider host',
+        },
+      };
+    },
+  };
+  const documentMock = {
+    getElementById(id) {
+      if (id !== 'contentFrame') {
+        return null;
+      }
+      return {
+        querySelector(selector) {
+          if (selector === '[data-poff-converter-provider="true"]') {
+            return providerHost;
+          }
+          return null;
+        },
+      };
+    },
+    querySelector() {
+      return null;
+    },
+  };
+  const windowMock = {
+    location: {
+      href: 'http://example.test/MAUSMAUS/?edit=true',
+      search: '?edit=true',
+      hash: '',
+      pathname: '/MAUSMAUS/',
+    },
+    dispatchEvent() {},
+    addEventListener() {},
+    alert() {},
+    prompt() { return null; },
+    history: {
+      replaceState() {},
+    },
+  };
+
+  const { createEditController } = loadEditController(documentMock, {
+    window: windowMock,
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'file',
+      subjectTarget: 'file',
+      config: {
+        kind: 'text',
+        mimeType: 'text/plain',
+        size: 12,
+        work: {
+          type: 'text',
+        },
+      },
+    }),
+    requestMcpRoute: async (route, payload) => {
+      if (route === 'convert') {
+        convertPayload = payload;
+        return {
+          ok: true,
+          output: {
+            name: 'notes.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            size: 35,
+            bodyBase64: Buffer.from('Edited plain text with provider host', 'utf8').toString('base64'),
+          },
+        };
+      }
+      if (route === 'save-converted-work') {
+        return { ok: true };
+      }
+      throw new Error(`Unexpected MCP route: ${route}`);
+    },
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel: { querySelector() { return null; } },
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  await capturedPanelOptions.onConvertWork({
+    statusEl: { textContent: '' },
+    converter: {
+      id: 'converter/convert-text-editor',
+      format: 'source',
+      saveMode: 'new-hidden-work',
+      node: 'local',
+    },
+  });
+
+  expect(convertPayload).toBeTruthy();
+  expect(convertPayload.converter.node).toEqual({
+    id: 'text-editor-local-php',
+    endpoint: 'http://localhost:8888/MAUSMAUS/worktypes/templates/converter/convert-text-editor/converter.php',
+  });
+  expect(convertPayload.editor).toEqual({
+    content: 'Edited plain text with provider host',
+  });
+});
+
+test('convert work reports source-file save when text editor overwrite mode is selected', async () => {
+  let capturedPanelOptions = null;
+  const alerts = [];
+  let refreshCount = 0;
+  let savedPayload = null;
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+  const windowMock = {
+    location: {
+      href: 'http://example.test/MAUSMAUS/?edit=true',
+      search: '?edit=true',
+      hash: '',
+      pathname: '/MAUSMAUS/',
+    },
+    dispatchEvent() {},
+    addEventListener() {},
+    alert(message) {
+      alerts.push(message);
+    },
+    prompt() { return null; },
+    history: {
+      replaceState() {},
+    },
+  };
+
+  const { createEditController } = loadEditController(null, {
+    window: windowMock,
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async (action, payload) => {
+      if (action === 'save') {
+        savedPayload = payload;
+        return {
+          auth,
+          allowed: true,
+          saved: true,
+          target: 'file',
+          subjectTarget: 'file',
+          routePath: 'notes.txt',
+          config: {
+            kind: 'text',
+            mimeType: 'text/plain',
+            size: 12,
+            title: payload.title || '',
+            description: payload.description || '',
+            work: payload.work,
+          },
+        };
+      }
+      return {
+        auth,
+        allowed: true,
+        target: 'file',
+        subjectTarget: 'file',
+        config: {
+          kind: 'text',
+          mimeType: 'text/plain',
+          size: 12,
+          work: {
+            type: 'text',
+          },
+        },
+      };
+    },
+    requestMcpRoute: async (route) => {
+      if (route === 'convert') {
+        return {
+          ok: true,
+          target: {
+            mode: 'replace-source-file',
+          },
+          output: {
+            name: 'notes.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            size: 17,
+            bodyBase64: Buffer.from('Edited plain text', 'utf8').toString('base64'),
+          },
+        };
+      }
+      if (route === 'save-converted-work') {
+        return { ok: true, type: 'saved-source-file', path: 'notes.txt' };
+      }
+      throw new Error(`Unexpected MCP route: ${route}`);
+    },
+    getActiveSelection: () => ({
+      path: 'notes.txt',
+      previewPath: 'notes.txt',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'notes.txt',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel: { querySelector() { return null; } },
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  controller.setPreviewRefreshHandler(() => {
+    refreshCount += 1;
+  });
+
+  await controller.initEditMode();
+  await capturedPanelOptions.onConvertWork({
+    statusEl: { textContent: '' },
+    converter: {
+      id: 'converter/convert-text-editor',
+      format: 'source',
+      saveMode: 'replace-source-file',
+      node: 'local',
+    },
+  });
+
+  expect(alerts).toEqual([
+    'OK — the edited preview content was saved back into the source file.',
+  ]);
+  expect(refreshCount).toBe(1);
+  expect(savedPayload).toBeTruthy();
+  expect(savedPayload.work.converter).toEqual(expect.objectContaining({
+    id: 'converter/convert-text-editor',
+    format: 'source',
+    saveMode: 'replace-source-file',
+  }));
+});

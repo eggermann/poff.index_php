@@ -52,7 +52,7 @@ trait WorktypeContextTrait
             'isVideo' => $kind === 'video',
             'isAudio' => $kind === 'audio',
             'isPdf' => $kind === 'pdf',
-            'isText' => $kind === 'text',
+            'isText' => in_array($kind, ['text', 'htaccess'], true),
             'isLink' => $kind === 'link',
             'isOther' => $kind === 'other',
         ];
@@ -125,8 +125,14 @@ trait WorktypeContextTrait
 
     private static function hydrateRenderCollections(array $context): array
     {
+        if (isset($context['tree']) && is_array($context['tree'])) {
+            $context['tree'] = self::hydrateRenderItems($context['tree']);
+            if (!isset($context['items'])) {
+                $context['items'] = $context['tree'];
+            }
+        }
+
         foreach ([
-            'tree',
             'items',
             'allItems',
             'allFiles',
@@ -139,9 +145,13 @@ trait WorktypeContextTrait
             'allLinks',
             'allOther',
         ] as $key) {
-            if (isset($context[$key]) && is_array($context[$key])) {
-                $context[$key] = self::hydrateRenderItems($context[$key]);
+            if (!isset($context[$key]) || !is_array($context[$key])) {
+                continue;
             }
+            if ($key === 'items' && isset($context['tree']) && $context['items'] === $context['tree']) {
+                continue;
+            }
+            $context[$key] = self::hydrateRenderItems($context[$key]);
         }
 
         if (isset($context['workTree']) && is_array($context['workTree'])) {

@@ -1,0 +1,40 @@
+<section class="poff-pageoff-remote-text__panel">
+    <header class="poff-pageoff-remote-text__header">
+        <p class="poff-pageoff-remote-text__eyebrow">Remote PHP converter</p>
+        <h2 class="poff-pageoff-remote-text__title">{{converter.label}}</h2>
+        <p class="poff-pageoff-remote-text__summary">Preview and edit the text locally. Convert sends the current content to a local PHP endpoint and stores the PHP response as a generated work.</p>
+    </header>
+    <dl class="poff-pageoff-remote-text__meta">
+        <div>
+            <dt>Source</dt>
+            <dd>{{source.name}}</dd>
+        </div>
+        <div>
+            <dt>Format</dt>
+            <dd>{{converter.format}}</dd>
+        </div>
+        <div>
+            <dt>Save as</dt>
+            <dd>{{target.saveAs}}</dd>
+        </div>
+    </dl>
+    <div class="poff-pageoff-remote-text__controls">
+        <label class="poff-pageoff-remote-text__control">
+            <span>Font size</span>
+            <select data-poff-pageoff-font-size>
+                <option value="14px">14px</option>
+                <option value="16px" selected>16px</option>
+                <option value="18px">18px</option>
+                <option value="22px">22px</option>
+                <option value="28px">28px</option>
+            </select>
+        </label>
+    </div>
+    <div class="poff-pageoff-remote-text__surface">
+        <div class="poff-pageoff-remote-text__toolbar">
+            <span class="poff-pageoff-remote-text__badge">pageoff localhost PHP</span>
+            <span class="poff-pageoff-remote-text__status" data-poff-pageoff-remote-status>Ready for remote PHP conversion.</span>
+        </div>
+        <textarea class="poff-pageoff-remote-text__editor" data-poff-pageoff-remote-editor spellcheck="false">{{textContent}}</textarea>
+    </div>
+</section>

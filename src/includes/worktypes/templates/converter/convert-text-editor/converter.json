@@ -1,0 +1,32 @@
+{
+  "type": "converter",
+  "name": "convert-text-editor",
+  "label": "Convert Text Editor",
+  "description": "Loads a zero-build CDN code editor for text files and converts through a local PHP endpoint that returns the generated result.",
+  "accepts": ["text/plain", "text/*", "application/json", "application/rtf", "text/rtf"],
+  "outputs": ["application/json", "text/html", "text/plain", "text/markdown"],
+  "engine": "remote-node",
+  "defaults": {
+    "format": "source",
+    "quality": "default",
+    "saveMode": "replace-source-file",
+    "hiddenByDefault": true
+  },
+  "ui": {
+    "format": {
+      "type": "select",
+      "label": "Output format",
+      "options": ["source", "json", "html", "txt", "md"]
+    },
+    "quality": {
+      "type": "select",
+      "label": "Quality",
+      "options": ["preview", "default", "archival", "small-web"]
+    },
+    "saveMode": {
+      "type": "select",
+      "label": "Save mode",
+      "options": ["replace-source-file", "new-hidden-work", "temporary-preview-only"]
+    }
+  }
+}

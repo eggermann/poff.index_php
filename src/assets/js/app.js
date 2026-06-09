@@ -17,6 +17,18 @@ const currentPathForIframe = Object.prototype.hasOwnProperty.call(poffContext, '
     ? poffContext.currentPathForIframe
     : null;
 
+function resolveRootDocumentTitle(context = {}) {
+    const config = context && typeof context === 'object' ? context.currentPoffConfig : null;
+    const title = typeof config?.title === 'string' ? config.title.trim() : '';
+    if (title) {
+        return title;
+    }
+    const folderName = typeof config?.folderName === 'string' ? config.folderName.trim() : '';
+    return folderName || 'poff.io';
+}
+
+document.title = resolveRootDocumentTitle(poffContext);
+
 const editRequested = new URLSearchParams(window.location.search).get('edit') === 'true';
 const editQuery = editRequested ? '&edit=true' : '';
 
@@ -32,6 +44,11 @@ const navigation = initNavigation({
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode,
+    getPreviewParams: editController.getPreviewParams,
+});
+
+editController.setPreviewRefreshHandler(() => {
+    navigation.refreshCurrentPreviewLocation();
 });
 
 const sidebarController = bindSidebarToggle(elements);
@@ -42,6 +59,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     editController.syncEditToggle();
     editController.bindEditToggle();
+    editController.bindAddWorkButton();
+    editController.bindJumpToSectionButton();
+    editController.bindSidebarFileDrop(elements.appSidebar);
+    editController.bindAuthForm();
 
     if (isPreviewHashActive()) {
         navigation.loadCurrentFolderInIframe();

@@ -11,9 +11,15 @@ function cmsIsOpenAiCompatibleEndpoint(string $url): bool
 
 function cmsPromptSendSseHeaders(): void
 {
+    $GLOBALS['__poff_prompt_sse_active'] = true;
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache, no-transform');
     header('X-Accel-Buffering: no');
+}
+
+function cmsPromptIsSseActive(): bool
+{
+    return !empty($GLOBALS['__poff_prompt_sse_active']);
 }
 
 function cmsPromptSendSseEvent(string $event, array $payload): void

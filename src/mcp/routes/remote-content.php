@@ -167,6 +167,13 @@ function mcpRemoteContentBaseUrl(array $opts): string
 function mcpRemoteNormalizeExportItem(array $item, string $baseUrl): array
 {
     $result = [];
+    $routePath = trim((string) ($item['routePath'] ?? ($item['relativePath'] ?? ($item['path'] ?? ''))));
+    $routeSlug = trim((string) ($item['routeSlug'] ?? ''));
+    if ($routeSlug === '') {
+        $routeBase = $routePath !== '' ? basename(str_replace('\\', '/', $routePath)) : trim((string) ($item['name'] ?? ''));
+        $routeSlug = class_exists('PoffConfig') ? PoffConfig::slugify($routeBase) : (preg_replace('/[^a-z0-9]+/i', '-', strtolower($routeBase)) ?: '');
+        $routeSlug = trim($routeSlug, '-');
+    }
     foreach ([
         'name',
         'title',
@@ -185,10 +192,17 @@ function mcpRemoteNormalizeExportItem(array $item, string $baseUrl): array
         'childCount',
         'mimeType',
         'extension',
+        'renderedHtml',
     ] as $key) {
         if (array_key_exists($key, $item)) {
             $result[$key] = $item[$key];
         }
+    }
+    if ($routePath !== '') {
+        $result['routePath'] = $routePath;
+    }
+    if ($routeSlug !== '') {
+        $result['routeSlug'] = $routeSlug;
     }
 
     $pageLink = trim((string) ($item['pageLink'] ?? $item['viewerHref'] ?? ''));
@@ -287,10 +301,19 @@ function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $s
         $uniqueName = mcpRemoteUniqueImportedName($preferredName, $sourceId, $usedNames);
         $type = trim((string) ($item['type'] ?? 'file'));
         $isFolder = ($item['isFolder'] ?? false) === true || $type === 'folder';
-        $entries[] = [
+        $routePath = trim((string) ($item['routePath'] ?? ($item['relativePath'] ?? ($item['path'] ?? ''))));
+        $routeSlug = trim((string) ($item['routeSlug'] ?? ''));
+        if ($routeSlug === '') {
+            $routeBase = $routePath !== '' ? basename(str_replace('\\', '/', $routePath)) : $uniqueName;
+            $routeSlug = class_exists('PoffConfig') ? PoffConfig::slugify($routeBase) : (preg_replace('/[^a-z0-9]+/i', '-', strtolower($routeBase)) ?: '');
+            $routeSlug = trim($routeSlug, '-');
+        }
+        $entry = [
             'name' => $uniqueName,
             'title' => trim((string) ($item['title'] ?? $item['name'] ?? $uniqueName)),
-            'slug' => trim((string) ($item['slug'] ?? (class_exists('PoffConfig') ? PoffConfig::slugify($uniqueName) : ''))),
+            'slug' => $routeSlug !== '' ? $routeSlug : trim((string) ($item['slug'] ?? (class_exists('PoffConfig') ? PoffConfig::slugify($uniqueName) : ''))),
+            'routeSlug' => $routeSlug,
+            'routePath' => $routePath,
             'type' => $isFolder
                 ? 'folder'
                 : (trim((string) ($item['kind'] ?? $type)) === 'link' ? 'link' : 'file'),
@@ -305,6 +328,7 @@ function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $s
             'remoteKind' => trim((string) ($item['kind'] ?? $type)),
             'importedAt' => date('c'),
         ];
+        $entries[] = $entry;
     }
 
     return $entries;
@@ -314,6 +338,10 @@ function handleExportContent(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = trim((string) ($opts['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'export-content'], $access);
+    }
 
     if (!class_exists('PoffConfig')) {
         return array_merge([
@@ -376,6 +404,11 @@ function handleImportRemote(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = trim((string) ($opts['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'import-remote'], $access);
+    }
+
     $url = trim((string) ($opts['url'] ?? ''));
     $sourceId = trim((string) ($opts['sourceId'] ?? ''));
     $replace = (bool) ($opts['replace'] ?? false);

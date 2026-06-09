@@ -23,6 +23,8 @@ export function createLayoutModeController({
     getSharedLayoutName = () => '',
     getSharedLayoutPackage = () => null,
     wrapperTarget,
+    sectionName = 'works',
+    sectionSourceLabel = '',
     originalTarget,
     originalEditable,
     hasVirtualSource,
@@ -45,7 +47,7 @@ export function createLayoutModeController({
         return hasVirtualSource ? 'virtual' : 'local';
     };
 
-    const syncLayoutMode = ({ modePreviewEl, sourcePreviewEl, primaryTitleEl, primaryHintEl, primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
+    const syncLayoutMode = ({ modePreviewEl, sourcePreviewEl, sectionSourcePreviewEl, primaryTitleEl, primaryHintEl, primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
         const preset = (presetEl?.value || 'actual').trim();
         const sharedPackage = preset === 'shared' ? getSharedLayoutPackage() : null;
         if (preset === 'shared' && sharedPackage) {
@@ -71,12 +73,18 @@ export function createLayoutModeController({
                 ? `Collection: ${sharedLayoutName || 'shared'}`
                 : (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout'))
             : `Filesystem: ${localWrapperDirectory}`;
+        const sectionSourcePreview = preset === 'shared'
+            ? `Collection: ${sharedLayoutName || 'shared'} (${sectionName}.hbs)`
+            : sectionSourceLabel;
 
         if (modePreviewEl) {
             modePreviewEl.textContent = nextMode;
         }
         if (sourcePreviewEl) {
             sourcePreviewEl.textContent = sourcePreview;
+        }
+        if (sectionSourcePreviewEl) {
+            sectionSourcePreviewEl.textContent = sectionSourcePreview;
         }
         if (primaryTitleEl) {
             primaryTitleEl.textContent = preset === 'shared'

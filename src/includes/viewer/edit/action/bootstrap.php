@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__ . '/../core.php';
+require_once __DIR__ . '/../../../auth.php';
 require_once __DIR__ . '/../upload.php';
 require_once __DIR__ . '/../delete.php';
 require_once __DIR__ . '/../reset.php';
@@ -14,11 +15,13 @@ require_once __DIR__ . '/../prompt-refs.php';
 require_once __DIR__ . '/../../utils.php';
 require_once __DIR__ . '/context.php';
 require_once __DIR__ . '/dispatch.php';
+require_once __DIR__ . '/auth-action.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/upload-action.php';
 require_once __DIR__ . '/delete-action.php';
 require_once __DIR__ . '/reset-action.php';
 require_once __DIR__ . '/save-action.php';
+require_once __DIR__ . '/models-action.php';
 require_once __DIR__ . '/prompt-action.php';
 require_once __DIR__ . '/save/helpers.php';
 require_once __DIR__ . '/save/meta.php';

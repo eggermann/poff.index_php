@@ -7,7 +7,7 @@ function cmsBuildEditActionContext(): array
 {
     $action = (string) ($_GET['edit'] ?? '');
     $runtimeRootDir = realpath(getcwd() ?: '.') ?: '.';
-    $data = ($action === 'save' || $action === 'prompt') ? cmsReadJsonBody() : [];
+    $data = cmsReadJsonBody();
     if ($data === []) {
         $data = $_POST;
     }
@@ -17,18 +17,42 @@ function cmsBuildEditActionContext(): array
     }
     $runtimeTarget = cmsResolveTarget($runtimeRootDir, $path);
     $runtimeAllowDir = $runtimeTarget['dir'] ?? $runtimeRootDir;
+    $editModeAllowed = cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir);
+    $editorAuthenticated = cmsAuthBypassEnabled() || cmsIsEditorAuthenticated($runtimeRootDir);
+    $publicExternalLinkSubmission = $action === 'upload' && trim((string) ($data['source'] ?? '')) === 'url';
 
-    if (!cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir)) {
-        cmsJsonResponse(['allowed' => false, 'error' => 'Edit mode not enabled.']);
+    if ($action === 'auth') {
+        return [
+            'action' => $action,
+            'runtimeRootDir' => $runtimeRootDir,
+            'rootDir' => $runtimeRootDir,
+            'data' => $data,
+            'path' => $path,
+            'target' => $runtimeTarget,
+            'targetDir' => is_array($runtimeTarget) ? (string) ($runtimeTarget['dir'] ?? $runtimeRootDir) : $runtimeRootDir,
+            'editModeAllowed' => $editModeAllowed,
+        ];
+    }
+
+    if (!$editModeAllowed) {
+        cmsJsonResponse([
+            'allowed' => false,
+            'error' => 'Edit mode not enabled.',
+            'auth' => cmsBuildEditorAuthView($runtimeRootDir, false),
+        ], 403);
+    }
+
+    if (!$editorAuthenticated && !$publicExternalLinkSubmission) {
+        cmsRequireEditorAccess($runtimeRootDir, true);
     }
 
     if (!class_exists('PoffConfig')) {
-        cmsJsonResponse(['allowed' => true, 'error' => 'PoffConfig unavailable.']);
+        cmsJsonResponse(['allowed' => true, 'error' => 'PoffConfig unavailable.', 'auth' => cmsBuildEditorAuthView($runtimeRootDir, true)]);
     }
 
     $target = cmsResolveTarget($runtimeRootDir, $path);
     if ($target === null) {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Invalid folder path.']);
+        cmsJsonResponse(['allowed' => true, 'error' => 'Invalid folder path.', 'auth' => cmsBuildEditorAuthView($runtimeRootDir, true)]);
     }
 
     $targetType = (string) $target['type'];
@@ -62,6 +86,7 @@ function cmsBuildEditActionContext(): array
         'data' => $data,
         'path' => $path,
         'target' => $target,
+        'editModeAllowed' => $editModeAllowed,
         'targetType' => $targetType,
         'isLayoutTarget' => $isLayoutTarget,
         'subjectType' => $subjectType,
@@ -70,5 +95,7 @@ function cmsBuildEditActionContext(): array
         'targetFile' => $targetFile,
         'config' => $config,
         'folderViewData' => $folderViewData,
+        'editorAuthenticated' => $editorAuthenticated,
+        'publicExternalLinkSubmission' => $publicExternalLinkSubmission,
     ];
 }

@@ -1,6 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 const { NodeSSH } = require('node-ssh');
+const {
+    resolveDeployTargetProfile,
+    resolveTargetEnvValue,
+    requireTargetEnvValue,
+    getEnvValue,
+} = require('./deploy-targets');
 
 const projectRoot = path.resolve(__dirname, '..');
 const ssh = new NodeSSH();
@@ -35,37 +41,12 @@ function loadEnv(rootDir) {
     return env;
 }
 
-function getEnvValue(env, keys, fallback = '') {
-    const keyList = Array.isArray(keys) ? keys : [keys];
-    for (const key of keyList) {
-        const processValue = process.env[key];
-        if (typeof processValue === 'string' && processValue !== '') {
-            return processValue;
-        }
-
-        const envValue = env[key];
-        if (typeof envValue === 'string' && envValue !== '') {
-            return envValue;
-        }
-    }
-
-    return fallback;
-}
-
-function requireEnvValue(env, keys, label) {
-    const value = getEnvValue(env, keys);
-    if (!value) {
-        throw new Error(`Missing required deploy setting: ${label}`);
-    }
-    return value;
-}
-
 function shellEscape(value) {
     return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
-function resolveDeployMode(env) {
-    const cliArgs = new Set(process.argv.slice(2));
+function resolveDeployMode(argv, env) {
+    const cliArgs = new Set(argv);
     if (cliArgs.has('--full')) {
         return 'full';
     }
@@ -77,15 +58,10 @@ function resolveDeployMode(env) {
     return configuredMode === 'full' ? 'full' : 'index';
 }
 
-function resolveSourcePath(env) {
-    const configuredPath = getEnvValue(
-        env,
-        ['DEPLOY_SOURCE_PATH', 'SOURCE_PATH', 'sourcePath'],
-        'pages/dominikeggermann.com'
-    );
-    return path.isAbsolute(configuredPath)
-        ? configuredPath
-        : path.resolve(projectRoot, configuredPath);
+function resolveDeployTarget(argv) {
+    const positionalArgs = argv.filter((arg) => !arg.startsWith('-'));
+    const targetArg = positionalArgs.length > 0 ? positionalArgs.join('_') : 'default';
+    return resolveDeployTargetProfile(targetArg);
 }
 
 function resolveIndexFilePath(sourcePath) {
@@ -230,26 +206,55 @@ async function uploadDir(localDir, remoteDir, concurrency) {
 
 async function main() {
     const env = loadEnv(projectRoot);
-    const deployMode = resolveDeployMode(env);
-    const host = requireEnvValue(env, ['DEPLOY_HOST', 'SSH_HOST', 'host'], 'DEPLOY_HOST / SSH_HOST / host');
-    const username = requireEnvValue(
+    const argv = process.argv.slice(2);
+    const deployTarget = resolveDeployTarget(argv);
+    const deployMode = resolveDeployMode(argv, env);
+    const host = requireTargetEnvValue(
+        env,
+        ['DEPLOY_HOST', 'SSH_HOST', 'host'],
+        deployTarget.suffix,
+        'DEPLOY_HOST / SSH_HOST / host'
+    );
+    const username = requireTargetEnvValue(
         env,
         ['DEPLOY_USERNAME', 'SSH_USERNAME', 'SSH_USER', 'user'],
+        deployTarget.suffix,
         'DEPLOY_USERNAME / SSH_USERNAME / SSH_USER / user'
     );
-    const remotePath = requireEnvValue(
+    const remotePath = requireTargetEnvValue(
         env,
         ['DEPLOY_REMOTE_PATH', 'SSH_REMOTE_PATH', 'DESTINATION_PATH', 'destinationPath'],
+        deployTarget.suffix,
         'DEPLOY_REMOTE_PATH / SSH_REMOTE_PATH / DESTINATION_PATH / destinationPath'
     );
-    const sourcePath = resolveSourcePath(env);
+    const sourcePathValue = resolveTargetEnvValue(
+        env,
+        ['DEPLOY_SOURCE_PATH', 'SOURCE_PATH', 'sourcePath'],
+        deployTarget.suffix,
+        'pages/dominikeggermann.com'
+    );
+    const sourcePath = path.isAbsolute(sourcePathValue)
+        ? sourcePathValue
+        : path.resolve(projectRoot, sourcePathValue);
     const concurrency = Number.parseInt(
         getEnvValue(env, ['DEPLOY_CONCURRENCY', 'SSH_CONCURRENCY', 'concurrency'], '8'),
         10
     ) || 8;
-    const password = getEnvValue(env, ['DEPLOY_PASSWORD', 'SSH_PASSWORD', 'password']);
-    const privateKeyValue = getEnvValue(env, ['DEPLOY_PRIVATE_KEY', 'SSH_PRIVATE_KEY', 'privateKey']);
-    const passphrase = getEnvValue(env, ['DEPLOY_PASSPHRASE', 'SSH_PASSPHRASE', 'passphrase']);
+    const password = resolveTargetEnvValue(
+        env,
+        ['DEPLOY_PASSWORD', 'SSH_PASSWORD', 'password'],
+        deployTarget.suffix
+    );
+    const privateKeyValue = resolveTargetEnvValue(
+        env,
+        ['DEPLOY_PRIVATE_KEY', 'SSH_PRIVATE_KEY', 'privateKey'],
+        deployTarget.suffix
+    );
+    const passphrase = resolveTargetEnvValue(
+        env,
+        ['DEPLOY_PASSPHRASE', 'SSH_PASSPHRASE', 'passphrase'],
+        deployTarget.suffix
+    );
 
     if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isDirectory()) {
         throw new Error(`Deploy source directory not found: ${sourcePath}`);
@@ -261,7 +266,7 @@ async function main() {
     };
 
     if (privateKeyValue) {
-        connection.privateKey = path.isAbsolute(privateKeyValue)
+        connection.privateKeyPath = path.isAbsolute(privateKeyValue)
             ? privateKeyValue
             : path.resolve(projectRoot, privateKeyValue);
         if (passphrase) {
@@ -276,6 +281,7 @@ async function main() {
     console.log('Connecting to server...');
     console.log(`Source: ${sourcePath}`);
     console.log(`Remote: ${remotePath}`);
+    console.log(`Target: ${deployTarget.targetName}`);
     console.log(`Mode: ${deployMode}`);
 
     try {

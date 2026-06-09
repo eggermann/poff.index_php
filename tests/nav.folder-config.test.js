@@ -1,4 +1,6 @@
 const { spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
@@ -12,6 +14,270 @@ test('nav rendering uses folderPoffConfig instead of an undefined config variabl
 
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');
-  expect(result.stdout).toContain('viewer-folder');
+  expect(result.stdout).toContain('Folder Preview');
+  expect(result.stdout).not.toContain('> ./ viewer-folder<');
   expect(result.stdout).toContain('nav-link-up');
+});
+
+test('home navigation appears only when viewing a subfolder and uses the root title', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-home-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'home-root',
+      slug: 'home-root',
+      title: 'My Home',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'section',
+          slug: 'section',
+          type: 'folder',
+          path: 'section',
+          visible: true,
+        },
+      ],
+    }, null, 2), 'utf8');
+    fs.mkdirSync(path.join(tempRoot, 'section'));
+
+    const rootResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    expect(rootResult.status).toBe(0);
+    expect(rootResult.stderr).toBe('');
+    expect(rootResult.stdout).not.toContain('nav-link-home');
+
+    const childResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, 'section'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    expect(childResult.status).toBe(0);
+    expect(childResult.stderr).toBe('');
+    expect(childResult.stdout).toContain('nav-link-home');
+    expect(childResult.stdout).toContain('My Home');
+    expect(childResult.stdout).toContain('data-path=""');
+    expect(childResult.stdout).toContain('?path=');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('nav ajax rendering tolerates missing directories without undefined variable warnings', () => {
+  const baseDir = path.join(ROOT, 'tests', 'poff-tests');
+  const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav_ajax.php'), baseDir, 'deg'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toContain('Error reading directory.');
+  expect(result.stdout).not.toContain('Undefined variable $folderPoffConfig');
+});
+
+test('nav edit rendering includes fast hide actions for tree items', () => {
+  const baseDir = path.join(ROOT, 'tests', 'poff-tests');
+  const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), baseDir, 'viewer-folder', 'edit'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toContain('data-nav-action="toggle-visibility"');
+  expect(result.stdout).toContain('data-nav-action="delete-target"');
+  expect(result.stdout).toContain('nav-row-actions');
+  expect(result.stdout).toContain('data-tree-item="1"');
+  expect(result.stdout).toContain('nav-row-action__icon');
+  expect(result.stdout).toContain('Hide');
+});
+
+test('hidden tree items render an unhide toggle', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'visible.txt'), 'hello', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'visible.txt',
+          slug: 'visible-txt',
+          type: 'file',
+          path: 'visible.txt',
+          visible: false,
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, '', 'edit'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('Unhide');
+    expect(result.stdout).toContain('data-nav-hidden="1"');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('renders .htaccess as a hidden normal file entry in edit mode', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-htaccess-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'visible.txt'), 'hello', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, '.htaccess'), 'RewriteEngine On', 'utf8');
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'visible.txt',
+          slug: 'visible-txt',
+          type: 'file',
+          path: 'visible.txt',
+          visible: true,
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, '', 'edit'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('data-file=".htaccess"');
+    expect(result.stdout).toContain('data-hidden="true"');
+    expect(result.stdout).toContain('nav-link-hidden');
+    expect(result.stdout).not.toContain('aria-disabled="true"');
+    expect(result.stdout).not.toContain('pointer-events:none;');
+    expect(result.stdout).not.toContain('Create embed policy');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('pending external links stay hidden from visitors and show review state for authenticated editors', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-pending-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'remote-link',
+          slug: 'remote-link',
+          type: 'link',
+          path: 'remote-link',
+          linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+          visible: false,
+          externalSubmission: true,
+          approvalStatus: 'pending',
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const publicResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    expect(publicResult.status).toBe(0);
+    expect(publicResult.stdout).not.toContain('remote-link');
+
+    const editorResult = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, POFF_TEST_AUTH_BYPASS: '1' },
+    });
+    expect(editorResult.status).toBe(0);
+    expect(editorResult.stdout).toContain('nav-link-pending-approval');
+    expect(editorResult.stdout).toContain('data-nav-action="review-external"');
+    expect(editorResult.stdout).toContain('new</span>');
+    expect(editorResult.stdout).toContain('data-hidden="true"');
+    expect(editorResult.stdout).not.toContain('aria-disabled="true"');
+    expect(editorResult.stdout).not.toContain('pointer-events:none;');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('approved external links expose direct preview urls in sidebar markup', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-external-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'remote-link',
+          slug: 'remote-link',
+          type: 'link',
+          path: 'remote-link',
+          linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+          visible: true,
+          externalSubmission: true,
+          approvalStatus: 'approved',
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('data-path="remote-link"');
+    expect(result.stdout).toContain('data-view-url="https://remote.example/index.php?view=1&amp;path=portfolio"');
+    expect(result.stdout).toContain('nav-link-approved-external');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('converter folders render a visible converter badge in the sidebar nav', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-converter-'));
+  try {
+    fs.mkdirSync(path.join(tempRoot, 'converters', 'convert-text'), { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'converters', 'convert-text', 'poff.config.json'), JSON.stringify({
+      folderName: 'convert-text',
+      title: 'Convert Text',
+      type: 'folder',
+      work: {
+        type: 'converter',
+      },
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, 'converters'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('nav-link-converter');
+    expect(result.stdout).toContain('nav-link-badge-converter');
+    expect(result.stdout).toContain('converter</span>');
+    expect(result.stdout).toContain('convert-text');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

@@ -1,7 +1,148 @@
 <?php
 
-function buildFolderViewerData(string $relativePath, string $fullPath, ?array $folderConfig, array $rootMeta): array
+function cmsFolderViewerCacheDirectory(): string
 {
+    static $cacheDir = null;
+
+    if (is_string($cacheDir) && $cacheDir !== '') {
+        return $cacheDir;
+    }
+
+    $rootHash = function_exists('cmsProjectRootDir')
+        ? sha1(cmsProjectRootDir())
+        : sha1((string) getcwd());
+    $cacheDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'poff-folder-viewer-cache' . DIRECTORY_SEPARATOR . $rootHash;
+
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0775, true);
+    }
+
+    return $cacheDir;
+}
+
+function cmsFolderViewerCachePath(string $fullPath, string $relativePath): string
+{
+    return cmsFolderViewerCacheDirectory() . DIRECTORY_SEPARATOR . sha1($fullPath . '|' . $relativePath) . '.json';
+}
+
+function cmsFolderViewerTrackDependency(array &$dependencies, string $path): void
+{
+    if ($path === '') {
+        return;
+    }
+
+    clearstatcache(false, $path);
+    $mtime = @filemtime($path);
+    if ($mtime === false) {
+        return;
+    }
+
+    $dependencies[$path] = (int) $mtime;
+}
+
+function cmsFolderViewerCollectDependencies(array $dependencies): array
+{
+    ksort($dependencies, SORT_STRING);
+
+    $resolved = [];
+    foreach ($dependencies as $path => $mtime) {
+        $resolved[] = [
+            'path' => $path,
+            'mtime' => (int) $mtime,
+        ];
+    }
+
+    return $resolved;
+}
+
+function cmsFolderViewerCacheIsFresh(array $dependencies): bool
+{
+    foreach ($dependencies as $dependency) {
+        if (!is_array($dependency)) {
+            return false;
+        }
+
+        $path = (string) ($dependency['path'] ?? '');
+        $expectedMtime = (int) ($dependency['mtime'] ?? 0);
+        if ($path === '' || $expectedMtime <= 0) {
+            return false;
+        }
+
+        clearstatcache(false, $path);
+        if (!file_exists($path)) {
+            return false;
+        }
+
+        $currentMtime = @filemtime($path);
+        if ($currentMtime === false || (int) $currentMtime !== $expectedMtime) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function cmsFolderViewerCacheLoad(string $fullPath, string $relativePath): ?array
+{
+    $cachePath = cmsFolderViewerCachePath($fullPath, $relativePath);
+    if (!is_file($cachePath)) {
+        return null;
+    }
+
+    $decoded = json_decode((string) file_get_contents($cachePath), true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+
+    if (!isset($decoded['dependencies']) || !is_array($decoded['dependencies'])) {
+        return null;
+    }
+
+    if (!cmsFolderViewerCacheIsFresh($decoded['dependencies'])) {
+        return null;
+    }
+
+    return is_array($decoded['data'] ?? null) ? $decoded['data'] : null;
+}
+
+function cmsFolderViewerCacheStore(string $fullPath, string $relativePath, array $data, array $dependencies): void
+{
+    $cachePath = cmsFolderViewerCachePath($fullPath, $relativePath);
+    $payload = [
+        'data' => $data,
+        'dependencies' => cmsFolderViewerCollectDependencies($dependencies),
+    ];
+
+    @file_put_contents($cachePath, json_encode($payload, JSON_UNESCAPED_SLASHES));
+}
+
+function cmsFolderViewerNormalizedMaxDepth(array $options): ?int
+{
+    if (!array_key_exists('maxDepth', $options) || $options['maxDepth'] === null || $options['maxDepth'] === '') {
+        return null;
+    }
+
+    return max(0, (int) $options['maxDepth']);
+}
+
+function buildFolderViewerData(string $relativePath, string $fullPath, ?array $folderConfig, array $rootMeta, array $options = []): array
+{
+    $dependencies = [];
+    cmsFolderViewerTrackDependency($dependencies, $fullPath);
+    if (class_exists('PoffConfig')) {
+        $rootConfigPath = PoffConfig::configPath($fullPath);
+        if (is_file($rootConfigPath)) {
+            cmsFolderViewerTrackDependency($dependencies, $rootConfigPath);
+        }
+    }
+
+    if ($options === []) {
+        $cached = cmsFolderViewerCacheLoad($fullPath, $relativePath);
+        if (is_array($cached)) {
+            return $cached;
+        }
+    }
+
     $visited = [];
     $realPath = realpath($fullPath);
     if (is_string($realPath) && $realPath !== '') {
@@ -9,11 +150,19 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
     }
 
     $flatItems = [];
-    $tree = buildFolderViewerItems($relativePath, $fullPath, $folderConfig, $flatItems, $visited);
+    $tree = buildFolderViewerItems(
+        $relativePath,
+        $fullPath,
+        $folderConfig,
+        $flatItems,
+        $visited,
+        $dependencies,
+        cmsFolderViewerNormalizedMaxDepth($options)
+    );
     $allFiles = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFile'])));
     $allFolders = array_values(array_filter($flatItems, static fn(array $item): bool => !empty($item['isFolder'])));
 
-    return [
+    $data = [
         'tree' => $tree,
         'workTree' => [
             'name' => (string) ($rootMeta['name'] ?? basename($fullPath)),
@@ -44,9 +193,15 @@ function buildFolderViewerData(string $relativePath, string $fullPath, ?array $f
         'allLinks' => filterFolderViewerItemsByKind($allFiles, 'link'),
         'allOther' => filterFolderViewerItemsByKind($allFiles, 'other'),
     ];
+
+    if ($options === []) {
+        cmsFolderViewerCacheStore($fullPath, $relativePath, $data, $dependencies);
+    }
+
+    return $data;
 }
 
-function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited): array
+function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $folderConfig, array &$flatItems, array &$visited, array &$dependencies, ?int $depthRemaining = null): array
 {
     $tree = resolveFolderViewerTree($fullPath, $folderConfig);
     $items = [];
@@ -63,6 +218,7 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         $entryRelativePath = cmsConfiguredTreeDisplayPath($relativePath, $entry, $entryName);
         $filesystemRelativePath = cmsConfiguredTreeFilesystemRelativePath($relativePath, $entry, $entryName);
         $entryTarget = cmsConfiguredTreeLinkTarget($entry);
+        $directLinkTarget = cmsConfiguredTreeDirectLinkTarget($entry);
         $entryLinkUrl = cmsConfiguredTreeExternalLinkUrl($entry);
         $entryStoredPath = trim((string) ($entry['path'] ?? $entry['relativePath'] ?? ''));
         $entryFullPath = '';
@@ -76,18 +232,29 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             continue;
         }
 
+        if ($hasPhysicalTarget) {
+            cmsFolderViewerTrackDependency($dependencies, $entryFullPath);
+        }
+
         $configuredType = strtolower(trim((string) ($entry['type'] ?? '')));
         $isFolder = $hasPhysicalTarget ? is_dir($entryFullPath) : ($configuredType === 'folder');
         $entryType = $isFolder ? 'folder' : 'file';
         $entryKind = $isFolder
             ? 'folder'
             : (($configuredType === 'link' || (!$hasPhysicalTarget && $entryTarget !== '')) ? 'link' : detectFileType($entryFullPath));
-        $viewerHref = $entryTarget !== ''
-            ? $entryTarget
-            : cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, !$isFolder);
-        $rawHref = $entryTarget !== ''
-            ? $entryTarget
-            : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, !$isFolder);
+        $preferLocalViewer = !$isFolder && ($hasPhysicalTarget || ($entryTarget !== '' && $directLinkTarget === ''));
+        $viewerHref = $preferLocalViewer
+            ? cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, true)
+            : ($entryTarget !== ''
+                ? $entryTarget
+                : cmsBuildViewerHrefFromRelativePath($filesystemRelativePath, !$isFolder));
+        $rawHref = $preferLocalViewer
+            ? ($hasPhysicalTarget
+                ? cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, true)
+                : ($entryTarget !== '' ? $entryTarget : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, true)))
+            : ($entryTarget !== ''
+                ? $entryTarget
+                : cmsBuildAssetHrefFromRelativePath($filesystemRelativePath, !$isFolder));
         $item = array_merge($entry, [
             'name' => $entryName,
             'title' => $entry['title'] ?? $entryName,
@@ -114,25 +281,21 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         ]);
 
         if ($isFolder && $hasPhysicalTarget) {
-            $childConfig = readExistingFolderViewerConfig($entryFullPath);
-            if (is_array($childConfig)) {
-                if (isset($childConfig['title']) && is_string($childConfig['title']) && trim($childConfig['title']) !== '') {
-                    $item['title'] = $childConfig['title'];
-                }
-                if (isset($childConfig['slug']) && is_string($childConfig['slug']) && trim($childConfig['slug']) !== '') {
-                    $item['slug'] = $childConfig['slug'];
-                }
-                if (isset($childConfig['description']) && is_string($childConfig['description'])) {
-                    $item['description'] = $childConfig['description'];
-                }
-            }
+            $childConfig = cmsReadFolderViewerConfig($entryFullPath);
+            cmsApplyFolderViewerConfigMeta($item, $childConfig);
+            cmsTrackFolderViewerConfigPath($dependencies, class_exists('PoffConfig') ? PoffConfig::configPath($entryFullPath) : null);
             $children = [];
             $realChildPath = realpath($entryFullPath);
-            if (!is_string($realChildPath) || $realChildPath === '' || !isset($visited[$realChildPath])) {
+            $nextDepthRemaining = $depthRemaining === null ? null : max(0, $depthRemaining - 1);
+            $canDescend = $depthRemaining === null || $depthRemaining > 0;
+            if (
+                $canDescend
+                && (!is_string($realChildPath) || $realChildPath === '' || !isset($visited[$realChildPath]))
+            ) {
                 if (is_string($realChildPath) && $realChildPath !== '') {
                     $visited[$realChildPath] = true;
                 }
-                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited);
+                $children = buildFolderViewerItems($entryRelativePath, $entryFullPath, $childConfig, $flatItems, $visited, $dependencies, $nextDepthRemaining);
             }
             $item['children'] = $children;
             $item['childCount'] = count($children);
@@ -142,19 +305,11 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
         } else {
             $item['extension'] = strtolower((string) pathinfo($entryName, PATHINFO_EXTENSION));
             if ($hasPhysicalTarget) {
+                cmsFolderViewerTrackDependency($dependencies, $entryFullPath);
                 $item['mimeType'] = MediaType::detectMimeType($entryFullPath, $entryName) ?? '';
-                $fileConfig = readExistingFolderViewerFileConfig($fullPath, $entryName);
-                if (is_array($fileConfig)) {
-                    if (isset($fileConfig['title']) && is_string($fileConfig['title']) && trim($fileConfig['title']) !== '') {
-                        $item['title'] = $fileConfig['title'];
-                    }
-                    if (isset($fileConfig['slug']) && is_string($fileConfig['slug']) && trim($fileConfig['slug']) !== '') {
-                        $item['slug'] = $fileConfig['slug'];
-                    }
-                    if (isset($fileConfig['description']) && is_string($fileConfig['description'])) {
-                        $item['description'] = $fileConfig['description'];
-                    }
-                }
+                $fileConfig = cmsReadFolderViewerFileConfig($fullPath, $entryName);
+                cmsApplyFolderViewerConfigMeta($item, $fileConfig);
+                cmsTrackFolderViewerConfigPath($dependencies, class_exists('PoffConfig') ? PoffConfig::fileConfigPath($fullPath, $entryName) : null);
             }
         }
 
@@ -179,36 +334,68 @@ function resolveFolderViewerTree(string $fullPath, ?array $folderConfig): array
     return [];
 }
 
-function readExistingFolderViewerConfig(string $dir): ?array
+function cmsReadFolderViewerConfigFile(string $configPath, array &$cache): ?array
 {
-    if (!class_exists('PoffConfig')) {
-        return null;
-    }
-
-    $configPath = PoffConfig::configPath($dir);
     if (!is_file($configPath)) {
         return null;
     }
 
-    $decoded = json_decode((string) file_get_contents($configPath), true);
+    $cacheKey = $configPath . '|' . (string) (@filemtime($configPath) ?: 0);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
 
-    return is_array($decoded) ? $decoded : null;
+    $decoded = json_decode((string) file_get_contents($configPath), true);
+    $cache[$cacheKey] = is_array($decoded) ? $decoded : null;
+
+    return $cache[$cacheKey];
 }
 
-function readExistingFolderViewerFileConfig(string $dir, string $fileName): ?array
+function cmsApplyFolderViewerConfigMeta(array &$item, ?array $config): void
 {
+    if (!is_array($config)) {
+        return;
+    }
+
+    foreach (['title', 'slug', 'description'] as $field) {
+        if (!isset($config[$field]) || !is_string($config[$field])) {
+            continue;
+        }
+        if (($field === 'title' || $field === 'slug') && trim($config[$field]) === '') {
+            continue;
+        }
+        $item[$field] = $config[$field];
+    }
+}
+
+function cmsTrackFolderViewerConfigPath(array &$dependencies, ?string $configPath): void
+{
+    if (!is_string($configPath) || $configPath === '' || !is_file($configPath)) {
+        return;
+    }
+    cmsFolderViewerTrackDependency($dependencies, $configPath);
+}
+
+function cmsReadFolderViewerConfig(string $dir): ?array
+{
+    static $cache = [];
+
     if (!class_exists('PoffConfig')) {
         return null;
     }
 
-    $configPath = PoffConfig::fileConfigPath($dir, $fileName);
-    if (!is_file($configPath)) {
+    return cmsReadFolderViewerConfigFile(PoffConfig::configPath($dir), $cache);
+}
+
+function cmsReadFolderViewerFileConfig(string $dir, string $fileName): ?array
+{
+    static $cache = [];
+
+    if (!class_exists('PoffConfig')) {
         return null;
     }
 
-    $decoded = json_decode((string) file_get_contents($configPath), true);
-
-    return is_array($decoded) ? $decoded : null;
+    return cmsReadFolderViewerConfigFile(PoffConfig::fileConfigPath($dir, $fileName), $cache);
 }
 
 function filterFolderViewerItemsByKind(array $items, string $kind): array

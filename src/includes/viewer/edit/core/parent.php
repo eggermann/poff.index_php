@@ -43,7 +43,12 @@ function cmsPromptFolderViewData(string $relativePath, string $fullPath, array $
         return [];
     }
 
-    return buildFolderViewerData($relativePath, $fullPath, $config, $rootMeta);
+    $options = [];
+    if (trim($relativePath, '/\\') === '') {
+        $options['maxDepth'] = 0;
+    }
+
+    return buildFolderViewerData($relativePath, $fullPath, $config, $rootMeta, $options);
 }
 
 function cmsApplyParentTreeVisible(string $rootDir, string $subjectRelativePath, string $subjectType, string $targetDir, mixed $treeVisible): void

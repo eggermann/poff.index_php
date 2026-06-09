@@ -7,11 +7,16 @@ chdir(dirname(__DIR__, 2)); // project root
 require __DIR__ . '/../../vendor/autoload.php';
 @require_once __DIR__ . '/../includes/MediaType.php';
 @require_once __DIR__ . '/../includes/Worktype.php';
+@require_once __DIR__ . '/../includes/Converter.php';
 @require_once __DIR__ . '/../includes/PoffConfig.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/routes/workprompt.php';
 require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/remote-content.php';
+require_once __DIR__ . '/routes/converters.php';
+require_once __DIR__ . '/routes/convert.php';
+require_once __DIR__ . '/routes/create-converter.php';
+require_once __DIR__ . '/routes/converter-prompt.php';
 
 use PhpMcp\Server\Server;
 use PhpMcp\Server\Transports\StreamableHttpServerTransport;
@@ -90,6 +95,96 @@ $server = Server::make()
                 'replace' => ['type' => 'boolean', 'description' => 'Replace prior imported entries from the same source id before adding the new ones'],
             ],
             'required' => ['url'],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleConverters([
+                'rootDir' => $rootDir,
+                'input' => $args,
+            ]);
+        },
+        name: 'converters',
+        description: 'List poff converters available for a MIME/worktype/file extension.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'path' => ['type' => 'string'],
+                'mimeType' => ['type' => 'string'],
+                'kind' => ['type' => 'string'],
+            ],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleConvert([
+                'rootDir' => $rootDir,
+                'payload' => $args,
+            ]);
+        },
+        name: 'convert',
+        description: 'Convert a source work into a web-readable generated work payload.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'source' => ['type' => 'object'],
+                'converter' => ['type' => 'object'],
+                'target' => ['type' => 'object'],
+            ],
+            'required' => ['source', 'converter'],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleSaveConvertedWork([
+                'rootDir' => $rootDir,
+                'payload' => $args,
+            ]);
+        },
+        name: 'save_converted_work',
+        description: 'Save a successful conversion response as hidden generated work beside the source.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'sourcePath' => ['type' => 'string'],
+                'conversion' => ['type' => 'object'],
+            ],
+            'required' => ['sourcePath', 'conversion'],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleCreateConverter([
+                'rootDir' => $rootDir,
+                'path' => $args['path'] ?? '',
+                'payload' => $args,
+            ]);
+        },
+        name: 'create_converter',
+        description: 'Create a new folder-backed converter app from the default starter grain.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'path' => ['type' => 'string', 'description' => 'Relative content path used for editor access checks'],
+                'name' => ['type' => 'string', 'description' => 'Converter folder name such as convert-image'],
+            ],
+            'required' => ['name'],
+        ]
+    )
+    ->withTool(
+        function (array $args) use ($rootDir) {
+            return handleConverterPrompt([
+                'rootDir' => $rootDir,
+                'path' => $args['path'] ?? '',
+            ]);
+        },
+        name: 'converter_prompt',
+        description: 'Return prompt instructions and grain metadata for editing a folder-backed poff converter app.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'path' => ['type' => 'string', 'description' => 'Relative converter folder path such as poff/converters/convert-image'],
+            ],
         ]
     )
     ->build();

@@ -1,4 +1,5 @@
 import { APP_ELEMENT_IDS, APP_HASHES, APP_LABELS } from './constants.js';
+import { registerEscapeClose } from '../core/escape-stack.js';
 
 export function redirectLegacyMcpHash() {
     if (window.location.hash !== APP_HASHES.legacyMcp) {
@@ -33,6 +34,7 @@ export function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
     if (!appShell || !appSidebar || !sidebarToggle) {
         return null;
     }
+    let unregisterEscapeClose = null;
 
     const syncSidebarState = (isOpen) => {
         appShell.classList.toggle('sidebar-collapsed', !isOpen);
@@ -43,7 +45,21 @@ export function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
         sidebarToggle.setAttribute('title', isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
     };
 
+    const bindEscapeClose = () => {
+        if (typeof unregisterEscapeClose === 'function') {
+            return;
+        }
+        unregisterEscapeClose = registerEscapeClose(() => {
+            if (appShell.classList.contains('sidebar-collapsed')) {
+                return false;
+            }
+            syncSidebarState(false);
+            return true;
+        }, { label: 'sidebar-toggle' });
+    };
+
     syncSidebarState(true);
+    bindEscapeClose();
 
     const onToggleClick = () => {
         const isOpen = !appShell.classList.contains('sidebar-collapsed');
@@ -56,6 +72,10 @@ export function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
         syncSidebarState,
         destroy() {
             sidebarToggle.removeEventListener('click', onToggleClick);
+            if (typeof unregisterEscapeClose === 'function') {
+                unregisterEscapeClose();
+                unregisterEscapeClose = null;
+            }
         },
     };
 }

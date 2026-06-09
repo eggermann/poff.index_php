@@ -3,15 +3,30 @@
  * Edit action dispatcher.
  */
 
+function cmsEditRequestMethod(): string
+{
+    return strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+}
+
+function cmsEditRequirePost(string $actionLabel): void
+{
+    if (cmsEditRequestMethod() !== 'POST') {
+        cmsJsonResponse(['allowed' => true, 'error' => $actionLabel . ' requires POST.'], 405);
+    }
+}
+
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['config', 'save', 'prompt', 'upload', 'delete', 'reset'], true)) {
+    if (!in_array($action, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
         return;
     }
 
     $ctx = cmsBuildEditActionContext();
     switch ((string) ($ctx['action'] ?? '')) {
+        case 'auth':
+            cmsHandleEditAuthAction($ctx);
+            return;
         case 'config':
             cmsHandleEditConfigAction($ctx);
             return;
@@ -26,6 +41,9 @@ function cmsHandleEditAction(): void
             return;
         case 'save':
             cmsHandleEditSaveAction($ctx);
+            return;
+        case 'models':
+            cmsHandleEditModelsAction($ctx);
             return;
         case 'prompt':
             cmsHandleEditPromptAction($ctx);

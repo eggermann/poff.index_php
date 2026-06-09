@@ -1,0 +1,9 @@
+<section class="poff-converter-external">
+    <h2>{{title}}</h2>
+    {{#if external.sourceWork.path}}
+        <p>Converted from <code>{{external.sourceWork.path}}</code>.</p>
+    {{/if}}
+    {{#if external.resultWork.srcUrl}}
+        <a href="{{external.resultWork.srcUrl}}">{{external.resultWork.name}}</a>
+    {{/if}}
+</section>

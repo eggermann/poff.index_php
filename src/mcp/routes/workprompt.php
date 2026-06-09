@@ -8,6 +8,10 @@ function handleWorkPrompt(array $opts): array
     $rootDir = $opts['rootDir'];
     $targetFile = $opts['file'] ?? '';
     $stylePrompt = $opts['style'] ?? '';
+    $access = mcpEditorAccessState($rootDir, (string) $targetFile);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'workprompt', 'file' => $targetFile], $access);
+    }
 
     if ($targetFile === '') {
         mcpJsonError('Missing file parameter (?file=relative/path)', ['route' => 'workprompt']);

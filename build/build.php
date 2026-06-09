@@ -17,6 +17,9 @@ $outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
 $outputFileName = $config['outputFile'];
 $outputFile = $outputDir . $outputFileName;
 $legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileName;
+$buildMode = getenv('POFF_BUILD_MODE') === 'production' ? 'production' : 'development';
+$isProductionBuild = $buildMode === 'production';
+$skipDistributionCopies = getenv('POFF_SKIP_DISTRIBUTION_COPIES') === '1';
 $standaloneCopyTargets = [
     '/Applications/MAMP/htdocs/MAUSMAUS',
 ];
@@ -32,6 +35,36 @@ if (!is_dir($outputDir)) {
 
 try {
     $buildContent = "<?php\n";
+    $stripPhp = static function (string $content): string {
+        $content = str_replace(['<?php', '?>'], '', $content);
+        $content = preg_replace('/^\s*declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/m', '', $content) ?? $content;
+        return preg_replace('/^\s*@?require_once[^\n]*\n/m', '', $content);
+    };
+    $stripRequires = static function (string $content): string {
+        $content = preg_replace('/^\s*declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/m', '', $content) ?? $content;
+        return preg_replace('/^\s*@?require_once[^\n]*\n/m', '', $content);
+    };
+    $appendPhpBlock = static function (string &$buffer, string $content): void {
+        $buffer .= trim($content) . "\n\n";
+    };
+    $readSourceFile = static function (string $relativePath) use ($sourceDir): string {
+        return ComponentReader::readComponentFile($sourceDir . $relativePath);
+    };
+    $appendSourceParts = static function (string &$buffer, array $relativePaths, ?callable $transform = null) use ($readSourceFile, $appendPhpBlock): void {
+        foreach ($relativePaths as $relativePath) {
+            $content = $readSourceFile($relativePath);
+            if ($transform !== null) {
+                $content = $transform($content);
+            }
+            $appendPhpBlock($buffer, $content);
+        }
+    };
+    $appendExportAssignment = static function (string &$buffer, string $variable, mixed $value, ?string $setter = null) use ($appendPhpBlock): void {
+        $appendPhpBlock($buffer, $variable . ' = ' . var_export($value, true) . ';');
+        if ($setter !== null) {
+            $appendPhpBlock($buffer, $setter);
+        }
+    };
 
     // Embed the LightnCandy renderer so the built output can render HBS templates
     // without depending on the project vendor directory at runtime.
@@ -61,8 +94,8 @@ try {
             ComponentReader::readComponentFile(__DIR__ . '/..' . $lightnCandyRelativePath)
         ));
     }
-    $buildContent .= '$__embeddedLightnCandySources = ' . var_export($embeddedLightnCandySources, true) . ";\n";
-    $buildContent .= <<<'PHP'
+    $appendPhpBlock($buildContent, '$__embeddedLightnCandySources = ' . var_export($embeddedLightnCandySources, true) . ';');
+    $appendPhpBlock($buildContent, <<<'PHP'
 if (!class_exists('\LightnCandy\LightnCandy', false)) {
     foreach ($__embeddedLightnCandySources as $__lightnCandySource) {
         eval("namespace LightnCandy {\n" . $__lightnCandySource . "\n}");
@@ -70,8 +103,8 @@ if (!class_exists('\LightnCandy\LightnCandy', false)) {
 }
 unset($__embeddedLightnCandySources, $__lightnCandySource);
 
-PHP;
-    $buildContent .= "\n";
+PHP
+    );
 
     // Get the first file header comment only
   
@@ -79,33 +112,28 @@ PHP;
 
 
     // Add function definition without its doc comment
-    $functionsContent = ComponentReader::readComponentFile($sourceDir . '/includes/functions.php');
+    $functionsContent = $readSourceFile('/includes/functions.php');
     if (preg_match('/function\s+extractLinkFileUrl.*?^}/ms', $functionsContent, $matches)) {
-        $buildContent .= $matches[0] . "\n\n";
+        $appendPhpBlock($buildContent, $matches[0]);
     }
 
     // Add MediaType helper
-    $mediaTypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/MediaType.php');
-    $mediaTypeContent = str_replace(['<?php', '?>'], '', $mediaTypeContent);
-    $buildContent .= trim($mediaTypeContent) . "\n\n";
+    $appendSourceParts($buildContent, ['/includes/MediaType.php'], static function (string $content): string {
+        return str_replace(['<?php', '?>'], '', $content);
+    });
+
+    // Add converter registry before edit-mode config references it.
+    $appendSourceParts($buildContent, ['/includes/Converter.php'], $stripPhp);
 
     // Add Worktype helper as a standalone class without runtime require_once dependencies.
-    $worktypeState = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/State.php');
-    $worktypeDefinitions = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Definitions.php');
-    $worktypeContext = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Context.php');
-    $worktypeLayout = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Layout.php');
-    $worktypeRender = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype/Render.php');
-    $worktypeContent = ComponentReader::readComponentFile($sourceDir . '/includes/Worktype.php');
-    $stripStandalonePhp = static function (string $content): string {
-        $content = str_replace(['<?php', '?>'], '', $content);
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
-    };
-    $buildContent .= trim($stripStandalonePhp($worktypeState)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeDefinitions)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeContext)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeLayout)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeRender)) . "\n\n";
-    $buildContent .= trim($stripStandalonePhp($worktypeContent)) . "\n\n";
+    $appendSourceParts($buildContent, [
+        '/includes/Worktype/State.php',
+        '/includes/Worktype/Definitions.php',
+        '/includes/Worktype/Context.php',
+        '/includes/Worktype/Layout.php',
+        '/includes/Worktype/Render.php',
+        '/includes/Worktype.php',
+    ], $stripPhp);
     // Embed worktype definitions and templates (prefer bundle file)
     $bundlePath = $sourceDir . '/includes/worktypes/worktypes.php';
     $embeddedWorktypes = [];
@@ -185,37 +213,28 @@ PHP;
             $embeddedLayoutAssets[$layoutName] = $layoutAssets;
         }
     }
-    $buildContent .= '$__worktypeEmbedded = ' . var_export($embeddedWorktypes, true) . ";\n";
-    $buildContent .= "Worktype::setEmbedded(\$__worktypeEmbedded);\n\n";
-    $buildContent .= '$__worktypeTemplates = ' . var_export($embeddedTemplates, true) . ";\n";
-    $buildContent .= "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);\n\n";
-    $buildContent .= '$__worktypeLayoutAssets = ' . var_export($embeddedLayoutAssets, true) . ";\n";
-    $buildContent .= "Worktype::setEmbeddedLayoutAssets(\$__worktypeLayoutAssets);\n\n";
+    $appendExportAssignment($buildContent, '$__worktypeEmbedded', $embeddedWorktypes, "Worktype::setEmbedded(\$__worktypeEmbedded);");
+    $appendExportAssignment($buildContent, '$__worktypeTemplates', $embeddedTemplates, "Worktype::setEmbeddedTemplates(\$__worktypeTemplates);");
+    $appendExportAssignment($buildContent, '$__worktypeLayoutAssets', $embeddedLayoutAssets, "Worktype::setEmbeddedLayoutAssets(\$__worktypeLayoutAssets);");
     $viewerShellCssAsset = __DIR__ . '/assets/app.css';
-    $buildContent .= '$__embeddedViewerShellCss = ' . var_export(
-        is_file($viewerShellCssAsset) ? trim((string) file_get_contents($viewerShellCssAsset)) : '',
-        true
-    ) . ";\n\n";
+    $appendExportAssignment(
+        $buildContent,
+        '$__embeddedViewerShellCss',
+        is_file($viewerShellCssAsset) ? trim((string) file_get_contents($viewerShellCssAsset)) : ''
+    );
 
     // Add edit-mode helpers, root detection, prompt/template sanitizers, and PoffConfig model so the built output stays single-file.
-    $editModeHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/edit-mode.php');
-    $projectRootHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/project-root.php');
-    $promptTemplateSanitize = ComponentReader::readComponentFile($sourceDir . '/includes/prompt-template-sanitize.php');
-    $poffConfigLayoutHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-helpers.php');
-    $poffConfigCoreHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/core-helpers.php');
-    $poffConfigLayoutFiles = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-files.php');
-    $poffConfigLayoutView = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-view.php');
-    $poffConfigLayoutCollections = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/layout-collections.php');
-    $poffConfigPromptHelpers = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig/prompt-helpers.php');
-    $viewerLinkTargets = ComponentReader::readComponentFile($sourceDir . '/includes/viewer/link-targets.php');
-    $poffConfigContent = ComponentReader::readComponentFile($sourceDir . '/includes/PoffConfig.php');
-    $stripPhp = static function (string $content): string {
-        $content = str_replace(['<?php', '?>'], '', $content);
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
-    };
-    $editModeHelpers = $stripPhp($editModeHelpers);
-    $projectRootHelpers = $stripPhp($projectRootHelpers);
-    $promptTemplateSanitize = $stripPhp($promptTemplateSanitize);
+    $editModeHelpers = $stripPhp($readSourceFile('/includes/edit-mode.php'));
+    $projectRootHelpers = $stripPhp($readSourceFile('/includes/project-root.php'));
+    $promptTemplateSanitize = $stripPhp($readSourceFile('/includes/prompt-template-sanitize.php'));
+    $poffConfigLayoutHelpers = $readSourceFile('/includes/PoffConfig/layout-helpers.php');
+    $poffConfigCoreHelpers = $readSourceFile('/includes/PoffConfig/core-helpers.php');
+    $poffConfigLayoutFiles = $readSourceFile('/includes/PoffConfig/layout-files.php');
+    $poffConfigLayoutView = $readSourceFile('/includes/PoffConfig/layout-view.php');
+    $poffConfigLayoutCollections = $readSourceFile('/includes/PoffConfig/layout-collections.php');
+    $poffConfigPromptHelpers = $readSourceFile('/includes/PoffConfig/prompt-helpers.php');
+    $viewerLinkTargets = $stripPhp($readSourceFile('/includes/viewer/link-targets.php'));
+    $poffConfigContent = $readSourceFile('/includes/PoffConfig.php');
     $poffConfigContent = PoffConfigBuilder::buildClass($poffConfigContent, [
         $poffConfigLayoutHelpers,
         $poffConfigCoreHelpers,
@@ -225,19 +244,36 @@ PHP;
         $poffConfigPromptHelpers,
     ]);
     $poffConfigContent = $stripPhp($poffConfigContent);
-    $viewerLinkTargets = $stripPhp($viewerLinkTargets);
-    $buildContent .= trim($editModeHelpers) . "\n\n";
-    $buildContent .= trim($projectRootHelpers) . "\n\n";
-    $buildContent .= trim($promptTemplateSanitize) . "\n\n";
-    $buildContent .= trim($viewerLinkTargets) . "\n\n";
-    $buildContent .= trim($poffConfigContent) . "\n\n";
+    $authHelpers = $stripPhp($readSourceFile('/includes/auth.php'));
+    $navRenderHelpers = $stripPhp($readSourceFile('/includes/nav-render.php'));
+    foreach ([
+        $editModeHelpers,
+        $authHelpers,
+        $projectRootHelpers,
+        $promptTemplateSanitize,
+        $viewerLinkTargets,
+        $poffConfigContent,
+        $navRenderHelpers,
+    ] as $phpBlock) {
+        $appendPhpBlock($buildContent, $phpBlock);
+    }
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
-    $stripRequires = static function (string $content): string {
-        return preg_replace('/^\s*require_once[^\n]*\n/m', '', $content);
-    };
+    $viewerSharedParts = [
+        '/includes/viewer/utils/core.php',
+        '/includes/viewer/utils/targets.php',
+        '/includes/viewer/utils/remote-html.php',
+        '/includes/viewer/utils/remote-links.php',
+        '/includes/viewer/utils/http.php',
+        '/includes/viewer/render/entry.php',
+        '/includes/viewer/render/file.php',
+        '/includes/viewer/render/folder.php',
+        '/includes/viewer/render/data.php',
+        '/includes/viewer/render/shell.php',
+    ];
+    $appendSourceParts($buildContent, $viewerSharedParts, $stripRequires);
+
     $viewerEditParts = [
-        '/includes/viewer/utils.php',
         '/includes/viewer/edit/core/config.php',
         '/includes/viewer/edit/core/parent.php',
         '/includes/viewer/edit/core/transport.php',
@@ -247,6 +283,7 @@ PHP;
         '/includes/viewer/edit/prompt-compact/config.php',
         '/includes/viewer/edit/prompt-compact/context.php',
         '/includes/viewer/edit/prompt-compact/history.php',
+        '/includes/viewer/edit/prompt-refs.php',
         '/includes/viewer/edit/prompt-context/wrapper.php',
         '/includes/viewer/edit/prompt-context/parent.php',
         '/includes/viewer/edit/prompt/context-state.php',
@@ -255,6 +292,7 @@ PHP;
         '/includes/viewer/edit/delete.php',
         '/includes/viewer/edit/reset.php',
         '/includes/viewer/edit/action/context.php',
+        '/includes/viewer/edit/action/auth-action.php',
         '/includes/viewer/edit/action/config.php',
         '/includes/viewer/edit/action/upload-action.php',
         '/includes/viewer/edit/action/delete-action.php',
@@ -272,19 +310,26 @@ PHP;
         '/includes/viewer/edit/action/prompt/gemini.php',
         '/includes/viewer/edit/action/prompt/local.php',
         '/includes/viewer/edit/action/prompt-action.php',
+        '/includes/viewer/edit/action/models-action.php',
         '/includes/viewer/edit/action/dispatch.php',
-        '/includes/viewer/render/entry.php',
-        '/includes/viewer/render/file.php',
-        '/includes/viewer/render/folder.php',
-        '/includes/viewer/render/data.php',
-        '/includes/viewer/render/shell.php',
     ];
-    foreach ($viewerEditParts as $relativePath) {
-        $content = ComponentReader::readComponentFile($sourceDir . $relativePath);
-        $content = $stripRequires($content);
-        $buildContent .= trim($content) . "\n\n";
-    }
-    $buildContent .= "cmsHandleEditAction();\n\n";
+    $appendSourceParts($buildContent, $viewerEditParts, $stripRequires);
+    $appendPhpBlock($buildContent, "cmsHandleEditAction();");
+
+    $mcpParts = [
+        '/mcp/helpers.php',
+        '/mcp/routes/workprompt.php',
+        '/mcp/routes/create.php',
+        '/mcp/routes/edit-config.php',
+        '/mcp/routes/prompt-template.php',
+        '/mcp/routes/remote-content.php',
+        '/mcp/routes/converters.php',
+        '/mcp/routes/convert.php',
+        '/mcp/routes/create-converter.php',
+        '/mcp/routes/converter-prompt.php',
+        '/mcp/routes/style.php',
+    ];
+    $appendSourceParts($buildContent, $mcpParts, $stripRequires);
 
     // Add initialization code
     $buildContent .= <<<'PHP'
@@ -317,6 +362,135 @@ if (isset($_GET['view']) && (isset($_GET['file']) || array_key_exists('path', $_
     return;
 }
 
+if ((string) ($_GET['mcp'] ?? '') === '1') {
+    register_shutdown_function(static function (): void {
+        $error = error_get_last();
+        if (!is_array($error)) {
+            return;
+        }
+        $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+        if (!in_array((int) ($error['type'] ?? 0), $fatalTypes, true) || headers_sent()) {
+            return;
+        }
+        mcpJsonResponse([
+            'ok' => false,
+            'error' => sprintf(
+                'MCP route fatal error: %s in %s:%d',
+                (string) ($error['message'] ?? 'Unknown error'),
+                (string) ($error['file'] ?? 'unknown'),
+                (int) ($error['line'] ?? 0)
+            ),
+        ], 500);
+    });
+
+    try {
+        $route = mcpQueryString('route', 'info') ?? 'info';
+        $prompt = mcpQueryString('prompt', '') ?? '';
+        $targetFile = mcpRouteFile();
+        $stylePrompt = mcpRouteStyle();
+        $mcpUrl = rtrim((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'), '/') . '#mcp';
+
+        header('Content-Type: application/json');
+
+        switch ($route) {
+            case 'workprompt':
+                mcpJsonResponse(handleWorkPrompt(mcpWorkPromptArgs($baseDir, $targetFile, $stylePrompt)));
+            case 'create':
+                mcpJsonResponse(handleCreate(mcpCreateArgs($baseDir, [
+                    'dest' => mcpRouteDest(),
+                    'path' => mcpQueryString('path', null),
+                    'url' => mcpQueryString('url', null),
+                    'poffDir' => mcpPoffDirOverride(),
+                ])));
+            case 'edit-config':
+                mcpJsonResponse(handleEditConfig([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'prompt-template':
+                mcpJsonResponse(handlePromptTemplate([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'export-content':
+                mcpJsonResponse(handleExportContent([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'import-remote':
+                mcpJsonResponse(handleImportRemote([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                    'url' => mcpQueryString('url', '') ?? '',
+                    'sourceId' => mcpQueryString('sourceId', '') ?? '',
+                    'replace' => in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true),
+                ]));
+            case 'converters':
+                mcpJsonResponse(handleConverters([
+                    'rootDir' => $baseDir,
+                    'input' => mcpConvertersInput(),
+                ]));
+            case 'convert':
+                mcpJsonResponse(handleConvert([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'create-converter':
+                mcpJsonResponse(handleCreateConverter([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'save-converted-work':
+                mcpJsonResponse(handleSaveConvertedWork([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'converter-prompt':
+                mcpJsonResponse(handleConverterPrompt([
+                    'rootDir' => $baseDir,
+                    'path' => mcpRoutePath(),
+                ]));
+            case 'style':
+                mcpJsonResponse(handleStyleRoute($prompt, $mcpUrl, $baseDir . DIRECTORY_SEPARATOR . 'poff.config.toon'));
+            default:
+                mcpJsonResponse([
+                    'route' => 'info',
+                    'mcpUrl' => $mcpUrl,
+                    'rootDir' => $baseDir,
+                ]);
+        }
+    } catch (Throwable $error) {
+        mcpJsonResponse([
+            'ok' => false,
+            'error' => sprintf(
+                'MCP route error: %s in %s:%d',
+                $error->getMessage(),
+                $error->getFile(),
+                $error->getLine()
+            ),
+        ], 500);
+    }
+}
+
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'nav') {
+    $folderPoffConfig = null;
+    if (is_dir($currentAbsolutePath)) {
+        $folderPoffConfig = class_exists('PoffConfig') ? PoffConfig::ensure($currentAbsolutePath) : null;
+    }
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<ul id="navList" class="nav-list">';
+    echo cmsRenderNavListMarkup([
+        'baseDir' => $baseDir,
+        'currentRelativePath' => $currentRelativePath,
+        'currentAbsolutePath' => $currentAbsolutePath,
+        'currentScript' => $currentScript,
+        'folderPoffConfig' => $folderPoffConfig,
+    ]);
+    echo '</ul>';
+    return;
+}
+
 // Route mapper for hash-only slugs. Browser hashes are not sent on refresh,
 // so the client asks this endpoint to map #slug back to the filesystem item.
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'resolve') {
@@ -337,6 +511,7 @@ PHP;
     // Add HTML structure from header.php without PHP tags
     $content = ComponentReader::readComponentFile($sourceDir . '/includes/header.built.php');
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
+    $content = str_replace('<html lang="en">', '<html lang="de">', $content);
     $buildContent .= trim($content) . "\n";
 
     // Add layout.php content and inject nav placeholder from includes/nav.php
@@ -344,6 +519,7 @@ PHP;
     $layout = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $layout);
     $nav = ComponentReader::readComponentFile($sourceDir . '/includes/nav.php');
     $nav = preg_replace('/<\?php\s*|\?>/s', '', $nav); // strip PHP tags before inlining
+    $nav = preg_replace('/^\s*require_once[^\n]*\n/m', '', $nav);
     $layout = str_replace('<!-- NAV_PLACEHOLDER -->', '<?php ' . trim($nav) . ' ?>', $layout);
     $buildContent .= trim($layout) . "\n";
 
@@ -362,38 +538,75 @@ PHP;
         'const currentPathForIframe = <?php echo json_encode($currentRelativePath); ?>;',
         $content
     );
+    $content = str_replace(
+        'window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };',
+        'const cmsAuth = <?php $poffAuthScopeDir = is_dir($currentAbsolutePath) ? $currentAbsolutePath : dirname($currentAbsolutePath); echo json_encode(cmsBuildEditorAuthView($baseDir, cmsEditModeAllowedForDirectory($poffAuthScopeDir, $baseDir))); ?>;' . "\n" . 'window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe, cmsAuth };',
+        $content
+    );
     $buildContent .= trim($content);
+
+    if ($isProductionBuild) {
+        $tempOutputFile = tempnam(sys_get_temp_dir(), 'poff-release-');
+        if ($tempOutputFile === false) {
+            throw new Exception('Failed to allocate temporary file for production build.');
+        }
+        if (file_put_contents($tempOutputFile, $buildContent) === false) {
+            @unlink($tempOutputFile);
+            throw new Exception("Failed to write temporary output file: $tempOutputFile");
+        }
+        $strippedBuildContent = php_strip_whitespace($tempOutputFile);
+        @unlink($tempOutputFile);
+        if ($strippedBuildContent === '') {
+            throw new Exception('Failed to strip PHP whitespace for production build.');
+        }
+        $buildContent = $strippedBuildContent;
+    }
 
     // Write the concatenated content to the output file
     if (file_put_contents($outputFile, $buildContent) === false) {
         throw new Exception("Failed to write output file: $outputFile");
     }
 
-    foreach ($standaloneCopyTargets as $targetDir) {
-        $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
-        if ($resolvedTargetDir === '') {
-            continue;
-        }
-        if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
-            throw new Exception("Failed to create standalone output directory: $resolvedTargetDir");
+    if (!$skipDistributionCopies) {
+        foreach ($standaloneCopyTargets as $targetDir) {
+            $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+            if ($resolvedTargetDir === '') {
+                continue;
+            }
+            if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
+                throw new Exception("Failed to create standalone output directory: $resolvedTargetDir");
+            }
+
+            $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
+            if (!copy($outputFile, $targetFile)) {
+                throw new Exception("Failed to copy standalone build to: $targetFile");
+            }
+            FileCopier::removeGeneratedEntrypointsFromSubdirectories($resolvedTargetDir, $outputFileName);
+
+            $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
+            if (is_file($layoutAsset)) {
+                FileCopier::copyFileToLayoutDirectories($layoutAsset, $resolvedTargetDir);
+            }
+            $converterGrainDir = $sourceDir . '/includes/worktypes/templates/converter';
+            if (is_dir($converterGrainDir)) {
+                FileCopier::mirrorDirectory($converterGrainDir, $resolvedTargetDir . '/worktypes/templates/converter');
+            }
         }
 
-        $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
-        if (!copy($outputFile, $targetFile)) {
-            throw new Exception("Failed to copy standalone build to: $targetFile");
+        FileCopier::removeGeneratedEntrypointsFromSubdirectories($outputDir, $outputFileName);
+
+        // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
+        $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
+        if (is_file($layoutAsset)) {
+            FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
+        }
+        $converterGrainDir = $sourceDir . '/includes/worktypes/templates/converter';
+        if (is_dir($converterGrainDir)) {
+            FileCopier::mirrorDirectory($converterGrainDir, $outputDir . '/worktypes/templates/converter');
         }
     }
 
-    echo "Build completed successfully!\n";
-
-    // Copy the built index.php to all directories
-    FileCopier::copyFileToAllDirectories($outputFile, $outputDir);
-
-    // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
-    $layoutAsset = $sourceDir . '/includes/worktypes/templates/layout/default/eggman_profile-image.jpg';
-    if (is_file($layoutAsset)) {
-        FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
-    }
+    echo "Build completed successfully ($buildMode): $outputFile\n";
 
     // Trigger SSH upload using SSHUploader
     require_once __DIR__ . '/SSHUploader.php';

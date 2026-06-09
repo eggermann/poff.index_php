@@ -3,7 +3,6 @@ import {
     normalizeCmsRelativePath,
     normalizePreviewStyleNode,
     previewStateFromUrl,
-    scopePreviewStyleText,
 } from './preview-helpers.js';
 
 export function createPreviewController({
@@ -13,18 +12,238 @@ export function createPreviewController({
     navigateToPath,
     setLoadingVisible,
     getCurrentSelection,
+    getPreviewParams,
 }) {
     let previewRequestId = 0;
     let previewClickBound = false;
     let previewDisabled = false;
     let lastPreviewKey = '';
+    let previewMountRoot = null;
+
+    function stripPreviewChrome(root) {
+        if (!root || typeof root.querySelectorAll !== 'function') {
+            return root;
+        }
+
+        root.querySelectorAll('script, #appShell, #preview, #appSidebar, #sidebarToggle, #editPanel, #editDrawer, #promptDock, #iframeLoading, #sidebarLoading, #editActionsMenu, .app-edit-toggle-wrap').forEach((node) => {
+            if (node && typeof node.remove === 'function') {
+                node.remove();
+            }
+        });
+
+        return root;
+    }
+
+    function escapePreviewMarkup(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function rewritePreviewMarkupUrls(markup, baseUrl) {
+        const html = String(markup || '');
+        const trimmedBaseUrl = String(baseUrl || '').trim();
+        if (html === '' || trimmedBaseUrl === '') {
+            return html;
+        }
+
+        let base;
+        try {
+            base = new URL(trimmedBaseUrl);
+        } catch (err) {
+            return html;
+        }
+
+        const isKeepRelative = (value) => {
+            const trimmed = String(value || '').trim();
+            return (
+                trimmed === ''
+                || trimmed.startsWith('#')
+                || trimmed.startsWith('//')
+                || /^(?:data|blob|mailto|tel|javascript):/i.test(trimmed)
+                || /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
+            );
+        };
+
+        const resolveUrl = (value) => {
+            const trimmed = String(value || '').trim();
+            if (isKeepRelative(trimmed)) {
+                return trimmed;
+            }
+            try {
+                return new URL(trimmed, base).href;
+            } catch (err) {
+                return trimmed;
+            }
+        };
+
+        let rewritten = html.replace(/\b(src|href|poster|action|data)=("|')([^"']+)\2/gi, (match, attribute, quote, value) => {
+            const nextValue = resolveUrl(value);
+            return nextValue === value ? match : `${attribute}=${quote}${nextValue}${quote}`;
+        });
+
+        rewritten = rewritten.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, quote, value) => {
+            const nextValue = resolveUrl(value);
+            return nextValue === value ? match : `url("${nextValue}")`;
+        });
+
+        return rewritten;
+    }
+
+    function isExternalPreviewUrl(url) {
+        const trimmed = String(url || '').trim();
+        if (!trimmed) {
+            return false;
+        }
+        try {
+            const resolved = new URL(trimmed, window.location.href);
+            return resolved.origin !== window.location.origin;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function extractPreferredPreviewMarkup(previewDocument, previewRoot, options = {}) {
+        const candidateRoot = previewRoot && typeof previewRoot.cloneNode === 'function'
+            ? previewRoot.cloneNode(true)
+            : previewDocument.body;
+        if (!candidateRoot) {
+            return '';
+        }
+
+        if (typeof candidateRoot.querySelector === 'function') {
+            if (options.converterPreview) {
+                const converterRoot = candidateRoot.querySelector('[data-poff-text-editor-converter], .poff-text-editor-converter, [data-poff-converter], .converter-app');
+                if (converterRoot && typeof converterRoot.outerHTML === 'string') {
+                    return converterRoot.outerHTML.trim();
+                }
+            }
+
+            const layout = candidateRoot.querySelector('.poff-default-layout');
+            if (layout && typeof layout.outerHTML === 'string') {
+                return layout.outerHTML.trim();
+            }
+
+            const main = candidateRoot.querySelector('.poff-default-layout__main');
+            if (main && typeof main.innerHTML === 'string') {
+                return main.innerHTML.trim();
+            }
+
+            const appShell = candidateRoot.querySelector('#appShell');
+            if (appShell && typeof appShell.querySelector === 'function') {
+                const appShellLayout = appShell.querySelector('.poff-default-layout');
+                if (appShellLayout && typeof appShellLayout.outerHTML === 'string') {
+                    return appShellLayout.outerHTML.trim();
+                }
+
+                const appShellMain = appShell.querySelector('.poff-default-layout__main');
+                if (appShellMain && typeof appShellMain.innerHTML === 'string') {
+                    return appShellMain.innerHTML.trim();
+                }
+            }
+        }
+
+        stripPreviewChrome(candidateRoot);
+        const renderedHtml = typeof candidateRoot.innerHTML === 'string' ? candidateRoot.innerHTML.trim() : '';
+        if (renderedHtml === '' || renderedHtml.includes('currentPoffConfig') || renderedHtml.includes('POFF_CONTEXT')) {
+            return '';
+        }
+        if (renderedHtml !== '') {
+            return renderedHtml;
+        }
+        if (typeof candidateRoot.outerHTML === 'string') {
+            return candidateRoot.outerHTML.trim();
+        }
+        return '';
+    }
+
+    function isConverterPreviewUrl(url) {
+        try {
+            const parsed = new URL(url, window.location.href);
+            return parsed.searchParams.get('converter_preview') === '1';
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function collectPreviewScripts(previewDocument, baseUrl, enabled = false) {
+        if (!enabled || !previewDocument || typeof previewDocument.querySelectorAll !== 'function') {
+            return [];
+        }
+
+        return Array.from(previewDocument.querySelectorAll('script'))
+            .map((node) => {
+                const src = node.getAttribute('src') || '';
+                const text = node.textContent || '';
+                if (src) {
+                    try {
+                        return {
+                            src: new URL(src, baseUrl).href,
+                            text: '',
+                        };
+                    } catch (err) {
+                        return null;
+                    }
+                }
+                const trimmed = String(text || '').trim();
+                if (trimmed === '' || trimmed.includes('POFF_CONTEXT') || trimmed.includes('currentPoffConfig')) {
+                    return null;
+                }
+                return {
+                    src: '',
+                    text: trimmed,
+                };
+            })
+            .filter(Boolean);
+    }
+
+    function executePreviewScripts(previewContainer, scripts = []) {
+        if (!previewContainer || !scripts.length) {
+            return;
+        }
+        scripts.forEach((scriptData) => {
+            try {
+                const script = document.createElement('script');
+                if (scriptData.src) {
+                    script.src = scriptData.src;
+                    script.async = false;
+                } else {
+                    script.textContent = scriptData.text || '';
+                }
+                previewContainer.appendChild(script);
+            } catch (err) {
+                // Converter previews still render through their HTML/CSS fallback if a script cannot be mounted.
+            }
+        });
+    }
 
     function buildViewerUrl(path, isFile = false, forceRefresh = false) {
+        const currentUrl = new URL(window.location.href);
+        const editRequested = currentUrl.searchParams.get('edit') === 'true';
         const url = new URL(window.location.href);
         url.search = '';
         url.hash = '';
+        if (editRequested) {
+            url.searchParams.set('edit', 'true');
+        }
         url.searchParams.set('view', '1');
         url.searchParams.set(isFile ? 'file' : 'path', path);
+        const previewParams = typeof getPreviewParams === 'function' ? getPreviewParams({
+            path,
+            isFile,
+        }) : null;
+        if (previewParams && typeof previewParams === 'object') {
+            Object.entries(previewParams).forEach(([key, value]) => {
+                const normalizedKey = String(key || '').trim();
+                if (!normalizedKey || value === undefined || value === null || value === '') {
+                    return;
+                }
+                url.searchParams.set(normalizedKey, String(value));
+            });
+        }
         if (forceRefresh) {
             url.searchParams.set('_refresh', String(Date.now()));
         }
@@ -43,7 +262,8 @@ export function createPreviewController({
             return;
         }
 
-        contentFrame.querySelectorAll('a, button, input, select, textarea, summary, iframe, video, audio, [contenteditable="true"], [tabindex]').forEach((node) => {
+        const previewRoot = previewMountRoot || contentFrame;
+        previewRoot.querySelectorAll('a, button, input, select, textarea, summary, iframe, video, audio, [contenteditable="true"], [tabindex]').forEach((node) => {
             if (node instanceof HTMLElement) {
                 node.setAttribute('tabindex', '-1');
                 node.setAttribute('aria-disabled', 'true');
@@ -180,7 +400,8 @@ export function createPreviewController({
             if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
                 return;
             }
-            let target = event.target;
+            const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+            let target = path.find((node) => node && node.tagName === 'A') || event.target;
             while (target && target.tagName !== 'A') {
                 target = target.parentElement;
             }
@@ -207,39 +428,64 @@ export function createPreviewController({
         const preservedScrollTop = shouldPreserveScroll ? contentFrame.scrollTop : 0;
         const preservedScrollLeft = shouldPreserveScroll ? contentFrame.scrollLeft : 0;
         try {
+            previewMountRoot = null;
             const response = await fetch(url, {
                 credentials: 'same-origin',
                 headers: {
+                    'Accept': 'text/html,application/xhtml+xml',
                     'X-Requested-With': 'fetch-preview',
                 },
             });
-            const html = await response.text();
-            if (requestId !== previewRequestId) {
-                return;
+            if (!response.ok) {
+                throw new Error(`Preview request failed: ${response.status}`);
             }
-
+            const html = await response.text();
             const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const fragments = [];
-            const scripts = Array.from(doc.querySelectorAll('script'));
-            doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-                fragments.push(normalizePreviewStyleNode(node));
-            });
-            doc.body?.querySelectorAll('style').forEach((node) => {
-                node.textContent = scopePreviewStyleText(node.textContent || '');
-            });
-            scripts.forEach((node) => node.remove());
-            const bodyHtml = doc.body ? doc.body.innerHTML : html;
-            contentFrame.innerHTML = `${fragments.join('')}${bodyHtml}`;
-
-            scripts.forEach((oldScript) => {
-                const script = document.createElement('script');
-                for (const attribute of oldScript.attributes) {
-                    script.setAttribute(attribute.name, attribute.value);
-                }
-                script.textContent = oldScript.textContent || '';
-                contentFrame.appendChild(script);
-            });
+            const previewDocument = parser.parseFromString(html, 'text/html');
+            const previewRoot = previewDocument.querySelector('#contentFrame > .viewer') || previewDocument.querySelector('.viewer') || previewDocument.body;
+            const converterPreview = isConverterPreviewUrl(url);
+            const previewContainer = contentFrame.shadowRoot || contentFrame;
+            previewMountRoot = previewContainer;
+            previewContainer.innerHTML = '';
+            const headNodes = previewDocument.head ? Array.from(previewDocument.head.children) : [];
+            const previewStyles = headNodes
+                .filter((node) => node instanceof HTMLStyleElement || (node instanceof HTMLLinkElement && (node.getAttribute('rel') || '').toLowerCase() === 'stylesheet'))
+                .map((node) => {
+                    if (node instanceof HTMLStyleElement) {
+                        return normalizePreviewStyleNode(node);
+                    }
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    const href = node.getAttribute('href') || '';
+                    if (!href) {
+                        return '';
+                    }
+                    try {
+                        link.href = new URL(href, response.url).href;
+                    } catch (err) {
+                        return '';
+                    }
+                    return link.outerHTML;
+                })
+                .filter(Boolean)
+                .join('');
+            const previewMarkup = rewritePreviewMarkupUrls(
+                extractPreferredPreviewMarkup(previewDocument, previewRoot, { converterPreview }),
+                response.url
+            );
+            let previewScripts = [];
+            try {
+                previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview);
+            } catch (err) {
+                previewScripts = [];
+            }
+            const fallbackMarkup = previewMarkup || (
+                isExternalPreviewUrl(response.url)
+                    ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`
+                    : '<div class="viewer-error">Preview unavailable.</div>'
+            );
+            previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
+            executePreviewScripts(previewContainer, previewScripts);
             syncPreviewDisabledState(previewDisabled);
             bindPreviewNavigation();
             lastPreviewKey = nextPreview.key;
@@ -258,6 +504,7 @@ export function createPreviewController({
             if (requestId !== previewRequestId) {
                 return;
             }
+            previewMountRoot = null;
             contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
         } finally {
             if (requestId === previewRequestId) {

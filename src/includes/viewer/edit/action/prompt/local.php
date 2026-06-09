@@ -3,7 +3,10 @@
 function cmsEditPromptRunLocal(array $request): array
 {
     $endpoint = $request['endpoint'] !== '' ? $request['endpoint'] : 'http://127.0.0.1:1234/v1/chat/completions';
-    $usedModel = $request['model'] !== '' ? $request['model'] : 'gemma4';
+    $usedModel = trim((string) ($request['model'] ?? ''));
+    if ($usedModel === '') {
+        cmsJsonResponse(['allowed' => true, 'error' => 'Select a local model before sending prompts.']);
+    }
     $promptIsOpenAiCompatible = cmsIsOpenAiCompatibleEndpoint($endpoint);
     if ($promptIsOpenAiCompatible) {
         $messages = [['role' => 'system', 'content' => $request['systemPrompt']]];

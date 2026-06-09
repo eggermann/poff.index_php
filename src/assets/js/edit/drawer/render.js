@@ -1,4 +1,7 @@
 import { escapeHtml } from '../../core/utils.js';
+import { renderPersistentDetailsSection } from '../panel/shared.js';
+
+const TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY = 'template-defaults-details';
 
 function groupWorktypeChoices(choices = []) {
     return Array.isArray(choices)
@@ -100,10 +103,16 @@ export function renderDrawerTreeHtml(config, status) {
             const key = escapeHtml(item.path || item.name || '');
             const visible = item.visible !== false ? 'checked' : '';
             const type = escapeHtml(item.type || 'item');
+            const approvalStatus = String(item?.approvalStatus || '').trim();
+            const pendingApproval = approvalStatus === 'pending';
+            const approvedExternal = !!item?.externalSubmission && approvalStatus === 'approved';
+            const badge = pendingApproval
+                ? '<span class="edit-tree-badge edit-tree-badge-pending">new approval</span>'
+                : (approvedExternal ? '<span class="edit-tree-badge edit-tree-badge-approved">approved external</span>' : '');
             return `
-                <label class="edit-tree-item">
+                <label class="edit-tree-item${pendingApproval ? ' edit-tree-item-pending' : ''}${approvedExternal ? ' edit-tree-item-approved' : ''}" data-tree-item-path="${key}">
                     <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
-                    <span>${label} <span class="opacity-60">(${type})</span></span>
+                    <span>${label} <span class="opacity-60">(${type})</span>${badge}</span>
                 </label>
             `;
         }).join('')
@@ -126,7 +135,18 @@ function renderDrawerTreeBulkToggle(treeItems = [], status) {
     `;
 }
 
-export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) {
+export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems, showDeleteAction = false }) {
+    const templateDefaultsBody = Array.isArray(config?.workTemplateMapCatalog?.rows) && config.workTemplateMapCatalog.rows.length
+        ? `
+            <div class="edit-template-map-list">
+                ${config.workTemplateMapCatalog.rows.map((row) => `
+                    <div class="edit-template-map-row">
+                        ${renderTemplateMapSelect(row)}
+                    </div>
+                `).join('')}
+            </div>
+        `
+        : '';
     return `
         <div class="drawer-header">
             <h4 class="drawer-title">More settings</h4>
@@ -151,19 +171,19 @@ export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) 
                 </div>
                 <div class="small-note">Use <strong>Change layout</strong> for wrapper editing. This selector chooses the active work template for the current item.</div>
             </div>
-            ${Array.isArray(config?.workTemplateMapCatalog?.rows) && config.workTemplateMapCatalog.rows.length ? `
-            <div class="edit-fieldset">
-                <div class="edit-fieldset-title">Template defaults by MIME</div>
-                <div class="small-note">Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.</div>
-                <div class="edit-template-map-list">
-                    ${config.workTemplateMapCatalog.rows.map((row) => `
-                        <div class="edit-template-map-row">
-                            ${renderTemplateMapSelect(row)}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ` : ''}
+            ${templateDefaultsBody
+        ? renderPersistentDetailsSection({
+            storageKey: TEMPLATE_DEFAULTS_DETAILS_STORAGE_KEY,
+            defaultOpen: true,
+            id: 'editTemplateDefaultsDetails',
+            className: 'edit-fieldset edit-template-default-details',
+            summaryClassName: 'edit-template-default-details-summary',
+            bodyClassName: 'edit-template-default-details-body',
+            titleHtml: 'Template defaults by MIME',
+            noteHtml: 'Set the inherited default template for each MIME family in this folder or layout. Leave the entry on <em>Inherit default</em> to use the parent value.',
+            bodyHtml: templateDefaultsBody,
+        })
+        : ''}
             ${status?.target !== 'file' ? `
             <div>
                 <label class="edit-label">Visible items</label>
@@ -173,6 +193,11 @@ export function renderEditDrawerMarkup({ config, status, treeHtml, treeItems }) 
             ` : ''}
             <div class="edit-actions">
                 <button class="btn" type="submit">Save advanced</button>
+                ${showDeleteAction ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDrawerDeleteTarget">
+                    Delete
+                </button>
+                ` : ''}
             </div>
         </form>
     `;

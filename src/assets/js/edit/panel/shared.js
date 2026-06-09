@@ -1,5 +1,108 @@
 import { getLayoutState } from '../../core/utils.js';
 
+const DETAILS_STORAGE_PREFIX = 'poff.edit.details';
+
+function resolveStorage(storage = null) {
+    if (storage) {
+        return storage;
+    }
+    if (typeof localStorage !== 'undefined') {
+        return localStorage;
+    }
+    return null;
+}
+
+function normalizeDetailsStorageKey(storageKey) {
+    const key = String(storageKey || '').trim();
+    if (!key) {
+        return '';
+    }
+    return key.startsWith(DETAILS_STORAGE_PREFIX) ? key : `${DETAILS_STORAGE_PREFIX}:${key}`;
+}
+
+export function readStoredDetailsState(storageKey, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+        return null;
+    }
+    try {
+        const raw = resolvedStorage.getItem(key);
+        if (raw === null) {
+            return null;
+        }
+        const stored = JSON.parse(raw);
+        if (typeof stored === 'boolean') {
+            return stored;
+        }
+        if (stored && typeof stored === 'object' && Object.prototype.hasOwnProperty.call(stored, 'open')) {
+            return !!stored.open;
+        }
+        return null;
+    } catch (err) {
+        return null;
+    }
+}
+
+export function writeStoredDetailsState(storageKey, open, storage = null) {
+    const resolvedStorage = resolveStorage(storage);
+    const key = normalizeDetailsStorageKey(storageKey);
+    if (!resolvedStorage || !key) {
+        return;
+    }
+    try {
+        resolvedStorage.setItem(key, JSON.stringify({ open: !!open }));
+    } catch (err) {
+        // Ignore storage failures.
+    }
+}
+
+export function bindStoredDetailsState(detailsEl, storageKey, storage = null) {
+    if (!detailsEl) {
+        return () => {};
+    }
+    const key = normalizeDetailsStorageKey(storageKey);
+    const onToggle = () => {
+        writeStoredDetailsState(key, !!detailsEl.open, storage);
+    };
+    detailsEl.addEventListener('toggle', onToggle);
+    return () => {
+        detailsEl.removeEventListener('toggle', onToggle);
+    };
+}
+
+export function renderPersistentDetailsSection({
+    storageKey = '',
+    defaultOpen = true,
+    id = '',
+    className = '',
+    summaryClassName = '',
+    bodyClassName = '',
+    titleHtml = '',
+    noteHtml = '',
+    bodyHtml = '',
+} = {}) {
+    const storedOpen = readStoredDetailsState(storageKey);
+    const detailsOpen = storedOpen === null ? defaultOpen : storedOpen;
+    const detailsClasses = ['edit-collapsible-details', className].filter(Boolean).join(' ');
+    const summaryClasses = ['edit-work-fields-header', 'edit-collapsible-summary', summaryClassName].filter(Boolean).join(' ');
+    const bodyClasses = ['edit-collapsible-details-body', bodyClassName].filter(Boolean).join(' ');
+
+    return `
+        <details class="${detailsClasses}"${id ? ` id="${id}"` : ''}${detailsOpen ? ' open' : ''}>
+            <summary class="${summaryClasses}">
+                <div>
+                    ${titleHtml ? `<div class="edit-work-fields-title">${titleHtml}</div>` : ''}
+                    ${noteHtml ? `<div class="small-note">${noteHtml}</div>` : ''}
+                </div>
+            </summary>
+            <div class="${bodyClasses}">
+                ${bodyHtml}
+            </div>
+        </details>
+    `;
+}
+
 export function formatUploadBytes(value = 0) {
     const bytes = Number(value) || 0;
     if (bytes <= 0) {
@@ -56,6 +159,7 @@ export function syncPromptDock(promptRoot = null) {
 export function layoutOverlayState(config, status) {
     const layoutState = getLayoutState(config);
     const isFile = status?.target === 'file';
+    const workType = String(config?.work?.type || (isFile ? 'other' : 'folder')).trim() || (isFile ? 'other' : 'folder');
     const sectionName = layoutState.section || (isFile ? 'work' : 'works');
     const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile
         ? `.works/${config.name || config.path || 'item'}.layout`
@@ -63,11 +167,10 @@ export function layoutOverlayState(config, status) {
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
     const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const activeSectionDirectory = String(layoutState.sectionDirectory || '').trim();
-    const sectionTarget = activeSectionDirectory
+    const sectionTarget = localSectionTarget;
+    const sectionSourceLabel = activeSectionDirectory
         ? `${activeSectionDirectory}/${sectionName}.hbs`
-        : (isFile && layoutState.storage === 'filesystem' && layoutState.directory !== localLayoutDirectory
-            ? `built-in ${sectionName}.hbs`
-            : localSectionTarget);
+        : `Built-in ${workType} section (${sectionName}.hbs)`;
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
     const hasInheritedLayout = !!layoutState.inheritedDirectory;
@@ -103,7 +206,9 @@ export function layoutOverlayState(config, status) {
     }
 
     const resolvedDirectory = layoutState.directory || localLayoutDirectory;
-    const wrapperSourceLabel = layoutState.storage === 'filesystem'
+    const wrapperSourceLabel = layoutState.mode === 'none' || layoutState.storage === 'none'
+        ? 'No outer layout'
+        : layoutState.storage === 'filesystem'
         ? (isFile && resolvedDirectory !== localLayoutDirectory
             ? `Folder layout: ${resolvedDirectory}`
             : `${isFile ? 'File layout' : 'Folder layout'}: ${resolvedDirectory}`)
@@ -130,6 +235,7 @@ export function layoutOverlayState(config, status) {
         wrapperTarget,
         localSectionTarget,
         sectionTarget,
+        sectionSourceLabel,
         wrapperWasLocal,
         sectionWasLocal,
         hasInheritedLayout,

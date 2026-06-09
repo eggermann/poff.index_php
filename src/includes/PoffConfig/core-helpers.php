@@ -40,15 +40,28 @@ trait PoffConfigCoreHelpers
         return self::normalizeTemplateMap($work['templateMap'] ?? null);
     }
 
-    public static function resolveInheritedTemplateMap(string $dir): array
+    private static function normalizeExistingDirectoryPath(string $dir): string
     {
-        $normalizedDir = realpath($dir);
-        if ($normalizedDir === false) {
-            $normalizedDir = rtrim($dir, DIRECTORY_SEPARATOR);
+        $resolvedDir = realpath($dir);
+        return is_string($resolvedDir) && $resolvedDir !== ''
+            ? $resolvedDir
+            : rtrim($dir, DIRECTORY_SEPARATOR);
+    }
+
+    private static function readDecodedConfigFile(string $configPath): ?array
+    {
+        if (!is_file($configPath)) {
+            return null;
         }
 
+        $decoded = json_decode((string) file_get_contents($configPath), true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private static function ancestorDirectories(string $dir): array
+    {
         $directories = [];
-        $cursor = $normalizedDir;
+        $cursor = self::normalizeExistingDirectoryPath($dir);
         while ($cursor !== '' && $cursor !== DIRECTORY_SEPARATOR) {
             $directories[] = $cursor;
             $parent = dirname($cursor);
@@ -58,15 +71,15 @@ trait PoffConfigCoreHelpers
             $cursor = $parent;
         }
 
-        $map = [];
-        foreach (array_reverse($directories) as $directory) {
-            $configPath = self::configPath($directory);
-            if (!is_file($configPath)) {
-                continue;
-            }
+        return $directories;
+    }
 
-            $decoded = json_decode((string) file_get_contents($configPath), true);
-            if (!is_array($decoded)) {
+    public static function resolveInheritedTemplateMap(string $dir): array
+    {
+        $map = [];
+        foreach (array_reverse(self::ancestorDirectories($dir)) as $directory) {
+            $decoded = self::readDecodedConfigFile(self::configPath($directory));
+            if ($decoded === null) {
                 continue;
             }
 
@@ -148,6 +161,79 @@ trait PoffConfigCoreHelpers
         return $work;
     }
 
+    private static function isImplicitDefaultLayoutValue(mixed $layout, string $section): bool
+    {
+        $normalized = Worktype::normalizeLayout($layout, $section);
+        $preset = trim((string) ($normalized['preset'] ?? ''));
+        $source = trim((string) ($normalized['source'] ?? ''));
+        $sharedName = trim((string) ($normalized['sharedName'] ?? ''));
+        $name = trim((string) ($normalized['name'] ?? Worktype::defaultLayoutName()));
+        $mode = trim((string) ($normalized['mode'] ?? Worktype::defaultLayoutName()));
+
+        if (!in_array($name, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)) {
+            return false;
+        }
+        if (!in_array($mode, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)) {
+            return false;
+        }
+        if ($preset !== '' && $preset !== 'actual') {
+            return false;
+        }
+        if ($source !== '' || $sharedName !== '') {
+            return false;
+        }
+        foreach (['template', 'css', 'js', 'sectionTemplate', 'workTemplate', 'worksTemplate', 'directory', 'inheritedDirectory', 'sectionDirectory', 'storage'] as $key) {
+            if (!array_key_exists($key, $normalized)) {
+                continue;
+            }
+            $value = $normalized[$key];
+            if (is_array($value)) {
+                if ($value !== []) {
+                    return false;
+                }
+                continue;
+            }
+            if (is_string($value) && trim($value) !== '') {
+                return false;
+            }
+            if ($value !== null && !is_string($value) && $value !== [] && $value !== 0 && $value !== false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function resolveInheritedConfiguredLayout(string $dir, string $section, bool $includeCurrentDir = false): ?array
+    {
+        $cursor = $includeCurrentDir ? realpath($dir) : realpath(dirname($dir));
+        $cwd = realpath(getcwd() ?: '.');
+        while (is_string($cursor) && $cursor !== '') {
+            $decoded = self::readDecodedConfigFile(self::configPath($cursor));
+            if ($decoded !== null) {
+                $candidateLayout = is_array($decoded['work'] ?? null) ? ($decoded['work']['layout'] ?? null) : null;
+                if ($candidateLayout !== null && !self::isImplicitDefaultLayoutValue($candidateLayout, 'works')) {
+                    return Worktype::normalizeLayout($candidateLayout, $section);
+                }
+            }
+
+            if (self::hasWrapperFiles(self::folderLayoutDir($cursor))) {
+                return null;
+            }
+
+            if ($cwd !== false && $cursor === $cwd) {
+                break;
+            }
+            $parent = dirname($cursor);
+            if ($parent === $cursor) {
+                break;
+            }
+            $cursor = realpath($parent);
+        }
+
+        return null;
+    }
+
     public static function buildFirstLevelTree(string $dir): array
     {
         $entries = @scandir($dir) ?: [];
@@ -157,15 +243,8 @@ trait PoffConfigCoreHelpers
             if (
                 $entry === '.' ||
                 $entry === '..' ||
-                $entry === 'poff.config.json' ||
-                $entry === '.works' ||
-                self::isEditOnlyTreeEntry($entry) ||
-                $entry === '.DS_Store' ||
-                $entry === 'Thumbs.db' ||
-                $entry === '.git' ||
-                $entry === '.idea' ||
-                $entry === 'node_modules' ||
-                $entry === '.edit.allow'
+                cmsIsHiddenSystemEntry($entry) ||
+                self::isEditOnlyTreeEntry($entry)
             ) {
                 continue;
             }
@@ -180,7 +259,7 @@ trait PoffConfigCoreHelpers
                 'type' => $isDir ? 'folder' : 'file',
                 'path' => $entry,
                 'modifiedAt' => $modifiedAt ? date('c', (int) $modifiedAt) : null,
-                'visible' => true,
+                'visible' => $entry === '.htaccess' ? false : true,
             ];
         }
 
@@ -226,7 +305,7 @@ trait PoffConfigCoreHelpers
             'path' => $fileName,
             'size' => $size !== false ? $size : null,
             'modifiedAt' => $modified ? date('c', (int) $modified) : null,
-            'visible' => true,
+            'visible' => $fileName === '.htaccess' ? false : true,
             'mimeType' => $mime,
         ];
         $hash = hash('sha256', json_encode($base));
@@ -240,6 +319,51 @@ trait PoffConfigCoreHelpers
 
     public static function detectMimeType(string $fullPath, string $fileName): ?string
     {
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $known = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'bmp' => 'image/bmp',
+            'tif' => 'image/tiff',
+            'tiff' => 'image/tiff',
+            'heic' => 'image/heic',
+            'mp4' => 'video/mp4',
+            'mov' => 'video/quicktime',
+            'webm' => 'video/webm',
+            'avi' => 'video/x-msvideo',
+            'mkv' => 'video/x-matroska',
+            'm4v' => 'video/x-m4v',
+            'mts' => 'video/MP2T',
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'm4a' => 'audio/mp4',
+            'flac' => 'audio/flac',
+            'aac' => 'audio/aac',
+            'pdf' => 'application/pdf',
+            'txt' => 'text/plain',
+            'md' => 'text/markdown',
+            'csv' => 'text/csv',
+            'json' => 'application/json',
+            'log' => 'text/plain',
+            'ini' => 'text/plain',
+            'yml' => 'text/yaml',
+            'yaml' => 'text/yaml',
+            'xml' => 'application/xml',
+            'html' => 'text/html',
+            'htm' => 'text/html',
+            'css' => 'text/css',
+            'js' => 'application/javascript',
+            'rtf' => 'application/rtf',
+        ];
+        if (isset($known[$ext])) {
+            return $known[$ext];
+        }
+
         if (function_exists('finfo_open')) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             if ($finfo) {
@@ -256,13 +380,35 @@ trait PoffConfigCoreHelpers
 
     public static function ensure(string $dir): array
     {
+        $normalizedDir = self::normalizeExistingDirectoryPath($dir);
         $configPath = self::configPath($dir);
         $defaults = self::defaultConfig($dir);
-        $existing = null;
+        $existing = self::readDecodedConfigFile($configPath);
         $forceWrite = false;
 
-        if (file_exists($configPath)) {
-            $existing = json_decode((string) file_get_contents($configPath), true);
+        if (
+            is_array($existing)
+            && is_dir($normalizedDir)
+            && is_file($configPath)
+            && (($existing['work'] ?? null) === null || is_array($existing['work']))
+        ) {
+            $configMtime = @filemtime($configPath);
+            $dirMtime = @filemtime($normalizedDir);
+            if ($configMtime !== false && $dirMtime !== false && $dirMtime < $configMtime) {
+                $fastData = $existing;
+                $fastData['folderName'] = $fastData['folderName'] ?? basename(rtrim($dir, DIRECTORY_SEPARATOR));
+                $fastData['slug'] = trim((string) ($fastData['slug'] ?? self::slugify((string) $fastData['folderName'])), '-') ?: 'untitled';
+                $fastData['title'] = $fastData['title'] ?? '';
+                $fastData['description'] = $fastData['description'] ?? '';
+                if (empty($fastData['id'])) {
+                    $fastData['id'] = self::generateId();
+                }
+                $existingWork = (isset($fastData['work']) && is_array($fastData['work'])) ? $fastData['work'] : [];
+                $fastData['work'] = array_merge(self::defaultWork('folder'), $existingWork);
+                $fastData['work']['layout'] = Worktype::normalizeLayout($fastData['work']['layout'] ?? null, 'works');
+
+                return self::hydrateConfigLayout($fastData, $dir);
+            }
         }
 
         $mergedTree = $defaults['tree'];
@@ -416,11 +562,52 @@ trait PoffConfigCoreHelpers
     public static function ensureFileConfig(string $dir, string $fileName): array
     {
         $configPath = self::fileConfigPath($dir, $fileName);
+        $sourcePath = rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $fileName;
+        $resolvedSourcePath = realpath($sourcePath);
+        $normalizedSourcePath = is_string($resolvedSourcePath) && $resolvedSourcePath !== ''
+            ? $resolvedSourcePath
+            : $sourcePath;
         $defaults = self::defaultFileConfig($dir, $fileName);
-        $existing = null;
+        $existing = self::readDecodedConfigFile($configPath);
 
-        if (file_exists($configPath)) {
-            $existing = json_decode((string) file_get_contents($configPath), true);
+        if (
+            is_array($existing)
+            && is_file($normalizedSourcePath)
+            && (($existing['work'] ?? null) === null || is_array($existing['work']))
+        ) {
+            $configMtime = @filemtime($configPath);
+            $sourceMtime = @filemtime($normalizedSourcePath);
+            $sourceSize = @filesize($normalizedSourcePath);
+            $existingSize = $existing['size'] ?? null;
+            if (
+                $configMtime !== false
+                && $sourceMtime !== false
+                && $sourceMtime < $configMtime
+                && ($existingSize === null || $sourceSize === false || (int) $existingSize === (int) $sourceSize)
+            ) {
+                $fastData = $existing;
+                $kind = (string) ($fastData['kind'] ?? MediaType::classifyExtension($fileName));
+                $mime = isset($fastData['mimeType']) && is_string($fastData['mimeType']) ? $fastData['mimeType'] : null;
+                $fastData['name'] = $fastData['name'] ?? $fileName;
+                $fastData['slug'] = trim((string) ($fastData['slug'] ?? self::slugify($fileName)), '-') ?: 'untitled';
+                $fastData['type'] = $fastData['type'] ?? 'file';
+                $fastData['kind'] = $kind;
+                $fastData['path'] = $fastData['path'] ?? $fileName;
+                $fastData['visible'] = array_key_exists('visible', $fastData) ? (bool) $fastData['visible'] : true;
+                $fastData['title'] = $fastData['title'] ?? '';
+                $fastData['description'] = $fastData['description'] ?? '';
+                if (!isset($fastData['mimeType']) && $mime !== null) {
+                    $fastData['mimeType'] = $mime;
+                }
+                if (empty($fastData['id'])) {
+                    $fastData['id'] = self::generateId();
+                }
+                $existingWork = (isset($fastData['work']) && is_array($fastData['work'])) ? $fastData['work'] : [];
+                $fastData['work'] = array_merge(self::defaultWork($kind, $mime, $fileName), $existingWork);
+                $fastData['work']['layout'] = Worktype::normalizeLayout($fastData['work']['layout'] ?? null, 'work');
+
+                return self::hydrateConfigLayout($fastData, $dir, $fileName);
+            }
         }
 
         $data = $defaults;
@@ -431,12 +618,6 @@ trait PoffConfigCoreHelpers
             $data['visible'] = $existing['visible'] ?? $data['visible'];
             $data['title'] = $existing['title'] ?? '';
             $data['description'] = $existing['description'] ?? '';
-            if (isset($existing['title'])) {
-                $data['title'] = $existing['title'];
-            }
-            if (isset($existing['description'])) {
-                $data['description'] = $existing['description'];
-            }
             if (isset($existing['link'])) {
                 $data['link'] = $existing['link'];
             }

@@ -181,12 +181,19 @@ export function createPromptWindowWorkflows({
             const userPrompt = promptInputEl.value.trim();
             const providerValue = providerEl ? providerEl.value : 'local';
             const apiKeyValue = apiKeyEl ? apiKeyEl.value.trim() : '';
+            const modelValue = modelEl ? modelEl.value.trim() : '';
             const selection = currentSelection({ path: state.activePath, previewPath: state.activePath, previewIsFile: false, isLayout: false });
             if ((providerValue === 'openai' || providerValue === 'gemini') && apiKeyValue === '') {
                 setGeneratingState(false);
                 setPromptStatus(providerValue === 'openai'
                     ? 'Add an OpenAI API key to send prompts.'
                     : 'Add a Gemini API key to send prompts.');
+                state.isSending = false;
+                return;
+            }
+            if (providerValue === 'local' && modelValue === '') {
+                setGeneratingState(false);
+                setPromptStatus('Select a local model before sending prompts.');
                 state.isSending = false;
                 return;
             }
@@ -205,10 +212,10 @@ export function createPromptWindowWorkflows({
             const systemPromptValue = (systemPromptEl?.value || '').trim();
             const payload = {
                 path: state.activePath,
-                provider: providerEl ? providerEl.value : 'local',
-                model: modelEl ? modelEl.value.trim() : '',
+                provider: providerValue,
+                model: modelValue,
                 endpoint: endpointEl ? endpointEl.value.trim() : '',
-                apiKey: apiKeyEl ? apiKeyEl.value.trim() : '',
+                apiKey: providerValue === 'local' ? '' : apiKeyValue,
                 prompt: userPrompt,
                 history: historyForRequest,
                 systemPrompt: systemPromptValue,

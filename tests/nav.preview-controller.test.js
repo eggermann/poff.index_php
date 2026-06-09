@@ -1,0 +1,473 @@
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+function loadPreviewController(overrides = {}) {
+  const filePath = path.join(__dirname, '..', 'src/assets/js/nav/preview-controller.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/import\s+\{[\s\S]*?\}\s+from\s+'\.\/preview-helpers\.js';\n?/g, '')
+    .replace(/import\s+\{[\s\S]*?\}\s+from\s+'\.\.\/core\/selection\.js';\n?/g, '')
+    .replace(/export function /g, 'function ');
+
+  class FakeHTMLElement {
+    constructor(tagName = 'div', innerHTML = '', queryMap = {}) {
+      this.tagName = String(tagName || 'div').toUpperCase();
+      this.innerHTML = innerHTML;
+      this.textContent = '';
+      this.dataset = {};
+      this.attributes = {};
+      this.children = [];
+      this.scrollTop = 0;
+      this.scrollLeft = 0;
+      this.queryMap = { ...queryMap };
+    }
+
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+    }
+
+    getAttribute(name) {
+      return this.attributes[name] || '';
+    }
+
+    hasAttribute(name) {
+      return Object.prototype.hasOwnProperty.call(this.attributes, name);
+    }
+
+    appendChild(node) {
+      this.children.push(node);
+      return node;
+    }
+
+    addEventListener() {}
+
+    querySelectorAll() {
+      return [];
+    }
+
+    querySelector(selector) {
+      return this.queryMap[selector] || null;
+    }
+
+    cloneNode() {
+      const clone = new FakeHTMLElement(this.tagName.toLowerCase(), this.innerHTML, this.queryMap);
+      clone.textContent = this.textContent;
+      clone.dataset = { ...this.dataset };
+      clone.attributes = { ...this.attributes };
+      return clone;
+    }
+
+    get outerHTML() {
+      const attrs = Object.entries(this.attributes)
+        .map(([key, value]) => ` ${key}="${String(value).replace(/"/g, '&quot;')}"`)
+        .join('');
+      return `<${this.tagName.toLowerCase()}${attrs}>${this.innerHTML || this.textContent || ''}</${this.tagName.toLowerCase()}>`;
+    }
+  }
+
+  class FakeHTMLStyleElement extends FakeHTMLElement {
+    constructor(textContent = '') {
+      super('style');
+      this.textContent = textContent;
+    }
+
+    cloneNode() {
+      return new FakeHTMLStyleElement(this.textContent);
+    }
+
+    get outerHTML() {
+      return `<style>${this.textContent}</style>`;
+    }
+  }
+
+  class FakeHTMLLinkElement extends FakeHTMLElement {
+    constructor(href = '') {
+      super('link');
+      this.rel = 'stylesheet';
+      this.href = href;
+    }
+
+    get href() {
+      return this.attributes.href || '';
+    }
+
+    set href(value) {
+      this.attributes.href = String(value);
+    }
+
+    get outerHTML() {
+      return `<link rel="stylesheet" href="${this.href}">`;
+    }
+  }
+
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    console,
+    URL,
+    URLSearchParams,
+    HTMLElement: FakeHTMLElement,
+    HTMLStyleElement: FakeHTMLStyleElement,
+    HTMLLinkElement: FakeHTMLLinkElement,
+    HTMLMediaElement: FakeHTMLElement,
+    HTMLDetailsElement: FakeHTMLElement,
+    document: {
+      createElement(tagName) {
+        if (tagName === 'style') {
+          return new FakeHTMLStyleElement();
+        }
+        if (tagName === 'link') {
+          return new FakeHTMLLinkElement();
+        }
+        return new FakeHTMLElement(tagName);
+      },
+    },
+    DOMParser: overrides.DOMParser || class {
+      parseFromString() {
+          const remoteSnapshot = new FakeHTMLElement('article', '<img class="remote-image" src="images/remote-image.jpg" alt="Remote Snapshot">');
+          remoteSnapshot.setAttribute('class', 'remote-snapshot');
+          const main = new FakeHTMLElement('main', remoteSnapshot.outerHTML);
+          main.setAttribute('class', 'poff-default-layout__main');
+          const layout = new FakeHTMLElement('div', main.outerHTML, {
+            '.poff-default-layout__main': main,
+          });
+          layout.setAttribute('class', 'poff-default-layout poff-default-layout--file');
+          const appShell = new FakeHTMLElement('div', layout.outerHTML, {
+            '.poff-default-layout__main': main,
+            '.poff-default-layout': layout,
+          });
+          appShell.setAttribute('id', 'appShell');
+          appShell.setAttribute('class', 'container');
+          const viewer = new FakeHTMLElement('div', appShell.outerHTML, {
+            '.poff-default-layout__main': main,
+            '.poff-default-layout': layout,
+            '#appShell': appShell,
+          });
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: {
+              children: [
+                new FakeHTMLStyleElement('.poff-default-layout { color: red; }'),
+                new FakeHTMLLinkElement('/layout/style.css'),
+              ],
+            },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.poff-default-layout__main': main,
+              '.poff-default-layout': layout,
+              '#appShell': appShell,
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+    fetch: overrides.fetch || (async (url, options) => ({
+      ok: true,
+      url,
+      text: async () => '<!doctype html><html><head></head><body><div id="contentFrame"><div class="viewer"></div></div></body></html>',
+      options,
+    })),
+    requestAnimationFrame: (fn) => fn(),
+    window: overrides.window || {
+      location: {
+        href: 'http://example.test/',
+        origin: 'http://example.test',
+        pathname: '/',
+      },
+    },
+    getSelectionFromPath(pathValue) {
+      return {
+        previewPath: pathValue,
+        previewIsFile: true,
+      };
+    },
+    inferFilePath() {
+      return true;
+    },
+    normalizeCmsRelativePath(value) {
+      return value;
+    },
+    normalizePreviewStyleNode(node) {
+      return node.outerHTML;
+    },
+    previewStateFromUrl(url) {
+      return {
+        key: url,
+        path: '',
+        isFile: false,
+      };
+    },
+  });
+
+  vm.runInContext(`${source}
+module.exports = {
+  createPreviewController,
+};
+`, context);
+
+  return {
+    createPreviewController: module.exports.createPreviewController,
+    FakeHTMLElement,
+  };
+}
+
+describe('preview controller', () => {
+  test('renders fetched preview HTML without an iframe', async () => {
+    const { createPreviewController } = loadPreviewController();
+    const contentFrame = {
+      innerHTML: '',
+      dataset: {},
+      scrollTop: 12,
+      scrollLeft: 8,
+      attributes: {},
+      addEventListener(type, handler) {
+        this.handler = handler;
+      },
+      setAttribute(name, value) {
+        this.attributes[name] = String(value);
+      },
+      getAttribute(name) {
+        return this.attributes[name] || '';
+      },
+      querySelectorAll() {
+        return [];
+      },
+    };
+    const loadingCalls = [];
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: null,
+      initialQueryPath: '',
+      navigateToPath() {
+        throw new Error('navigateToPath should not be called');
+      },
+      setLoadingVisible(_element, visible) {
+        loadingCalls.push(visible);
+      },
+      getCurrentSelection() {
+        return null;
+      },
+    });
+
+    await controller.renderPreview('http://example.test/source/?view=1&file=flux-jpeg');
+
+    expect(contentFrame.innerHTML).toContain('<style>');
+    expect(contentFrame.innerHTML).toContain('remote-snapshot');
+    expect(contentFrame.innerHTML).toContain('http://example.test/source/images/remote-image.jpg');
+    expect(contentFrame.innerHTML).not.toContain('id="appShell"');
+    expect(contentFrame.innerHTML).not.toContain('class="viewer"');
+    expect(contentFrame.innerHTML).not.toContain('preview-iframe');
+    expect(loadingCalls).toEqual([false]);
+  });
+
+  test('builds viewer urls with transient converter preview params', () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      DOMParser: class {
+        parseFromString() {
+          const viewer = new FakeHTMLElement('div', '');
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: { children: [] },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+    });
+    const controller = createPreviewController({
+      contentFrame: new FakeHTMLElement(),
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return {
+          previewPath: 'hello.txt',
+          previewIsFile: true,
+        };
+      },
+      getPreviewParams({ path: targetPath, isFile }) {
+        if (!isFile || targetPath !== 'hello.txt') {
+          return null;
+        }
+        return {
+          converter_preview: '1',
+          converter_id: 'converter/convert-text',
+          converter_format: 'txt',
+          converter_quality: 'preview',
+        };
+      },
+    });
+
+    expect(controller.buildViewerUrl('hello.txt', true, false)).toBe(
+      '/?view=1&file=hello.txt&converter_preview=1&converter_id=converter%2Fconvert-text&converter_format=txt&converter_quality=preview'
+    );
+  });
+
+  test('preserves edit=true in viewer urls for hidden edit-mode previews', () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      window: {
+        location: {
+          href: 'http://example.test/?edit=true#/mcmmcmc',
+          origin: 'http://example.test',
+          pathname: '/',
+        },
+      },
+    });
+    const controller = createPreviewController({
+      contentFrame: new FakeHTMLElement(),
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return {
+          previewPath: 'mcmmcmc',
+          previewIsFile: true,
+        };
+      },
+    });
+
+    expect(controller.buildViewerUrl('mcmmcmc', true, false)).toBe('/?edit=true&view=1&file=mcmmcmc');
+  });
+
+  test('converter previews prefer converter markup over the normal file iframe and execute converter scripts', async () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      DOMParser: class {
+        parseFromString() {
+          const converter = new FakeHTMLElement('section', '<textarea data-poff-text-editor-fallback>{"ok":true}</textarea>');
+          converter.setAttribute('class', 'poff-text-editor-converter');
+          converter.setAttribute('data-poff-text-editor-converter', '');
+          const layout = new FakeHTMLElement('div', '<main><iframe src="/raw.json"></iframe></main>');
+          layout.setAttribute('class', 'poff-default-layout');
+          const viewer = new FakeHTMLElement('div', `${layout.outerHTML}${converter.outerHTML}`, {
+            '[data-poff-text-editor-converter], .poff-text-editor-converter, [data-poff-converter], .converter-app': converter,
+            '.poff-default-layout': layout,
+          });
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: { children: [] },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            querySelectorAll(selector) {
+              if (selector === 'script') {
+                const script = new FakeHTMLElement('script');
+                script.textContent = 'window.poffConverterPayloadProvider = function () { return {}; };';
+                return [script];
+              }
+              return [];
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+      fetch: async (url, options) => ({
+        ok: true,
+        url: `http://example.test${url}`,
+        text: async () => '<html></html>',
+        options,
+      }),
+    });
+    const contentFrame = new FakeHTMLElement();
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return null;
+      },
+    });
+
+    await controller.renderPreview('/?view=1&file=hello.json&converter_preview=1&converter_id=converter%2Fconvert-text-editor');
+
+    expect(contentFrame.innerHTML).toContain('poff-text-editor-converter');
+    expect(contentFrame.innerHTML).not.toContain('<iframe');
+    expect(contentFrame.children).toHaveLength(1);
+    expect(contentFrame.children[0].textContent).toContain('poffConverterPayloadProvider');
+  });
+
+  test('uses a local preview fallback message instead of remote snapshot text for same-origin responses', async () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      DOMParser: class {
+        parseFromString() {
+          const viewer = new FakeHTMLElement('div', '');
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: { children: [] },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+    });
+    const contentFrame = {
+      innerHTML: '',
+      dataset: {},
+      scrollTop: 0,
+      scrollLeft: 0,
+      attributes: {},
+      addEventListener() {},
+      setAttribute(name, value) {
+        this.attributes[name] = String(value);
+      },
+      getAttribute(name) {
+        return this.attributes[name] || '';
+      },
+      querySelectorAll() {
+        return [];
+      },
+    };
+    const iframeLoading = new FakeHTMLElement('div');
+
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading,
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return {
+          previewPath: 'converters/convert-link',
+          previewIsFile: false,
+        };
+      },
+      getPreviewParams() {
+        return null;
+      },
+    });
+
+    await controller.renderPreview('/MAUSMAUS/?view=1&path=converters%2Fconvert-link');
+
+    expect(contentFrame.innerHTML).toContain('Preview unavailable.');
+    expect(contentFrame.innerHTML).not.toContain('Remote snapshot unavailable.');
+    expect(contentFrame.innerHTML).not.toContain('Open original');
+  });
+});

@@ -2,13 +2,11 @@
 
 function cmsHandleEditSaveAction(array $ctx): void
 {
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        cmsJsonResponse(['allowed' => true, 'error' => 'Save requires POST.'], 405);
-    }
+    cmsEditRequirePost('Save');
 
     $config = $ctx['config'];
     $data = $ctx['data'];
-    cmsEditSaveApplyBasicFields($config, $data);
+    cmsEditSaveApplyBasicFields($config, $data, $ctx['subjectType'], $ctx['targetFile']);
     cmsEditSaveApplyWorkFields($config, $data, $ctx['targetDir']);
     cmsEditSaveApplyLayoutFields($config, $data, $ctx['subjectType'], $ctx['targetDir'], $ctx['targetFile']);
     cmsEditSaveFinalize($config, $ctx['targetDir'], $ctx['subjectType'], $ctx['targetFile']);

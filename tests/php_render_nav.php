@@ -8,6 +8,7 @@ require_once __DIR__ . '/../src/includes/MediaType.php';
 require_once __DIR__ . '/../src/includes/Worktype.php';
 require_once __DIR__ . '/../src/includes/PoffConfig.php';
 require_once __DIR__ . '/../src/includes/viewer/utils.php';
+require_once __DIR__ . '/../src/includes/auth.php';
 
 $baseDir = $argv[1] ?? '';
 $relativePath = $argv[2] ?? '';
@@ -32,6 +33,4 @@ $currentScript = 'index.php';
 $config = PoffConfig::ensure($currentAbsolutePath);
 $folderPoffConfig = $config;
 
-ob_start();
 include __DIR__ . '/../src/includes/nav.php';
-echo ob_get_clean();

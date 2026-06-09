@@ -9,6 +9,76 @@ export function buildCmsUrl(action, path) {
     return url.toString();
 }
 
+export function buildLocalModelsUrl(endpoint = '') {
+    const fallback = 'http://127.0.0.1:1234/v1/models';
+    const rawEndpoint = String(endpoint || '').trim();
+    if (rawEndpoint === '') {
+        return fallback;
+    }
+    try {
+        const url = new URL(rawEndpoint);
+        const normalizedPath = url.pathname.replace(/\/+$/, '');
+        if (/\/v1\/chat\/completions$/i.test(normalizedPath)) {
+            url.pathname = normalizedPath.replace(/\/v1\/chat\/completions$/i, '/v1/models');
+        } else if (/\/v1\/responses$/i.test(normalizedPath)) {
+            url.pathname = normalizedPath.replace(/\/v1\/responses$/i, '/v1/models');
+        } else if (!/\/v1\/models$/i.test(normalizedPath)) {
+            url.pathname = '/v1/models';
+        }
+        url.search = '';
+        url.hash = '';
+        return url.toString();
+    } catch (err) {
+        return fallback;
+    }
+}
+
+export async function requestPromptModels({ provider = 'local', endpoint = '', apiKey = '' } = {}) {
+    const url = buildCmsUrl('models', '');
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                provider,
+                endpoint,
+                apiKey,
+            }),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return {
+                error: (data && typeof data.error === 'string' ? data.error : '')
+                    || responseText.trim()
+                    || `Local models proxy failed (HTTP ${res.status}).`,
+                models: [],
+            };
+        }
+        return {
+            error: typeof data?.error === 'string' ? data.error : undefined,
+            models: Array.isArray(data?.models) ? data.models : [],
+        };
+    } catch (err) {
+        return {
+            error: err?.message || 'Local models endpoint unavailable.',
+            models: [],
+        };
+    }
+}
+
+export async function requestLocalPromptModels(endpoint = '') {
+    return requestPromptModels({ provider: 'local', endpoint });
+}
+
 export async function requestEditConfig(action, payload) {
     const url = buildCmsUrl(action, payload.path || '');
     try {
@@ -29,15 +99,104 @@ export async function requestEditConfig(action, payload) {
     }
 }
 
+export async function requestMcpRoute(route, payload = {}) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set('mcp', '1');
+    url.searchParams.set('route', route);
+    try {
+        const res = await fetch(url.toString(), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return data || { ok: false, error: responseText.trim() || `MCP route failed (HTTP ${res.status}).` };
+        }
+        return data || { ok: false, error: 'MCP route returned invalid JSON.' };
+    } catch (err) {
+        return { ok: false, error: err?.message || 'MCP route unavailable.' };
+    }
+}
+
+export async function requestEditAuth(payload = {}) {
+    const url = buildCmsUrl('auth', payload.path || '');
+    const method = payload.method === 'GET' ? 'GET' : 'POST';
+    const bodyPayload = { ...payload };
+    delete bodyPayload.method;
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: {
+                'Accept': 'application/json',
+                ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: method === 'GET' ? undefined : JSON.stringify(bodyPayload),
+        });
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
+        }
+        if (!res.ok) {
+            return data || {
+                allowed: false,
+                error: responseText.trim() || `Auth endpoint failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || {
+            allowed: false,
+            error: responseText.trim() || 'Auth endpoint returned invalid JSON.',
+        };
+    } catch (err) {
+        return {
+            allowed: false,
+            error: err?.message || 'Auth endpoint unavailable.',
+        };
+    }
+}
+
 export async function requestEditUpload(payload) {
     const url = buildCmsUrl('upload', payload.path || '');
     const formData = new FormData();
     formData.set('source', payload.source || 'upload');
+    if (payload.hideTargetFolder) {
+        formData.set('hideTargetFolder', '1');
+    }
     if (typeof payload.fileName === 'string') {
         formData.set('fileName', payload.fileName);
     }
+    if (typeof payload.linkName === 'string') {
+        formData.set('linkName', payload.linkName);
+    }
+    if (typeof payload.linkUrl === 'string') {
+        formData.set('linkUrl', payload.linkUrl);
+    }
     if (typeof payload.contents === 'string') {
         formData.set('contents', payload.contents);
+    }
+    if (typeof payload.saveTarget === 'string') {
+        formData.set('saveTarget', payload.saveTarget);
+    }
+    if (typeof payload.activeWorkName === 'string') {
+        formData.set('activeWorkName', payload.activeWorkName);
+    }
+    if (typeof payload.activeWorkPath === 'string') {
+        formData.set('activeWorkPath', payload.activeWorkPath);
+    }
+    if (typeof payload.activeWorkIsFile === 'boolean') {
+        formData.set('activeWorkIsFile', payload.activeWorkIsFile ? '1' : '0');
     }
     for (const file of payload.files || []) {
         formData.append('files[]', file);

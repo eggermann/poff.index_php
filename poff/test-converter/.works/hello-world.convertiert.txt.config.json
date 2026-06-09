@@ -1,0 +1,61 @@
+{
+    "name": "hello-world.convertiert.txt",
+    "title": "hello-world.convertiert",
+    "type": "file",
+    "kind": "text",
+    "mimeType": "text/plain",
+    "visible": false,
+    "generated": true,
+    "sourceWork": "hello.txt",
+    "generatedBy": {
+        "type": "converter",
+        "id": "converter/convert-text",
+        "name": "convert-text",
+        "folder": "poff/converters/convert-text",
+        "engine": "text-copy",
+        "format": "txt",
+        "quality": "default"
+    },
+    "external": {
+        "type": "node-work",
+        "relation": "converted-from",
+        "visible": false,
+        "sourceWork": {
+            "path": "poff/test-converter/hello.txt",
+            "mimeType": "text/plain"
+        },
+        "resultWork": {
+            "name": "hello-world.convertiert.txt",
+            "mimeType": "text/plain",
+            "kind": "text",
+            "srcUrl": "hello-world.convertiert.txt"
+        },
+        "generatedBy": {
+            "type": "converter",
+            "id": "converter/convert-text",
+            "name": "convert-text",
+            "folder": "poff/converters/convert-text",
+            "engine": "text-copy",
+            "format": "txt",
+            "quality": "default"
+        }
+    },
+    "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+    "path": "hello-world.convertiert.txt",
+    "size": 12,
+    "modifiedAt": "2026-05-22T21:27:06+00:00",
+    "updatedAt": "2026-05-22T21:27:06+00:00",
+    "id": "77943cadce4ecf51",
+    "work": {
+        "type": "text",
+        "kind": "text",
+        "mimeType": "text/plain",
+        "template": "external",
+        "layout": {
+            "mode": "poff-layout",
+            "name": "poff-layout",
+            "engine": "lightncandy",
+            "section": "work"
+        }
+    }
+}

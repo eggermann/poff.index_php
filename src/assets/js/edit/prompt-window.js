@@ -119,9 +119,12 @@ export function renderPromptWindow(settings = {}, options = {}) {
                         </div>
                         <div>
                             <label class="edit-label" for="prompt-model">Model</label>
+                            <select class="form-input" id="prompt-model-local" hidden>
+                                <option value="">Loading local models...</option>
+                            </select>
                             <input class="form-input" id="prompt-model" type="text" value="${escapeHtml(settings.model || '')}" placeholder="optional">
                         </div>
-                        <div>
+                        <div id="prompt-api-key-row">
                             <label class="edit-label" for="prompt-api-key">API key (stored in localStorage)</label>
                             <input class="form-input" id="prompt-api-key" type="password" value="${escapeHtml(settings.apiKey || '')}">
                         </div>
