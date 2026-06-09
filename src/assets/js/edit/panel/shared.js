@@ -159,6 +159,7 @@ export function syncPromptDock(promptRoot = null) {
 export function layoutOverlayState(config, status) {
     const layoutState = getLayoutState(config);
     const isFile = status?.target === 'file';
+    const workType = String(config?.work?.type || (isFile ? 'other' : 'folder')).trim() || (isFile ? 'other' : 'folder');
     const sectionName = layoutState.section || (isFile ? 'work' : 'works');
     const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile
         ? `.works/${config.name || config.path || 'item'}.layout`
@@ -166,11 +167,10 @@ export function layoutOverlayState(config, status) {
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
     const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const activeSectionDirectory = String(layoutState.sectionDirectory || '').trim();
-    const sectionTarget = activeSectionDirectory
+    const sectionTarget = localSectionTarget;
+    const sectionSourceLabel = activeSectionDirectory
         ? `${activeSectionDirectory}/${sectionName}.hbs`
-        : (isFile && layoutState.storage === 'filesystem' && layoutState.directory !== localLayoutDirectory
-            ? `built-in ${sectionName}.hbs`
-            : localSectionTarget);
+        : `Built-in ${workType} section (${sectionName}.hbs)`;
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
     const hasInheritedLayout = !!layoutState.inheritedDirectory;
@@ -235,6 +235,7 @@ export function layoutOverlayState(config, status) {
         wrapperTarget,
         localSectionTarget,
         sectionTarget,
+        sectionSourceLabel,
         wrapperWasLocal,
         sectionWasLocal,
         hasInheritedLayout,

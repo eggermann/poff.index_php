@@ -186,6 +186,18 @@ export async function requestEditUpload(payload) {
     if (typeof payload.contents === 'string') {
         formData.set('contents', payload.contents);
     }
+    if (typeof payload.saveTarget === 'string') {
+        formData.set('saveTarget', payload.saveTarget);
+    }
+    if (typeof payload.activeWorkName === 'string') {
+        formData.set('activeWorkName', payload.activeWorkName);
+    }
+    if (typeof payload.activeWorkPath === 'string') {
+        formData.set('activeWorkPath', payload.activeWorkPath);
+    }
+    if (typeof payload.activeWorkIsFile === 'boolean') {
+        formData.set('activeWorkIsFile', payload.activeWorkIsFile ? '1' : '0');
+    }
     for (const file of payload.files || []) {
         formData.append('files[]', file);
     }

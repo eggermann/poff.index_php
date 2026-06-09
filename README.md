@@ -229,6 +229,14 @@ npm run deploy
 
 Default deploy mode is root `index.php` only.
 
+Named targets:
+```sh
+npm run deploy -- dodi
+npm run deploy -- dodi_2
+```
+
+Those target names resolve to the suffixed env keys when present, for example `host2`, `user2`, `password2`, `destinationPath2`, and `sourcePath2` for `dodi_2`. The unsuffixed keys stay the default profile.
+
 Full folder sync:
 ```sh
 node scripts/deploy.js --full

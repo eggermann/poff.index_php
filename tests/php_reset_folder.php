@@ -20,12 +20,4 @@ if ($targetDir === '') {
 }
 
 $result = cmsResetFolderTarget($targetDir, $relativePath);
-if (($result['errors'] ?? []) === []) {
-    $resetDir = trim((string) $relativePath, "/\\");
-    $target = $resetDir === ''
-        ? rtrim($targetDir, DIRECTORY_SEPARATOR)
-        : rtrim($targetDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $resetDir);
-    $result['config'] = PoffConfig::ensure($target);
-}
-
 echo json_encode($result, JSON_UNESCAPED_SLASHES);

@@ -215,6 +215,44 @@ test('pending external links stay hidden from visitors and show review state for
   }
 });
 
+test('approved external links expose direct preview urls in sidebar markup', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-external-'));
+  try {
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-nav',
+      slug: 'poff-nav',
+      title: 'Poff Nav',
+      description: '',
+      type: 'folder',
+      tree: [
+        {
+          name: 'remote-link',
+          slug: 'remote-link',
+          type: 'link',
+          path: 'remote-link',
+          linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+          visible: true,
+          externalSubmission: true,
+          approvalStatus: 'approved',
+        },
+      ],
+    }, null, 2), 'utf8');
+
+    const result = spawnSync('php', [path.join(ROOT, 'tests/php_render_nav.php'), tempRoot, ''], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('data-path="remote-link"');
+    expect(result.stdout).toContain('data-view-url="https://remote.example/index.php?view=1&amp;path=portfolio"');
+    expect(result.stdout).toContain('nav-link-approved-external');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('converter folders render a visible converter badge in the sidebar nav', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-converter-'));
   try {

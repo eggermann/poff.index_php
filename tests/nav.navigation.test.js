@@ -13,6 +13,7 @@ function loadNavigation(overrides = {}) {
 
   const previewCalls = [];
   const sidebarCalls = [];
+  let sidebarNavigate = null;
   const module = { exports: {} };
   const context = vm.createContext({
     module,
@@ -49,14 +50,17 @@ function loadNavigation(overrides = {}) {
       syncPreviewDisabledState() {},
       bindPreviewNavigation() {},
     })),
-    createSidebarController: overrides.createSidebarController || (() => ({
-      bindNavClick() {},
-      loadNav(pathValue) {
-        sidebarCalls.push(pathValue);
-        return Promise.resolve();
-      },
-      syncSidebarSelection() {},
-    })),
+    createSidebarController: overrides.createSidebarController || ((params = {}) => {
+      sidebarNavigate = params.navigateToPath;
+      return {
+        bindNavClick() {},
+        loadNav(pathValue) {
+          sidebarCalls.push(pathValue);
+          return Promise.resolve();
+        },
+        syncSidebarSelection() {},
+      };
+    }),
     createRouteResolver: overrides.createRouteResolver || (() => ({
       readHashPath() {
         return '';
@@ -90,6 +94,9 @@ module.exports = {
     initNavigation: module.exports.initNavigation,
     previewCalls,
     sidebarCalls,
+    getSidebarNavigate() {
+      return sidebarNavigate;
+    },
   };
 }
 
@@ -196,5 +203,47 @@ describe('navigation', () => {
     expect(previewCalls[0]).toContain('viewer:notes.txt:file:refresh');
     expect(previewCalls[0]).not.toContain('viewer:notes-txt:folder');
     expect(sidebarCalls).toHaveLength(0);
+  });
+
+  test('sidebar direct preview urls render remote target without replacing local selection path', () => {
+    const { initNavigation, previewCalls, getSidebarNavigate } = loadNavigation();
+    initNavigation({
+      elements: {
+        navList: {
+          querySelectorAll() {
+            return [];
+          },
+        },
+        contentFrame: {
+          classList: {
+            toggle() {},
+          },
+        },
+        iframeLoading: {
+          classList: {
+            toggle() {},
+          },
+        },
+        sidebarLoading: {
+          classList: {
+            toggle() {},
+          },
+        },
+      },
+      editQuery: '',
+      currentPathForIframe: '',
+      renderFolderMeta() {},
+      initEditMode() {},
+    });
+
+    const navigateToPath = getSidebarNavigate();
+    navigateToPath('mcmmcmc', {
+      isFile: true,
+      previewUrl: 'https://dominikeggermann.com/?view=1&path=portfolio',
+    });
+
+    expect(previewCalls).toEqual([
+      'https://dominikeggermann.com/?view=1&path=portfolio',
+    ]);
   });
 });

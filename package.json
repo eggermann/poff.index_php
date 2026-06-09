@@ -5,6 +5,10 @@
     "build": "npm run build:assets && npm run build:php",
     "build:production": "POFF_BUILD_MODE=production POFF_OUTPUT_DIR=dist POFF_SKIP_DISTRIBUTION_COPIES=1 npm run build:assets && POFF_BUILD_MODE=production POFF_OUTPUT_DIR=dist POFF_SKIP_DISTRIBUTION_COPIES=1 npm run build:php",
     "deploy": "node scripts/deploy.js",
+    "deploy:dodi": "node scripts/deploy.js dodi",
+    "deploy:customer": "node scripts/deploy.js customer",
+    "deploy:pageoff": "node scripts/deploy.js pageoff",
+    "deploy:dodi_2": "node scripts/deploy.js dodi_2",
     "watch": "node scripts/watch-build.js",
     "test:mcp": "MCP_JSON=1 jest --watchman=false tests/mcp.create.test.js"
   },

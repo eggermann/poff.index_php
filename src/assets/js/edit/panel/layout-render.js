@@ -9,14 +9,14 @@ const LAYOUT_PRESET_OPTIONS = [
     { value: 'shared', label: 'Collection' },
 ];
 
-export function renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionTarget }) {
+export function renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionSourceLabel }) {
     return `
         <div class="edit-layout-launch edit-layout-summary">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
                 <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
                 <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
-                <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
+                <div class="edit-layout-summary-line">Inner preview content source: <code id="edit-layout-section-source-preview">${escapeHtml(sectionSourceLabel)}</code></div>
                 <div class="edit-layout-summary-line">Prompt context separates <code>root.title</code> for the layout shell from <code>work.title</code> for the nested item.</div>
             </div>
             <div class="edit-inline-actions edit-layout-header-actions">
@@ -132,6 +132,7 @@ export function renderEditLayoutPanelHtml({
     sectionName,
     wrapperTarget,
     sectionTarget,
+    sectionSourceLabel,
     sectionWasLocal,
     wrapperSourceLabel,
     inheritedLayoutLabel,
@@ -150,7 +151,7 @@ export function renderEditLayoutPanelHtml({
         <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
         <div class="edit-status" id="editLayoutStatus"></div>
         <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
-            ${renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionTarget })}
+            ${renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionSourceLabel })}
             <div class="edit-grid edit-grid-cols">
                 <div>
                     ${renderLayoutPresetSelect(layoutState, sharedLayouts, sharedLayoutName)}
@@ -180,7 +181,8 @@ export function renderEditLayoutPanelHtml({
                     <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
-                    <div class="small-note">Inner section target: <code>${escapeHtml(sectionTarget)}</code></div>
+                    <div class="small-note">Inner content source: <code>${escapeHtml(sectionSourceLabel)}</code></div>
+                    <div class="small-note">Advanced local override target: <code>${escapeHtml(sectionTarget)}</code></div>
                 </div>
             </div>
             ${renderLayoutEditorFields({
@@ -198,6 +200,7 @@ export function renderEditLayoutOverlayHtml({
     sectionName,
     wrapperTarget,
     sectionTarget,
+    sectionSourceLabel,
     sectionWasLocal,
     wrapperSourceLabel,
     inheritedLayoutLabel,
@@ -227,13 +230,13 @@ export function renderEditLayoutOverlayHtml({
                         <div class="edit-layout-meta-title">Inheritance</div>
                         <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
                         <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
-                        <div class="small-note">Wrapped inner partial: <code>${escapeHtml(layoutState.sectionDirectory ? `${layoutState.sectionDirectory}/${sectionName}.hbs` : `built-in ${sectionName}.hbs`)}</code></div>
+                        <div class="small-note">Wrapped inner content source: <code>${escapeHtml(sectionSourceLabel)}</code></div>
                     </div>
                     <div class="edit-layout-meta-card">
                         <div class="edit-layout-meta-title">Targets</div>
                         <div class="small-note">Virtual/original target: <code>${escapeHtml(originalLabel)}</code></div>
                         <div class="small-note">Custom layout target: <code>${escapeHtml(wrapperTarget)}</code></div>
-                        <div class="small-note">Advanced inner partial target: <code>${escapeHtml(sectionTarget)}</code></div>
+                        <div class="small-note">Advanced inner override target: <code>${escapeHtml(sectionTarget)}</code></div>
                     </div>
                 </div>
 

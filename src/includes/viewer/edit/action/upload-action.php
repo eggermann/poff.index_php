@@ -25,6 +25,12 @@ function cmsHandleEditUploadAction(array $ctx): void
         cmsJsonResponse(['allowed' => false, 'error' => 'External link submissions are only supported for folders.', 'auth' => cmsBuildEditorAuthView($rootDir, (bool) ($ctx['editModeAllowed'] ?? true))], 403);
     }
 
+    $uploadTarget = cmsResolveUploadTargetDir($targetDir, $data, $source);
+    if (is_array($uploadTarget['error'] ?? null)) {
+        cmsJsonResponse(['allowed' => true, 'error' => $uploadTarget['error']['errors'][0] ?? 'Failed to prepare upload target.'], 400);
+    }
+    $targetDir = (string) ($uploadTarget['dir'] ?? $targetDir);
+
     $result = match ($source) {
         'blank' => cmsCreateBlankFile($targetDir, (string) ($data['fileName'] ?? $data['filename'] ?? ''), (string) ($data['contents'] ?? '')),
         'folder' => cmsCreateFolder($targetDir, (string) ($data['fileName'] ?? $data['folderName'] ?? $data['filename'] ?? '')),
@@ -37,9 +43,15 @@ function cmsHandleEditUploadAction(array $ctx): void
                 'htaccessDir' => $rootDir,
             ]
         ),
-        default => function () use ($targetDir): array {
+        default => function () use ($targetDir, $uploadTarget): array {
             $entries = cmsCollectUploadedEntries($_FILES['files'] ?? []);
             if ($entries === []) {
+                if (!empty($uploadTarget['createdWorkFolder']) && (string) ($uploadTarget['folderName'] ?? '') !== '') {
+                    return cmsUploadStoredResult((string) $uploadTarget['folderName'], [
+                        'path' => (string) $uploadTarget['folderName'],
+                        'type' => 'folder',
+                    ]);
+                }
                 cmsJsonResponse(['allowed' => true, 'error' => 'No files selected.'], 400);
             }
             return cmsStoreUploadEntries($targetDir, $entries);
@@ -68,6 +80,8 @@ function cmsHandleEditUploadAction(array $ctx): void
         'uploaded' => $result['stored'],
         'errors' => $result['errors'],
         'config' => $updatedConfig,
+        'createdWorkFolder' => !empty($uploadTarget['createdWorkFolder']),
+        'workFolderName' => (string) ($uploadTarget['folderName'] ?? ''),
         'uploadLimits' => cmsUploadLimits(),
         'pendingApproval' => !empty($result['stored'][0]['pendingApproval']),
         'auth' => cmsBuildEditorAuthView($rootDir, (bool) ($ctx['editModeAllowed'] ?? true)),

@@ -14,6 +14,13 @@ function cmsNavEntry(string $name, string $path, string $type, string $icon, arr
 {
     $title = (string) ($source['title'] ?? $name);
     $slug = (string) ($source['slug'] ?? cmsNavSlug($title));
+    $directViewUrl = '';
+    if ($type !== 'folder') {
+        $directViewUrl = cmsConfiguredTreeDirectLinkTarget($source);
+        if ($directViewUrl === '' && strtolower(trim((string) ($source['type'] ?? ''))) === 'link') {
+            $directViewUrl = cmsConfiguredTreeLinkTarget($source);
+        }
+    }
     $entry = [
         'name' => $name,
         'title' => $title,
@@ -21,6 +28,7 @@ function cmsNavEntry(string $name, string $path, string $type, string $icon, arr
         'slug' => $slug,
         'icon' => $icon,
         'copyText' => (string) ($source['name'] ?? $name),
+        'view_url' => $directViewUrl,
     ];
 
     if ($type === 'folder') {
@@ -189,11 +197,14 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $bas
 
     if ($isFile) {
         $dataAttrs .= ' data-src="' . htmlspecialchars($item['data_src']) . '" data-file="' . htmlspecialchars($item['name']) . '"';
+        if (trim((string) ($item['view_url'] ?? '')) !== '') {
+            $dataAttrs .= ' data-view-url="' . htmlspecialchars((string) $item['view_url']) . '"';
+        }
     }
 
     return '<li class="' . cmsNavRowClass($isHidden && !$isPendingApproval) . '">'
         . '<a class="' . $navLinkClasses . '" href="' . htmlspecialchars($href) . '"' . $dataAttrs . ' title="' . htmlspecialchars((string) ($item['name'] ?? $displayName)) . '"' . $hiddenAttrs . '>'
-        . $item['icon'] . htmlspecialchars($displayName) . cmsNavBadgeForItem($isHidden, $isPendingApproval, $isApprovedExternal, $isConverter) . '</a>'
+        . $item['icon'] . '<span class="nav-link__label">' . htmlspecialchars($displayName) . '</span>' . cmsNavBadgeForItem($isHidden, $isPendingApproval, $isApprovedExternal, $isConverter) . '</a>'
         . cmsNavActionGroup(
             $isPendingApproval ? cmsNavActionButton('Review', 'Review external link submission', 'nav-row-action-review', cmsNavIcon('pending'), ' data-nav-action="review-external" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '',
             $editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr((string) ($item['copyText'] ?? $item['name']))) : '',

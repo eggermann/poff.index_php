@@ -4029,6 +4029,40 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('switching from collection back to inherit clears stale shared layout state', async () => {
+    await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
+      layout: {
+        name: 'filesystem-layout',
+        preset: 'shared',
+        source: 'shared',
+        sharedName: 'filesystem-layout',
+      },
+    });
+
+    let ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(ensured.work.layout).toMatchObject({
+      preset: 'shared',
+      sharedName: 'filesystem-layout',
+    });
+
+    await runViewerSave(POFF_DIR, 'inherits-default/.layout', {
+      layout: {
+        name: 'filesystem-layout',
+        preset: 'inherit',
+      },
+    });
+
+    ensured = JSON.parse(await runLayoutFilesystem('ensure-folder', INHERITED_DEFAULT_DIR));
+    expect(ensured.work.layout).toMatchObject({
+      name: 'filesystem-layout',
+      preset: 'actual',
+      storage: 'filesystem',
+      directory: 'tests/poff-tests/.layout',
+    });
+    expect(ensured.work.layout.source || '').toBe('');
+    expect(ensured.work.layout.sharedName || '').toBe('');
+  });
+
   test('can persist edits back into the inherited original filesystem layout source', async () => {
     const originalTarget = path.relative(ROOT, path.join(POFF_DIR, '.layout'));
     await runLayoutFilesystem('persist-original', originalTarget, '', {
@@ -5739,6 +5773,33 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('resets a folder work override when called through the virtual layout path', async () => {
+    const tempDir = path.join(POFF_DIR, `reset-layout-virtual-${Date.now()}`);
+    copyDirSync(PERSIST_LAYOUT_DIR, tempDir);
+
+    try {
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(true);
+
+      const output = await runResetFolder(tempDir, '.layout');
+      const result = JSON.parse(output);
+
+      expect(result.errors).toEqual([]);
+      expect(result.reset).toEqual([
+        expect.objectContaining({ name: '.layout', path: '.layout', type: 'layout' }),
+      ]);
+      expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(false);
+      expect(result.config.work.layout).toEqual(
+        expect.objectContaining({
+          name: 'filesystem-layout',
+          mode: 'filesystem-layout',
+          section: 'works',
+        }),
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('hydrates a shared marketplace layout without creating local wrapper files', async () => {
     const tempDir = path.join(os.tmpdir(), `shared-layout-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
@@ -5758,9 +5819,10 @@ describe('Worktype HBS renderer', () => {
       expect(serializedLayout).toMatchObject({
         name: 'filesystem-layout',
         preset: 'shared',
-        source: 'shared',
         sharedName: 'filesystem-layout',
       });
+      expect(serializedLayout.source).toBeUndefined();
+      expect(serializedLayout.storage).toBeUndefined();
       expect(fs.existsSync(path.join(tempDir, '.layout'))).toBe(false);
 
       const configPath = path.join(tempDir, 'poff.config.json');
@@ -5794,7 +5856,6 @@ describe('Worktype HBS renderer', () => {
       expect(ensuredConfig.work.layout).toEqual(
         expect.objectContaining({
           preset: 'shared',
-          source: 'shared',
           sharedName: 'filesystem-layout',
         }),
       );

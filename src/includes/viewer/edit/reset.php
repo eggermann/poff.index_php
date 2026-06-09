@@ -18,6 +18,18 @@ function cmsResetFolderTarget(string $rootDir, string $relativePath): array
     }
 
     $target = cmsResolveTarget($rootReal, $relativePath);
+    if (
+        is_array($target)
+        && ($target['type'] ?? '') === 'layout'
+        && ($target['subjectType'] ?? '') === 'folder'
+    ) {
+        $relativePath = (string) ($target['subjectRelativePath'] ?? '');
+        $target = [
+            'type' => 'folder',
+            'dir' => $target['dir'] ?? '',
+        ];
+    }
+
     if ($target === null || ($target['type'] ?? '') !== 'folder') {
         return [
             'reset' => [],

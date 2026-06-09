@@ -502,3 +502,29 @@
     padding: var(--poff-space-md);
     background: var(--poff-color-surface);
 }
+.edit-upload-file-picker {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--poff-space-xs);
+}
+.edit-upload-file-input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    opacity: 0;
+    pointer-events: none;
+}
+.edit-upload-file-picker-name {
+    color: var(--poff-color-text-secondary);
+    font-size: var(--poff-font-size-sm);
+    overflow-wrap: anywhere;
+}
+.edit-upload-file-trigger {
+    min-width: 9.5rem;
+}

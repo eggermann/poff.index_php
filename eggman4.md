@@ -25,3 +25,16 @@
 - `~/proxy/.env`
 - `~/proxy/server.js`
 
+
+
+
+AUTH_MODE=basic
+BASIC_AUTH_USER=pageoff
+BASIC_AUTH_PASSWORD=feePwjJUPpp88fg7Rt8DTevh
+PROXY_UPSTREAM_URL=http://127.0.0.1:8080
+CHAT_WORKSPACE_ROOT=/home/eggman4/html/copilot
+PUBLIC_SITE_ROOT=/var/www/virtual/eggman4/html
+PUBLIC_SITE_ROUTES=dodi:pages/dodi/actual,dodi2:pages/dodi2/actual,dodi_2:pages/dodi2/actual
+PORT=19090
+BIND_HOST=0.0.0.0
+COPILOT_BIN=/home/eggman4/.local/bin/copilot

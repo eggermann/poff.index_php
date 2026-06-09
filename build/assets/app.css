@@ -276,6 +276,7 @@
 .tracking-wide{letter-spacing:0.025em;}
 .tracking-wider{letter-spacing:0.05em;}
 .uppercase{text-transform:uppercase;}
+.underline{text-decoration-line:underline;}
 .hover\:underline:hover{text-decoration-line:underline;}
 .focus-visible\:underline:focus-visible{text-decoration-line:underline;}
 .no-underline{text-decoration:none;}
@@ -1266,8 +1267,20 @@ body, html {
   box-shadow: inset 0 0 0 1px transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+#appSidebar .nav-link__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-overflow: clip;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#appSidebar .nav-link__label::-webkit-scrollbar {
+  display: none;
 }
 
 #appSidebar .nav-link-badge {
@@ -1699,6 +1712,11 @@ body, html {
   gap: var(--poff-space-xs-plus);
 }
 
+.edit-panel .edit-panel-stack {
+  display: grid;
+  gap: var(--poff-space-sm);
+}
+
 .edit-panel .edit-work-fields {
   display: grid;
   gap: var(--poff-space-sm);
@@ -2049,6 +2067,11 @@ body, html {
   background: linear-gradient(135deg, var(--poff-color-surface-warning) 0%, var(--poff-color-warning-100) 100%);
 }
 
+.edit-panel .edit-panel-stack .edit-layout-launch,
+.edit-panel .edit-panel-stack .edit-upload-launch {
+  margin-top: 0;
+}
+
 .edit-panel .edit-upload-launch {
   display: flex;
   align-items: center;
@@ -2093,6 +2116,36 @@ body, html {
   gap: var(--poff-space-lg-plus);
   padding: var(--poff-space-md);
   background: var(--poff-color-surface);
+}
+
+.edit-upload-file-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--poff-space-xs);
+}
+
+.edit-upload-file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.edit-upload-file-picker-name {
+  color: var(--poff-color-text-secondary);
+  font-size: var(--poff-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.edit-upload-file-trigger {
+  min-width: 9.5rem;
 }
 
 .edit-layout-overlay-shell {
@@ -2306,6 +2359,11 @@ body, html {
   display: flex;
   justify-content: flex-start;
   align-items: flex-start;
+  pointer-events: none;
+}
+
+.prompt-layer .prompt-window,
+.prompt-layer .prompt-layer-toggle {
   pointer-events: auto;
 }
 

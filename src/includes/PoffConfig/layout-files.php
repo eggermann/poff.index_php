@@ -39,7 +39,6 @@ trait PoffConfigLayoutFileHelpers
             }
         }
         if ($isSharedPreset) {
-            $normalized['storage'] = 'shared';
             return self::serializeLayout($normalized, $section);
         }
         $layoutDir = $fileName === null

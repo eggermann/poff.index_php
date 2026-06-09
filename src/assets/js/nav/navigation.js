@@ -47,6 +47,26 @@ export function initNavigation({
         getPreviewParams,
     });
 
+    function resolveSelectionPreviewUrl(selection, explicitPreviewUrl = '') {
+        const normalizedExplicit = String(explicitPreviewUrl || '').trim();
+        if (normalizedExplicit) {
+            return normalizedExplicit;
+        }
+        if (!navList || !selection || selection.isLayout) {
+            return '';
+        }
+        const selectionPath = String(selection.path || selection.previewPath || '').trim();
+        if (!selectionPath || typeof navList.querySelectorAll !== 'function') {
+            return '';
+        }
+        for (const link of navList.querySelectorAll('a[data-path][data-view-url]')) {
+            if ((link.getAttribute('data-path') || '').trim() === selectionPath) {
+                return String(link.getAttribute('data-view-url') || '').trim();
+            }
+        }
+        return '';
+    }
+
     const sidebarController = createSidebarController({
         navList,
         sidebarLoading,
@@ -93,12 +113,13 @@ export function initNavigation({
         const previewPath = selection.previewPath || '';
         const previewIsFile = !!selection.previewIsFile;
         const folderPath = previewIsFile ? previewPath.split('/').slice(0, -1).join('/') : previewPath;
+        const previewUrl = resolveSelectionPreviewUrl(selection, options?.previewUrl);
 
         setLoadingVisible(iframeLoading, true);
         if (contentFrame) {
             contentFrame.classList.toggle('content-frame-layout-target', !!selection.isLayout);
             previewController.syncPreviewDisabledState(!!selection.isLayout);
-            previewController.renderPreview(previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
+            previewController.renderPreview(previewUrl || previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
         }
         if (updateHash) {
             writeHashPath(selection.path || '');

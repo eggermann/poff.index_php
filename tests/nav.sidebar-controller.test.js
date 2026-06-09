@@ -193,6 +193,7 @@ describe('sidebar selection scroll', () => {
       href: '#',
       'data-path': 'eggermann',
       'data-is-file': '1',
+      'data-view-url': 'https://dominikeggermann.com/?view=1&path=portfolio',
     });
     const navList = {
       addEventListener(type, handler) {
@@ -219,7 +220,10 @@ describe('sidebar selection scroll', () => {
       preventDefault: jest.fn(),
     });
 
-    expect(navigateToPath).toHaveBeenCalledWith('eggermann', { isFile: true });
+    expect(navigateToPath).toHaveBeenCalledWith('eggermann', {
+      isFile: true,
+      previewUrl: 'https://dominikeggermann.com/?view=1&path=portfolio',
+    });
   });
 
   test('delete actions call the delete endpoint and refresh to the parent folder', async () => {

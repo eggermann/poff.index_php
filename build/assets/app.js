@@ -199,6 +199,18 @@
     if (typeof payload.contents === "string") {
       formData.set("contents", payload.contents);
     }
+    if (typeof payload.saveTarget === "string") {
+      formData.set("saveTarget", payload.saveTarget);
+    }
+    if (typeof payload.activeWorkName === "string") {
+      formData.set("activeWorkName", payload.activeWorkName);
+    }
+    if (typeof payload.activeWorkPath === "string") {
+      formData.set("activeWorkPath", payload.activeWorkPath);
+    }
+    if (typeof payload.activeWorkIsFile === "boolean") {
+      formData.set("activeWorkIsFile", payload.activeWorkIsFile ? "1" : "0");
+    }
     for (const file of payload.files || []) {
       formData.append("files[]", file);
     }
@@ -4032,14 +4044,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     promptDock.replaceChildren();
   }
   function layoutOverlayState(config, status) {
+    var _a;
     const layoutState = getLayoutState(config);
     const isFile = (status == null ? void 0 : status.target) === "file";
+    const workType = String(((_a = config == null ? void 0 : config.work) == null ? void 0 : _a.type) || (isFile ? "other" : "folder")).trim() || (isFile ? "other" : "folder");
     const sectionName = layoutState.section || (isFile ? "work" : "works");
     const localLayoutDirectory = layoutState.localLayoutDirectory || (isFile ? `.works/${config.name || config.path || "item"}.layout` : ".layout");
     const wrapperTarget = `${localLayoutDirectory}/template.hbs`;
     const localSectionTarget = `${localLayoutDirectory}/${sectionName}.hbs`;
     const activeSectionDirectory = String(layoutState.sectionDirectory || "").trim();
-    const sectionTarget = activeSectionDirectory ? `${activeSectionDirectory}/${sectionName}.hbs` : isFile && layoutState.storage === "filesystem" && layoutState.directory !== localLayoutDirectory ? `built-in ${sectionName}.hbs` : localSectionTarget;
+    const sectionTarget = localSectionTarget;
+    const sectionSourceLabel = activeSectionDirectory ? `${activeSectionDirectory}/${sectionName}.hbs` : `Built-in ${workType} section (${sectionName}.hbs)`;
     const wrapperWasLocal = layoutState.directory === localLayoutDirectory;
     const sectionWasLocal = layoutState.sectionDirectory === localLayoutDirectory;
     const hasInheritedLayout = !!layoutState.inheritedDirectory;
@@ -4076,6 +4091,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       wrapperTarget,
       localSectionTarget,
       sectionTarget,
+      sectionSourceLabel,
       wrapperWasLocal,
       sectionWasLocal,
       hasInheritedLayout,
@@ -4787,12 +4803,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/panel/upload.js
-  function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true }) {
+  function escapeUploadHtml(value) {
+    return String(value != null ? value : "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalOnly = false, showLauncher = true, activeWorkName = "" }) {
     const allowFileTarget = !externalOnly && isFileTarget;
     if (isFileTarget && !allowFileTarget) {
       return "";
     }
-    const launcherCopy = externalOnly ? "Submit a Poff link from another system. It stays hidden until an editor confirms it." : allowFileTarget ? "Add related work into this work inbox folder. Upload a file, create a blank file, create a folder, or add a link." : isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder.";
+    const launcherCopy = externalOnly ? "Submit a Poff link from another system. It stays hidden until an editor confirms it." : allowFileTarget ? "Add related work into the containing folder. Upload a file, create a blank file, create a folder, or add a link." : isEmptyFolder ? "This folder is empty. Upload a file, create a blank file, create a folder, or add a link to start." : "Upload files, create a blank file, create a folder, or add a link in this folder.";
     const sourceFieldHtml = externalOnly ? '<input type="hidden" name="upload_source" value="url">' : `
                     <div>
                         <label class="edit-label" for="edit-upload-source">Source</label>
@@ -4801,6 +4820,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
                             <option value="url">Poff link</option>
+                        </select>
+                    </div>
+        `;
+    const activeWorkLabel = String(activeWorkName || "").trim();
+    const titleText = externalOnly ? "Submit external link" : activeWorkLabel ? `Add work: ${activeWorkLabel}` : "Add work";
+    const saveTargetHtml = externalOnly ? "" : `
+                    <div id="editUploadSaveTargetWrap">
+                        <label class="edit-label" for="edit-upload-save-target">Save in</label>
+                        <select class="form-select" id="edit-upload-save-target" name="upload_save_target">
+                            <option value="current" selected>This folder</option>
+                            <option value="work-folder">Folder with active work title</option>
                         </select>
                     </div>
         `;
@@ -4818,14 +4848,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         <dialog class="edit-upload-dialog" id="editUploadDialog">
             <form method="dialog" class="edit-upload-dialog-form">
                 <div class="drawer-header">
-                    <h4 class="drawer-title">${externalOnly ? "Submit external link" : "Add work"}</h4>
+                    <h4 class="drawer-title">${escapeUploadHtml(titleText)}</h4>
                     <button type="button" class="drawer-close" id="editUploadClose">&times;</button>
                 </div>
                 <div class="edit-grid">
                     ${sourceFieldHtml}
+                    ${saveTargetHtml}
                     <div id="editUploadFilesWrap">
                         <label class="edit-label" for="edit-upload-files">Files</label>
-                        <input class="form-input" id="edit-upload-files" type="file" name="files" multiple>
+                        <div class="edit-upload-file-picker">
+                            <label class="btn btn-secondary edit-upload-file-trigger" id="editUploadChooseFiles" for="edit-upload-files" role="button" tabindex="0">Choose files</label>
+                            <input class="edit-upload-file-input" id="edit-upload-files" type="file" name="files" multiple>
+                            <span class="edit-upload-file-picker-name" id="editUploadFilePickerName">No files selected.</span>
+                        </div>
                     </div>
                     <div id="editBlankFileWrap" hidden>
                         <label class="edit-label" for="edit-blank-file-name">Blank file name</label>
@@ -4861,7 +4896,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const uploadCancelButton = editPanel.querySelector("#editUploadCancel");
     const uploadSubmitButton = editPanel.querySelector("#editUploadSubmit");
     const uploadSourceEl = editPanel.querySelector("#edit-upload-source");
+    const uploadSaveTargetEl = editPanel.querySelector("#edit-upload-save-target");
+    const uploadSaveTargetWrapEl = editPanel.querySelector("#editUploadSaveTargetWrap");
+    const uploadChooseFilesButtonEl = editPanel.querySelector("#editUploadChooseFiles");
     const uploadFilesEl = editPanel.querySelector("#edit-upload-files");
+    const uploadFilePickerNameEl = editPanel.querySelector("#editUploadFilePickerName");
     const uploadSummaryEl = editPanel.querySelector("#editUploadSummary");
     const uploadFilesWrapEl = editPanel.querySelector("#editUploadFilesWrap");
     const blankFileWrapEl = editPanel.querySelector("#editBlankFileWrap");
@@ -4878,6 +4917,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       url: ""
     };
     const readUploadMode = () => externalOnly ? "url" : (uploadSourceEl == null ? void 0 : uploadSourceEl.value) || "upload";
+    const readSaveTarget = () => externalOnly ? "current" : (uploadSaveTargetEl == null ? void 0 : uploadSaveTargetEl.value) || "current";
     let uploadMode = readUploadMode();
     let unregisterEscapeClose = null;
     if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== "function" || typeof onCreateBlankFile !== "function" || typeof onCreateFolder !== "function" || typeof onCreateLink !== "function") {
@@ -4890,15 +4930,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       const mode = readUploadMode();
+      const saveTarget = readSaveTarget();
+      const saveSuffix = saveTarget === "work-folder" ? " in a new active-work folder" : "";
       if (mode === "blank" || mode === "folder") {
         const name = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
-        uploadSummaryEl.textContent = name ? `Will create: ${name}` : mode === "folder" ? "Enter a folder name." : "Enter a file name.";
+        uploadSummaryEl.textContent = name ? `Will create: ${name}${mode === "folder" ? "" : saveSuffix}` : mode === "folder" ? "Enter a folder name." : "Enter a file name.";
         return;
       }
       if (mode === "url") {
         const linkName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
         const linkUrl = ((_c = linkUrlEl == null ? void 0 : linkUrlEl.value) == null ? void 0 : _c.trim()) || "";
-        uploadSummaryEl.textContent = linkUrl ? externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}` : "Enter a link URL.";
+        uploadSummaryEl.textContent = linkUrl ? externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}${saveSuffix}` : "Enter a link URL.";
         return;
       }
       const validationError = uploadValidationError(files, uploadLimits);
@@ -4906,7 +4948,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         uploadSummaryEl.textContent = validationError;
         return;
       }
-      uploadSummaryEl.textContent = files.length ? files.map((file) => file.name).join(", ") : "No files selected.";
+      const fileSummary = files.length ? files.map((file) => file.name).join(", ") : "No files selected.";
+      if (uploadFilePickerNameEl) {
+        uploadFilePickerNameEl.textContent = fileSummary;
+      }
+      uploadSummaryEl.textContent = files.length ? `${files.map((file) => file.name).join(", ")}${saveSuffix}` : saveTarget === "work-folder" ? "Will create folder with the active work fullview." : "No files selected.";
     };
     const syncUploadMode = () => {
       const mode = readUploadMode();
@@ -4928,6 +4974,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       if (linkWrapEl) {
         linkWrapEl.hidden = mode !== "url";
+      }
+      if (uploadSaveTargetWrapEl) {
+        uploadSaveTargetWrapEl.hidden = mode === "folder";
       }
       if (blankFileLabelEl) {
         blankFileLabelEl.textContent = mode === "folder" ? "Folder name" : mode === "url" ? "Link label" : "Blank file name";
@@ -4986,6 +5035,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return true;
     };
+    const openFilePicker = () => {
+      if (!uploadFilesEl || uploadMode !== "upload") {
+        return;
+      }
+      if (typeof uploadFilesEl.showPicker === "function") {
+        try {
+          uploadFilesEl.showPicker();
+          return;
+        } catch (err) {
+        }
+      }
+      if (typeof uploadFilesEl.click === "function") {
+        uploadFilesEl.click();
+      }
+    };
     openUploadDialogButton.addEventListener("click", openUploadDialog);
     if (uploadCloseButton) {
       uploadCloseButton.addEventListener("click", closeUploadDialog);
@@ -4996,8 +5060,20 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (uploadSourceEl) {
       uploadSourceEl.addEventListener("change", syncUploadMode);
     }
+    if (uploadSaveTargetEl) {
+      uploadSaveTargetEl.addEventListener("change", setUploadSummary);
+    }
     if (uploadFilesEl) {
       uploadFilesEl.addEventListener("change", setUploadSummary);
+    }
+    if (uploadChooseFilesButtonEl) {
+      uploadChooseFilesButtonEl.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        openFilePicker();
+      });
     }
     if (blankFileNameEl) {
       blankFileNameEl.addEventListener("input", setUploadSummary);
@@ -5017,7 +5093,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             await onCreateBlankFile({
               source,
               fileName,
-              statusEl
+              saveTarget: readSaveTarget(),
+              statusEl,
+              closeDialog: closeUploadDialog
             });
           } else if (source === "folder") {
             const folderName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
@@ -5028,7 +5106,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             await onCreateFolder({
               source,
               folderName,
-              statusEl
+              saveTarget: "current",
+              statusEl,
+              closeDialog: closeUploadDialog
             });
           } else if (source === "url") {
             const linkName = ((_c = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _c.trim()) || "";
@@ -5041,11 +5121,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               source,
               linkName,
               linkUrl,
-              statusEl
+              saveTarget: readSaveTarget(),
+              statusEl,
+              closeDialog: closeUploadDialog
             });
           } else {
             const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
-            if (files.length === 0) {
+            if (files.length === 0 && readSaveTarget() !== "work-folder") {
               setStatusMessage(statusEl, "Choose at least one file.");
               return;
             }
@@ -5057,10 +5139,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             await onUploadFiles({
               source,
               files,
-              statusEl
+              saveTarget: readSaveTarget(),
+              statusEl,
+              closeDialog: closeUploadDialog
             });
           }
-          closeUploadDialog();
         } catch (err) {
           setStatusMessage(statusEl, err.message || "Upload failed.");
         } finally {
@@ -5110,6 +5193,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     getSharedLayoutName = () => "",
     getSharedLayoutPackage = () => null,
     wrapperTarget,
+    sectionName = "works",
+    sectionSourceLabel = "",
     originalTarget,
     originalEditable,
     hasVirtualSource,
@@ -5130,7 +5215,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return hasVirtualSource ? "virtual" : "local";
     };
-    const syncLayoutMode = ({ modePreviewEl, sourcePreviewEl, primaryTitleEl, primaryHintEl, primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
+    const syncLayoutMode = ({ modePreviewEl, sourcePreviewEl, sectionSourcePreviewEl, primaryTitleEl, primaryHintEl, primaryTemplateEl, primaryCssEl, primaryJsEl }) => {
       const preset = ((presetEl == null ? void 0 : presetEl.value) || "actual").trim();
       const sharedPackage = preset === "shared" ? getSharedLayoutPackage() : null;
       if (preset === "shared" && sharedPackage) {
@@ -5144,11 +5229,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, "");
       const sharedLayoutName = getSharedLayoutLabel();
       const sourcePreview = isVirtual ? preset === "shared" ? `Collection: ${sharedLayoutName || "shared"}` : originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
+      const sectionSourcePreview = preset === "shared" ? `Collection: ${sharedLayoutName || "shared"} (${sectionName}.hbs)` : sectionSourceLabel;
       if (modePreviewEl) {
         modePreviewEl.textContent = nextMode;
       }
       if (sourcePreviewEl) {
         sourcePreviewEl.textContent = sourcePreview;
+      }
+      if (sectionSourcePreviewEl) {
+        sectionSourcePreviewEl.textContent = sectionSourcePreview;
       }
       if (primaryTitleEl) {
         primaryTitleEl.textContent = preset === "shared" ? "Collection layout" : isVirtual ? "Virtual layout" : "Custom layout";
@@ -5239,15 +5328,208 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return payload;
   }
 
-  // src/assets/js/edit/panel/layout.js
-  function renderLayoutModeSummary({ subjectLabel, displayMode, wrapperSourceLabel, inheritedLayoutLabel, sectionTarget }) {
+  // src/assets/js/edit/panel/layout-bind.js
+  function collectLayoutElements(root, selectors = {}) {
+    const resolvedSelectors = {
+      form: "#editLayoutPanelForm",
+      statusEl: "#editLayoutStatus",
+      closeButton: null,
+      cancelButton: null,
+      backButton: "#editLayoutBack",
+      moreButton: "#editLayoutMore",
+      manualDetailsEl: "#editLayoutManual",
+      presetEl: "#edit-layout-preset",
+      sharedLayoutWrapEl: "#edit-layout-shared-wrap",
+      sharedLayoutEl: "#edit-layout-shared",
+      modePreviewEl: "#edit-layout-mode-preview",
+      sourcePreviewEl: "#edit-layout-source-preview",
+      sectionSourcePreviewEl: "#edit-layout-section-source-preview",
+      primaryTitleEl: "#edit-layout-primary-title",
+      primaryHintEl: "#edit-layout-primary-hint",
+      primaryTemplateEl: "#edit-layout-primary-template",
+      primaryCssEl: "#edit-layout-primary-css",
+      primaryJsEl: "#edit-layout-primary-js",
+      contentTemplateEl: "#edit-content-template",
+      promptRoot: "#promptLayer",
+      ...selectors
+    };
+    return Object.entries(resolvedSelectors).reduce((elements2, [key, selector]) => {
+      elements2[key] = selector ? root.querySelector(selector) : null;
+      return elements2;
+    }, {});
+  }
+  function createLayoutBindingContext({
+    layoutState,
+    sharedLayouts,
+    sharedLayoutName,
+    originalTemplate,
+    originalCss,
+    originalJs,
+    localWrapperTemplate,
+    localWrapperCss,
+    localWrapperJs,
+    wrapperTarget,
+    sectionName,
+    sectionSourceLabel,
+    originalTarget,
+    originalEditable,
+    hasVirtualSource
+  }) {
+    const drafts = createLayoutDraftState({
+      originalTemplate,
+      originalCss,
+      originalJs,
+      localWrapperTemplate,
+      localWrapperCss,
+      localWrapperJs
+    });
+    return {
+      currentSectionTemplate: layoutState.sectionTemplate || "",
+      drafts,
+      createModeController(presetEl, sharedLayoutEl) {
+        return createLayoutModeController({
+          presetEl,
+          getSharedLayoutName: () => (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName,
+          getSharedLayoutPackage: () => (sharedLayouts || []).find((option) => String(option.name || "") === String((sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName)) || null,
+          wrapperTarget,
+          sectionName,
+          sectionSourceLabel,
+          originalTarget,
+          originalEditable,
+          hasVirtualSource,
+          drafts
+        });
+      }
+    };
+  }
+  function syncLayoutUi(modeController, elements2) {
+    modeController.syncLayoutMode({
+      modePreviewEl: elements2.modePreviewEl,
+      sourcePreviewEl: elements2.sourcePreviewEl,
+      sectionSourcePreviewEl: elements2.sectionSourcePreviewEl,
+      primaryTitleEl: elements2.primaryTitleEl,
+      primaryHintEl: elements2.primaryHintEl,
+      primaryTemplateEl: elements2.primaryTemplateEl,
+      primaryCssEl: elements2.primaryCssEl,
+      primaryJsEl: elements2.primaryJsEl
+    });
+  }
+  function bindLayoutDraftInputs(modeController, elements2) {
+    [elements2.primaryTemplateEl, elements2.primaryCssEl, elements2.primaryJsEl].forEach((field) => {
+      if (field) {
+        field.addEventListener("input", () => modeController.storePrimaryDraft(elements2));
+      }
+    });
+  }
+  function bindLayoutPresetChanges({
+    elements: elements2,
+    modeController,
+    sharedLayoutName,
+    onLayoutPresetChange
+  }) {
+    if (elements2.presetEl) {
+      elements2.presetEl.addEventListener("change", async () => {
+        var _a;
+        if (elements2.sharedLayoutWrapEl) {
+          elements2.sharedLayoutWrapEl.classList.toggle("hidden", elements2.presetEl.value !== "shared");
+        }
+        modeController.storePrimaryDraft(elements2);
+        syncLayoutUi(modeController, elements2);
+        if (typeof onLayoutPresetChange === "function") {
+          await onLayoutPresetChange({
+            payload: {
+              layoutPreset: (elements2.presetEl.value || "actual").trim(),
+              layoutSharedName: ((_a = elements2.sharedLayoutEl) == null ? void 0 : _a.value) || sharedLayoutName
+            },
+            statusEl: elements2.statusEl
+          });
+        }
+      });
+    }
+    if (elements2.sharedLayoutEl) {
+      elements2.sharedLayoutEl.addEventListener("change", async () => {
+        var _a;
+        if (typeof onLayoutPresetChange === "function") {
+          await onLayoutPresetChange({
+            payload: {
+              layoutPreset: (((_a = elements2.presetEl) == null ? void 0 : _a.value) || "actual").trim(),
+              layoutSharedName: elements2.sharedLayoutEl.value
+            },
+            statusEl: elements2.statusEl
+          });
+        }
+        syncLayoutUi(modeController, elements2);
+      });
+    }
+  }
+  function bindLayoutSubmit({
+    elements: elements2,
+    modeController,
+    currentSectionTemplate,
+    sectionWasLocal,
+    originalEditable,
+    originalTarget,
+    wrapperWasLocal,
+    sharedLayoutName,
+    drafts,
+    onSubmit,
+    onAfterSubmit
+  }) {
+    if (!elements2.form || typeof onSubmit !== "function") {
+      return;
+    }
+    elements2.form.addEventListener("submit", async (event) => {
+      var _a, _b;
+      event.preventDefault();
+      modeController.storePrimaryDraft(elements2);
+      const payload = buildLayoutSubmitPayload({
+        preset: (((_a = elements2.presetEl) == null ? void 0 : _a.value) || "actual").trim(),
+        sharedLayoutName: ((_b = elements2.sharedLayoutEl) == null ? void 0 : _b.value) || sharedLayoutName,
+        currentSectionTemplate,
+        sectionWasLocal,
+        contentTemplateEl: elements2.contentTemplateEl,
+        currentPrimaryMode: modeController.currentPrimaryMode,
+        drafts,
+        originalEditable,
+        originalTarget,
+        wrapperWasLocal
+      });
+      await onSubmit({
+        payload,
+        statusEl: elements2.statusEl
+      });
+      if (typeof onAfterSubmit === "function") {
+        onAfterSubmit();
+      }
+    });
+  }
+  function bindLayoutPanelChrome({ backButton, moreButton, manualDetailsEl, onReturnToWork }) {
+    if (backButton && typeof onReturnToWork === "function") {
+      backButton.addEventListener("click", () => onReturnToWork());
+    }
+    if (moreButton && manualDetailsEl) {
+      moreButton.addEventListener("click", () => {
+        manualDetailsEl.open = true;
+        manualDetailsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }
+
+  // src/assets/js/edit/panel/layout-render.js
+  var LAYOUT_PRESET_OPTIONS = [
+    { value: "actual", label: "Inherit" },
+    { value: "none", label: "None" },
+    { value: "custom", label: "Custom" },
+    { value: "shared", label: "Collection" }
+  ];
+  function renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionSourceLabel }) {
     return `
         <div class="edit-layout-launch edit-layout-summary">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
                 <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
                 <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
-                <div class="edit-layout-summary-line">Inner section stays at <code>${escapeHtml(sectionTarget)}</code> unless you change it in <strong>More...</strong></div>
+                <div class="edit-layout-summary-line">Inner preview content source: <code id="edit-layout-section-source-preview">${escapeHtml(sectionSourceLabel)}</code></div>
                 <div class="edit-layout-summary-line">Prompt context separates <code>root.title</code> for the layout shell from <code>work.title</code> for the nested item.</div>
             </div>
             <div class="edit-inline-actions edit-layout-header-actions">
@@ -5300,121 +5582,86 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         <div class="small-note">Choose a layout from the same worktype. The visible names come from the folder names.</div>
     `;
   }
-  function bindLayoutForm({
-    form,
-    presetEl,
-    sharedLayoutEl,
-    contentTemplateEl,
-    currentSectionTemplate,
-    sectionWasLocal,
-    currentPrimaryMode,
-    storePrimaryDraft,
-    drafts,
-    originalEditable,
-    originalTarget,
-    wrapperWasLocal,
-    statusEl,
-    onSubmitLayout,
-    primaryTemplateEl,
-    primaryCssEl,
-    primaryJsEl
-  }) {
-    if (!form || typeof onSubmitLayout !== "function") {
-      return;
-    }
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
-      const payload = buildLayoutSubmitPayload({
-        preset: ((presetEl == null ? void 0 : presetEl.value) || "actual").trim(),
-        sharedLayoutName: (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || "",
-        currentSectionTemplate,
-        sectionWasLocal,
-        contentTemplateEl,
-        currentPrimaryMode,
-        drafts,
-        originalEditable,
-        originalTarget,
-        wrapperWasLocal
-      });
-      await onSubmitLayout({
-        payload,
-        statusEl
-      });
-    });
+  function renderLayoutPresetSelect(layoutState, sharedLayouts, sharedLayoutName) {
+    return `
+        <label class="edit-label" for="edit-layout-preset">Layout select</label>
+        <select class="form-select" id="edit-layout-preset" name="layout_preset">
+            ${LAYOUT_PRESET_OPTIONS.map((option) => `
+                <option value="${option.value}" ${layoutState.preset === option.value ? "selected" : ""}>${option.label}</option>
+            `).join("")}
+        </select>
+        <div class="mt-3${layoutState.preset === "shared" ? "" : " hidden"}" id="edit-layout-shared-wrap">
+            ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName, layoutState.directory || "")}
+        </div>
+    `;
   }
-  function renderEditLayoutPanel({
-    editPanel,
-    config,
-    status,
-    contentTargetLabel,
-    onSubmitLayout,
-    onLayoutPresetChange,
-    onReturnToWork,
-    onUploadFiles,
-    onCreateBlankFile,
-    onCreateFolder,
-    onResetFolderWork
+  function renderLayoutEditorFields({ sectionWasLocal, sectionName, sectionTemplate = "" }) {
+    return `
+        <div class="edit-layout-editor">
+            <div class="edit-layout-editor-head">
+                <div>
+                    <div class="edit-layout-meta-title" id="edit-layout-primary-title"></div>
+                    <div class="small-note" id="edit-layout-primary-hint"></div>
+                </div>
+            </div>
+            <textarea class="form-textarea" id="edit-layout-primary-template" name="layout_primary_template"></textarea>
+            <div class="edit-layout-overlay-grid">
+                <div>
+                    <label class="edit-label" for="edit-layout-primary-css">Layout CSS</label>
+                    <textarea class="form-textarea" id="edit-layout-primary-css" name="layout_primary_css"></textarea>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-layout-primary-js">Layout JS</label>
+                    <textarea class="form-textarea" id="edit-layout-primary-js" name="layout_primary_js"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <details class="edit-layout-advanced" ${sectionWasLocal ? "open" : ""}>
+            <summary class="edit-layout-advanced-summary">Inner work section (advanced)</summary>
+            <div class="edit-layout-editor">
+                <div class="edit-layout-editor-head">
+                    <div>
+                        <div class="edit-layout-meta-title">Inner section partial</div>
+                        <div class="small-note">Edit the wrapped <code>{{> ${escapeHtml(sectionName)}}</code> partial only when you need item-specific content inside the current layout.</div>
+                    </div>
+                </div>
+                <textarea class="form-textarea" id="edit-content-template" name="content_template">${escapeHtml(sectionTemplate)}</textarea>
+            </div>
+        </details>
+    `;
+  }
+  function renderEditLayoutPanelHtml({
+    settings,
+    subjectLabel,
+    activeWorkName,
+    displayMode,
+    layoutState,
+    sectionName,
+    wrapperTarget,
+    sectionTarget,
+    sectionSourceLabel,
+    sectionWasLocal,
+    wrapperSourceLabel,
+    inheritedLayoutLabel,
+    originalLabel,
+    sharedLayouts,
+    sharedLayoutName
   }) {
-    const settings = loadPromptSettings();
-    const subjectStatus = {
-      ...status,
-      target: (status == null ? void 0 : status.subjectTarget) || (status == null ? void 0 : status.target)
-    };
-    const overlayState = layoutOverlayState(config, subjectStatus);
-    const {
-      layoutState,
-      displayMode,
-      sectionName,
-      wrapperTarget,
-      sectionTarget,
-      wrapperWasLocal,
-      sectionWasLocal,
-      originalTarget,
-      originalEditable,
-      originalUsesLocal,
-      localWrapperTemplate,
-      localWrapperCss,
-      localWrapperJs,
-      originalTemplate,
-      originalCss,
-      originalJs,
-      wrapperSourceLabel,
-      inheritedLayoutLabel,
-      originalLabel
-    } = overlayState;
-    const subjectLabel = subjectStatus.target === "file" ? "file" : "folder";
-    const layoutPresetOptions = [
-      { value: "actual", label: "Inherit" },
-      { value: "none", label: "None" },
-      { value: "custom", label: "Custom" },
-      { value: "shared", label: "Collection" }
-    ];
-    const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
-    const isFileSubject = subjectStatus.target === "file";
-    const sharedLayouts = Array.isArray(layoutState.sharedLayouts) ? layoutState.sharedLayouts : [];
-    const sharedLayoutName = String(layoutState.sharedName || layoutState.name || "").trim();
     const uploadSectionHtml = renderUploadSectionHtml({
-      isFileTarget: isFileSubject,
-      isEmptyFolder: false
+      isFileTarget: subjectLabel === "file",
+      isEmptyFolder: false,
+      activeWorkName
     });
-    editPanel.innerHTML = `
+    return `
         <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
         <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
         <div class="edit-status" id="editLayoutStatus"></div>
         <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
-            ${renderLayoutModeSummary({ subjectLabel, displayMode, wrapperSourceLabel, inheritedLayoutLabel, sectionTarget })}
+            ${renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionSourceLabel })}
             <div class="edit-grid edit-grid-cols">
                 <div>
-                    <label class="edit-label" for="edit-layout-preset">Layout select</label>
-                    <select class="form-select" id="edit-layout-preset" name="layout_preset">
-                        ${layoutPresetOptions.map((option) => `
-                            <option value="${option.value}" ${layoutState.preset === option.value ? "selected" : ""}>${option.label}</option>
-                        `).join("")}
-                    </select>
-                    <div class="mt-3${layoutState.preset === "shared" ? "" : " hidden"}" id="edit-layout-shared-wrap">
-                        ${renderSharedLayoutOptions(sharedLayouts, sharedLayoutName, layoutState.directory || "")}
-                    </div>
+                    ${renderLayoutPresetSelect(layoutState, sharedLayouts, sharedLayoutName)}
                 </div>
                 <div class="edit-layout-copy edit-layout-section-note">
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
@@ -5441,250 +5688,147 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
-                    <div class="small-note">Inner section target: <code>${escapeHtml(sectionTarget)}</code></div>
+                    <div class="small-note">Inner content source: <code>${escapeHtml(sectionSourceLabel)}</code></div>
+                    <div class="small-note">Advanced local override target: <code>${escapeHtml(sectionTarget)}</code></div>
                 </div>
             </div>
-            <div class="edit-layout-editor">
-                <div class="edit-layout-editor-head">
-                    <div>
-                        <div class="edit-layout-meta-title">Layout template</div>
-                        <div class="small-note">Manual editor for the outer wrapper template used by this virtual <code>.layout</code> page.</div>
-                    </div>
-                </div>
-                <textarea class="form-textarea" id="edit-layout-primary-template" name="layout_primary_template"></textarea>
-                <div class="edit-layout-overlay-grid">
-                    <div>
-                        <label class="edit-label" for="edit-layout-primary-css">Layout CSS</label>
-                        <textarea class="form-textarea" id="edit-layout-primary-css" name="layout_primary_css"></textarea>
-                    </div>
-                    <div>
-                        <label class="edit-label" for="edit-layout-primary-js">Layout JS</label>
-                        <textarea class="form-textarea" id="edit-layout-primary-js" name="layout_primary_js"></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <details class="edit-layout-advanced" ${sectionWasLocal ? "open" : ""}>
-                <summary class="edit-layout-advanced-summary">Inner work section (advanced)</summary>
-                <div class="edit-layout-editor">
-                    <div class="edit-layout-editor-head">
-                        <div>
-                            <div class="edit-layout-meta-title">Inner section partial</div>
-                            <div class="small-note">Edit the wrapped <code>{{> ${escapeHtml(sectionName)}}</code> partial only when you need item-specific content inside the current layout.</div>
-                        </div>
-                    </div>
-                    <textarea class="form-textarea" id="edit-content-template" name="content_template">${escapeHtml(layoutState.sectionTemplate || "")}</textarea>
-                </div>
-            </details>
+            ${renderLayoutEditorFields({
+      sectionWasLocal,
+      sectionName,
+      sectionTemplate: layoutState.sectionTemplate || ""
+    })}
         </details>
     `;
-    const form = editPanel.querySelector("#editLayoutPanelForm");
-    const statusEl = editPanel.querySelector("#editLayoutStatus");
-    const backButton = editPanel.querySelector("#editLayoutBack");
-    const moreButton = editPanel.querySelector("#editLayoutMore");
-    const manualDetailsEl = editPanel.querySelector("#editLayoutManual");
-    const presetEl = editPanel.querySelector("#edit-layout-preset");
-    const sharedLayoutWrapEl = editPanel.querySelector("#edit-layout-shared-wrap");
-    const sharedLayoutEl = editPanel.querySelector("#edit-layout-shared");
-    const modePreviewEl = editPanel.querySelector("#edit-layout-mode-preview");
-    const sourcePreviewEl = editPanel.querySelector("#edit-layout-source-preview");
-    const primaryTitleEl = editPanel.querySelector("#edit-layout-primary-title");
-    const primaryHintEl = editPanel.querySelector("#edit-layout-primary-hint");
-    const primaryTemplateEl = editPanel.querySelector("#edit-layout-primary-template");
-    const primaryCssEl = editPanel.querySelector("#edit-layout-primary-css");
-    const primaryJsEl = editPanel.querySelector("#edit-layout-primary-js");
-    const contentTemplateEl = editPanel.querySelector("#edit-content-template");
-    const promptRoot = editPanel.querySelector("#promptLayer");
+  }
+
+  // src/assets/js/edit/panel/layout.js
+  function renderEditLayoutPanel({
+    editPanel,
+    config,
+    status,
+    activeWorkName,
+    onSubmitLayout,
+    onLayoutPresetChange,
+    onReturnToWork,
+    onUploadFiles,
+    onCreateBlankFile,
+    onCreateFolder,
+    onCreateLink,
+    onResetFolderWork
+  }) {
+    const settings = loadPromptSettings();
+    const subjectStatus = {
+      ...status,
+      target: (status == null ? void 0 : status.subjectTarget) || (status == null ? void 0 : status.target)
+    };
+    const overlayState = layoutOverlayState(config, subjectStatus);
+    const {
+      layoutState,
+      displayMode,
+      sectionName,
+      wrapperTarget,
+      sectionTarget,
+      sectionSourceLabel,
+      wrapperWasLocal,
+      sectionWasLocal,
+      originalTarget,
+      originalEditable,
+      originalUsesLocal,
+      localWrapperTemplate,
+      localWrapperCss,
+      localWrapperJs,
+      originalTemplate,
+      originalCss,
+      originalJs,
+      wrapperSourceLabel,
+      inheritedLayoutLabel,
+      originalLabel
+    } = overlayState;
+    const subjectLabel = subjectStatus.target === "file" ? "file" : "folder";
+    const hasVirtualSource = !overlayState.wrapperWasLocal && !originalUsesLocal;
+    const sharedLayouts = Array.isArray(layoutState.sharedLayouts) ? layoutState.sharedLayouts : [];
+    const sharedLayoutName = String(layoutState.sharedName || layoutState.name || "").trim();
+    editPanel.innerHTML = renderEditLayoutPanelHtml({
+      settings,
+      subjectLabel,
+      status,
+      activeWorkName,
+      displayMode,
+      layoutState,
+      sectionName,
+      wrapperTarget,
+      sectionTarget,
+      sectionSourceLabel,
+      sectionWasLocal,
+      wrapperSourceLabel,
+      inheritedLayoutLabel,
+      originalLabel,
+      sharedLayouts,
+      sharedLayoutName
+    });
+    const elements2 = collectLayoutElements(editPanel);
+    const promptRoot = elements2.promptRoot;
     syncPromptDock(promptRoot);
-    const currentSectionTemplate = layoutState.sectionTemplate || "";
-    const drafts = createLayoutDraftState({
+    const bindingContext = createLayoutBindingContext({
+      layoutState,
+      sharedLayouts,
+      sharedLayoutName,
+      sectionName,
+      sectionSourceLabel,
       originalTemplate,
       originalCss,
       originalJs,
       localWrapperTemplate,
       localWrapperCss,
-      localWrapperJs
-    });
-    const { currentPrimaryMode, syncLayoutMode, storePrimaryDraft } = createLayoutModeController({
-      presetEl,
-      getSharedLayoutName: () => (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName,
-      getSharedLayoutPackage: () => (sharedLayouts || []).find((option) => String(option.name || "") === String((sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName)) || null,
+      localWrapperJs,
       wrapperTarget,
       originalTarget,
       originalEditable,
-      hasVirtualSource,
-      drafts
+      hasVirtualSource
     });
-    if (presetEl) {
-      presetEl.addEventListener("change", async () => {
-        if (sharedLayoutWrapEl) {
-          sharedLayoutWrapEl.classList.toggle("hidden", presetEl.value !== "shared");
-        }
-        storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl });
-        syncLayoutMode({
-          modePreviewEl,
-          sourcePreviewEl,
-          primaryTitleEl,
-          primaryHintEl,
-          primaryTemplateEl,
-          primaryCssEl,
-          primaryJsEl
-        });
-        if (typeof onLayoutPresetChange === "function") {
-          await onLayoutPresetChange({
-            payload: {
-              layoutPreset: (presetEl.value || "actual").trim(),
-              layoutSharedName: (sharedLayoutEl == null ? void 0 : sharedLayoutEl.value) || sharedLayoutName
-            },
-            statusEl
-          });
-        }
-      });
-    }
-    if (sharedLayoutEl) {
-      sharedLayoutEl.addEventListener("change", async () => {
-        if (typeof onLayoutPresetChange === "function") {
-          await onLayoutPresetChange({
-            payload: {
-              layoutPreset: ((presetEl == null ? void 0 : presetEl.value) || "actual").trim(),
-              layoutSharedName: sharedLayoutEl.value
-            },
-            statusEl
-          });
-        }
-        syncLayoutMode({
-          modePreviewEl,
-          sourcePreviewEl,
-          primaryTitleEl,
-          primaryHintEl,
-          primaryTemplateEl,
-          primaryCssEl,
-          primaryJsEl
-        });
-      });
-    }
-    [primaryTemplateEl, primaryCssEl, primaryJsEl].forEach((field) => {
-      if (field) {
-        field.addEventListener("input", () => storePrimaryDraft({ primaryTemplateEl, primaryCssEl, primaryJsEl }));
-      }
+    const modeController = bindingContext.createModeController(elements2.presetEl, elements2.sharedLayoutEl);
+    bindLayoutPresetChanges({
+      elements: elements2,
+      modeController,
+      sharedLayoutName,
+      onLayoutPresetChange
     });
-    if (backButton && typeof onReturnToWork === "function") {
-      backButton.addEventListener("click", () => onReturnToWork());
-    }
-    if (moreButton && manualDetailsEl) {
-      moreButton.addEventListener("click", () => {
-        manualDetailsEl.open = true;
-        manualDetailsEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
-    syncLayoutMode({
-      modePreviewEl,
-      sourcePreviewEl,
-      primaryTitleEl,
-      primaryHintEl,
-      primaryTemplateEl,
-      primaryCssEl,
-      primaryJsEl
+    bindLayoutDraftInputs(modeController, elements2);
+    bindLayoutPanelChrome({
+      backButton: elements2.backButton,
+      moreButton: elements2.moreButton,
+      manualDetailsEl: elements2.manualDetailsEl,
+      onReturnToWork
     });
-    bindLayoutForm({
-      form,
-      presetEl,
-      sharedLayoutEl,
-      contentTemplateEl,
-      currentSectionTemplate,
+    syncLayoutUi(modeController, elements2);
+    bindLayoutSubmit({
+      elements: elements2,
+      modeController,
+      currentSectionTemplate: bindingContext.currentSectionTemplate,
       sectionWasLocal,
-      currentPrimaryMode,
-      storePrimaryDraft,
-      drafts,
       originalEditable,
       originalTarget,
       wrapperWasLocal,
-      statusEl,
-      onSubmitLayout,
-      primaryTemplateEl,
-      primaryCssEl,
-      primaryJsEl
+      sharedLayoutName,
+      drafts: bindingContext.drafts,
+      onSubmit: onSubmitLayout
     });
     bindUploadDialog({
       editPanel,
-      statusEl,
+      statusEl: elements2.statusEl,
       uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
       onUploadFiles,
       onCreateBlankFile,
       onCreateFolder,
+      onCreateLink,
       onResetFolderWork
     });
-    return { statusEl, promptRoot };
+    return { statusEl: elements2.statusEl, promptRoot };
   }
 
-  // src/assets/js/edit/panel/inline.js
+  // src/assets/js/edit/panel/inline-sections.js
   var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind", "converter"]);
   var PASSWORD_DETAILS_STORAGE_KEY = "password-details";
-  function readRowText(row, selector) {
-    const field = row.querySelector(selector);
-    return field && typeof field.value === "string" ? field.value : "";
-  }
-  function readRowNumber(row, selector) {
-    const value = readRowText(row, selector).trim();
-    return value === "" ? "" : Number(value);
-  }
-  function readRowList(row, selector) {
-    const value = readRowText(row, selector);
-    return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
-  }
-  function readRowBool(row, selector) {
-    const field = row.querySelector(selector);
-    return !!(field == null ? void 0 : field.checked);
-  }
-  function readRowValue(row, selector) {
-    const field = row.querySelector(selector);
-    if (!field) {
-      return "";
-    }
-    if (field instanceof HTMLInputElement && field.type === "checkbox") {
-      return field.checked;
-    }
-    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
-      return field.value;
-    }
-    return "";
-  }
-  function renderValueControl(field, index) {
-    const value = field.value;
-    if (field.type === "checkbox") {
-      return `
-            <label class="edit-work-field-value-toggle">
-                <input class="edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="checkbox"${value ? " checked" : ""}>
-            </label>
-        `;
-    }
-    if (field.type === "number") {
-      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="number" step="any" value="${escapeHtml(value != null ? value : "")}" placeholder="Value">`;
-    }
-    if (field.type === "select") {
-      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="text" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="Selected value">`;
-    }
-    if (field.type === "color") {
-      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="color" value="${escapeHtml(value || "#000000")}">`;
-    }
-    if (field.type === "date") {
-      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="date" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}">`;
-    }
-    if (field.type === "url") {
-      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="url" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="https://example.com">`;
-    }
-    if (field.type === "email") {
-      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="email" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="name@example.com">`;
-    }
-    return `<textarea class="form-textarea edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value rows="${field.type === "textarea" ? "5" : "2"}" placeholder="Value">${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}</textarea>`;
-  }
-  function renderSchemaControl(field, key, html) {
-    return getWorkFieldSchemaProfile(field.type).visibleControls.has(key) ? html : "";
-  }
-  function renderSchemaGroup(field, keys, html) {
-    const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
-    return visible ? html : "";
-  }
   function renderMediaTypeOptions(selectedValue = "", catalog = null) {
     const normalizedSelected = String(selectedValue || "").trim();
     const choices = Array.isArray(catalog == null ? void 0 : catalog.choices) ? catalog.choices : [];
@@ -5693,6 +5837,26 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       options.unshift(normalizedSelected);
     }
     return options.filter((option, index) => option && options.indexOf(option) === index).map((option) => `<option value="${escapeHtml(option)}"${option === normalizedSelected ? " selected" : ""}>${escapeHtml(option)}</option>`).join("");
+  }
+  function renderWorkValueControl(key, value) {
+    const normalizedKey = String(key || "").trim();
+    const inputId = `edit-work-config-${normalizedKey}`;
+    if (typeof value === "boolean") {
+      return `
+            <label class="edit-work-field-value-toggle">
+                <input class="edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="checkbox" type="checkbox"${value ? " checked" : ""}>
+            </label>
+        `;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="number" type="number" step="any" value="${escapeHtml(String(value))}" placeholder="Value">`;
+    }
+    if (Array.isArray(value) || value && typeof value === "object") {
+      const serialized = JSON.stringify(value, null, 2);
+      return `<textarea class="form-textarea edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="json" rows="3" placeholder="JSON value">${escapeHtml(serialized)}</textarea>`;
+    }
+    const isNullable = normalizedKey === "poster";
+    return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="text"${isNullable ? ' data-work-config-nullable="true"' : ""} type="text" value="${escapeHtml(value === null || value === void 0 ? "" : String(value))}" placeholder="Value">`;
   }
   function readMediaConfigFromForm(form, currentWork = {}) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
@@ -5777,26 +5941,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       delete nextWork.converter;
     }
     return nextWork;
-  }
-  function renderWorkValueControl(key, value) {
-    const normalizedKey = String(key || "").trim();
-    const inputId = `edit-work-config-${normalizedKey}`;
-    if (typeof value === "boolean") {
-      return `
-            <label class="edit-work-field-value-toggle">
-                <input class="edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="checkbox" type="checkbox"${value ? " checked" : ""}>
-            </label>
-        `;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="number" type="number" step="any" value="${escapeHtml(String(value))}" placeholder="Value">`;
-    }
-    if (Array.isArray(value) || value && typeof value === "object") {
-      const serialized = JSON.stringify(value, null, 2);
-      return `<textarea class="form-textarea edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="json" rows="3" placeholder="JSON value">${escapeHtml(serialized)}</textarea>`;
-    }
-    const isNullable = normalizedKey === "poster";
-    return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="text"${isNullable ? ' data-work-config-nullable="true"' : ""} type="text" value="${escapeHtml(value === null || value === void 0 ? "" : String(value))}" placeholder="Value">`;
   }
   function renderWorkConfigFieldsSection(config = {}) {
     var _a, _b;
@@ -5895,25 +6039,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             <div class="edit-grid edit-grid-cols">
                 <div>
                     <label class="edit-label" for="edit-converter-id">Converter</label>
-                    <select class="form-select" id="edit-converter-id" name="converter_id">
+                    <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
-                    <select class="form-select" id="edit-converter-quality" name="converter_quality">
+                    <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
                         ${renderSelectOptions(qualityOptions, selectedQuality)}
                     </select>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
-                    <select class="form-select" id="edit-converter-format" name="converter_format">
+                    <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
                         ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
                     </select>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
-                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode">
+                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
                         ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
                     </select>
                 </div>
@@ -5990,6 +6134,73 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             </form>
         `
     });
+  }
+
+  // src/assets/js/edit/panel/inline-work-fields.js
+  function readRowText(row, selector) {
+    const field = row.querySelector(selector);
+    return field && typeof field.value === "string" ? field.value : "";
+  }
+  function readRowNumber(row, selector) {
+    const value = readRowText(row, selector).trim();
+    return value === "" ? "" : Number(value);
+  }
+  function readRowList(row, selector) {
+    const value = readRowText(row, selector);
+    return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+  }
+  function readRowBool(row, selector) {
+    const field = row.querySelector(selector);
+    return !!(field == null ? void 0 : field.checked);
+  }
+  function readRowValue(row, selector) {
+    const field = row.querySelector(selector);
+    if (!field) {
+      return "";
+    }
+    if (field instanceof HTMLInputElement && field.type === "checkbox") {
+      return field.checked;
+    }
+    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+      return field.value;
+    }
+    return "";
+  }
+  function renderValueControl(field, index) {
+    const value = field.value;
+    if (field.type === "checkbox") {
+      return `
+            <label class="edit-work-field-value-toggle">
+                <input class="edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="checkbox"${value ? " checked" : ""}>
+            </label>
+        `;
+    }
+    if (field.type === "number") {
+      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="number" step="any" value="${escapeHtml(value != null ? value : "")}" placeholder="Value">`;
+    }
+    if (field.type === "select") {
+      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="text" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="Selected value">`;
+    }
+    if (field.type === "color") {
+      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="color" value="${escapeHtml(value || "#000000")}">`;
+    }
+    if (field.type === "date") {
+      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="date" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}">`;
+    }
+    if (field.type === "url") {
+      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="url" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="https://example.com">`;
+    }
+    if (field.type === "email") {
+      return `<input class="form-input edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value type="email" value="${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}" placeholder="name@example.com">`;
+    }
+    return `<textarea class="form-textarea edit-work-field-value" id="edit-work-field-value-${index}" data-work-field-value rows="${field.type === "textarea" ? "5" : "2"}" placeholder="Value">${escapeHtml(typeof value === "string" ? value : String(value != null ? value : ""))}</textarea>`;
+  }
+  function renderSchemaControl(field, key, html) {
+    return getWorkFieldSchemaProfile(field.type).visibleControls.has(key) ? html : "";
+  }
+  function renderSchemaGroup(field, keys, html) {
+    const visible = keys.some((key) => getWorkFieldSchemaProfile(field.type).visibleControls.has(key));
+    return visible ? html : "";
   }
   function renderWorkFieldRows(fields = [], typeOptions = schemaFieldTypeOptions()) {
     if (!fields.length) {
@@ -6238,12 +6449,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       addWorkField
     };
   }
+
+  // src/assets/js/edit/panel/inline.js
   function renderEditPanel({
     editPanel,
     editRequested: editRequested2,
     config,
     status,
     contentTargetLabel,
+    activeWorkName,
     onTitleInput,
     onDescriptionInput,
     onWorkFieldsInput,
@@ -6282,7 +6496,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         isFileTarget: false,
         isEmptyFolder: treeItems2.length === 0,
         externalOnly: true,
-        showLauncher: false
+        showLauncher: false,
+        activeWorkName
       });
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Submit external link</h3>
@@ -6327,12 +6542,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         config,
         status,
         contentTargetLabel,
+        activeWorkName,
         onSubmitLayout,
         onLayoutPresetChange,
         onReturnToWork,
         onUploadFiles,
         onCreateBlankFile,
-        onCreateFolder
+        onCreateFolder,
+        onCreateLink
       });
     }
     const label = (status == null ? void 0 : status.target) === "file" ? "Edit mode (file)" : "Edit mode (folder)";
@@ -6351,7 +6568,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       isFileTarget,
       isEmptyFolder,
       externalOnly: false,
-      showLauncher: false
+      showLauncher: false,
+      activeWorkName
     });
     const relativePath = String((config == null ? void 0 : config.__poffRelativePath) || "").trim();
     editPanel.innerHTML = `
@@ -6372,7 +6590,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
             </div>
             ${(status == null ? void 0 : status.target) === "file" || (status == null ? void 0 : status.target) === "folder" || (config == null ? void 0 : config.work) && typeof config.work === "object" && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === "type") ? renderWorkConfigFieldsSection(config) : ""}
-            ${(status == null ? void 0 : status.target) === "file" ? renderConverterSection(config) : ""}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -6385,9 +6602,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     ${workFieldEditor.renderRows()}
                 </div>
             </div>
+       
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
+                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+                ${!isFileTarget && typeof onResetFolderWork === "function" ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
+                    Reset
+                </button>
+                ` : ""}
                 ${typeof onDeleteTarget === "function" ? `
                 <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDeleteTarget">
                     <img class="block" src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16">
@@ -6395,25 +6619,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 </button>
                 ` : ""}
             </div>
+            <div class="small-note">Layout: ${escapeHtml(overlayState.wrapperSourceLabel)} \xB7 parent: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code> \xB7 mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+
         </form>
-        <div class="edit-layout-launch">
-            <div class="edit-layout-copy">
-                <div class="edit-layout-title">Layout</div>
-                <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                <div class="small-note">Current mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
-            </div>
-            <div class="edit-inline-actions">
-                ${!isFileTarget && typeof onResetFolderWork === "function" ? `
-                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
-                    Reset work
-                </button>
-                ` : ""}
-                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-            </div>
+        <div class="edit-panel-stack">
+            ${uploadSectionHtml}
+            ${(status == null ? void 0 : status.target) === "file" ? renderConverterSection(config) : ""}
+            ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
         </div>
-        ${uploadSectionHtml}
-        ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
     `;
     const form = editPanel.querySelector("#inlineEditForm");
     const passwordForm = editPanel.querySelector("#editPasswordForm");
@@ -6440,30 +6653,61 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       onMediaInput(readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}));
     };
-    const syncConverterFormatOptions = () => {
-      var _a2, _b2, _c, _d, _e, _f;
+    const syncConverterDependentOptions = ({ preserveCurrentValues = false } = {}) => {
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
       const converterSelect = (_a2 = form == null ? void 0 : form.elements) == null ? void 0 : _a2.converter_id;
       const formatSelect = (_b2 = form == null ? void 0 : form.elements) == null ? void 0 : _b2.converter_format;
-      if (!(converterSelect instanceof HTMLSelectElement) || !(formatSelect instanceof HTMLSelectElement)) {
+      const qualitySelect = (_c = form == null ? void 0 : form.elements) == null ? void 0 : _c.converter_quality;
+      const saveModeSelect = (_d = form == null ? void 0 : form.elements) == null ? void 0 : _d.converter_save_mode;
+      if (!(converterSelect instanceof HTMLSelectElement)) {
         return;
       }
       const selectedOption = converterSelect.selectedOptions && converterSelect.selectedOptions[0] ? converterSelect.selectedOptions[0] : null;
       let ui = {};
       let defaults = {};
       try {
-        ui = JSON.parse(((_c = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _c.converterUi) || "{}");
+        ui = JSON.parse(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterUi) || "{}");
       } catch (e) {
         ui = {};
       }
       try {
-        defaults = JSON.parse(((_d = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _d.converterDefaults) || "{}");
+        defaults = JSON.parse(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterDefaults) || "{}");
       } catch (e) {
         defaults = {};
       }
-      const formats = Array.isArray((_e = ui == null ? void 0 : ui.format) == null ? void 0 : _e.options) && ui.format.options.length ? ui.format.options : String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean);
-      const nextOptions = formats.length ? formats : ["source"];
-      const selected = String(defaults.format || nextOptions[0] || "source");
-      formatSelect.innerHTML = nextOptions.map((item) => `<option value="${escapeHtml(item)}"${item === selected ? " selected" : ""}>${escapeHtml(item === "source" ? "same as source" : item)}</option>`).join("");
+      const formats = Array.isArray((_g = ui == null ? void 0 : ui.format) == null ? void 0 : _g.options) && ui.format.options.length ? ui.format.options : String(((_h = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _h.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean);
+      const qualityOptions = Array.isArray((_i = ui == null ? void 0 : ui.quality) == null ? void 0 : _i.options) && ui.quality.options.length ? ui.quality.options : ["preview", "default", "archival", "small-web"];
+      const saveModeOptions = Array.isArray((_j = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _j.options) && ui.saveMode.options.length ? ui.saveMode.options : ["new-hidden-work", "replace-generated-work", "temporary-preview-only"];
+      const syncSelectOptions = (select, options, preferredValue, labeler = null) => {
+        if (!(select instanceof HTMLSelectElement)) {
+          return;
+        }
+        const nextOptions = Array.isArray(options) && options.length ? options : [""];
+        const currentValue = String(select.value || "").trim();
+        const normalizedPreferred = String(preferredValue || "").trim();
+        const selected = preserveCurrentValues && nextOptions.includes(currentValue) ? currentValue : nextOptions.includes(normalizedPreferred) ? normalizedPreferred : String(nextOptions[0] || "");
+        select.innerHTML = nextOptions.map((item) => {
+          const value = String(item || "");
+          const label2 = typeof labeler === "function" ? labeler(value) : value;
+          return `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}>${escapeHtml(label2)}</option>`;
+        }).join("");
+      };
+      syncSelectOptions(
+        formatSelect,
+        formats.length ? formats : ["source"],
+        defaults.format || "source",
+        (item) => item === "source" ? "same as source" : item
+      );
+      syncSelectOptions(
+        qualitySelect,
+        qualityOptions,
+        defaults.quality || "default"
+      );
+      syncSelectOptions(
+        saveModeSelect,
+        saveModeOptions,
+        defaults.saveMode || "new-hidden-work"
+      );
     };
     const syncConvertButtonState = () => {
       var _a2;
@@ -6495,7 +6739,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       input.addEventListener("input", syncMediaState);
       input.addEventListener("change", () => {
         if (input.id === "edit-converter-id") {
-          syncConverterFormatOptions();
+          syncConverterDependentOptions({ preserveCurrentValues: false });
           syncConvertButtonState();
         }
         syncMediaState();
@@ -6505,7 +6749,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       editPanel,
       onMediaInput
     });
-    syncConverterFormatOptions();
+    syncConverterDependentOptions({ preserveCurrentValues: true });
     syncConvertButtonState();
     syncMediaState();
     if (form && typeof onSubmit === "function") {
@@ -6542,8 +6786,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === "function") {
       resetFolderWorkButton.addEventListener("click", async () => {
-        const confirmed = window.prompt("Type rm -rf to reset this folder work to the default inherited layout. This removes the local .layout override.");
-        if ((confirmed || "").trim() !== "rm -rf") {
+        const confirmed = window.confirm("Reset this folder work to the default inherited layout? This removes the local .layout override.");
+        if (!confirmed) {
           return;
         }
         await onResetFolderWork({ statusEl });
@@ -6646,23 +6890,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return normalized.split("/").slice(0, -1).join("/");
   }
-  function fileInboxViewerPath(path = "") {
-    const normalized = normalizeViewerPath(path);
-    if (!normalized) {
-      return "";
-    }
-    const parentPath = parentViewerPath(normalized);
-    const name = normalized.split("/").pop() || "";
-    if (name.startsWith(".")) {
-      return parentPath;
-    }
-    const extensionIndex = name.lastIndexOf(".");
-    const baseName = extensionIndex > 0 ? name.slice(0, extensionIndex) : name;
-    if (!baseName) {
-      return parentPath;
-    }
-    return normalizeViewerPath(parentPath ? `${parentPath}/${baseName}` : baseName);
-  }
   function findConfiguredSelectionItem(items = [], targetPath = "", prefix = "") {
     const normalizedTarget = normalizeViewerPath(targetPath);
     if (!normalizedTarget || !Array.isArray(items)) {
@@ -6719,11 +6946,6 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (selection2 == null ? void 0 : selection2.isLayout) {
       return getContentTargetPath(selection2);
     }
-    const configuredItem = resolveConfiguredSelectionItem(selection2);
-    const previewPath = (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
-    if ((selection2 == null ? void 0 : selection2.previewIsFile) || configuredItem && configuredItem.type === "file") {
-      return fileInboxViewerPath(previewPath) || parentViewerPath(previewPath);
-    }
     return getContentTargetPath(selection2);
   }
   function getEditTargetPath(selection2 = getActiveSelection()) {
@@ -6740,7 +6962,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return (selection2 == null ? void 0 : selection2.previewPath) || (selection2 == null ? void 0 : selection2.path) || "";
   }
 
-  // src/assets/js/edit/controller.js
+  // src/assets/js/edit/controller/media-config.js
   function buildConverterSaveAs(sourceName, format) {
     const normalizedFormat = String(format || "").trim().toLowerCase();
     if (!normalizedFormat || normalizedFormat === "source") {
@@ -6847,6 +7069,484 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     return nextWork;
   }
+
+  // src/assets/js/edit/controller/panel-actions.js
+  function activeWorkTitle(config, fallbackPath = "") {
+    const title = String((config == null ? void 0 : config.title) || (config == null ? void 0 : config.name) || (config == null ? void 0 : config.folderName) || "").trim();
+    if (title) {
+      return title;
+    }
+    const lastPathPart = String(fallbackPath || "").split("/").filter(Boolean).pop() || "";
+    return lastPathPart || "work";
+  }
+  function formatStoredNames(uploaded = []) {
+    if (!Array.isArray(uploaded) || uploaded.length === 0) {
+      return "";
+    }
+    const names = uploaded.map((entry) => String((entry == null ? void 0 : entry.name) || "").trim()).filter(Boolean);
+    if (names.length === 0) {
+      return "";
+    }
+    if (names.length === 1) {
+      return names[0];
+    }
+    if (names.length === 2) {
+      return `${names[0]} and ${names[1]}`;
+    }
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+  }
+  function createPanelActions({
+    getSelection,
+    getEditTargetPath: getEditTargetPath2,
+    getContentTargetPath: getContentTargetPath2,
+    getAddWorkTargetPath: getAddWorkTargetPath2,
+    getEditConfig,
+    setEditConfig,
+    getEditTarget,
+    setEditTarget,
+    getAuthState,
+    updateAuthState,
+    syncDrawerVisibility,
+    setDrawerOpen,
+    saveConfig,
+    persistSelectedConverter,
+    refreshCurrentEditState,
+    buildLayoutPayload: buildLayoutPayload2,
+    layoutNameForPreset
+  }) {
+    function buildAddWorkRequestPayload(selection2, extra = {}) {
+      const contentTargetPath = getContentTargetPath2(selection2);
+      const activePath = getEditTargetPath2(selection2);
+      return {
+        path: getAddWorkTargetPath2(selection2) || contentTargetPath,
+        activeWorkPath: activePath,
+        activeWorkName: activeWorkTitle(getEditConfig(), activePath),
+        activeWorkIsFile: (selection2 == null ? void 0 : selection2.previewIsFile) === true,
+        ...extra
+      };
+    }
+    function describeAddWorkTarget(selection2) {
+      const addWorkTargetPath = getAddWorkTargetPath2(selection2);
+      return addWorkTargetPath ? ` in ${addWorkTargetPath}` : "";
+    }
+    function describeUploadDestination(data, selection2) {
+      const workFolderName = String((data == null ? void 0 : data.workFolderName) || "").trim();
+      if (workFolderName) {
+        const parentTarget = getAddWorkTargetPath2(selection2);
+        return ` in ${parentTarget ? `${parentTarget}/` : ""}${workFolderName}`;
+      }
+      return describeAddWorkTarget(selection2);
+    }
+    return {
+      onTitleInput: (value, status) => {
+        const editConfig = getEditConfig();
+        if (!editConfig) {
+          return;
+        }
+        editConfig.title = value;
+        if ((status == null ? void 0 : status.target) !== "file") {
+          setEditConfig(editConfig);
+        }
+      },
+      onDescriptionInput: (value, status) => {
+        const editConfig = getEditConfig();
+        if (!editConfig) {
+          return;
+        }
+        editConfig.description = value;
+        if ((status == null ? void 0 : status.target) !== "file") {
+          setEditConfig(editConfig);
+        }
+      },
+      onWorkFieldsInput: (fields, status) => {
+        const editConfig = getEditConfig();
+        if (!editConfig) {
+          return;
+        }
+        const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
+        editConfig.work = materializeWorkFields(currentWork, fields);
+        if ((status == null ? void 0 : status.target) !== "file") {
+          setEditConfig(editConfig);
+        }
+      },
+      onMediaInput: (mediaState) => {
+        const editConfig = getEditConfig();
+        if (!editConfig || !mediaState || typeof mediaState !== "object") {
+          return;
+        }
+        const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
+        editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
+        setEditConfig(editConfig);
+      },
+      onSubmit: async ({ elements: elements2, statusEl }) => {
+        var _a, _b;
+        const selection2 = getSelection();
+        const editConfig = getEditConfig();
+        const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
+        const form = (elements2 == null ? void 0 : elements2.form) || null;
+        const mediaWork = readMediaConfigFromElements(elements2, form, currentWork);
+        const payload = {
+          path: getEditTargetPath2(selection2),
+          title: (((_a = elements2.title) == null ? void 0 : _a.value) || "").trim(),
+          description: (((_b = elements2.description) == null ? void 0 : _b.value) || "").trim()
+        };
+        if (mediaWork && typeof mediaWork === "object" && Object.keys(mediaWork).length > 0) {
+          payload.work = materializeWorkFields(mediaWork);
+        }
+        await saveConfig(payload, statusEl);
+      },
+      onToggleDrawer: () => {
+        setDrawerOpen((open) => !open);
+        syncDrawerVisibility();
+      },
+      onOpenLayoutPage: (buildVirtualLayoutPath2) => {
+        var _a, _b;
+        const selection2 = getSelection();
+        const previewPath = (_b = (_a = selection2.previewPath) != null ? _a : selection2.path) != null ? _b : "";
+        const layoutRootPath = selection2.previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
+        const nextPath = buildVirtualLayoutPath2(layoutRootPath);
+        setDrawerOpen(false);
+        syncDrawerVisibility();
+        window.location.hash = `#/${nextPath}`;
+      },
+      onDeleteTarget: async ({ statusEl }) => {
+        const selection2 = getSelection();
+        const targetPath = getEditTargetPath2(selection2);
+        if (!targetPath) {
+          throw new Error("Delete target unavailable.");
+        }
+        const data = await requestEditDelete({
+          path: targetPath,
+          return: selection2.previewPath || selection2.path || ""
+        });
+        if (!data || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Delete failed.");
+        }
+        setDrawerOpen(false);
+        syncDrawerVisibility();
+        setStatusMessage(statusEl, "Deleted.", true);
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
+        window.location.hash = nextPath ? `#/${nextPath}` : "";
+        await refreshCurrentEditState(getSelection());
+      },
+      onConvertWork: async ({ statusEl, converter }) => {
+        const selection2 = getSelection();
+        const sourcePath = getEditTargetPath2(selection2);
+        if (!sourcePath) {
+          throw new Error("Convert target unavailable.");
+        }
+        if (!(converter == null ? void 0 : converter.id)) {
+          setStatusMessage(statusEl, "Choose a converter first.");
+          return;
+        }
+        setStatusMessage(statusEl, "Converting...");
+        const currentConfig = getEditConfig() && typeof getEditConfig() === "object" ? getEditConfig() : {};
+        const sourceName = sourcePath.split("/").pop() || sourcePath;
+        const payload = {
+          source: {
+            name: sourceName,
+            path: sourcePath,
+            mimeType: currentConfig.mimeType || "",
+            extension: sourceName.includes(".") ? sourceName.split(".").pop() : "",
+            size: currentConfig.size || 0,
+            srcUrl: currentConfig.srcUrl || ""
+          },
+          converter,
+          target: {
+            folder: sourcePath.split("/").slice(0, -1).join("/"),
+            saveAs: buildConverterSaveAs(sourceName, converter.format || "source"),
+            mode: converter.saveMode || "new-hidden-work"
+          }
+        };
+        const payloadProvider = resolveConverterPayloadProvider();
+        if (typeof payloadProvider === "function") {
+          const extraPayload = await Promise.resolve(payloadProvider({
+            sourcePath,
+            sourceName,
+            converter: { ...converter },
+            target: { ...payload.target }
+          }));
+          if (extraPayload && typeof extraPayload === "object") {
+            if (extraPayload.source && typeof extraPayload.source === "object") {
+              payload.source = { ...payload.source, ...extraPayload.source };
+            }
+            if (extraPayload.converter && typeof extraPayload.converter === "object") {
+              payload.converter = { ...payload.converter, ...extraPayload.converter };
+            }
+            if (extraPayload.target && typeof extraPayload.target === "object") {
+              payload.target = { ...payload.target, ...extraPayload.target };
+            }
+            if (extraPayload.editor && typeof extraPayload.editor === "object") {
+              payload.editor = { ...extraPayload.editor };
+            }
+          }
+        }
+        const converted = await requestMcpRoute("convert", payload);
+        if (!converted || converted.error || converted.ok === false) {
+          throw new Error((converted == null ? void 0 : converted.error) || "Conversion failed.");
+        }
+        const saveMode = converter.saveMode || "new-hidden-work";
+        if (saveMode !== "temporary-preview-only") {
+          const saved = await requestMcpRoute("save-converted-work", {
+            sourcePath,
+            conversion: {
+              ...converted,
+              target: { ...(converted == null ? void 0 : converted.target) && typeof converted.target === "object" ? converted.target : {}, ...payload.target }
+            }
+          });
+          if (!saved || saved.error || saved.ok === false) {
+            throw new Error((saved == null ? void 0 : saved.error) || "Saving converted work failed.");
+          }
+          await persistSelectedConverter(selection2, converter, statusEl);
+          if (saveMode === "replace-source-file" || saved.type === "saved-source-file") {
+            window.alert("OK \u2014 the edited preview content was saved back into the source file.");
+            await refreshCurrentEditState(selection2, { forcePreviewRefresh: true });
+            return;
+          }
+        }
+        window.alert("OK \u2014 this file was converted into a web-readable poff work and saved in the folder.");
+        await refreshCurrentEditState(selection2);
+      },
+      onCreateConverter: async ({ statusEl, form }) => {
+        var _a;
+        const selection2 = getSelection();
+        const sourcePath = getEditTargetPath2(selection2);
+        const editConfig = getEditConfig();
+        const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
+        const suggestedBase = String(currentWork.type || (editConfig == null ? void 0 : editConfig.kind) || "image").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "converter";
+        const suggestedName = suggestedBase.startsWith("convert-") ? suggestedBase : `convert-${suggestedBase}`;
+        const requestedName = window.prompt("New converter folder name", suggestedName);
+        if (requestedName === null) {
+          return;
+        }
+        const name = requestedName.trim();
+        if (!name) {
+          setStatusMessage(statusEl, "Converter creation cancelled.");
+          return;
+        }
+        setStatusMessage(statusEl, "Creating converter...");
+        const created = await requestMcpRoute("create-converter", {
+          path: sourcePath,
+          name
+        });
+        if (!created || created.ok === false || created.error) {
+          throw new Error((created == null ? void 0 : created.error) || "Creating converter failed.");
+        }
+        const definition = created.definition && typeof created.definition === "object" ? created.definition : null;
+        const nextPath = String((definition == null ? void 0 : definition.path) || created.folder || "").trim().replace(/^\/+|\/+$/g, "");
+        if (nextPath) {
+          const nextHash = `#/${nextPath}`;
+          if (window.location.hash === nextHash) {
+            window.dispatchEvent(new Event("hashchange"));
+          } else {
+            window.location.hash = nextHash;
+          }
+          return;
+        }
+        await refreshCurrentEditState(selection2);
+        const refreshedForm = document.getElementById("inlineEditForm") || form;
+        const refreshedSelect = ((_a = refreshedForm == null ? void 0 : refreshedForm.elements) == null ? void 0 : _a.converter_id) instanceof HTMLSelectElement ? refreshedForm.elements.converter_id : null;
+        if (definition && refreshedSelect) {
+          refreshedSelect.value = String(definition.id || "");
+          refreshedSelect.dispatchEvent(new Event("input", { bubbles: true }));
+          refreshedSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        setStatusMessage(
+          document.getElementById("editInlineStatus") || statusEl,
+          `Created converter ${(definition == null ? void 0 : definition.label) || (definition == null ? void 0 : definition.name) || name} at ${created.folder || ""}. Select it to continue.`,
+          true
+        );
+      },
+      onResetFolderWork: async ({ statusEl }) => {
+        const selection2 = getSelection();
+        const targetPath = getContentTargetPath2(selection2);
+        if (targetPath === null || typeof targetPath === "undefined") {
+          throw new Error("Reset target unavailable.");
+        }
+        const data = await requestEditReset({
+          path: targetPath,
+          return: selection2.previewPath || selection2.path || ""
+        });
+        if (!data || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Reset failed.");
+        }
+        setDrawerOpen(false);
+        syncDrawerVisibility();
+        setStatusMessage(statusEl, "Folder work reset to default.", true);
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        await refreshCurrentEditState(getSelection());
+      },
+      onReturnToWork: () => {
+        const selection2 = getSelection();
+        const nextPath = selection2.previewPath || "";
+        setDrawerOpen(false);
+        syncDrawerVisibility();
+        if (nextPath) {
+          window.location.hash = `#/${nextPath}`;
+          return;
+        }
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        window.dispatchEvent(new Event("hashchange"));
+      },
+      onSubmitLayout: async ({ payload, statusEl }) => {
+        const selection2 = getSelection();
+        const { layoutPayload } = buildLayoutPayload2(payload, layoutNameForPreset);
+        await saveConfig({
+          path: getEditTargetPath2(selection2),
+          layout: layoutPayload
+        }, statusEl);
+      },
+      onLayoutPresetChange: async ({ payload, statusEl }) => {
+        const layoutPreset = ((payload == null ? void 0 : payload.layoutPreset) || "actual").trim() === "inherit" ? "actual" : ((payload == null ? void 0 : payload.layoutPreset) || "actual").trim();
+        const selection2 = getSelection();
+        await saveConfig({
+          path: getEditTargetPath2(selection2),
+          layout: {
+            name: layoutNameForPreset(layoutPreset, (payload == null ? void 0 : payload.layoutSharedName) || ""),
+            engine: "lightncandy",
+            preset: layoutPreset,
+            ...layoutPreset === "shared" ? {
+              source: "shared",
+              sharedName: (payload == null ? void 0 : payload.layoutSharedName) || layoutNameForPreset(layoutPreset, (payload == null ? void 0 : payload.layoutSharedName) || "")
+            } : {}
+          }
+        }, statusEl);
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        await refreshCurrentEditState(selection2, { forcePreviewRefresh: true });
+      },
+      onUploadFiles: async ({ source, files, saveTarget, closeDialog }) => {
+        const selection2 = getSelection();
+        const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
+          source,
+          files,
+          saveTarget
+        }));
+        if (!data || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Upload failed.");
+        }
+        if (typeof closeDialog === "function") {
+          closeDialog();
+        }
+        await refreshCurrentEditState(selection2);
+        const inlineStatus = document.getElementById("editInlineStatus");
+        if (inlineStatus) {
+          const uploaded = Array.isArray(data.uploaded) ? data.uploaded : [];
+          const names = formatStoredNames(uploaded);
+          const targetLabel = describeUploadDestination(data, selection2);
+          const fallbackCount = uploaded.length || files.length;
+          const message = names ? `Uploaded ${names}${targetLabel}.` : fallbackCount === 1 ? `Uploaded 1 file${targetLabel}.` : `Uploaded ${fallbackCount} files${targetLabel}.`;
+          setStatusMessage(inlineStatus, message, true);
+        }
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+      },
+      onCreateBlankFile: async ({ source, fileName, saveTarget, closeDialog }) => {
+        var _a;
+        const selection2 = getSelection();
+        const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
+          source,
+          fileName,
+          saveTarget,
+          files: []
+        }));
+        if (!data || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Create blank file failed.");
+        }
+        if (typeof closeDialog === "function") {
+          closeDialog();
+        }
+        await refreshCurrentEditState(selection2);
+        const inlineStatus = document.getElementById("editInlineStatus");
+        if (inlineStatus) {
+          const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : fileName;
+          setStatusMessage(inlineStatus, `Created ${createdName}${describeUploadDestination(data, selection2)}.`, true);
+        }
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+      },
+      onCreateFolder: async ({ source, folderName, saveTarget, closeDialog }) => {
+        var _a;
+        const selection2 = getSelection();
+        const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
+          source,
+          fileName: folderName,
+          saveTarget,
+          files: []
+        }));
+        if (!data || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Create folder failed.");
+        }
+        if (typeof closeDialog === "function") {
+          closeDialog();
+        }
+        await refreshCurrentEditState(selection2);
+        const inlineStatus = document.getElementById("editInlineStatus");
+        if (inlineStatus) {
+          const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : folderName;
+          setStatusMessage(inlineStatus, `Created folder ${createdName}${describeUploadDestination(data, selection2)}.`, true);
+        }
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+      },
+      onCreateLink: async ({ source, linkName, linkUrl, saveTarget, closeDialog }) => {
+        var _a;
+        const selection2 = getSelection();
+        const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
+          source,
+          linkName,
+          fileName: linkName,
+          linkUrl,
+          saveTarget,
+          files: []
+        }));
+        if (data == null ? void 0 : data.auth) {
+          updateAuthState(data.auth);
+        }
+        if (!data || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Create link failed.");
+        }
+        if (typeof closeDialog === "function") {
+          closeDialog();
+        }
+        const inlineStatus = document.getElementById("editInlineStatus");
+        if (inlineStatus) {
+          const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : linkName || linkUrl;
+          const message = data.pendingApproval ? `Submitted ${createdName} for approval${describeAddWorkTarget(selection2)}.` : `Created link ${createdName}${describeUploadDestination(data, selection2)}.`;
+          setStatusMessage(inlineStatus, message, true);
+        }
+        if (!(data.pendingApproval && !getAuthState().canEdit)) {
+          await refreshCurrentEditState(selection2);
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+        }
+      },
+      onChangePassword: async ({ elements: elements2, form, statusEl }) => {
+        var _a, _b, _c;
+        try {
+          setStatusMessage(statusEl, "Changing password...");
+          const selection2 = getSelection();
+          const data = await requestEditAuth({
+            path: getEditTargetPath2(selection2),
+            intent: "change-password",
+            currentPassword: (((_a = elements2.currentPassword) == null ? void 0 : _a.value) || "").trim(),
+            newPassword: (((_b = elements2.newPassword) == null ? void 0 : _b.value) || "").trim(),
+            confirmPassword: (((_c = elements2.confirmPassword) == null ? void 0 : _c.value) || "").trim()
+          });
+          if (data == null ? void 0 : data.auth) {
+            updateAuthState(data.auth);
+          }
+          if (!data || data.allowed === false || data.changed !== true) {
+            throw new Error((data == null ? void 0 : data.error) || "Password change failed.");
+          }
+          if (form && typeof form.reset === "function") {
+            form.reset();
+          }
+          setStatusMessage(statusEl, "Password changed.", true);
+        } catch (err) {
+          setStatusMessage(statusEl, err.message || "Password change failed.");
+        }
+      }
+    };
+  }
+
+  // src/assets/js/edit/controller.js
   function createEditController({ elements: elements2, context, editRequested: editRequested2 }) {
     const {
       editPanel,
@@ -6930,11 +7630,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
       };
     }
-    function updateConverterPreviewState(nextState, { refresh = true } = {}) {
+    function updateConverterPreviewState(nextState, { refresh = true, force = false } = {}) {
       const previousKey = previewStateKey(activeConverterPreview);
       const nextKey = previewStateKey(nextState);
       activeConverterPreview = nextState;
-      if (refresh && previousKey !== nextKey && typeof previewRefreshHandler === "function") {
+      if (refresh && (force || previousKey !== nextKey) && typeof previewRefreshHandler === "function") {
         previewRefreshHandler();
       }
     }
@@ -7004,15 +7704,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     function renderFolderMeta() {
       return folderConfig;
     }
-    function buildAddWorkRequestPayload(selection2, extra = {}) {
-      const contentTargetPath = getContentTargetPath(selection2);
-      const addWorkTargetPath = getAddWorkTargetPath(selection2);
-      const usesFileInbox = !!(selection2 == null ? void 0 : selection2.previewIsFile) && addWorkTargetPath !== "" && addWorkTargetPath !== contentTargetPath;
-      return {
-        path: addWorkTargetPath || contentTargetPath,
-        hideTargetFolder: usesFileInbox,
-        ...extra
-      };
+    function activeWorkTitle2(config, fallbackPath = "") {
+      const title = String((config == null ? void 0 : config.title) || (config == null ? void 0 : config.name) || (config == null ? void 0 : config.folderName) || "").trim();
+      if (title) {
+        return title;
+      }
+      const lastPathPart = String(fallbackPath || "").split("/").filter(Boolean).pop() || "";
+      return lastPathPart || "work";
     }
     function syncEditToggle() {
       if (!editToggle) {
@@ -7325,6 +8023,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         throw err;
       }
     }
+    async function persistSelectedConverter(selection2, converter, statusEl) {
+      if (!(selection2 == null ? void 0 : selection2.previewIsFile) || !(converter == null ? void 0 : converter.id) || !editConfig || typeof editConfig !== "object") {
+        return;
+      }
+      const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
+      const nextWork = materializeWorkFields({
+        ...currentWork,
+        converter: {
+          ...currentWork.converter && typeof currentWork.converter === "object" ? currentWork.converter : {},
+          ...converter
+        }
+      });
+      await saveConfig({
+        path: getEditTargetPath(selection2),
+        title: String(editConfig.title || "").trim(),
+        description: String(editConfig.description || "").trim(),
+        work: nextWork
+      }, statusEl);
+    }
     function syncDrawerVisibility() {
       if (!editDrawer) {
         return;
@@ -7348,7 +8065,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }, { label: "edit-drawer" });
       }
     }
-    async function refreshCurrentEditState(selection2 = getActiveSelection()) {
+    async function refreshCurrentEditState(selection2 = getActiveSelection(), { forcePreviewRefresh = false } = {}) {
       const refreshed = await requestEditConfig("config", { path: getEditTargetPath(selection2) });
       if (refreshed == null ? void 0 : refreshed.auth) {
         updateAuthState(refreshed.auth);
@@ -7356,7 +8073,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (refreshed == null ? void 0 : refreshed.config) {
         editConfig = annotateConfigPath(refreshed.config, selection2, refreshed);
         editTarget = refreshed.target || (selection2.isLayout ? "layout" : selection2.previewIsFile ? "file" : "folder");
-        updateConverterPreviewState(buildConverterPreviewState((editConfig == null ? void 0 : editConfig.work) || {}, selection2));
+        updateConverterPreviewState(buildConverterPreviewState((editConfig == null ? void 0 : editConfig.work) || {}, selection2), { force: forcePreviewRefresh });
         if (editTarget === "folder" || editTarget === "layout" && refreshed.subjectTarget === "folder") {
           folderConfig = editConfig;
           renderFolderMeta();
@@ -7376,381 +8093,64 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncAuthDisclosure(false, status);
       uploadLimits = (status == null ? void 0 : status.uploadLimits) || uploadLimits;
       const layoutNameForPreset = createLayoutNameForPreset(editConfig);
+      const panelActions = createPanelActions({
+        getSelection: getActiveSelection,
+        getEditTargetPath,
+        getContentTargetPath,
+        getAddWorkTargetPath,
+        getEditConfig: () => editConfig,
+        setEditConfig: (nextConfig) => {
+          editConfig = nextConfig;
+          if ((status == null ? void 0 : status.target) !== "file") {
+            folderConfig = nextConfig;
+            renderFolderMeta();
+          }
+        },
+        getEditTarget: () => editTarget,
+        setEditTarget: (nextTarget) => {
+          editTarget = nextTarget;
+        },
+        getAuthState: () => authState,
+        updateAuthState,
+        syncDrawerVisibility,
+        setDrawerOpen: (nextValue) => {
+          drawerOpen = typeof nextValue === "function" ? nextValue(drawerOpen) : nextValue;
+        },
+        saveConfig,
+        persistSelectedConverter,
+        refreshCurrentEditState,
+        buildLayoutPayload,
+        layoutNameForPreset
+      });
       const panelState = renderEditPanel({
         editPanel,
         editRequested: editRequested2,
         config,
         status,
         contentTargetLabel: getContentTargetPath(),
-        onTitleInput: (value) => {
-          if (!editConfig) {
-            return;
-          }
-          editConfig.title = value;
-          if ((status == null ? void 0 : status.target) !== "file") {
-            folderConfig = editConfig;
-            renderFolderMeta();
-          }
-        },
-        onDescriptionInput: (value) => {
-          if (!editConfig) {
-            return;
-          }
-          editConfig.description = value;
-          if ((status == null ? void 0 : status.target) !== "file") {
-            folderConfig = editConfig;
-            renderFolderMeta();
-          }
-        },
-        onWorkFieldsInput: (fields) => {
-          if (!editConfig) {
-            return;
-          }
-          const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
-          editConfig.work = materializeWorkFields(currentWork, fields);
-          if ((status == null ? void 0 : status.target) !== "file") {
-            folderConfig = editConfig;
-            renderFolderMeta();
-          }
-        },
+        activeWorkName: activeWorkTitle2(config, getEditTargetPath(getActiveSelection())),
+        onTitleInput: (value) => panelActions.onTitleInput(value, status),
+        onDescriptionInput: (value) => panelActions.onDescriptionInput(value, status),
+        onWorkFieldsInput: (fields) => panelActions.onWorkFieldsInput(fields, status),
         onMediaInput: (mediaState) => {
-          if (!editConfig || !mediaState || typeof mediaState !== "object") {
-            return;
-          }
-          const currentWork = editConfig.work && typeof editConfig.work === "object" ? editConfig.work : {};
-          editConfig.work = materializeWorkFields({ ...currentWork, ...mediaState });
-          updateConverterPreviewState(buildConverterPreviewState(editConfig.work));
+          panelActions.onMediaInput(mediaState);
+          updateConverterPreviewState(buildConverterPreviewState((editConfig == null ? void 0 : editConfig.work) || {}));
         },
-        onSubmit: async ({ elements: elements3, statusEl }) => {
-          var _a, _b;
-          const selection2 = getActiveSelection();
-          const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
-          const form = (elements3 == null ? void 0 : elements3.form) || null;
-          const mediaWork = readMediaConfigFromElements(elements3, form, currentWork);
-          const payload = {
-            path: getEditTargetPath(selection2),
-            title: (((_a = elements3.title) == null ? void 0 : _a.value) || "").trim(),
-            description: (((_b = elements3.description) == null ? void 0 : _b.value) || "").trim()
-          };
-          if (mediaWork && typeof mediaWork === "object" && Object.keys(mediaWork).length > 0) {
-            payload.work = materializeWorkFields(mediaWork);
-          }
-          await saveConfig(payload, statusEl);
-        },
-        onToggleDrawer: () => {
-          drawerOpen = !drawerOpen;
-          syncDrawerVisibility();
-        },
-        onOpenLayoutPage: () => {
-          var _a, _b;
-          const selection2 = getActiveSelection();
-          const previewPath = (_b = (_a = selection2.previewPath) != null ? _a : selection2.path) != null ? _b : "";
-          const layoutRootPath = selection2.previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
-          const nextPath = buildVirtualLayoutPath(layoutRootPath);
-          drawerOpen = false;
-          syncDrawerVisibility();
-          window.location.hash = `#/${nextPath}`;
-        },
-        onDeleteTarget: async ({ statusEl }) => {
-          const selection2 = getActiveSelection();
-          const targetPath = getEditTargetPath(selection2);
-          if (!targetPath) {
-            throw new Error("Delete target unavailable.");
-          }
-          const data = await requestEditDelete({
-            path: targetPath,
-            return: selection2.previewPath || selection2.path || ""
-          });
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Delete failed.");
-          }
-          drawerOpen = false;
-          syncDrawerVisibility();
-          setStatusMessage(statusEl, "Deleted.", true);
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
-          const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
-          window.location.hash = nextPath ? `#/${nextPath}` : "";
-          await refreshCurrentEditState(getActiveSelection());
-        },
-        onConvertWork: async ({ statusEl, converter }) => {
-          const selection2 = getActiveSelection();
-          const sourcePath = getEditTargetPath(selection2);
-          if (!sourcePath) {
-            throw new Error("Convert target unavailable.");
-          }
-          if (!(converter == null ? void 0 : converter.id)) {
-            setStatusMessage(statusEl, "Choose a converter first.");
-            return;
-          }
-          setStatusMessage(statusEl, "Converting...");
-          const currentConfig = editConfig && typeof editConfig === "object" ? editConfig : {};
-          const sourceName = sourcePath.split("/").pop() || sourcePath;
-          const payload = {
-            source: {
-              name: sourceName,
-              path: sourcePath,
-              mimeType: currentConfig.mimeType || "",
-              extension: sourceName.includes(".") ? sourceName.split(".").pop() : "",
-              size: currentConfig.size || 0,
-              srcUrl: currentConfig.srcUrl || ""
-            },
-            converter,
-            target: {
-              folder: sourcePath.split("/").slice(0, -1).join("/"),
-              saveAs: buildConverterSaveAs(sourceName, converter.format || "source"),
-              mode: converter.saveMode || "new-hidden-work"
-            }
-          };
-          const payloadProvider = resolveConverterPayloadProvider();
-          if (typeof payloadProvider === "function") {
-            const extraPayload = await Promise.resolve(payloadProvider({
-              sourcePath,
-              sourceName,
-              converter: { ...converter },
-              target: { ...payload.target }
-            }));
-            if (extraPayload && typeof extraPayload === "object") {
-              if (extraPayload.source && typeof extraPayload.source === "object") {
-                payload.source = { ...payload.source, ...extraPayload.source };
-              }
-              if (extraPayload.converter && typeof extraPayload.converter === "object") {
-                payload.converter = { ...payload.converter, ...extraPayload.converter };
-              }
-              if (extraPayload.target && typeof extraPayload.target === "object") {
-                payload.target = { ...payload.target, ...extraPayload.target };
-              }
-              if (extraPayload.editor && typeof extraPayload.editor === "object") {
-                payload.editor = { ...extraPayload.editor };
-              }
-            }
-          }
-          const converted = await requestMcpRoute("convert", payload);
-          if (!converted || converted.error || converted.ok === false) {
-            throw new Error((converted == null ? void 0 : converted.error) || "Conversion failed.");
-          }
-          if ((converter.saveMode || "new-hidden-work") !== "temporary-preview-only") {
-            const saved = await requestMcpRoute("save-converted-work", {
-              sourcePath,
-              conversion: converted
-            });
-            if (!saved || saved.error || saved.ok === false) {
-              throw new Error((saved == null ? void 0 : saved.error) || "Saving converted work failed.");
-            }
-          }
-          window.alert("OK \u2014 this file was converted into a web-readable poff work and saved in the folder.");
-          await refreshCurrentEditState(selection2);
-        },
-        onCreateConverter: async ({ statusEl, form }) => {
-          var _a, _b, _c;
-          const selection2 = getActiveSelection();
-          const sourcePath = getEditTargetPath(selection2);
-          const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
-          const suggestedBase = String(currentWork.type || (editConfig == null ? void 0 : editConfig.kind) || "image").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "converter";
-          const suggestedName = suggestedBase.startsWith("convert-") ? suggestedBase : `convert-${suggestedBase}`;
-          const requestedName = window.prompt("New converter folder name", suggestedName);
-          if (requestedName === null) {
-            return;
-          }
-          const name = requestedName.trim();
-          if (!name) {
-            setStatusMessage(statusEl, "Converter creation cancelled.");
-            return;
-          }
-          setStatusMessage(statusEl, "Creating converter...");
-          const created = await requestMcpRoute("create-converter", {
-            path: sourcePath,
-            name
-          });
-          if (!created || created.ok === false || created.error) {
-            throw new Error((created == null ? void 0 : created.error) || "Creating converter failed.");
-          }
-          const definition = created.definition && typeof created.definition === "object" ? created.definition : null;
-          const nextPath = String((definition == null ? void 0 : definition.path) || created.folder || "").trim().replace(/^\/+|\/+$/g, "");
-          if (nextPath) {
-            const nextHash = `#/${nextPath}`;
-            if (window.location.hash === nextHash) {
-              window.dispatchEvent(new Event("hashchange"));
-            } else {
-              window.location.hash = nextHash;
-            }
-            return;
-          }
-          await refreshCurrentEditState(selection2);
-          const refreshedForm = ((_a = editPanel == null ? void 0 : editPanel.querySelector) == null ? void 0 : _a.call(editPanel, "#inlineEditForm")) || form;
-          const refreshedSelect = ((_b = refreshedForm == null ? void 0 : refreshedForm.elements) == null ? void 0 : _b.converter_id) instanceof HTMLSelectElement ? refreshedForm.elements.converter_id : null;
-          if (definition && refreshedSelect) {
-            refreshedSelect.value = String(definition.id || "");
-            refreshedSelect.dispatchEvent(new Event("input", { bubbles: true }));
-            refreshedSelect.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-          setStatusMessage(
-            ((_c = editPanel == null ? void 0 : editPanel.querySelector) == null ? void 0 : _c.call(editPanel, "#editInlineStatus")) || statusEl,
-            `Created converter ${(definition == null ? void 0 : definition.label) || (definition == null ? void 0 : definition.name) || name} at ${created.folder || ""}. Select it to continue.`,
-            true
-          );
-        },
-        onResetFolderWork: async ({ statusEl }) => {
-          const selection2 = getActiveSelection();
-          const targetPath = getEditTargetPath(selection2);
-          if (!targetPath) {
-            throw new Error("Reset target unavailable.");
-          }
-          const data = await requestEditReset({
-            path: targetPath,
-            return: selection2.previewPath || selection2.path || ""
-          });
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Reset failed.");
-          }
-          drawerOpen = false;
-          syncDrawerVisibility();
-          setStatusMessage(statusEl, "Folder work reset to default.", true);
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
-          await refreshCurrentEditState(getActiveSelection());
-        },
-        onReturnToWork: () => {
-          const selection2 = getActiveSelection();
-          const nextPath = selection2.previewPath || "";
-          drawerOpen = false;
-          syncDrawerVisibility();
-          if (nextPath) {
-            window.location.hash = `#/${nextPath}`;
-            return;
-          }
-          window.history.replaceState(null, "", window.location.pathname + window.location.search);
-          window.dispatchEvent(new Event("hashchange"));
-        },
-        onSubmitLayout: async ({ payload, statusEl }) => {
-          const selection2 = getActiveSelection();
-          const { layoutPayload } = buildLayoutPayload(payload, layoutNameForPreset);
-          await saveConfig({
-            path: getEditTargetPath(selection2),
-            layout: layoutPayload
-          }, statusEl);
-        },
-        onLayoutPresetChange: async ({ payload, statusEl }) => {
-          const layoutPreset = ((payload == null ? void 0 : payload.layoutPreset) || "actual").trim() === "inherit" ? "actual" : ((payload == null ? void 0 : payload.layoutPreset) || "actual").trim();
-          await saveConfig({
-            path: getEditTargetPath(getActiveSelection()),
-            layout: {
-              name: layoutNameForPreset(layoutPreset, (payload == null ? void 0 : payload.layoutSharedName) || ""),
-              engine: "lightncandy",
-              preset: layoutPreset,
-              ...layoutPreset === "shared" ? {
-                source: "shared",
-                sharedName: (payload == null ? void 0 : payload.layoutSharedName) || layoutNameForPreset(layoutPreset, (payload == null ? void 0 : payload.layoutSharedName) || "")
-              } : {}
-            }
-          }, statusEl);
-        },
-        onUploadFiles: async ({ source, files }) => {
-          const selection2 = getActiveSelection();
-          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
-            source,
-            files
-          }));
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Upload failed.");
-          }
-          await refreshCurrentEditState(selection2);
-          const inlineStatus = document.getElementById("editInlineStatus");
-          if (inlineStatus) {
-            const count = Array.isArray(data.uploaded) ? data.uploaded.length : 0;
-            setStatusMessage(inlineStatus, count === 1 ? "Uploaded 1 file." : `Uploaded ${count} files.`, true);
-          }
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
-        },
-        onCreateBlankFile: async ({ source, fileName }) => {
-          var _a;
-          const selection2 = getActiveSelection();
-          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
-            source,
-            fileName,
-            files: []
-          }));
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Create blank file failed.");
-          }
-          await refreshCurrentEditState(selection2);
-          const inlineStatus = document.getElementById("editInlineStatus");
-          if (inlineStatus) {
-            const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : fileName;
-            setStatusMessage(inlineStatus, `Created ${createdName}.`, true);
-          }
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
-        },
-        onCreateFolder: async ({ source, folderName }) => {
-          var _a;
-          const selection2 = getActiveSelection();
-          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
-            source,
-            fileName: folderName,
-            files: []
-          }));
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Create folder failed.");
-          }
-          await refreshCurrentEditState(selection2);
-          const inlineStatus = document.getElementById("editInlineStatus");
-          if (inlineStatus) {
-            const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : folderName;
-            setStatusMessage(inlineStatus, `Created folder ${createdName}.`, true);
-          }
-          window.dispatchEvent(new CustomEvent("poff:content-updated"));
-        },
-        onCreateLink: async ({ source, linkName, linkUrl }) => {
-          var _a;
-          const selection2 = getActiveSelection();
-          const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
-            source,
-            linkName,
-            fileName: linkName,
-            linkUrl,
-            files: []
-          }));
-          if (data == null ? void 0 : data.auth) {
-            updateAuthState(data.auth);
-          }
-          if (!data || data.error) {
-            throw new Error((data == null ? void 0 : data.error) || "Create link failed.");
-          }
-          const inlineStatus = document.getElementById("editInlineStatus");
-          if (inlineStatus) {
-            const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : linkName || linkUrl;
-            const message = data.pendingApproval ? `Submitted ${createdName} for approval.` : `Created link ${createdName}.`;
-            setStatusMessage(inlineStatus, message, true);
-          }
-          if (!(data.pendingApproval && !authState.canEdit)) {
-            await refreshCurrentEditState(selection2);
-            window.dispatchEvent(new CustomEvent("poff:content-updated"));
-          }
-        },
-        onChangePassword: async ({ elements: elements3, form, statusEl }) => {
-          var _a, _b, _c;
-          try {
-            setStatusMessage(statusEl, "Changing password...");
-            const selection2 = getActiveSelection();
-            const data = await requestEditAuth({
-              path: getEditTargetPath(selection2),
-              intent: "change-password",
-              currentPassword: (((_a = elements3.currentPassword) == null ? void 0 : _a.value) || "").trim(),
-              newPassword: (((_b = elements3.newPassword) == null ? void 0 : _b.value) || "").trim(),
-              confirmPassword: (((_c = elements3.confirmPassword) == null ? void 0 : _c.value) || "").trim()
-            });
-            if (data == null ? void 0 : data.auth) {
-              updateAuthState(data.auth);
-            }
-            if (!data || data.allowed === false || data.changed !== true) {
-              throw new Error((data == null ? void 0 : data.error) || "Password change failed.");
-            }
-            if (form && typeof form.reset === "function") {
-              form.reset();
-            }
-            setStatusMessage(statusEl, "Password changed.", true);
-          } catch (err) {
-            setStatusMessage(statusEl, err.message || "Password change failed.");
-          }
-        }
+        onSubmit: panelActions.onSubmit,
+        onToggleDrawer: panelActions.onToggleDrawer,
+        onOpenLayoutPage: () => panelActions.onOpenLayoutPage(buildVirtualLayoutPath),
+        onDeleteTarget: panelActions.onDeleteTarget,
+        onConvertWork: panelActions.onConvertWork,
+        onCreateConverter: panelActions.onCreateConverter,
+        onResetFolderWork: panelActions.onResetFolderWork,
+        onReturnToWork: panelActions.onReturnToWork,
+        onSubmitLayout: panelActions.onSubmitLayout,
+        onLayoutPresetChange: panelActions.onLayoutPresetChange,
+        onUploadFiles: panelActions.onUploadFiles,
+        onCreateBlankFile: panelActions.onCreateBlankFile,
+        onCreateFolder: panelActions.onCreateFolder,
+        onCreateLink: panelActions.onCreateLink,
+        onChangePassword: panelActions.onChangePassword
       });
       const drawerState = renderEditDrawer({
         editDrawer,
@@ -8981,7 +9381,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       const hasExplicitFileFlag = Object.prototype.hasOwnProperty.call(target.dataset, "isFile");
       const isFile = target.dataset.layoutPath ? false : hasExplicitFileFlag ? target.dataset.isFile === "1" : !(target.hasAttribute("href") && target.getAttribute("href").startsWith("?path="));
-      navigateToPath(relPath, { isFile });
+      const previewUrl = String(target.dataset.viewUrl || "").trim();
+      navigateToPath(relPath, {
+        isFile,
+        previewUrl: previewUrl || void 0
+      });
     }
     function bindNavClick() {
       if (!navList) {
@@ -9036,6 +9440,25 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       getCurrentSelection,
       getPreviewParams
     });
+    function resolveSelectionPreviewUrl(selection2, explicitPreviewUrl = "") {
+      const normalizedExplicit = String(explicitPreviewUrl || "").trim();
+      if (normalizedExplicit) {
+        return normalizedExplicit;
+      }
+      if (!navList || !selection2 || selection2.isLayout) {
+        return "";
+      }
+      const selectionPath = String(selection2.path || selection2.previewPath || "").trim();
+      if (!selectionPath || typeof navList.querySelectorAll !== "function") {
+        return "";
+      }
+      for (const link of navList.querySelectorAll("a[data-path][data-view-url]")) {
+        if ((link.getAttribute("data-path") || "").trim() === selectionPath) {
+          return String(link.getAttribute("data-view-url") || "").trim();
+        }
+      }
+      return "";
+    }
     const sidebarController2 = createSidebarController({
       navList,
       sidebarLoading,
@@ -9077,11 +9500,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const previewPath = selection2.previewPath || "";
       const previewIsFile = !!selection2.previewIsFile;
       const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
+      const previewUrl = resolveSelectionPreviewUrl(selection2, options == null ? void 0 : options.previewUrl);
       setLoadingVisible(iframeLoading, true);
       if (contentFrame) {
         contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
         previewController.syncPreviewDisabledState(!!selection2.isLayout);
-        previewController.renderPreview(previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
+        previewController.renderPreview(previewUrl || previewController.buildViewerUrl(previewPath, previewIsFile, forceRefresh));
       }
       if (updateHash) {
         writeHashPath(selection2.path || "");

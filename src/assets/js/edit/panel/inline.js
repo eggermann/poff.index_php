@@ -188,6 +188,12 @@ export function renderEditPanel({
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
                 <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
+                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
+                ${!isFileTarget && typeof onResetFolderWork === 'function' ? `
+                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
+                    Reset
+                </button>
+                ` : ''}
                 ${typeof onDeleteTarget === 'function' ? `
                 <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDeleteTarget">
                     <img class="block" src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16">
@@ -195,25 +201,10 @@ export function renderEditPanel({
                 </button>
                 ` : ''}
             </div>
+            <div class="small-note">Layout: ${escapeHtml(overlayState.wrapperSourceLabel)} · parent: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code> · mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
 
         </form>
         <div class="edit-panel-stack">
-            <div class="edit-layout-launch">
-                <div class="edit-layout-copy">
-                    <div class="edit-layout-title">Layout</div>
-                    <div class="small-note">${escapeHtml(overlayState.wrapperSourceLabel)}</div>
-                    <div class="small-note">Inherited parent layout: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code></div>
-                    <div class="small-note">Current mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
-                </div>
-                <div class="edit-inline-actions">
-                    ${!isFileTarget && typeof onResetFolderWork === 'function' ? `
-                    <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
-                        Reset work
-                    </button>
-                    ` : ''}
-                    <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-                </div>
-            </div>
             ${uploadSectionHtml}
             ${status?.target === 'file' ? renderConverterSection(config) : ''}
             ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
@@ -393,8 +384,8 @@ export function renderEditPanel({
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === 'function') {
         resetFolderWorkButton.addEventListener('click', async () => {
-            const confirmed = window.prompt('Type rm -rf to reset this folder work to the default inherited layout. This removes the local .layout override.');
-            if ((confirmed || '').trim() !== 'rm -rf') {
+            const confirmed = window.confirm('Reset this folder work to the default inherited layout? This removes the local .layout override.');
+            if (!confirmed) {
                 return;
             }
             await onResetFolderWork({ statusEl });

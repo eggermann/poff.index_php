@@ -300,8 +300,8 @@ export function createPanelActions({
         },
         onResetFolderWork: async ({ statusEl }) => {
             const selection = getSelection();
-            const targetPath = getEditTargetPath(selection);
-            if (!targetPath) {
+            const targetPath = getContentTargetPath(selection);
+            if (targetPath === null || typeof targetPath === 'undefined') {
                 throw new Error('Reset target unavailable.');
             }
             const data = await requestEditReset({
@@ -341,8 +341,9 @@ export function createPanelActions({
             const layoutPreset = (payload?.layoutPreset || 'actual').trim() === 'inherit'
                 ? 'actual'
                 : (payload?.layoutPreset || 'actual').trim();
+            const selection = getSelection();
             await saveConfig({
-                path: getEditTargetPath(getSelection()),
+                path: getEditTargetPath(selection),
                 layout: {
                     name: layoutNameForPreset(layoutPreset, payload?.layoutSharedName || ''),
                     engine: 'lightncandy',
@@ -355,6 +356,8 @@ export function createPanelActions({
                         : {}),
                 },
             }, statusEl);
+            window.dispatchEvent(new CustomEvent('poff:content-updated'));
+            await refreshCurrentEditState(selection, { forcePreviewRefresh: true });
         },
         onUploadFiles: async ({ source, files, saveTarget, closeDialog }) => {
             const selection = getSelection();

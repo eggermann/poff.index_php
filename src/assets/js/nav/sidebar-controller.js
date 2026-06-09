@@ -304,7 +304,11 @@ export function createSidebarController({
             : (hasExplicitFileFlag
                 ? target.dataset.isFile === '1'
                 : !(target.hasAttribute('href') && target.getAttribute('href').startsWith('?path=')));
-        navigateToPath(relPath, { isFile });
+        const previewUrl = String(target.dataset.viewUrl || '').trim();
+        navigateToPath(relPath, {
+            isFile,
+            previewUrl: previewUrl || undefined,
+        });
     }
 
     function bindNavClick() {
