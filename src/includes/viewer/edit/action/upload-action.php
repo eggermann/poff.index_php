@@ -71,7 +71,7 @@ function cmsHandleEditUploadAction(array $ctx): void
 
     $updatedConfig = $ctx['subjectType'] === 'file'
         ? PoffConfig::ensureFileConfig($ctx['targetDir'], (string) $ctx['targetFile'])
-        : PoffConfig::ensure($ctx['targetDir']);
+        : PoffConfig::read($ctx['targetDir']);
 
     cmsJsonResponse([
         'allowed' => true,

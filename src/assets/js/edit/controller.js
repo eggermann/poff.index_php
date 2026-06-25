@@ -1,4 +1,12 @@
-import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
+import {
+    clearEditorAuthToken,
+    requestEditAuth,
+    requestEditConfig,
+    requestEditDelete,
+    requestEditUpload,
+    requestPromptTemplate,
+    setEditorAuthToken,
+} from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { registerEscapeClose, registerEscapeCloseDetails } from '../core/escape-stack.js';
 import { bindPromptWindow } from './prompt.js';
@@ -238,6 +246,7 @@ export function createEditController({ elements, context, editRequested }) {
                 path: getEditTargetPath(selection),
                 intent: 'logout',
             });
+            clearEditorAuthToken();
             if (data?.auth) {
                 updateAuthState(data.auth);
             }
@@ -493,6 +502,9 @@ export function createEditController({ elements, context, editRequested }) {
                 });
                 if (data?.auth) {
                     updateAuthState(data.auth);
+                }
+                if (typeof data?.authToken === 'string' && data.authToken.trim() !== '') {
+                    setEditorAuthToken(data.authToken);
                 }
                 if (!data || data.allowed === false || !data.auth?.authenticated) {
                     syncEditToggle();

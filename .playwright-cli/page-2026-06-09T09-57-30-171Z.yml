@@ -1,0 +1,99 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ MAUSMAUS" [ref=e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e21]:
+        - link "Bildschirmfoto-2025-11-24-um-14.37.10.png-2" [ref=e22] [cursor=pointer]:
+          - /url: "?path=Bildschirmfoto-2025-11-24-um-14.37.10.png-2"
+          - img [ref=e23]
+          - generic [ref=e25]: Bildschirmfoto-2025-11-24-um-14.37.10.png-2
+      - listitem [ref=e26]:
+        - link "Bildschirmfoto-2025-11-24-um-14.37.10.png-3" [ref=e27] [cursor=pointer]:
+          - /url: "?path=Bildschirmfoto-2025-11-24-um-14.37.10.png-3"
+          - img [ref=e28]
+          - generic [ref=e30]: Bildschirmfoto-2025-11-24-um-14.37.10.png-3
+      - listitem [ref=e31]:
+        - link "converters" [ref=e32] [cursor=pointer]:
+          - /url: "?path=converters"
+          - img [ref=e33]
+          - generic [ref=e35]: converters
+      - listitem [ref=e36]:
+        - link "ideas_to_find" [ref=e37] [cursor=pointer]:
+          - /url: "?path=ideas_to_find"
+          - img [ref=e38]
+          - generic [ref=e40]: ideas_to_find
+      - listitem [ref=e41]:
+        - link "live-file-backed-scene-generation-creates-a-location-image-artifact" [ref=e42] [cursor=pointer]:
+          - /url: "?path=live-file-backed-scene-generation-creates-a-location-image-artifact"
+          - img [ref=e43]
+          - generic [ref=e45]: live-file-backed-scene-generation-creates-a-location-image-artifact
+      - listitem [ref=e46]:
+        - link "1er" [ref=e47] [cursor=pointer]:
+          - /url: "?path=ll-1er"
+          - img [ref=e48]
+          - generic [ref=e50]: 1er
+      - listitem [ref=e51]:
+        - link "ll-AAA" [ref=e52] [cursor=pointer]:
+          - /url: "?path=ll-AAA"
+          - img [ref=e53]
+          - generic [ref=e55]: ll-AAA
+      - listitem [ref=e56]:
+        - link "sadasdasdasd" [ref=e57] [cursor=pointer]:
+          - /url: "?path=sadasdasdasd"
+          - img [ref=e58]
+          - generic [ref=e60]: sadasdasdasd
+      - listitem [ref=e61]:
+        - link "tests" [ref=e62] [cursor=pointer]:
+          - /url: "?path=tests"
+          - img [ref=e63]
+          - generic [ref=e65]: tests
+      - listitem [ref=e66]:
+        - link "texte" [ref=e67] [cursor=pointer]:
+          - /url: "?path=texte"
+          - img [ref=e68]
+          - generic [ref=e70]: texte
+      - listitem [ref=e71]:
+        - link "trudels" [ref=e72] [cursor=pointer]:
+          - /url: "?path=trudels"
+          - img [ref=e73]
+          - generic [ref=e75]: trudels
+      - listitem [ref=e76]:
+        - link "worktypes" [ref=e77] [cursor=pointer]:
+          - /url: "?path=worktypes"
+          - img [ref=e78]
+          - generic [ref=e80]: worktypes
+      - listitem [ref=e81]:
+        - link "1-2184.json" [ref=e82] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e83]
+          - generic [ref=e85]: 1-2184.json
+      - listitem [ref=e86]:
+        - link "asddafsadf.jpg" [ref=e87] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e88]
+          - generic [ref=e90]: asddafsadf.jpg
+      - listitem [ref=e91]:
+        - link "bak.htaccess" [ref=e92] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e93]
+          - generic [ref=e95]: bak.htaccess
+      - listitem [ref=e96]:
+        - link "Bildschirmfoto-2025-11-24-um-14.37.10.png" [ref=e97] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e98]
+          - generic [ref=e100]: Bildschirmfoto-2025-11-24-um-14.37.10.png
+      - listitem [ref=e101]:
+        - link "Scheiss-au-den-Fisch-by-eggman-Suno.webloc" [ref=e102] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e103]
+          - generic [ref=e105]: Scheiss-au-den-Fisch-by-eggman-Suno.webloc
+  - document [ref=e108]:
+    - generic [ref=e109]:
+      - heading "MAUSMAUS" [level=2] [ref=e110]
+      - paragraph [ref=e111]: Converter work accepts source payloads and produces generated poff works.

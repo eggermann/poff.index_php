@@ -61,35 +61,14 @@ export function renderEditPanel({
         syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
-    const canRenderPublicExternalSubmission = !status?.auth?.canEdit
-        && status?.auth?.editModeAllowed !== false
-        && status?.target !== 'file';
     editPanel.hidden = false;
-    if (canRenderPublicExternalSubmission) {
-        const treeItems = Array.isArray(config?.tree) ? config.tree : [];
-        const uploadSectionHtml = renderUploadSectionHtml({
-            isFileTarget: false,
-            isEmptyFolder: treeItems.length === 0,
-            externalOnly: true,
-            showLauncher: false,
-            activeWorkName,
-        });
+    if (!status?.auth?.canEdit && status?.auth?.editModeAllowed !== false && status?.target !== 'file') {
         editPanel.innerHTML = `
-            <h3 class="edit-panel-title">Submit external link</h3>
+            <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status" id="editInlineStatus">${escapeHtml(status?.error || '')}</div>
-            ${uploadSectionHtml}
+            <div class="small-note">Enter the editor password to unlock editing.</div>
         `;
         const statusEl = editPanel.querySelector('#editInlineStatus');
-        bindUploadDialog({
-            editPanel,
-            statusEl,
-            uploadLimits: status?.uploadLimits || null,
-            externalOnly: true,
-            onUploadFiles,
-            onCreateBlankFile,
-            onCreateFolder,
-            onCreateLink,
-        });
         syncPromptDock();
         return { statusEl, promptRoot: null };
     }
@@ -330,7 +309,7 @@ export function renderEditPanel({
             workFieldEditor.addWorkField();
         });
     }
-    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode').forEach((input) => {
+    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-source-url, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode').forEach((input) => {
         if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
             return;
         }

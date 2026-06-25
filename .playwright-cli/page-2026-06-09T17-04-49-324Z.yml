@@ -1,0 +1,92 @@
+- generic [ref=e5]:
+  - generic [ref=e7]:
+    - generic [ref=e10]:
+      - heading "🍾 Ghost in the Bottle" [level=1] [ref=e11]
+      - paragraph [ref=e12]: For the demo, use fictional secrets. Do not enter sensitive personal information.
+      - generic [ref=e13]:
+        - strong [ref=e14]: "How to play:"
+        - text: 1. Type a fictional secret into “Whisper to GIB”.
+        - text: 2. If GIB asks if it is a secret, answer yes.
+        - text: 3. Click the map to propose where the secret should live; GIB flies there after a short delay.
+        - text: 4. Ask for a joke, a spooky story, or a hint when you want GIB to get weird.
+        - text: 5. Ask for more bottles, then reveal only the selected bottle.
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: 👻🍾
+          - generic [ref=e22]: GIB:// I KNOW ALL SECRETS. GIB:// EVERY SECRET NEEDS A PLACE. GIB:// GIVE ME ONE.█
+          - button "🔊 Wake the Ghost" [ref=e23] [cursor=pointer]
+        - generic [ref=e28]: "╔════════════════════════════╗ ║ GIB ROOM MATERIALIZED ║ ║ Bottle boot room ║ ║ mood: hungry for ║ ╟────────────────────────────╢ ║ BROKEN BOTTLES / STATIC ║ ╟────────────────────────────╢ ║ A ghost waits for a secret. ║ ╚════════════════════════════╝"
+        - paragraph [ref=e33]:
+          - strong [ref=e34]: "Bottle markers on map:"
+          - text: "0"
+          - strong [ref=e35]: "Total bottles in memory:"
+          - text: "12"
+          - strong [ref=e36]: "Selected bottle:"
+          - code [ref=e37]: none
+          - strong [ref=e38]: "Discovered bottles:"
+          - text: "0"
+          - strong [ref=e39]: "Pending secret:"
+          - code [ref=e40]: none
+          - strong [ref=e41]: "Location mode:"
+          - text: GIB fallback
+          - strong [ref=e42]: "User location:"
+          - text: not granted
+          - strong [ref=e43]: "Geo status:"
+          - text: unknown
+          - strong [ref=e44]: "Mood:"
+          - text: hungry for secrets
+          - strong [ref=e45]: "GIB says:"
+          - text: GIB is waiting for a scent.
+      - generic [ref=e49]:
+        - generic [ref=e51]:
+          - generic:
+            - generic:
+              - img
+            - text: GIB chat
+          - log "chatbot conversation" [ref=e52]:
+            - 'button "bot''s message: GIB:// I KNOW ALL SECRETS. GIB:// EVERY SECRET NEEDS A PLACE. GIB:// GIVE ME ONE." [ref=e57]':
+              - paragraph [ref=e59]:
+                - text: GIB:// I KNOW ALL SECRETS.
+                - text: GIB:// EVERY SECRET NEEDS A PLACE.
+                - text: GIB:// GIVE ME ONE.
+        - generic [ref=e62]:
+          - iframe [ref=e63]:
+            - generic [ref=f1e2]:
+              - generic:
+                - generic [ref=f1e3]:
+                  - button "Zoom in" [ref=f1e4] [cursor=pointer]: +
+                  - button "Zoom out" [ref=f1e5] [cursor=pointer]: −
+                - button "Layers" [ref=f1e7] [cursor=pointer]
+                - generic [ref=f1e8]:
+                  - link "Leaflet" [ref=f1e9] [cursor=pointer]:
+                    - /url: https://leafletjs.com
+                    - img [ref=f1e10]
+                    - text: Leaflet
+                  - text: "| © OpenStreetMap contributors"
+          - generic [ref=e64]: Showing 0 bottle markers on the map. Bottle ids and UUIDs are shown in popups. Paste one into “Selected bottle id” to open it.
+        - generic [ref=e67]:
+          - generic [ref=e68]: Whisper to GIB
+          - textbox "Whisper to GIB" [ref=e69]:
+            - /placeholder: "Example: go to Basel. Or: I never sent the letter. Then answer yes when GIB asks."
+        - generic [ref=e70]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: Selected bottle id
+            - textbox "Selected bottle id" [ref=e75]:
+              - /placeholder: bottle_xxxxxxxx or uuid
+          - button "Select pasted bottle id or uuid" [ref=e76] [cursor=pointer]
+        - generic [ref=e77]:
+          - button "Send to GIB" [ref=e78] [cursor=pointer]
+          - button "Ask GIB for a secret prompt" [ref=e79] [cursor=pointer]
+          - button "Place pending secret" [ref=e80] [cursor=pointer]
+          - button "Reveal selected bottle" [ref=e81] [cursor=pointer]
+          - button "Reset demo" [ref=e82] [cursor=pointer]
+  - contentinfo [ref=e83]:
+    - button "Use via API logo" [ref=e84] [cursor=pointer]:
+      - text: Use via API
+      - img "logo" [ref=e85]
+    - generic [ref=e86]: ·
+    - link "Mit Gradio erstellt logo" [ref=e87] [cursor=pointer]:
+      - /url: https://gradio.app
+      - text: Mit Gradio erstellt
+      - img "logo" [ref=e88]

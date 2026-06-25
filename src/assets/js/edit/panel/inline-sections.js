@@ -195,6 +195,19 @@ export function renderConverterSection(config = {}) {
     const available = Array.isArray(catalog?.available) ? catalog.available : [];
     const work = (config?.work && typeof config.work === 'object') ? config.work : {};
     const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
+    const rawSourceUrl = String(converter.sourceUrl || config?.srcUrl || '').trim();
+    const sourceUrlValue = rawSourceUrl
+        ? (() => {
+            try {
+                const baseHref = typeof window?.location?.href === 'string' && window.location.href
+                    ? window.location.href
+                    : 'http://localhost/';
+                return new URL(rawSourceUrl, baseHref).toString();
+            } catch {
+                return rawSourceUrl;
+            }
+        })()
+        : '';
     const selectedId = String(converter.id || '').trim();
     const selectedDefinition = selectedId ? (available.find((item) => item?.id === selectedId) || null) : null;
     const defaults = selectedDefinition?.defaults || {};
@@ -250,6 +263,11 @@ export function renderConverterSection(config = {}) {
                     <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-source-url">Source URL</label>
+                    <input class="form-input" id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${escapeHtml(sourceUrlValue)}" placeholder="https://example.com/source.tiff">
+                    <div class="small-note">Optional override used by remote converters when they need a public source URL.</div>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>

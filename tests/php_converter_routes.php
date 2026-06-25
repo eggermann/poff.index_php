@@ -50,6 +50,14 @@ if ($mode === 'normalize') {
     exit(0);
 }
 
+if ($mode === 'build-payload') {
+    echo json_encode(Converter::buildPayload(
+        is_array($payload['source'] ?? null) ? $payload['source'] : [],
+        is_array($payload['converter'] ?? null) ? $payload['converter'] : []
+    ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($mode === 'converter-prompt') {
     echo json_encode(handleConverterPrompt([
         'rootDir' => $rootDir,

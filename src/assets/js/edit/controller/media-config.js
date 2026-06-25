@@ -31,6 +31,20 @@ export function resolveConverterPayloadProvider() {
 
 export function readMediaConfigFromElements(elements, form, currentWork = {}) {
     const nextWork = { ...(currentWork && typeof currentWork === 'object' ? currentWork : {}) };
+    const normalizeSourceUrl = (value) => {
+        const raw = String(value || '').trim();
+        if (!raw) {
+            return '';
+        }
+        try {
+            const baseHref = typeof window?.location?.href === 'string' && window.location.href
+                ? window.location.href
+                : 'http://localhost/';
+            return new URL(raw, baseHref).toString();
+        } catch {
+            return raw;
+        }
+    };
     const typeField = elements.work_type;
     if (typeField && typeof typeField.value === 'string') {
         const type = typeField.value.trim();
@@ -89,9 +103,10 @@ export function readMediaConfigFromElements(elements, form, currentWork = {}) {
     const converterPath = String(selectedOption?.dataset?.converterPath || '').trim();
     const converterViewerHref = String(selectedOption?.dataset?.converterViewerHref || '').trim();
     const converterUrl = String(selectedOption?.dataset?.converterUrl || '').trim();
+    const converterSourceUrl = normalizeSourceUrl(elements.converter_source_url?.value || '');
     const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
-        nextWork.converter = {
+        const nextConverter = {
             ...existingConverter,
             type: converterType,
             name: converterName || String(existingConverter.name || converterId.split('/').pop() || 'converter'),
@@ -100,6 +115,7 @@ export function readMediaConfigFromElements(elements, form, currentWork = {}) {
             path: converterPath,
             viewerHref: converterViewerHref,
             url: converterUrl,
+            sourceUrl: converterSourceUrl || String(existingConverter.sourceUrl || '').trim(),
             node: converterEngine === 'remote-node'
                 ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
                 : 'local',
@@ -108,6 +124,12 @@ export function readMediaConfigFromElements(elements, form, currentWork = {}) {
             saveMode: String(elements.converter_save_mode?.value || 'new-hidden-work').trim() || 'new-hidden-work',
             hiddenByDefault: true,
         };
+        if (converterSourceUrl) {
+            nextConverter.sourceUrl = converterSourceUrl;
+        } else {
+            delete nextConverter.sourceUrl;
+        }
+        nextWork.converter = nextConverter;
     } else if (Object.prototype.hasOwnProperty.call(nextWork, 'converter')) {
         delete nextWork.converter;
     }

@@ -2,10 +2,13 @@
   "excludeFolders": [
     "node_modules",
     "dist",
+    "output",
     "pages",
     "vendor",
     ".git",
     ".history",
+    ".mlms",
+    ".playwright-cli",
     "memory-bank"
   ],
   "excludeFiles": [
@@ -16,19 +19,40 @@
   ],
   "patterns": [
     {
-      "src": "./src/**/*"
+      "src": "./package.json"
     },
     {
-      "src": "./scripts/**/*"
+      "src": "./build/BuildConfig.shared.json"
     },
     {
-      "src": "./tests/**/*"
+      "src": "./build/**/*.php"
     },
     {
-      "src": "./build/**/*"
+      "src": "./scripts/**/*.js"
     },
     {
-      "src": "./input-prompt.txt"
+      "src": "./src/includes/**/*.php"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.hbs"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.css"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.js"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.json"
+    },
+    {
+      "src": "./src/assets/js/**/*.js"
+    },
+    {
+      "src": "./src/assets/scss/**/*.scss"
+    },
+    {
+      "src": "./src/mcp/**/*.php"
     }
   ],
   "textEdit": true,

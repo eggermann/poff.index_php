@@ -1,0 +1,4 @@
+[     563ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://pageoff.de/?edit=true#/convert-pageoff-remote-image:0
+[    1526ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://pageoff.de/favicon.ico:0
+[    1644ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://pageoff.de/?ajax=resolve&slug=convert-pageoff-remote-image:0
+[    2309ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://pageoff.de/?view=1&path=convert-pageoff-remote-image:0

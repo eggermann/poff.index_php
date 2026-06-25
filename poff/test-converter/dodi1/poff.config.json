@@ -1,0 +1,24 @@
+{
+  "$schema": "https://dominikeggermann.com/poff-config.schema.json",
+  "folderName": "dodi1",
+  "slug": "dodi1",
+  "title": "dodi1",
+  "description": "Sample webspace folder for TIFF upload and remote PNG conversion.",
+  "type": "folder",
+  "tree": [
+    {
+      "name": "scan-001.tiff",
+      "slug": "scan-001-tiff",
+      "type": "file",
+      "path": "scan-001.tiff",
+      "visible": true
+    }
+  ],
+  "work": {
+    "type": "folder",
+    "layout": {
+      "mode": "list",
+      "name": "list"
+    }
+  }
+}

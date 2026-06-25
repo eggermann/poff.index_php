@@ -64,7 +64,7 @@ function cmsBuildEditActionContext(): array
 
     $config = $subjectType === 'file'
         ? PoffConfig::ensureFileConfig($targetDir, (string) $targetFile)
-        : PoffConfig::ensure($targetDir);
+        : PoffConfig::read($targetDir);
 
     $folderViewData = $subjectType === 'folder'
         ? cmsPromptFolderViewData(

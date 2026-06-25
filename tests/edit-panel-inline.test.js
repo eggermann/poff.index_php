@@ -15,6 +15,7 @@ function loadRenderEditPanel(overrides = {}) {
     exports: module.exports,
     console,
     window: overrides.window || {
+      location: { href: 'http://example.test/?edit=true' },
       prompt() { return null; },
       confirm() { return false; },
     },
@@ -96,6 +97,7 @@ function loadRenderEditPanel(overrides = {}) {
     renderConverterSection(config = {}) {
       const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
       const selected = String(config?.work?.converter?.id || '').trim();
+      const sourceUrl = String(config?.work?.converter?.sourceUrl || config?.srcUrl || '').trim();
       const disabled = selected === '';
       const options = ['<option value="">none</option>']
         .concat(available.map((item) => `<option value="${item.id || ''}"${item.id === selected ? ' selected' : ''}>${item.label || item.id || ''}</option>`))
@@ -103,6 +105,7 @@ function loadRenderEditPanel(overrides = {}) {
       return `
         <div class="edit-work-fields edit-work-converter">
           <select id="edit-converter-id" name="converter_id" form="inlineEditForm">${options}</select>
+          <input id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${sourceUrl}">
           <select id="edit-converter-quality" name="converter_quality" form="inlineEditForm"></select>
           <select id="edit-converter-format" name="converter_format" form="inlineEditForm"></select>
           <select id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"></select>
@@ -162,6 +165,7 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     exports: module.exports,
     console,
     window: overrides.window || {
+      location: { href: 'http://example.test/?edit=true' },
       prompt() { return null; },
       confirm() { return false; },
     },
@@ -243,6 +247,7 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     renderConverterSection(config = {}) {
       const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
       const selected = String(config?.work?.converter?.id || '').trim();
+      const sourceUrl = String(config?.work?.converter?.sourceUrl || config?.srcUrl || '').trim();
       const disabled = selected === '';
       const options = ['<option value="">none</option>']
         .concat(available.map((item) => `<option value="${item.id || ''}"${item.id === selected ? ' selected' : ''}>${item.label || item.id || ''}</option>`))
@@ -250,6 +255,7 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
       return `
         <div class="edit-work-fields edit-work-converter">
           <select id="edit-converter-id" name="converter_id" form="inlineEditForm">${options}</select>
+          <input id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${sourceUrl}">
           <select id="edit-converter-quality" name="converter_quality" form="inlineEditForm"></select>
           <select id="edit-converter-format" name="converter_format" form="inlineEditForm"></select>
           <select id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"></select>
@@ -376,6 +382,7 @@ test('converter controls stay attached to inline edit form after being moved bel
     config: {
       title: 'Example',
       description: '',
+      srcUrl: '/MAUSMAUS/files/example.tiff',
       work: {
         type: 'text',
       },
@@ -398,6 +405,8 @@ test('converter controls stay attached to inline edit form after being moved bel
   });
 
   expect(editPanel.innerHTML).toContain('id="edit-converter-id" name="converter_id" form="inlineEditForm"');
+  expect(editPanel.innerHTML).toContain('id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm"');
+  expect(editPanel.innerHTML).toContain('value="/MAUSMAUS/files/example.tiff"');
   expect(editPanel.innerHTML).toContain('id="edit-converter-quality" name="converter_quality" form="inlineEditForm"');
   expect(editPanel.innerHTML).toContain('id="edit-converter-format" name="converter_format" form="inlineEditForm"');
   expect(editPanel.innerHTML).toContain('id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"');
@@ -472,7 +481,7 @@ test('password section stays hidden on the main site root', () => {
   expect(editPanel.innerHTML).not.toContain('Current password');
 });
 
-test('guest edit mode still binds the external link upload dialog', () => {
+test('guest edit mode no longer renders the external link submission panel', () => {
   let bindUploadDialogArgs = null;
   let renderUploadSectionArgs = null;
   const renderEditPanel = loadRenderEditPanelWithHooks({
@@ -520,16 +529,11 @@ test('guest edit mode still binds the external link upload dialog', () => {
   });
 
   expect(editPanel.hidden).toBe(false);
-  expect(editPanel.innerHTML).toContain('Submit external link');
-  expect(renderUploadSectionArgs).toEqual(expect.objectContaining({
-    externalOnly: true,
-    showLauncher: false,
-  }));
-  expect(bindUploadDialogArgs).toEqual(expect.objectContaining({
-    editPanel,
-    statusEl,
-    externalOnly: true,
-  }));
+  expect(editPanel.innerHTML).toContain('Edit mode');
+  expect(editPanel.innerHTML).not.toContain('Submit external link');
+  expect(editPanel.innerHTML).not.toContain('Submit link');
+  expect(renderUploadSectionArgs).toBeNull();
+  expect(bindUploadDialogArgs).toBeNull();
   expect(result.statusEl).toBe(statusEl);
 });
 

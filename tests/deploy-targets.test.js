@@ -30,10 +30,20 @@ describe('deploy target resolution', () => {
       suffix: 'pageoff',
       isDefault: false,
     });
+
+    expect(resolveDeployTargetProfile('dodi1')).toEqual({
+      targetName: 'dodi1',
+      suffix: '1',
+      isDefault: false,
+    });
   });
 
   test('resolves suffixed env values for secondary deploy targets', () => {
     const env = {
+      host1: 'primary.example',
+      user1: 'primary-user',
+      destinationPath1: '/var/www/public/dodi1/',
+      sourcePath1: 'pages/dodi1',
       host2: 'secondary.example',
       user2: 'secondary-user',
       destinationPath2: '/var/www/public/dodi_2/',
@@ -47,6 +57,10 @@ describe('deploy target resolution', () => {
     expect(resolveTargetEnvValue(env, ['DEPLOY_USERNAME', 'SSH_USERNAME', 'SSH_USER', 'user'], '2')).toBe('secondary-user');
     expect(resolveTargetEnvValue(env, ['DEPLOY_REMOTE_PATH', 'destinationPath'], '2')).toBe('/var/www/public/dodi_2/');
     expect(resolveTargetEnvValue(env, ['DEPLOY_SOURCE_PATH', 'sourcePath'], '2')).toBe('pages/dodi_2');
+    expect(resolveTargetEnvValue(env, ['DEPLOY_HOST', 'SSH_HOST', 'host'], '1')).toBe('primary.example');
+    expect(resolveTargetEnvValue(env, ['DEPLOY_USERNAME', 'SSH_USERNAME', 'SSH_USER', 'user'], '1')).toBe('primary-user');
+    expect(resolveTargetEnvValue(env, ['DEPLOY_REMOTE_PATH', 'destinationPath'], '1')).toBe('/var/www/public/dodi1/');
+    expect(resolveTargetEnvValue(env, ['DEPLOY_SOURCE_PATH', 'sourcePath'], '1')).toBe('pages/dodi1');
     expect(resolveTargetEnvValue(env, ['DEPLOY_HOST', 'SSH_HOST', 'host'], 'customer')).toBe('customer.example');
     expect(resolveTargetEnvValue(env, ['DEPLOY_USERNAME', 'SSH_USERNAME', 'SSH_USER', 'user'], 'customer')).toBe('customer-user');
     expect(resolveTargetEnvValue(env, ['DEPLOY_REMOTE_PATH', 'destinationPath'], 'customer')).toBe('/var/www/public/customer/');

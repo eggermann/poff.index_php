@@ -144,7 +144,9 @@ async function uploadDir(localDir, remoteDir, concurrency) {
         concurrency,
         validate(itemPath) {
             const baseName = path.basename(itemPath);
-            if (baseName.startsWith('.') || baseName === 'node_modules') {
+            const normalizedPath = itemPath.replace(/\\/g, '/');
+            const isLayoutAsset = /(^|\/)\.layout(\/|$)/.test(normalizedPath);
+            if ((baseName.startsWith('.') && !isLayoutAsset) || baseName === 'node_modules') {
                 return false;
             }
 

@@ -11,7 +11,7 @@ function cmsUploadActiveWorkFolderName(string $targetDir, string $activeWorkName
     }
 
     $targetPath = rtrim($targetDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $baseName;
-    if (!is_file($targetPath)) {
+    if (!file_exists($targetPath)) {
         return $baseName;
     }
 

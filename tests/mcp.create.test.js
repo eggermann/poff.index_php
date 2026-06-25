@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -592,6 +593,7 @@ function loadPromptApiHelpers() {
       throw new Error('fetch should be mocked in test');
     },
   };
+  const storage = new Map();
   const context = vm.createContext({
     module,
     exports: module.exports,
@@ -602,10 +604,22 @@ function loadPromptApiHelpers() {
     AbortController: global.AbortController,
     TextDecoder: global.TextDecoder,
     URL: global.URL,
+    URLSearchParams: global.URLSearchParams,
     window: {
       location: {
         pathname: '/dominikeggermann.com/',
         origin: 'http://localhost:8888',
+      },
+      localStorage: {
+        getItem(key) {
+          return storage.has(key) ? storage.get(key) : null;
+        },
+        setItem(key, value) {
+          storage.set(String(key), String(value));
+        },
+        removeItem(key) {
+          storage.delete(String(key));
+        },
       },
     },
     setTimeout,
@@ -617,9 +631,13 @@ function loadPromptApiHelpers() {
 module.exports = {
   buildCmsUrl,
   buildLocalModelsUrl,
+  clearEditorAuthToken,
+  getEditorAuthToken,
+  requestEditAuth,
   requestPromptModels,
   requestLocalPromptModels,
   requestPromptTemplateStream,
+  setEditorAuthToken,
 };
 `, context);
 
@@ -843,6 +861,35 @@ function runEditRequestBypass(cwd, action, relativePath = '', payload = {}, sess
         resolve(JSON.parse(stdout));
       } catch (err) {
         reject(new Error(`invalid json from edit request helper: ${stdout}`));
+      }
+    });
+  });
+}
+
+function runEditAuthCookieProbe(cwd, password = 'secret-pass') {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_edit_auth_cookie.php'),
+      cwd,
+      password,
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`edit auth cookie probe failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from edit auth cookie probe: ${stdout}`));
       }
     });
   });
@@ -1095,6 +1142,45 @@ describe('MCP create route helper (CLI)', () => {
     expect(newLogin.auth.authenticated).toBe(true);
 
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('editor auth survives reload through the explicit editor token', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-auth-cookie-'));
+    const result = await runEditAuthCookieProbe(tempDir, 'secret-pass');
+    expect(result.passwordOk).toBe(true);
+    expect(result.token).toBeTruthy();
+    expect(result.restored).toBe(true);
+    expect(result.authenticated).toBe(true);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('edit auth requests attach the stored editor token header', async () => {
+    const api = loadPromptApiHelpers();
+    api.setEditorAuthToken('token-123');
+    let requestUrl = null;
+    let requestOptions = null;
+    api.setFetch(async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          allowed: true,
+          auth: {
+            configured: true,
+            authenticated: true,
+            editModeAllowed: true,
+            canEdit: true,
+          },
+        }),
+      };
+    });
+
+    await api.requestEditAuth({ method: 'GET', path: '' });
+
+    expect(requestUrl.toString()).toContain('authToken=token-123');
+    expect(requestOptions.headers['X-Poff-Editor-Auth']).toBe('token-123');
   });
 
   test('guest poff links stay pending until an authenticated editor approves them', async () => {
@@ -2148,6 +2234,31 @@ function runPageoffRemoteConverter(payload = {}) {
   });
 }
 
+function runPageoffRemoteImageConverter(payload = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      path.join(ROOT, 'tests/php_pageoff_remote_image_converter.php'),
+      JSON.stringify(payload),
+    ];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(stdout.trim()));
+        return;
+      }
+      reject(new Error(`pageoff remote image converter helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runTextEditorRemoteConverter(payload = {}) {
   return new Promise((resolve, reject) => {
     const args = [
@@ -2307,6 +2418,17 @@ describe('Poff converters', () => {
         name: 'convert-remote-node',
         label: 'Convert Remote Node',
       }),
+      expect.objectContaining({
+        id: 'converter/convert-pageoff-remote-image',
+        name: 'convert-pageoff-remote-image',
+        label: 'Convert Pageoff Remote Image',
+        engine: 'remote-node',
+        url: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-image',
+        remote: expect.objectContaining({
+          endpoint: 'https://pageoff.de/worktypes/templates/converter/convert-pageoff-remote-image/converter.php',
+          publicUrl: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-image',
+        }),
+      }),
     ]));
   });
 
@@ -2331,7 +2453,12 @@ describe('Poff converters', () => {
         name: 'convert-pageoff-remote-text',
         label: 'Convert Pageoff Remote Text',
         engine: 'remote-node',
+        url: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-text',
         outputs: ['text/html', 'text/plain'],
+        remote: expect.objectContaining({
+          endpoint: 'https://pageoff.de/worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
+          publicUrl: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-text',
+        }),
       }),
       expect.objectContaining({
         id: 'converter/convert-text-editor',
@@ -2344,6 +2471,24 @@ describe('Poff converters', () => {
     const editorDefinition = result.find((item) => item.id === 'converter/convert-text-editor');
     expect(editorDefinition?.folder || '').toContain('worktypes/templates/converter/convert-text-editor');
     expect(editorDefinition?.templateFolder || '').toContain('worktypes/templates/converter/convert-text-editor');
+  });
+
+  test('pageoff remote image converter payload prefixes generated files as external works', async () => {
+    const payload = await runConverterRoute('build-payload', POFF_DIR, {
+      source: {
+        path: 'scan-001.tiff',
+        name: 'scan-001.tiff',
+        mimeType: 'image/tiff',
+      },
+      converter: {
+        id: 'converter/convert-pageoff-remote-image',
+        format: 'png',
+        quality: 'default',
+      },
+    });
+
+    expect(payload.converter.id).toBe('converter/convert-pageoff-remote-image');
+    expect(payload.target.saveAs).toBe('external-scan-001.png');
   });
 
   test('pageoff local converter.php returns a php-generated text conversion response', async () => {
@@ -2521,6 +2666,81 @@ describe('Poff converters', () => {
       expect(result.output.name).toBe('draft.html');
       expect(Buffer.from(result.output.bodyBase64, 'base64').toString('utf8')).toBe('mock prefixed remote body');
       expect(result.generatedBy.endpoint).toContain('/MAUSMAUS/worktypes/templates/converter/convert-pageoff-remote-text/converter.php');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('pageoff remote image converter turns a tiff source into a png body', async () => {
+    const tempRoot = path.join(POFF_DIR, `pageoff-remote-image-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      const result = await runPageoffRemoteImageConverter({
+        source: {
+          path: 'scan-001.tiff',
+          name: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          bodyBase64: fs.readFileSync(sourcePath).toString('base64'),
+        },
+        converter: {
+          id: 'converter/convert-pageoff-remote-image',
+          format: 'png',
+          quality: 'default',
+        },
+        target: {
+          saveAs: 'scan-001.png',
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('image/png');
+      expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
+
+      const saved = await runConverterRoute('save', tempRoot, {
+        sourcePath: 'scan-001.tiff',
+        conversion: result,
+      });
+
+      expect(saved.ok).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'scan-001.png'))).toBe(true);
+      expect(fs.readFileSync(path.join(tempRoot, 'scan-001.png')).subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('pageoff remote image converter can fetch the source from a URL when base64 is missing', async () => {
+    const tempRoot = path.join(POFF_DIR, `pageoff-remote-image-url-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      const result = await runPageoffRemoteImageConverter({
+        source: {
+          path: 'scan-001.tiff',
+          name: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          srcUrl: pathToFileURL(sourcePath).href,
+        },
+        converter: {
+          id: 'converter/convert-pageoff-remote-image',
+          format: 'png',
+          quality: 'default',
+        },
+        target: {
+          saveAs: 'scan-001.png',
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('image/png');
+      expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -5503,6 +5723,54 @@ describe('Worktype HBS renderer', () => {
       expect(result.saved).toBe(true);
       expect(result.config.title).toBe(fileName);
       expect(savedConfig.title).toBe(fileName);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('saves nested item description into the parent tree metadata', async () => {
+    const tempDir = path.join(POFF_DIR, `nested-description-save-${Date.now()}`);
+    fs.mkdirSync(path.join(tempDir, 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'nested', 'item.txt'), 'hello');
+    fs.writeFileSync(path.join(tempDir, 'nested', 'poff.config.json'), JSON.stringify({
+      folderName: 'nested',
+      slug: 'nested',
+      title: 'nested',
+      description: '',
+      tree: [
+        {
+          name: 'item.txt',
+          title: 'item.txt',
+          description: '',
+          type: 'file',
+          path: 'item.txt',
+        },
+      ],
+      work: {
+        type: 'folder',
+        layout: {
+          mode: 'actual',
+          name: 'actual',
+          preset: 'actual',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const result = await runViewerSave(tempDir, 'nested/item.txt', {
+        title: 'Nested Title',
+        description: 'Nested Description',
+      });
+      const parentConfigPath = path.join(tempDir, 'nested', 'poff.config.json');
+      const parentConfig = JSON.parse(fs.readFileSync(parentConfigPath, 'utf8'));
+      const treeItem = parentConfig.tree.find((item) => item.name === 'item.txt');
+
+      expect(result.saved).toBe(true);
+      expect(treeItem).toEqual(expect.objectContaining({
+        title: 'Nested Title',
+        description: 'Nested Description',
+      }));
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

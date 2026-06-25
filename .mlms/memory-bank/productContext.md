@@ -1,0 +1,12 @@
+# Product Context
+## Purpose
+Provide a content editor for folder and file based works on dominikeggermann.com.
+## Users
+Editors managing site content and nested work folders.
+## Core Value
+Fast creation and organization of works without manual filesystem work.
+## Current Scope
+Editing, uploading, folder creation, link creation, and viewer rendering for local site content.
+## Non-Goals
+- Rewriting the generated site output by hand.
+- Broad editor redesign work unrelated to the bug.

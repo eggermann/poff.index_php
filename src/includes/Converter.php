@@ -417,7 +417,8 @@ class Converter
         $templateFolder = (string) ($definition['templateFolder'] ?? ($folder !== '' ? $folder . '/.layout' : '.layout/converters/' . $name));
         $path = self::definitionPath($folder);
         $viewerHref = $path !== '' ? '?view=1&path=' . rawurlencode($path) : '';
-        $url = $viewerHref;
+        $remote = is_array($definition['remote'] ?? null) ? $definition['remote'] : [];
+        $url = trim((string) ($definition['url'] ?? $remote['url'] ?? $remote['publicUrl'] ?? $viewerHref));
 
         return [
             'id' => $id,
@@ -437,7 +438,7 @@ class Converter
             'disabledReason' => $disabledReason,
             'defaults' => is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [],
             'ui' => is_array($definition['ui'] ?? null) ? $definition['ui'] : self::defaultUi(),
-            'remote' => is_array($definition['remote'] ?? null) ? $definition['remote'] : [],
+            'remote' => $remote,
             'source' => (string) ($definition['source'] ?? ''),
             'grain' => (bool) ($definition['grain'] ?? false),
         ];
@@ -682,6 +683,9 @@ class Converter
         $name = trim((string) ($definition['name'] ?? $converterOptions['name'] ?? 'converter'));
         $format = self::normalizeFormat((string) ($converterOptions['format'] ?? self::defaultOptions($id)['format'] ?? 'webp'));
         $baseName = pathinfo($sourceName, PATHINFO_FILENAME);
+        if ((string) ($definition['engine'] ?? '') === 'remote-node' && !str_starts_with($baseName, 'external-')) {
+            $baseName = 'external-' . $baseName;
+        }
         $saveAs = $format === 'source'
             ? $sourceName
             : self::sanitizeOutputName($baseName . '.' . $format);
@@ -733,6 +737,21 @@ class Converter
         }
         if ((int) ($source['size'] ?? 0) > self::MAX_SOURCE_BYTES) {
             return self::error('Source file is too large.');
+        }
+
+        if (($definition['engine'] ?? '') === 'remote-node') {
+            $root = realpath($rootDir);
+            $sourcePath = str_replace('\\', '/', trim((string) ($source['path'] ?? ''), '/'));
+            if (is_string($root) && $root !== '' && $sourcePath !== '') {
+                $fullPath = realpath($root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $sourcePath));
+                if (is_string($fullPath) && is_file($fullPath) && str_starts_with($fullPath, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+                    $body = @file_get_contents($fullPath);
+                    if (is_string($body) && $body !== '') {
+                        $source['bodyBase64'] = base64_encode($body);
+                        $payload['source'] = $source;
+                    }
+                }
+            }
         }
 
         $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'webp')));

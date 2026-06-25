@@ -1,0 +1,37 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e112]:
+        - link "MAUSMAUS" [ref=e113] [cursor=pointer]:
+          - /url: "?path="
+          - img [ref=e114]
+          - text: MAUSMAUS
+      - listitem [ref=e116]:
+        - link "Go Up" [ref=e117] [cursor=pointer]:
+          - /url: "?path="
+          - img [ref=e118]
+          - text: Go Up
+      - listitem [ref=e120]:
+        - link "./ converters" [ref=e121] [cursor=pointer]:
+          - /url: "?path=converters"
+  - document [ref=e108]:
+    - generic [ref=e122]:
+      - banner [ref=e123]:
+        - img "Poff profile" [ref=e125]
+        - generic [ref=e126]:
+          - heading "converters" [level=1] [ref=e127]
+          - generic "Categories" [ref=e128]:
+            - generic [ref=e129]: folder
+            - generic [ref=e130]: collection
+      - main [ref=e131]:
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - generic [ref=e134]: converters
+            - generic [ref=e135]: 0 entries
+          - generic [ref=e136]: This folder is empty.
+      - contentinfo [ref=e137]:
+        - generic [ref=e138]: Copyright eggman

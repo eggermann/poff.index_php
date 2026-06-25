@@ -1,0 +1,9 @@
+- generic [active] [ref=e1]:
+  - heading "dodi1 remote image converter harness" [level=1] [ref=e2]
+  - paragraph [ref=e3]:
+    - text: Converts
+    - code [ref=e4]: archive/scan-001.tiff
+    - text: to PNG through the new pageoff remote image endpoint.
+  - button "Convert TIFF to PNG" [ref=e5] [cursor=pointer]
+  - generic [ref=e6]: idle
+  - img "PNG preview" [ref=e7]

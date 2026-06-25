@@ -1,0 +1,100 @@
+{
+  "excludeFolders": [
+    "node_modules",
+    "dist",
+    "output",
+    "pages",
+    "vendor",
+    ".git",
+    ".history",
+    ".mlms",
+    ".playwright-cli"
+  ],
+  "excludeFiles": [
+    "output-prompt.txt",
+    "package-lock.json",
+    ".DS_Store"
+  ],
+  "patterns": [
+    {
+      "src": "./package.json"
+    },
+    {
+      "src": "./composer.json"
+    },
+    {
+      "src": "./composer.lock"
+    },
+    {
+      "src": "./poff.config.json"
+    },
+    {
+      "src": "./poff.config.toon"
+    },
+    {
+      "src": "./AGENTS.md"
+    },
+    {
+      "src": "./README.md"
+    },
+    {
+      "src": "./info.md"
+    },
+    {
+      "src": "./eggman4.md"
+    },
+    {
+      "src": "./plan.md"
+    },
+    {
+      "src": "./src/docs/**/*.md"
+    },
+    {
+      "src": "./memory-bank/**/*.md"
+    },
+    {
+      "src": "./build/**/*.php"
+    },
+    {
+      "src": "./build/**/*.json"
+    },
+    {
+      "src": "./scripts/**/*.js"
+    },
+    {
+      "src": "./src/includes/**/*.php"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.hbs"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.css"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.js"
+    },
+    {
+      "src": "./src/includes/worktypes/templates/**/*.json"
+    },
+    {
+      "src": "./src/assets/js/**/*.js"
+    },
+    {
+      "src": "./src/assets/scss/**/*.scss"
+    },
+    {
+      "src": "./src/mcp/**/*.php"
+    },
+    {
+      "src": "./tests/**/*.js"
+    },
+    {
+      "src": "./tests/**/*.php"
+    },
+    {
+      "src": "./tests/**/*.json"
+    }
+  ],
+  "textEdit": true,
+  "ignoreGitignore": false
+}

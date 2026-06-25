@@ -1,0 +1,8 @@
+[     410ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true:0
+[     447ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[   13541ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true:0
+[   14281ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[   27264ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[   29015ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[   29514ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[   34558ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0

@@ -1,0 +1,320 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e966]:
+        - link "./ dominikeggermann.com" [ref=e967] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=e969] [cursor=pointer]:
+          - img [ref=e971]
+      - listitem [ref=e973]:
+        - link "meine maus" [ref=e974] [cursor=pointer]:
+          - /url: "?path=asasdasdadasd&edit=true"
+          - img [ref=e975]
+          - generic [ref=e977]: meine maus
+        - generic [ref=e978]:
+          - button "Copy + paste" [ref=e979] [cursor=pointer]:
+            - img [ref=e981]
+          - button "Hide from sidebar" [ref=e983] [cursor=pointer]:
+            - img [ref=e985]
+          - button "Delete item" [ref=e987] [cursor=pointer]:
+            - img [ref=e989]
+      - listitem [ref=e991]:
+        - link "tests" [ref=e992] [cursor=pointer]:
+          - /url: "?path=tests&edit=true"
+          - img [ref=e993]
+          - generic [ref=e995]: tests
+        - generic [ref=e996]:
+          - button "Copy + paste" [ref=e997] [cursor=pointer]:
+            - img [ref=e999]
+          - button "Hide from sidebar" [ref=e1001] [cursor=pointer]:
+            - img [ref=e1003]
+          - button "Delete item" [ref=e1005] [cursor=pointer]:
+            - img [ref=e1007]
+      - listitem [ref=e1009]:
+        - link "worktypes" [ref=e1010] [cursor=pointer]:
+          - /url: "?path=worktypes&edit=true"
+          - img [ref=e1011]
+          - generic [ref=e1013]: worktypes
+        - generic [ref=e1014]:
+          - button "Copy + paste" [ref=e1015] [cursor=pointer]:
+            - img [ref=e1017]
+          - button "Hide from sidebar" [ref=e1019] [cursor=pointer]:
+            - img [ref=e1021]
+          - button "Delete item" [ref=e1023] [cursor=pointer]:
+            - img [ref=e1025]
+      - listitem [ref=e1027]:
+        - link ".layout" [ref=e1028] [cursor=pointer]:
+          - /url: "#/.layout"
+          - img [ref=e1029]
+          - text: .layout
+        - button "Copy + paste" [ref=e1032] [cursor=pointer]:
+          - img [ref=e1034]
+      - listitem [ref=e1036]:
+        - link "dominikeggermann.com external" [ref=e1037] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e1038]
+          - generic [ref=e1040]: dominikeggermann.com
+          - generic [ref=e1041]: external
+        - generic [ref=e1042]:
+          - button "Copy + paste" [ref=e1043] [cursor=pointer]:
+            - img [ref=e1045]
+          - button "Hide from sidebar" [ref=e1047] [cursor=pointer]:
+            - img [ref=e1049]
+          - button "Delete item" [ref=e1051] [cursor=pointer]:
+            - img [ref=e1053]
+      - listitem [ref=e1055]:
+        - link "index.php" [ref=e1056] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e1057]
+          - generic [ref=e1059]: index.php
+        - generic [ref=e1060]:
+          - button "Copy + paste" [ref=e1061] [cursor=pointer]:
+            - img [ref=e1063]
+          - button "Hide from sidebar" [ref=e1065] [cursor=pointer]:
+            - img [ref=e1067]
+          - button "Delete item" [ref=e1069] [cursor=pointer]:
+            - img [ref=e1071]
+      - listitem [ref=e1073]:
+        - link "scan-001.png" [ref=e1074] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e1075]
+          - generic [ref=e1077]: scan-001.png
+        - generic [ref=e1078]:
+          - button "Copy + paste" [ref=e1079] [cursor=pointer]:
+            - img [ref=e1081]
+          - button "Hide from sidebar" [ref=e1083] [cursor=pointer]:
+            - img [ref=e1085]
+          - button "Delete item" [ref=e1087] [cursor=pointer]:
+            - img [ref=e1089]
+      - listitem [ref=e1091]:
+        - link "scan-001.tiff" [ref=e1092] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e1093]
+          - generic [ref=e1095]: scan-001.tiff
+        - generic [ref=e1096]:
+          - button "Copy + paste" [ref=e1097] [cursor=pointer]:
+            - img [ref=e1099]
+          - button "Hide from sidebar" [ref=e1101] [cursor=pointer]:
+            - img [ref=e1103]
+          - button "Delete item" [ref=e1105] [cursor=pointer]:
+            - img [ref=e1107]
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - generic [ref=e162]:
+    - generic [ref=e163]:
+      - heading "Edit mode (file)" [level=3] [ref=e859]
+      - generic [ref=e1109]: Config saved.
+      - generic [ref=e860]:
+        - generic [ref=e861]:
+          - generic [ref=e862]: Title
+          - textbox "Title" [ref=e863]: playwright-title-2026-06-09
+        - generic [ref=e864]:
+          - generic [ref=e865]: Description
+          - textbox "Description" [ref=e866]: playwright-desc-2026-06-09
+        - generic [ref=e867]:
+          - generic [ref=e869]:
+            - generic [ref=e870]: Work settings
+            - generic [ref=e871]: Derived from the current work config. Each worktype exposes its own fields here.
+          - generic [ref=e872]:
+            - generic [ref=e873]:
+              - generic [ref=e874]: Work type
+              - combobox "Work type Work Template" [ref=e875]:
+                - option "other" [selected]
+              - generic [ref=e876]: Detected text/x-php · .php · showing other templates
+            - generic [ref=e877]:
+              - generic [ref=e878]: Current work fields
+              - generic [ref=e879]: No additional work fields yet.
+          - group [ref=e880]:
+            - generic "Categories Pick shared work categories for filtering and prompt context. +" [ref=e881] [cursor=pointer]:
+              - generic [ref=e882]:
+                - generic [ref=e883]: Categories
+                - generic [ref=e884]: Pick shared work categories for filtering and prompt context.
+              - text: +
+            - option "audio" [selected]
+            - option "collection"
+            - option "document"
+            - option "folder"
+            - option "image"
+            - option "link"
+            - option "media"
+            - option "motion"
+            - option "other"
+            - option "pdf"
+            - option "reference"
+            - option "sound"
+            - option "text"
+            - option "video"
+            - option "visual"
+        - generic [ref=e885]:
+          - generic [ref=e886]:
+            - generic [ref=e887]:
+              - generic [ref=e888]: Work fields
+              - generic [ref=e889]:
+                - text: Add extra values below Description. Saved as
+                - code [ref=e890]: work.<name>
+                - text: and shown in prompt context.
+            - button "Add work field" [ref=e891] [cursor=pointer]: +
+          - generic [ref=e893]: No extra work fields yet.
+        - generic [ref=e894]:
+          - button "Save" [active] [ref=e895] [cursor=pointer]
+          - button "More..." [ref=e896] [cursor=pointer]
+          - button "Change layout" [ref=e897] [cursor=pointer]
+          - button "Delete" [ref=e898] [cursor=pointer]
+        - generic [ref=e899]:
+          - text: "Layout: PHP built-in poff-layout · parent:"
+          - code [ref=e900]: .layout
+          - text: "· mode:"
+          - code [ref=e901]: poff-layout
+      - generic [ref=e902]:
+        - button "Add work" [ref=e903] [cursor=pointer]
+        - generic [ref=e904]:
+          - generic [ref=e905]:
+            - generic [ref=e906]:
+              - generic [ref=e907]: Converter
+              - generic [ref=e908]: Creates hidden generated works beside unsupported source files.
+            - button "New converter" [ref=e909] [cursor=pointer]
+          - generic [ref=e910]:
+            - generic [ref=e911]:
+              - generic [ref=e912]: Converter
+              - combobox "Converter" [ref=e913]:
+                - option "none" [selected]
+                - option "Convert Pageoff Remote Text"
+                - option "Convert Text Editor"
+                - option "Convert Text"
+            - generic [ref=e914]:
+              - generic [ref=e915]: Quality
+              - combobox "Quality" [ref=e916]:
+                - option "preview"
+                - option "default" [selected]
+                - option "archival"
+                - option "small-web"
+            - generic [ref=e917]:
+              - generic [ref=e918]: Output format
+              - combobox "Output format" [ref=e919]:
+                - option "same as source" [selected]
+            - generic [ref=e920]:
+              - generic [ref=e921]: Save mode
+              - combobox "Save mode" [ref=e922]:
+                - option "new-hidden-work" [selected]
+                - option "replace-generated-work"
+                - option "temporary-preview-only"
+          - button "Convert" [disabled] [ref=e924] [cursor=pointer]
+          - generic [ref=e925]: "Generated works: none"
+    - generic [ref=e230]:
+      - document [ref=e231]:
+        - generic [ref=e1110]:
+          - banner [ref=e1111]:
+            - img "Poff profile" [ref=e1113]
+            - generic [ref=e1114]:
+              - heading "index.php" [level=1] [ref=e1115]
+              - generic "Categories" [ref=e1116]:
+                - generic [ref=e1117]: other
+          - main [ref=e1118]:
+            - iframe [ref=e1119]:
+              - generic [ref=f3e2]:
+                - button "Close navigation" [expanded] [ref=f3e3] [cursor=pointer]
+                - complementary "Navigation" [ref=f3e8]:
+                  - group [ref=f3e10]:
+                    - generic "Toggle editor tools" [ref=f3e11] [cursor=pointer]:
+                      - generic [ref=f3e16]: Editor tools
+                  - list [ref=f3e18]:
+                    - listitem [ref=f3e19]:
+                      - link "./ dominikeggermann.com" [ref=f3e20] [cursor=pointer]:
+                        - /url: "?path="
+                    - listitem [ref=f3e21]:
+                      - link "meine maus" [ref=f3e22] [cursor=pointer]:
+                        - /url: "?path=asasdasdadasd"
+                        - img [ref=f3e23]
+                        - generic [ref=f3e25]: meine maus
+                    - listitem [ref=f3e26]:
+                      - link "tests" [ref=f3e27] [cursor=pointer]:
+                        - /url: "?path=tests"
+                        - img [ref=f3e28]
+                        - generic [ref=f3e30]: tests
+                    - listitem [ref=f3e31]:
+                      - link "worktypes" [ref=f3e32] [cursor=pointer]:
+                        - /url: "?path=worktypes"
+                        - img [ref=f3e33]
+                        - generic [ref=f3e35]: worktypes
+                    - listitem [ref=f3e36]:
+                      - link "dominikeggermann.com external" [ref=f3e37] [cursor=pointer]:
+                        - /url: "#"
+                        - img [ref=f3e38]
+                        - generic [ref=f3e40]: dominikeggermann.com
+                        - generic [ref=f3e41]: external
+                    - listitem [ref=f3e42]:
+                      - link "scan-001.png" [ref=f3e43] [cursor=pointer]:
+                        - /url: "#"
+                        - img [ref=f3e44]
+                        - generic [ref=f3e46]: scan-001.png
+                    - listitem [ref=f3e47]:
+                      - link "scan-001.tiff" [ref=f3e48] [cursor=pointer]:
+                        - /url: "#"
+                        - img [ref=f3e49]
+                        - generic [ref=f3e51]: scan-001.tiff
+                - document [ref=f3e54]
+          - contentinfo [ref=e1120]:
+            - link "Download original" [ref=e1121] [cursor=pointer]:
+              - /url: https://eggman4.uber.space/dodi/index.php
+              - img [ref=e1123]
+              - generic [ref=e1126]: Download original
+            - generic [ref=e1127]: Copyright eggman
+      - generic:
+        - generic:
+          - button "Hide prompt window" [ref=e926] [cursor=pointer]: ×
+          - generic [ref=e927]:
+            - generic [ref=e929]:
+              - heading "Prompt edit window" [level=4] [ref=e930]
+              - generic [ref=e931]: Chat + completion helper
+            - group [ref=e932]:
+              - generic "Connection" [ref=e933] [cursor=pointer]
+              - option "LM Studio" [selected]
+              - option "OpenAI"
+              - option "Gemini"
+              - option "Local models endpoint request failed." [selected]
+            - group [ref=e934]:
+              - generic "System prompt (description → HBS component)" [ref=e935] [cursor=pointer]
+            - generic [ref=e936]:
+              - generic [ref=e937]: Template summary
+              - generic [ref=e938]: Waiting for response...
+            - generic [ref=e939]:
+              - text: "Editable via prompt:"
+              - strong [ref=e941]: title
+              - text: ","
+              - strong [ref=e942]: description
+              - text: ","
+              - strong [ref=e943]: work.<name>
+            - group [ref=e944]:
+              - generic "Prompt context" [ref=e945] [cursor=pointer]
+            - group [ref=e946]:
+              - generic "Current template code" [ref=e947] [cursor=pointer]
+            - group [ref=e948]:
+              - generic "Messages" [ref=e949] [cursor=pointer]
+            - textbox "Describe the file component you want..." [ref=e950]
+            - generic [ref=e951]:
+              - generic [ref=e952]:
+                - button "Send" [ref=e953] [cursor=pointer]
+                - button "Attach image" [ref=e954] [cursor=pointer]
+                - button "Insert file name" [ref=e955] [cursor=pointer]
+                - button "Clear" [ref=e956] [cursor=pointer]
+              - generic [ref=e957]:
+                - checkbox "Stream response" [checked] [ref=e958] [cursor=pointer]
+                - text: Stream response
+            - generic [ref=e959]:
+              - text: Press
+              - code [ref=e960]: Enter
+              - text: to send. Use
+              - code [ref=e961]: Shift+Enter
+              - text: for a new line.
+            - generic [ref=e962]: Paste an image from the clipboard directly into the prompt input to attach it.
+            - generic [ref=e963]: Prompt edits the wrapped work.hbs partial for the current file.
+            - generic [ref=e964]:
+              - text: "Template responses are saved to the wrapped partial:"
+              - code [ref=e965]: work.hbs
+              - text: for files.

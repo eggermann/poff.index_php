@@ -1,0 +1,80 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ mouse" [ref=e20] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=e21] [cursor=pointer]:
+          - img [ref=e23]
+          - generic [ref=e25]: Copy
+      - listitem [ref=e26]:
+        - link "build" [ref=e27] [cursor=pointer]:
+          - /url: "?path=build&edit=true"
+          - img [ref=e28]
+          - text: build
+        - button "Copy + paste" [ref=e30] [cursor=pointer]:
+          - img [ref=e32]
+          - generic [ref=e34]: Copy
+        - button "Hide from sidebar" [ref=e35] [cursor=pointer]:
+          - img [ref=e37]
+          - generic [ref=e39]: Hide
+      - listitem [ref=e40]:
+        - link "worktypes" [ref=e41] [cursor=pointer]:
+          - /url: "?path=worktypes&edit=true"
+          - img [ref=e42]
+          - text: worktypes
+        - button "Copy + paste" [ref=e44] [cursor=pointer]:
+          - img [ref=e46]
+          - generic [ref=e48]: Copy
+        - button "Hide from sidebar" [ref=e49] [cursor=pointer]:
+          - img [ref=e51]
+          - generic [ref=e53]: Hide
+      - listitem [ref=e54]:
+        - link ".layout" [ref=e55] [cursor=pointer]:
+          - /url: "#/.layout"
+          - img [ref=e56]
+          - text: .layout
+        - button "Copy + paste" [ref=e58] [cursor=pointer]: Copy
+      - listitem [ref=e59]:
+        - link ".htaccess hidden" [disabled] [ref=e60] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e61]
+          - text: .htaccess
+          - generic [ref=e63]: hidden
+        - button "Copy + paste" [ref=e64] [cursor=pointer]:
+          - img [ref=e66]
+          - generic [ref=e68]: Copy
+        - button "Unhide in sidebar" [ref=e69] [cursor=pointer]:
+          - img [ref=e71]
+          - generic [ref=e73]: Unhide
+      - listitem [ref=e74]:
+        - link ".htaccess_bak_2021-03-31_11_03" [ref=e75] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e76]
+          - text: .htaccess_bak_2021-03-31_11_03
+        - button "Copy + paste" [ref=e78] [cursor=pointer]:
+          - img [ref=e80]
+          - generic [ref=e82]: Copy
+        - button "Hide from sidebar" [ref=e83] [cursor=pointer]:
+          - img [ref=e85]
+          - generic [ref=e87]: Hide
+      - listitem [ref=e88]:
+        - link "1749825623730-flux.jpeg" [ref=e89] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e90]
+          - text: 1749825623730-flux.jpeg
+        - button "Copy + paste" [ref=e92] [cursor=pointer]:
+          - img [ref=e94]
+          - generic [ref=e96]: Copy
+        - button "Hide from sidebar" [ref=e97] [cursor=pointer]:
+          - img [ref=e99]
+          - generic [ref=e101]: Hide
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - document [ref=e104]

@@ -1,0 +1,23 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "MAUSMAUS" [ref=e20] [cursor=pointer]:
+          - /url: "?path="
+          - img [ref=e21]
+          - text: MAUSMAUS
+      - listitem [ref=e23]:
+        - link "Go Up" [ref=e24] [cursor=pointer]:
+          - /url: "?path="
+          - img [ref=e25]
+          - text: Go Up
+      - listitem [ref=e27]:
+        - link "./ archive" [ref=e28] [cursor=pointer]:
+          - /url: "?path=archive"
+      - listitem [ref=e29]: Error reading directory.
+  - document [ref=e32]:
+    - generic [ref=e33]: Preview failed to load.

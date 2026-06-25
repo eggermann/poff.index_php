@@ -142,7 +142,7 @@ function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, st
             'webReadable' => Converter::isWebReadableMime($mime),
             'available' => Converter::availableFor($mime, $kind, $extension, $rootDir),
         ];
-        $folderConfig = class_exists('PoffConfig') ? PoffConfig::ensure($targetDir) : [];
+        $folderConfig = class_exists('PoffConfig') ? PoffConfig::read($targetDir) : [];
         $tree = is_array($folderConfig['tree'] ?? null) ? $folderConfig['tree'] : [];
         $config['generatedWorks'] = array_values(array_filter($tree, static function ($item) use ($targetFile): bool {
             return is_array($item)

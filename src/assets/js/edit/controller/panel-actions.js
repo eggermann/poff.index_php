@@ -182,6 +182,18 @@ export function createPanelActions({
             setStatusMessage(statusEl, 'Converting...');
             const currentConfig = getEditConfig() && typeof getEditConfig() === 'object' ? getEditConfig() : {};
             const sourceName = sourcePath.split('/').pop() || sourcePath;
+            const sourceUrl = String(converter?.sourceUrl || currentConfig.srcUrl || '').trim();
+            let normalizedSourceUrl = sourceUrl;
+            if (sourceUrl) {
+                try {
+                    const baseHref = typeof window?.location?.href === 'string' && window.location.href
+                        ? window.location.href
+                        : 'http://localhost/';
+                    normalizedSourceUrl = new URL(sourceUrl, baseHref).toString();
+                } catch {
+                    normalizedSourceUrl = sourceUrl;
+                }
+            }
             const payload = {
                 source: {
                     name: sourceName,
@@ -189,7 +201,7 @@ export function createPanelActions({
                     mimeType: currentConfig.mimeType || '',
                     extension: sourceName.includes('.') ? sourceName.split('.').pop() : '',
                     size: currentConfig.size || 0,
-                    srcUrl: currentConfig.srcUrl || '',
+                    srcUrl: normalizedSourceUrl,
                 },
                 converter,
                 target: {

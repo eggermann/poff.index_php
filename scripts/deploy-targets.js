@@ -22,6 +22,11 @@ function resolveTargetSuffix(targetName) {
         return namedSuffixes[normalized];
     }
 
+    const bareSuffixMatch = normalized.match(/^([a-z][a-z0-9_-]*?)(\d+)$/);
+    if (bareSuffixMatch) {
+        return bareSuffixMatch[2];
+    }
+
     const match = normalized.match(/(?:^|_)(\d+)$/);
     if (match) {
         return match[1];

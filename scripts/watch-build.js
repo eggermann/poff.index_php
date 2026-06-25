@@ -6,7 +6,7 @@ const { spawn, spawnSync } = require('child_process');
 const rootDir = path.resolve(__dirname, '..');
 const mampHtdocs = '/Applications/MAMP/htdocs';
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
-const standaloneCopyTargets = ['MAUSMAUS'];
+const standaloneCopyTargets = ['MAUSMAUS', 'node-1', 'node-2', 'pageoff'];
 const bundledLayoutAsset = path.join(rootDir, 'src', 'includes', 'worktypes', 'templates', 'layout', 'default', 'poff.profile.jpg');
 
 function logBrowseUrl(linkName) {

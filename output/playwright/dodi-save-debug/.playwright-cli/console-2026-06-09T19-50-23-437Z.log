@@ -1,0 +1,24 @@
+[     593ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true:0
+[     636ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  226637ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  228498ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  230252ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  233881ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  234372ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  237500ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  240159ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  240651ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  244046ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  248953ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  259026ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  259934ms] [ERROR] Access to fetch at 'https://dominikeggermann.com/#/joined-test-1762176567171-mp4' from origin 'https://eggman4.uber.space' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://eggman4.uber.space/dodi/?edit=true#/dominikeggermann.com:0
+[  259935ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://dominikeggermann.com/#/joined-test-1762176567171-mp4:0
+[  265326ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  386508ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true#/tests:0
+[  386588ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  504883ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true#/tests:0
+[  505014ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  567743ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true#/tests:0
+[  567822ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0
+[  577719ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true#/tests:0
+[  577792ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0

@@ -1,0 +1,183 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [active] [ref=e11] [cursor=pointer]:
+        - generic [ref=e16]: Editor tools
+      - generic [ref=e363]:
+        - group [ref=e364]:
+          - generic "Enable edit mode" [ref=e365] [cursor=pointer]
+          - generic [ref=e366]:
+            - generic [ref=e367]: Editor password
+            - textbox "Editor password" [ref=e368]
+            - button "Unlock" [ref=e369] [cursor=pointer]
+            - generic [ref=e370]: Enter the editor password to unlock editing.
+        - generic [ref=e371]:
+          - button "Add work" [ref=e372] [cursor=pointer]
+          - button "Jump to edit section" [ref=e373] [cursor=pointer]:
+            - img [ref=e375]
+    - list [ref=e18]:
+      - listitem [ref=e165]:
+        - link "./ dominikeggermann.com" [ref=e166] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=e168] [cursor=pointer]:
+          - img [ref=e170]
+      - listitem [ref=e172]:
+        - link "meine maus" [ref=e173] [cursor=pointer]:
+          - /url: "?path=asasdasdadasd&edit=true"
+          - img [ref=e174]
+          - generic [ref=e176]: meine maus
+        - generic [ref=e177]:
+          - button "Copy + paste" [ref=e178] [cursor=pointer]:
+            - img [ref=e180]
+          - button "Hide from sidebar" [ref=e182] [cursor=pointer]:
+            - img [ref=e184]
+          - button "Delete item" [ref=e186] [cursor=pointer]:
+            - img [ref=e188]
+      - listitem [ref=e190]:
+        - link "tests" [ref=e191] [cursor=pointer]:
+          - /url: "?path=tests&edit=true"
+          - img [ref=e192]
+          - generic [ref=e194]: tests
+        - generic [ref=e195]:
+          - button "Copy + paste" [ref=e196] [cursor=pointer]:
+            - img [ref=e198]
+          - button "Hide from sidebar" [ref=e200] [cursor=pointer]:
+            - img [ref=e202]
+          - button "Delete item" [ref=e204] [cursor=pointer]:
+            - img [ref=e206]
+      - listitem [ref=e208]:
+        - link "worktypes" [ref=e209] [cursor=pointer]:
+          - /url: "?path=worktypes&edit=true"
+          - img [ref=e210]
+          - generic [ref=e212]: worktypes
+        - generic [ref=e213]:
+          - button "Copy + paste" [ref=e214] [cursor=pointer]:
+            - img [ref=e216]
+          - button "Hide from sidebar" [ref=e218] [cursor=pointer]:
+            - img [ref=e220]
+          - button "Delete item" [ref=e222] [cursor=pointer]:
+            - img [ref=e224]
+      - listitem [ref=e226]:
+        - link ".layout" [ref=e227] [cursor=pointer]:
+          - /url: "#/.layout"
+          - img [ref=e228]
+          - text: .layout
+        - button "Copy + paste" [ref=e231] [cursor=pointer]:
+          - img [ref=e233]
+      - listitem [ref=e235]:
+        - link "dominikeggermann.com external" [ref=e236] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e237]
+          - generic [ref=e239]: dominikeggermann.com
+          - generic [ref=e240]: external
+        - generic [ref=e241]:
+          - button "Copy + paste" [ref=e242] [cursor=pointer]:
+            - img [ref=e244]
+          - button "Hide from sidebar" [ref=e246] [cursor=pointer]:
+            - img [ref=e248]
+          - button "Delete item" [ref=e250] [cursor=pointer]:
+            - img [ref=e252]
+      - listitem [ref=e254]:
+        - link "index.php" [ref=e255] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e256]
+          - generic [ref=e258]: index.php
+        - generic [ref=e259]:
+          - button "Copy + paste" [ref=e260] [cursor=pointer]:
+            - img [ref=e262]
+          - button "Hide from sidebar" [ref=e264] [cursor=pointer]:
+            - img [ref=e266]
+          - button "Delete item" [ref=e268] [cursor=pointer]:
+            - img [ref=e270]
+      - listitem [ref=e272]:
+        - link "scan-001.png" [ref=e273] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e274]
+          - generic [ref=e276]: scan-001.png
+        - generic [ref=e277]:
+          - button "Copy + paste" [ref=e278] [cursor=pointer]:
+            - img [ref=e280]
+          - button "Hide from sidebar" [ref=e282] [cursor=pointer]:
+            - img [ref=e284]
+          - button "Delete item" [ref=e286] [cursor=pointer]:
+            - img [ref=e288]
+      - listitem [ref=e290]:
+        - link "scan-001.tiff" [ref=e291] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e292]
+          - generic [ref=e294]: scan-001.tiff
+        - generic [ref=e295]:
+          - button "Copy + paste" [ref=e296] [cursor=pointer]:
+            - img [ref=e298]
+          - button "Hide from sidebar" [ref=e300] [cursor=pointer]:
+            - img [ref=e302]
+          - button "Delete item" [ref=e304] [cursor=pointer]:
+            - img [ref=e306]
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - generic [ref=e162]:
+    - generic [ref=e308]:
+      - heading "Edit mode" [level=3] [ref=e377]
+      - generic [ref=e378]: Enter the editor password to unlock editing.
+    - document [ref=e164]:
+      - generic [ref=e311]:
+        - banner [ref=e312]:
+          - img "Poff profile" [ref=e314]
+          - generic [ref=e315]:
+            - heading "dominikeggermann.com" [level=1] [ref=e316]
+            - generic "Categories" [ref=e317]:
+              - generic [ref=e318]: folder
+              - generic [ref=e319]: collection
+        - main [ref=e320]:
+          - generic [ref=e321]:
+            - generic [ref=e322]:
+              - generic [ref=e323]: .
+              - generic [ref=e324]: 7 entries
+            - generic [ref=e325]:
+              - article [ref=e326]:
+                - generic [ref=e327]: Folder
+                - strong [ref=e328]:
+                  - link "asasdasdadasd" [ref=e329] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&path=asasdasdadasd
+                - generic [ref=e330]: asasdasdadasd
+              - article [ref=e331]:
+                - generic [ref=e332]: File
+                - strong [ref=e333]:
+                  - link "index.php" [ref=e334] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&file=index.php
+                - generic [ref=e335]: index.php
+              - article [ref=e336]:
+                - generic [ref=e337]: File
+                - strong [ref=e338]:
+                  - link "scan-001.png" [ref=e339] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&file=scan-001.png
+                - generic [ref=e340]: scan-001.png
+              - article [ref=e341]:
+                - generic [ref=e342]: File
+                - strong [ref=e343]:
+                  - link "scan-001.tiff" [ref=e344] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&file=scan-001.tiff
+                - generic [ref=e345]: scan-001.tiff
+              - article [ref=e346]:
+                - generic [ref=e347]: Folder
+                - strong [ref=e348]:
+                  - link "tests" [ref=e349] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&path=tests
+                - generic [ref=e350]: tests
+              - article [ref=e351]:
+                - generic [ref=e352]: Folder
+                - strong [ref=e353]:
+                  - link "worktypes" [ref=e354] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&path=worktypes
+                - generic [ref=e355]: worktypes
+              - article [ref=e356]:
+                - generic [ref=e357]: File
+                - strong [ref=e358]:
+                  - link "dominikeggermann.com" [ref=e359] [cursor=pointer]:
+                    - /url: https://eggman4.uber.space/dodi/?view=1&file=dominikeggermann.com
+                - generic [ref=e360]: dominikeggermann.com
+        - contentinfo [ref=e361]:
+          - generic [ref=e362]: Copyright eggman

@@ -22,6 +22,9 @@ $isProductionBuild = $buildMode === 'production';
 $skipDistributionCopies = getenv('POFF_SKIP_DISTRIBUTION_COPIES') === '1';
 $standaloneCopyTargets = [
     '/Applications/MAMP/htdocs/MAUSMAUS',
+    '/Applications/MAMP/htdocs/node-1',
+    '/Applications/MAMP/htdocs/node-2',
+    '/Applications/MAMP/htdocs/pageoff',
 ];
 // Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
 if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {

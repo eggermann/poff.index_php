@@ -352,7 +352,7 @@ export function bindUploadDialog({
                     await onCreateFolder({
                         source,
                         folderName,
-                        saveTarget: 'current',
+                        saveTarget: readSaveTarget(),
                         statusEl,
                         closeDialog: closeUploadDialog,
                     });

@@ -1,0 +1,2 @@
+[     543ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://eggman4.uber.space/dodi/?edit=true:0
+[     584ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://eggman4.uber.space/favicon.ico:0

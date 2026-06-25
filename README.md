@@ -218,6 +218,16 @@ Responses:
 
 1) Run the build.
 2) Deploy the generated `index.php` and required assets.
+
+Named deploy targets:
+
+- `npm run deploy -- dodi`
+- `npm run deploy -- dodi1`
+- `npm run deploy -- dodi_2`
+- `npm run deploy -- customer`
+- `npm run deploy -- pageoff`
+
+`dodi1` currently aliases the `/dodi/` public webspace.
 3) Ensure PHP has read/write access where configs are stored.
 
 Deploy script:

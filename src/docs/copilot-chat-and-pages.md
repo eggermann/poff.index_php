@@ -13,6 +13,7 @@ On `eggman4`, the working split is:
 
 - `~/html/copilot` - private Copilot/code-server workspace
 - `~/html/pages/dodi/actual` - public PHP page for `dodi`
+- `~/html/pages/dodi/actual` - public PHP page for `dodi1` aliasing the same webspace
 - `~/html/pages/customer/actual` - public PHP page for `customer`
 - `~/html/pages/pageoff/actual` - public PHP page for `pageoff`
 
@@ -35,6 +36,7 @@ Then trust the folder if prompted, and type the task as a chat prompt.
 The deploy script accepts named targets:
 
 - `dodi`
+- `dodi1`
 - `customer`
 - `pageoff`
 - `dodi_2` as a legacy alias for the second target family
@@ -43,6 +45,7 @@ Examples:
 
 ```sh
 npm run deploy -- dodi
+npm run deploy -- dodi1
 npm run deploy -- customer
 npm run deploy -- pageoff
 ```
@@ -50,11 +53,14 @@ npm run deploy -- pageoff
 Target-specific env vars use the same base keys with an optional suffix:
 
 - `hostcustomer`, `usercustomer`, `destinationPathcustomer`
+- `host1`, `user1`, `destinationPath1`
 - `hostpageoff`, `userpageoff`, `destinationPathpageoff`
 
 Numeric suffixes still work too:
 
 - `host2`, `user2`, `destinationPath2`
+
+`dodi1` is a target label for the same public `/dodi/` webspace, not a separate URL.
 
 ## Source of Truth
 
