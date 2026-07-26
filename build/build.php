@@ -26,6 +26,9 @@ $standaloneCopyTargets = [
     '/Applications/MAMP/htdocs/node-2',
     '/Applications/MAMP/htdocs/pageoff',
 ];
+$additionalIndexCopyTargets = [
+    '/Applications/MAMP/htdocs/dominikeggermann-project/page',
+];
 // Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
 if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {
     unlink($legacyOutputFile);
@@ -594,6 +597,22 @@ PHP;
             if (is_dir($converterGrainDir)) {
                 FileCopier::mirrorDirectory($converterGrainDir, $resolvedTargetDir . '/worktypes/templates/converter');
             }
+        }
+
+        foreach ($additionalIndexCopyTargets as $targetDir) {
+            $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+            if ($resolvedTargetDir === '') {
+                continue;
+            }
+            if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
+                throw new Exception("Failed to create additional index target directory: $resolvedTargetDir");
+            }
+
+            $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
+            if (!copy($outputFile, $targetFile)) {
+                throw new Exception("Failed to copy additional index build to: $targetFile");
+            }
+            FileCopier::removeGeneratedEntrypointsFromSubdirectories($resolvedTargetDir, $outputFileName);
         }
 
         FileCopier::removeGeneratedEntrypointsFromSubdirectories($outputDir, $outputFileName);

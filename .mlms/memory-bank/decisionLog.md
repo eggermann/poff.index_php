@@ -16,3 +16,11 @@ Decision:
 Treat any existing path as a collision when selecting the work-folder name.
 Consequences:
 Folder naming now safely skips already-present directories as well as files.
+### D-0003: node-1 and node-2 must start empty and independent
+Status: Accepted
+Context:
+The sibling localhost folders were accidentally turned into aliases or cloned trees.
+Decision:
+Keep `node-1` and `node-2` as real independent directories and clear their duplicated starter content so they begin empty.
+Consequences:
+Their initial browser state is an empty directory listing instead of a copy of `MAUSMAUS`.

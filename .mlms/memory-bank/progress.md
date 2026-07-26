@@ -7,9 +7,12 @@
 - Confirmed the targeted work-folder regression passes.
 - Verified the live browser flow creates and shows `stiefring`.
 - Added sibling localhost mirror targets for `node-1`, `node-2`, and `pageoff`.
+- Created a live `success-story` folder with `note.txt` on `node-2`.
+- Verified the live browser sidebar/path shows `success-story`.
+- Captured a browser screenshot of the success state.
+- Removed duplicated cloned content from `node-1` and `node-2`.
+- Verified `node-2` now shows an empty directory index.
 ## In Progress
-- Source fix remains in place.
-- Regression coverage remains in place.
-- Deployment is optional follow-up.
+- Empty-starter state remains in place.
 ## Next
-- Stop or deploy if a ship step is still desired.
+- Stop or add a custom empty-state page if requested.

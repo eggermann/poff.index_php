@@ -1,19 +1,15 @@
 # Active Context
 ## Current Goal
-Fix the live folder-creation failure for the new folder stiefring and deploy the fix to eggman.
+Keep `node-1` and `node-2` as independent empty starter folders, not aliases or duplicated `MAUSMAUS` trees.
 ## Current Loop
-Loop: 3
+Loop: 5
 Phase: Verified
 ## Current Focus
-The live browser flow now shows the created `stiefring` folder in the root navigation, so the goal is verified.
+`node-1` and `node-2` are now real directories with their cloned content removed, and `node-2` shows an empty directory index.
 ## Assumptions
-- The live screenshot reflects current source behavior rather than a stale build.
-- The folder creation issue is reproducible through the edit upload path.
-- The deploy target uses generated output under `pages/`, so stale build artifacts matter.
-- MAMP PHP is the correct local runtime to use for lint and helper verification.
+- The user wants empty starters before any generated content is added.
+- A plain Apache directory index is acceptable as the initial empty state.
 ## Risks / Unknowns
-- The 500 may come from a server-side route bug instead of the folder helper.
-- The eggman deploy target may require a production build if assets changed.
-- The current repo state already contains unrelated dirty changes that were left untouched.
+- The user may later want a custom empty-state page instead of a raw directory listing.
 ## Next Action
-Stop unless the user wants a rebuild/deploy follow-up.
+Stop unless the user wants an empty-state page for `node-1` and `node-2`.

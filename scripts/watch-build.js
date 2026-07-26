@@ -7,6 +7,7 @@ const rootDir = path.resolve(__dirname, '..');
 const mampHtdocs = '/Applications/MAMP/htdocs';
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
 const standaloneCopyTargets = ['MAUSMAUS', 'node-1', 'node-2', 'pageoff'];
+const additionalIndexCopyTargets = ['dominikeggermann-project/page'];
 const bundledLayoutAsset = path.join(rootDir, 'src', 'includes', 'worktypes', 'templates', 'layout', 'default', 'poff.profile.jpg');
 
 function logBrowseUrl(linkName) {
@@ -98,6 +99,16 @@ function ensureStandaloneCopies(outputDir, outputFile) {
       copyFileToLayoutDirectories(bundledLayoutAsset, targetDir);
     }
     console.log(`[watch] Copied standalone build ${sourceFile} -> ${targetFile}.`);
+    logBrowseUrl(targetName);
+  });
+
+  additionalIndexCopyTargets.forEach((targetName) => {
+    const targetDir = path.join(resolvedHtdocs, targetName);
+    const targetFile = path.join(targetDir, outputFile);
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.copyFileSync(sourceFile, targetFile);
+    removeGeneratedEntrypointsFromSubdirectories(targetDir, outputFile);
+    console.log(`[watch] Copied additional index build ${sourceFile} -> ${targetFile}.`);
     logBrowseUrl(targetName);
   });
 }

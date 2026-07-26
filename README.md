@@ -141,6 +141,8 @@ Source is compiled into a single PHP file:
 - Build script: `build/build.php`
 - Config: `build/BuildConfig.php`
 - Output: `pages/dominikeggermann.com/index.php`
+- Local index copies: `MAUSMAUS`, `node-1`, `node-2`, `pageoff`, and `dominikeggermann-project/page` under MAMP `htdocs`.
+  The `dominikeggermann-project/page` target receives only the fresh `index.php`; it does not receive copied layout assets or converter templates.
 
 Asset build dependencies:
 ```sh

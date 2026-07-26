@@ -94,6 +94,65 @@
 ### Process Decision
 - Stop
 
+## Loop 4 Review
+### What Changed
+- Created a `success-story` folder under the live `node-2` mount.
+- Added `note.txt` containing `i love u`.
+- Loaded `http://localhost:8888/node-2/?path=success-story` in Chrome and captured the success state.
+### Acceptance Criteria Result
+- [x] Folder exists on the live `node-2` mount.
+- [x] Folder contains a text note.
+- [x] Browser view shows the folder path and sidebar state.
+- [x] Screenshot captured for the success story.
+### Verification Result
+- `mkdir -p /Applications/MAMP/htdocs/MAUSMAUS/success-story`
+- `printf 'i love u\n' > /Applications/MAMP/htdocs/MAUSMAUS/success-story/note.txt`
+- Playwright with system Chrome loaded `http://localhost:8888/node-2/?path=success-story`
+### Issues / Gaps
+- No repo code changed in this loop, so there is nothing to lint or unit test.
+### User Demo Notes
+- The live page shows `success-story` in the sidebar path and `note.txt` in the folder view.
+
+## Loop 4 Retrospective
+### What Worked
+- Direct filesystem changes were enough to create a visible live story artifact.
+- System Chrome worked as the Playwright target even though the bundled browser was missing.
+### What Was Confusing
+- The task wording mixed folder creation, download files, and screenshot capture in one request.
+### What To Improve Next Loop
+- If the user wants a second story, pin down the folder name and desired nesting level first.
+### Process Decision
+- Stop
+
+## Loop 5 Review
+### What Changed
+- Converted `node-1` and `node-2` from symlinks into real directories.
+- Removed the cloned `MAUSMAUS` content from both folders.
+- Verified `http://localhost:8888/node-2/` now shows an empty directory index.
+### Acceptance Criteria Result
+- [x] `node-1` and `node-2` are no longer aliases.
+- [x] The duplicated folder content is gone.
+- [x] The live browser shows an empty starter state.
+### Verification Result
+- `find /Applications/MAMP/htdocs/node-1 -mindepth 1 -maxdepth 1 -exec rm -rf {} +`
+- `find /Applications/MAMP/htdocs/node-2 -mindepth 1 -maxdepth 1 -exec rm -rf {} +`
+- Playwright with system Chrome loaded `http://localhost:8888/node-2/`
+### Issues / Gaps
+- The initial copy step briefly filled the folders before they were cleared.
+### User Demo Notes
+- `node-2` now starts empty, which matches the user request.
+
+## Loop 5 Retrospective
+### What Worked
+- Treating the folders as real directories made the cleanup straightforward.
+- The browser check clearly showed the empty root state.
+### What Was Confusing
+- The user’s request changed from “copy content” to “keep empty” mid-stream.
+### What To Improve Next Loop
+- Confirm whether the user wants only raw directory indexes or a styled empty-state page.
+### Process Decision
+- Stop
+
 ## Watcher Mirror Update
 ### What Changed
 - Added `node-1`, `node-2`, and `pageoff` to the watcher/build mirror targets alongside `MAUSMAUS`.

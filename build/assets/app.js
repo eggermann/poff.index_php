@@ -5196,7 +5196,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             await onCreateFolder({
               source,
               folderName,
-              saveTarget: "current",
+              saveTarget: readSaveTarget(),
               statusEl,
               closeDialog: closeUploadDialog
             });
@@ -6083,6 +6083,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const available = Array.isArray(catalog == null ? void 0 : catalog.available) ? catalog.available : [];
     const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
     const converter = work.converter && typeof work.converter === "object" ? work.converter : {};
+    const rawSourceUrl = String(converter.sourceUrl || (config == null ? void 0 : config.srcUrl) || "").trim();
+    const sourceUrlValue = rawSourceUrl ? (() => {
+      var _a2;
+      try {
+        const baseHref = typeof ((_a2 = window == null ? void 0 : window.location) == null ? void 0 : _a2.href) === "string" && window.location.href ? window.location.href : "http://localhost/";
+        return new URL(rawSourceUrl, baseHref).toString();
+      } catch (e) {
+        return rawSourceUrl;
+      }
+    })() : "";
     const selectedId = String(converter.id || "").trim();
     const selectedDefinition = selectedId ? available.find((item) => (item == null ? void 0 : item.id) === selectedId) || null : null;
     const defaults = (selectedDefinition == null ? void 0 : selectedDefinition.defaults) || {};
@@ -6132,6 +6142,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-converter-source-url">Source URL</label>
+                    <input class="form-input" id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${escapeHtml(sourceUrlValue)}" placeholder="https://example.com/source.tiff">
+                    <div class="small-note">Optional override used by remote converters when they need a public source URL.</div>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
@@ -6803,7 +6818,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         workFieldEditor.addWorkField();
       });
     }
-    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode").forEach((input) => {
+    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-source-url, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode").forEach((input) => {
       if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
         return;
       }
@@ -7060,8 +7075,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return null;
   }
   function readMediaConfigFromElements(elements2, form, currentWork = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
+    const normalizeSourceUrl = (value) => {
+      var _a2;
+      const raw = String(value || "").trim();
+      if (!raw) {
+        return "";
+      }
+      try {
+        const baseHref = typeof ((_a2 = window == null ? void 0 : window.location) == null ? void 0 : _a2.href) === "string" && window.location.href ? window.location.href : "http://localhost/";
+        return new URL(raw, baseHref).toString();
+      } catch (e) {
+        return raw;
+      }
+    };
     const typeField = elements2.work_type;
     if (typeField && typeof typeField.value === "string") {
       const type = typeField.value.trim();
@@ -7118,9 +7146,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const converterPath = String(((_d = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _d.converterPath) || "").trim();
     const converterViewerHref = String(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterViewerHref) || "").trim();
     const converterUrl = String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterUrl) || "").trim();
+    const converterSourceUrl = normalizeSourceUrl(((_g = elements2.converter_source_url) == null ? void 0 : _g.value) || "");
     const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
     if (converterId) {
-      nextWork.converter = {
+      const nextConverter = {
         ...existingConverter,
         type: converterType,
         name: converterName || String(existingConverter.name || converterId.split("/").pop() || "converter"),
@@ -7129,12 +7158,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         path: converterPath,
         viewerHref: converterViewerHref,
         url: converterUrl,
+        sourceUrl: converterSourceUrl || String(existingConverter.sourceUrl || "").trim(),
         node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
-        quality: String(((_g = elements2.converter_quality) == null ? void 0 : _g.value) || "default").trim() || "default",
-        format: String(((_h = elements2.converter_format) == null ? void 0 : _h.value) || "").trim() || "source",
-        saveMode: String(((_i = elements2.converter_save_mode) == null ? void 0 : _i.value) || "new-hidden-work").trim() || "new-hidden-work",
+        quality: String(((_h = elements2.converter_quality) == null ? void 0 : _h.value) || "default").trim() || "default",
+        format: String(((_i = elements2.converter_format) == null ? void 0 : _i.value) || "").trim() || "source",
+        saveMode: String(((_j = elements2.converter_save_mode) == null ? void 0 : _j.value) || "new-hidden-work").trim() || "new-hidden-work",
         hiddenByDefault: true
       };
+      if (converterSourceUrl) {
+        nextConverter.sourceUrl = converterSourceUrl;
+      } else {
+        delete nextConverter.sourceUrl;
+      }
+      nextWork.converter = nextConverter;
     } else if (Object.prototype.hasOwnProperty.call(nextWork, "converter")) {
       delete nextWork.converter;
     }
@@ -7302,6 +7338,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         await refreshCurrentEditState(getSelection());
       },
       onConvertWork: async ({ statusEl, converter }) => {
+        var _a;
         const selection2 = getSelection();
         const sourcePath = getEditTargetPath2(selection2);
         if (!sourcePath) {
@@ -7314,6 +7351,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setStatusMessage(statusEl, "Converting...");
         const currentConfig = getEditConfig() && typeof getEditConfig() === "object" ? getEditConfig() : {};
         const sourceName = sourcePath.split("/").pop() || sourcePath;
+        const sourceUrl = String((converter == null ? void 0 : converter.sourceUrl) || currentConfig.srcUrl || "").trim();
+        let normalizedSourceUrl = sourceUrl;
+        if (sourceUrl) {
+          try {
+            const baseHref = typeof ((_a = window == null ? void 0 : window.location) == null ? void 0 : _a.href) === "string" && window.location.href ? window.location.href : "http://localhost/";
+            normalizedSourceUrl = new URL(sourceUrl, baseHref).toString();
+          } catch (e) {
+            normalizedSourceUrl = sourceUrl;
+          }
+        }
         const payload = {
           source: {
             name: sourceName,
@@ -7321,7 +7368,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             mimeType: currentConfig.mimeType || "",
             extension: sourceName.includes(".") ? sourceName.split(".").pop() : "",
             size: currentConfig.size || 0,
-            srcUrl: currentConfig.srcUrl || ""
+            srcUrl: normalizedSourceUrl
           },
           converter,
           target: {
