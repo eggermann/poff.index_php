@@ -101,6 +101,65 @@ module.exports = {
 }
 
 describe('navigation', () => {
+  test('ignores stale sidebar completion after a newer navigation starts', async () => {
+    const pending = [];
+    const syncSidebarSelection = jest.fn();
+    const iframeLabel = { textContent: '' };
+    const sidebarLabel = { textContent: '' };
+    const createLoadingElement = (labelElement) => ({
+      classList: {
+        toggle() {},
+      },
+      setAttribute() {},
+      querySelector(selector) {
+        return selector === '.loader-label' ? labelElement : null;
+      },
+    });
+    const { initNavigation } = loadNavigation({
+      createSidebarController: (params = {}) => {
+        return {
+          bindNavClick() {},
+          loadNav(pathValue, options = {}) {
+            params.setLoadingVisible(params.sidebarLoading, true, options.loadingLabel);
+            return new Promise((resolve) => pending.push(resolve));
+          },
+          syncSidebarSelection,
+        };
+      },
+    });
+    const navigation = initNavigation({
+      elements: {
+        navList: {},
+        contentFrame: {
+          classList: {
+            toggle() {},
+          },
+        },
+        iframeLoading: createLoadingElement(iframeLabel),
+        sidebarLoading: createLoadingElement(sidebarLabel),
+      },
+      editQuery: '',
+      currentPathForIframe: '',
+      renderFolderMeta() {},
+      initEditMode() {},
+    });
+
+    const firstNavigation = navigation.syncFromLocation();
+    const secondNavigation = navigation.syncFromLocation();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(iframeLabel.textContent).toBe('Loading home...');
+    expect(sidebarLabel.textContent).toBe('Loading navigation for home...');
+    pending[0]();
+    await Promise.resolve();
+    expect(syncSidebarSelection).not.toHaveBeenCalled();
+
+    pending[1]();
+    await Promise.all([firstNavigation, secondNavigation]);
+    await Promise.resolve();
+    expect(syncSidebarSelection).toHaveBeenCalledTimes(1);
+  });
+
   test('refreshCurrentPreviewLocation refreshes preview without reinitializing edit mode', async () => {
     const initEditMode = jest.fn();
     const { initNavigation, previewCalls, sidebarCalls } = loadNavigation();

@@ -47,7 +47,7 @@ function createNavLink(attributes) {
   };
 }
 
-function loadSidebarController() {
+function loadSidebarController(overrides = {}) {
   const filePath = path.join(__dirname, '..', 'src/assets/js/nav/sidebar-controller.js');
   const source = fs.readFileSync(filePath, 'utf8')
     .replace(/^import .*$/gm, '')
@@ -66,6 +66,9 @@ function loadSidebarController() {
     console,
     require,
     window: windowMock,
+    AbortController,
+    fetch: overrides.fetch || jest.fn(),
+    extractNavHtml: overrides.extractNavHtml || ((html) => html),
     requestEditDelete: requestEditDeleteMock,
     CustomEvent: class CustomEvent {
       constructor(type, init = {}) {
@@ -87,6 +90,45 @@ module.exports = {
 }
 
 describe('sidebar selection scroll', () => {
+  test('aborts stale navigation requests and only renders the latest response', async () => {
+    const requests = [];
+    const fetchMock = jest.fn((url, options = {}) => new Promise((resolve, reject) => {
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      options.signal?.addEventListener('abort', () => reject(abortError), { once: true });
+      requests.push({ url, options, resolve });
+    }));
+    const createSidebarController = loadSidebarController({ fetch: fetchMock });
+    const navList = {
+      dataset: {},
+      innerHTML: '',
+    };
+    const controller = createSidebarController({
+      navList,
+      editQuery: '',
+      navigateToPath() {},
+      getCurrentSelection() {
+        return null;
+      },
+      setLoadingVisible() {},
+    });
+
+    const firstRequest = controller.loadNav('slow-folder');
+    const secondRequest = controller.loadNav('latest-folder');
+
+    expect(requests[0].options.signal.aborted).toBe(true);
+    requests[1].resolve({
+      ok: true,
+      text: async () => '<li>latest navigation</li>',
+    });
+
+    await Promise.all([firstRequest, secondRequest]);
+
+    expect(navList.innerHTML).toBe('<li>latest navigation</li>');
+    expect(navList.dataset.loaded).toBe('1');
+    expect(navList.dataset.error).toBeUndefined();
+  });
+
   test('scrolls the exact active list item into view even when filenames repeat', () => {
     const createSidebarController = loadSidebarController();
     const first = createNavLink({

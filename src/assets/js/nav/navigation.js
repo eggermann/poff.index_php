@@ -13,15 +13,21 @@ export function initNavigation({
 }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements;
     let ignoreNextHashSync = false;
+    let sidebarSyncId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get('path') || '';
     const routeResolver = createRouteResolver({ navList });
 
-    function setLoadingVisible(element, visible) {
+    function setLoadingVisible(element, visible, label = '') {
         if (!element) {
             return;
         }
         element.classList.toggle('flex', visible);
         element.classList.toggle('items-center', visible);
+        element.setAttribute?.('aria-busy', visible ? 'true' : 'false');
+        const labelElement = element.querySelector?.('.loader-label');
+        if (visible && labelElement && label) {
+            labelElement.textContent = label;
+        }
     }
 
     function readHashPath() {
@@ -114,8 +120,9 @@ export function initNavigation({
         const previewIsFile = !!selection.previewIsFile;
         const folderPath = previewIsFile ? previewPath.split('/').slice(0, -1).join('/') : previewPath;
         const previewUrl = resolveSelectionPreviewUrl(selection, options?.previewUrl);
+        const targetLabel = String(selection.path || previewPath || 'home').split('/').filter(Boolean).pop() || 'home';
 
-        setLoadingVisible(iframeLoading, true);
+        setLoadingVisible(iframeLoading, true, `Loading ${targetLabel}...`);
         if (contentFrame) {
             contentFrame.classList.toggle('content-frame-layout-target', !!selection.isLayout);
             previewController.syncPreviewDisabledState(!!selection.isLayout);
@@ -125,13 +132,21 @@ export function initNavigation({
             writeHashPath(selection.path || '');
         }
         if (navList && !skipSidebarReload) {
-            setLoadingVisible(sidebarLoading, true);
-            sidebarController.loadNav(folderPath)
+            const currentSidebarSyncId = ++sidebarSyncId;
+            sidebarController.loadNav(folderPath, {
+                loadingLabel: `Loading navigation for ${targetLabel}...`,
+            })
                 .then(() => {
+                    if (currentSidebarSyncId !== sidebarSyncId) {
+                        return;
+                    }
                     sidebarController.syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
                     setLoadingVisible(sidebarLoading, false);
                 })
                 .catch(() => {
+                    if (currentSidebarSyncId !== sidebarSyncId) {
+                        return;
+                    }
                     sidebarController.syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
                     setLoadingVisible(sidebarLoading, false);
                 });

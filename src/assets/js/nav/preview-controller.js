@@ -19,6 +19,7 @@ export function createPreviewController({
     let previewDisabled = false;
     let lastPreviewKey = '';
     let previewMountRoot = null;
+    let previewAbortController = null;
 
     function stripPreviewChrome(root) {
         if (!root || typeof root.querySelectorAll !== 'function') {
@@ -423,6 +424,11 @@ export function createPreviewController({
         }
 
         const requestId = ++previewRequestId;
+        previewAbortController?.abort();
+        const requestController = typeof AbortController === 'function'
+            ? new AbortController()
+            : null;
+        previewAbortController = requestController;
         const nextPreview = previewStateFromUrl(url);
         const shouldPreserveScroll = !!nextPreview.key && nextPreview.key === lastPreviewKey;
         const preservedScrollTop = shouldPreserveScroll ? contentFrame.scrollTop : 0;
@@ -435,6 +441,7 @@ export function createPreviewController({
                     'Accept': 'text/html,application/xhtml+xml',
                     'X-Requested-With': 'fetch-preview',
                 },
+                ...(requestController ? { signal: requestController.signal } : {}),
             });
             if (!response.ok) {
                 throw new Error(`Preview request failed: ${response.status}`);
@@ -501,12 +508,15 @@ export function createPreviewController({
                 contentFrame.scrollLeft = 0;
             }
         } catch (error) {
-            if (requestId !== previewRequestId) {
+            if (requestId !== previewRequestId || error?.name === 'AbortError') {
                 return;
             }
             previewMountRoot = null;
             contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
         } finally {
+            if (previewAbortController === requestController) {
+                previewAbortController = null;
+            }
             if (requestId === previewRequestId) {
                 setLoadingVisible(iframeLoading, false);
             }

@@ -107,6 +107,7 @@ function loadPreviewController(overrides = {}) {
     console,
     URL,
     URLSearchParams,
+    AbortController,
     HTMLElement: FakeHTMLElement,
     HTMLStyleElement: FakeHTMLStyleElement,
     HTMLLinkElement: FakeHTMLLinkElement,
@@ -218,6 +219,41 @@ module.exports = {
 }
 
 describe('preview controller', () => {
+  test('aborts an obsolete preview request when navigation changes', async () => {
+    const requests = [];
+    const fetchMock = jest.fn((url, options = {}) => new Promise((resolve, reject) => {
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      options.signal?.addEventListener('abort', () => reject(abortError), { once: true });
+      requests.push({ url, options, resolve });
+    }));
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({ fetch: fetchMock });
+    const contentFrame = new FakeHTMLElement();
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: new FakeHTMLElement(),
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return { previewPath: '', previewIsFile: false };
+      },
+    });
+
+    const firstRequest = controller.renderPreview('/slow-preview');
+    const secondRequest = controller.renderPreview('/latest-preview');
+
+    expect(requests[0].options.signal.aborted).toBe(true);
+    requests[1].resolve({
+      ok: true,
+      url: 'http://example.test/latest-preview',
+      text: async () => '<!doctype html><html><head></head><body><div id="contentFrame"><div class="viewer"></div></div></body></html>',
+    });
+
+    await Promise.all([firstRequest, secondRequest]);
+
+    expect(requests).toHaveLength(2);
+  });
+
   test('renders fetched preview HTML without an iframe', async () => {
     const { createPreviewController } = loadPreviewController();
     const contentFrame = {
