@@ -267,7 +267,8 @@ function cmsResolveFileViewerLinkState(string $fullPath, string $type, array $tr
     }
 
     $renderedHtml = '';
-    $shouldInlineRemoteHtml = $previewUrl === '' || $hasPhysicalFile;
+    $shouldInlineRemoteHtml = $previewUrl === ''
+        || ($hasPhysicalFile && cmsIsRemoteCmsViewerLink($previewUrl));
     if ($shouldInlineRemoteHtml) {
         $renderedHtml = cmsResolveRemoteRenderedHtml([
             'linkUrl' => $linkUrl ?? '',
@@ -284,6 +285,17 @@ function cmsResolveFileViewerLinkState(string $fullPath, string $type, array $tr
         'renderedHtml' => $renderedHtml,
         'previewUrl' => $previewUrl,
     ];
+}
+
+function cmsIsRemoteCmsViewerLink(string $url): bool
+{
+    if (cmsParseExternalCmsViewerUrl($url) !== null) {
+        return true;
+    }
+
+    $parts = parse_url(trim($url));
+    $fragment = is_array($parts) ? trim((string) ($parts['fragment'] ?? '')) : '';
+    return str_starts_with($fragment, '/');
 }
 
 function cmsBuildFileViewerContext(

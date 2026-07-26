@@ -5044,6 +5044,30 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('renders ordinary webloc targets immediately without fetching remote HTML', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-webloc-iframe-'));
+    try {
+      fs.writeFileSync(
+        path.join(tempRoot, 'sample.webloc'),
+        '<?xml version="1.0"?><plist><dict><key>URL</key><string>https://example.org/player.php?word=1984&amp;lang=en</string></dict></plist>',
+      );
+
+      const rendered = await runViewerWithMock('sample.webloc', tempRoot, false, {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: '<html><body>REMOTE FETCH SHOULD NOT RUN</body></html>',
+      });
+
+      expect(rendered).toContain('<iframe');
+      expect(rendered).toContain('src="https://example.org/player.php?word&#x3D;1984&amp;lang&#x3D;en"');
+      expect(rendered).toContain('href="https://example.org/player.php?word&#x3D;1984&amp;lang&#x3D;en"');
+      expect(rendered).not.toContain('REMOTE FETCH SHOULD NOT RUN');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('exports normalized remote content with absolute viewer and asset links', async () => {
     const result = await runRemoteContent('export', POFF_DIR, 'viewer-folder', {
       baseUrl: 'https://origin.example/index.php',
