@@ -24,3 +24,21 @@ Decision:
 Keep `node-1` and `node-2` as real independent directories and clear their duplicated starter content so they begin empty.
 Consequences:
 Their initial browser state is an empty directory listing instead of a copy of `MAUSMAUS`.
+
+### D-0004: Bulk conversion preserves files and changes tree visibility
+Status: Accepted
+Context:
+Editors need “converted only”, “originals only”, and “both” views without risking source loss.
+Decision:
+Bulk conversion never deletes or replaces source media. It writes generated works, then updates `tree[].visible` according to an explicit visibility mode.
+Consequences:
+Visibility is reversible through existing editor controls. Re-running bulk conversion replaces the same generated output path instead of multiplying files.
+
+### D-0005: Provider choice uses presets plus the generic Poff node protocol
+Status: Accepted
+Context:
+Editors could not tell whether conversion should happen locally, on Pageoff, or on another compatible node.
+Decision:
+Offer “This node” and `pageoff.de` as explicit presets while retaining an arbitrary Poff node URL field. All remote providers use the same converter-offer and inline-result protocol.
+Consequences:
+Pageoff is convenient without becoming a hardcoded special protocol, and every Poff node can offer converters after deploying the same route implementation.

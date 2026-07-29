@@ -2432,6 +2432,258 @@ describe('Poff converters', () => {
     ]));
   });
 
+  test('publishes locally executable converters as generic Poff node offers', async () => {
+    const result = await runConverterRoute('offers', POFF_DIR, {
+      mimeType: 'image/tiff',
+      kind: 'image',
+      extension: 'tiff',
+      nodeUrl: 'https://provider.example/index.php',
+      nodeId: 'provider-example',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      protocol: 'poff-converter/1',
+      node: expect.objectContaining({
+        id: 'provider-example',
+        endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+      }),
+    }));
+    expect(result.converters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'converter/convert-image',
+        accepts: expect.arrayContaining(['image/*']),
+        formats: expect.arrayContaining(['png']),
+      }),
+    ]));
+    expect(result.converters.every((converter) => converter.engine === undefined)).toBe(true);
+  });
+
+  test('discovers converter offers from an external Poff node', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-catalog-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+
+    try {
+      const result = await runConverterRoute('remote-catalog', tempRoot, {
+        path: 'photo.heic',
+        nodeUrl: 'https://example.com/index.php',
+        mimeType: 'image/heic',
+        kind: 'image',
+        extension: 'heic',
+        mockCatalog: {
+          ok: true,
+          protocol: 'poff-converter/1',
+          node: {
+            id: 'provider-example',
+            url: 'https://example.com/index.php',
+            endpoint: 'https://example.com/index.php?mcp=1&route=convert-offered',
+          },
+          converters: [
+            {
+              id: 'converter/convert-image',
+              name: 'convert-image',
+              label: 'Convert Image',
+              accepts: ['image/*'],
+              outputs: ['image/png'],
+              formats: ['png'],
+              defaults: { format: 'png' },
+              ui: {
+                format: {
+                  type: 'select',
+                  options: ['png'],
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        protocol: 'poff-converter/1',
+        node: expect.objectContaining({ id: 'provider-example' }),
+      }));
+      expect(result.available).toEqual([
+        expect.objectContaining({
+          id: 'converter/remote-provider-example-convert-image',
+          engine: 'remote-node',
+          enabled: true,
+          source: 'remote-node-catalog',
+          node: expect.objectContaining({
+            id: 'provider-example',
+            converterId: 'converter/convert-image',
+            endpoint: 'https://example.com/index.php?mcp=1&route=convert-offered',
+          }),
+        }),
+      ]);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('converts an inline file offered by a foreign Poff node', async () => {
+    const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
+    const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      source: {
+        name: 'scan-001.tiff',
+        path: 'scan-001.tiff',
+        mimeType: 'image/tiff',
+        bodyBase64: body.toString('base64'),
+      },
+      converter: {
+        id: 'converter/convert-image',
+        format: 'png',
+        quality: 'default',
+      },
+      target: {
+        saveAs: 'scan-001.png',
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      route: 'convert-offered',
+      output: expect.objectContaining({
+        name: 'scan-001.png',
+        mimeType: 'image/png',
+      }),
+      generatedBy: expect.objectContaining({
+        id: 'converter/convert-image',
+        node: 'provider',
+      }),
+    }));
+    expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
+  });
+
+  test('sends a local source to a discovered provider converter and receives its result', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-consumer-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'scan-001.tiff',
+          path: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          extension: 'tiff',
+          size: fs.statSync(sourcePath).size,
+        },
+        converter: {
+          id: 'converter/remote-provider-example-convert-image',
+          name: 'remote-provider-example-convert-image',
+          label: 'Convert Image · provider-example',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          formats: ['png'],
+          defaults: { format: 'png' },
+          ui: {},
+          engine: 'remote-node',
+          format: 'png',
+          quality: 'default',
+          node: {
+            id: 'provider-example',
+            baseUrl: 'https://provider.example/index.php',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+        target: {
+          folder: '',
+          saveAs: 'scan-001.png',
+          mode: 'new-hidden-work',
+        },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'scan-001.png',
+              mimeType: 'image/png',
+              kind: 'image',
+              size: 3,
+              bodyBase64: Buffer.from('png').toString('base64'),
+            },
+          },
+        },
+        captureRemotePayload: true,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('image/png');
+      expect(result._capturedRemotePayload.source.bodyBase64).toBe(
+        fs.readFileSync(sourcePath).toString('base64')
+      );
+      expect(result._capturedRemotePayload.converter.id).toBe('converter/convert-image');
+      expect(result._capturedRemotePayload.converter.node).toBe('provider');
+      expect(result.generatedBy.node).toBe('provider-example');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('bulk converts eligible folder images and applies converted-only visibility', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-bulk-${Date.now()}`);
+    const albumDir = path.join(tempRoot, 'album');
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(albumDir, 'scan-a.tiff'));
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(albumDir, 'scan-b.tiff'));
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(albumDir, 'photo.jpg'));
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(albumDir, 'thumb-photo.jpg'));
+    fs.writeFileSync(path.join(albumDir, 'notes.txt'), 'not an image');
+
+    try {
+      const result = await runConverterRoute('bulk-convert', tempRoot, {
+        path: 'album',
+        converter: {
+          id: 'converter/convert-image',
+          name: 'convert-image',
+          format: 'png',
+          quality: 'default',
+        },
+        mimeType: 'image/tiff',
+        hideThumbnails: true,
+        visibilityMode: 'converted-only',
+        enableImageMagickCli: true,
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        convertedCount: 2,
+        failedCount: 0,
+        hiddenThumbnailCount: 1,
+        visibilityMode: 'converted-only',
+      }));
+      expect(fs.existsSync(path.join(albumDir, 'scan-a.png'))).toBe(true);
+      expect(fs.existsSync(path.join(albumDir, 'scan-b.png'))).toBe(true);
+      expect(fs.existsSync(path.join(albumDir, 'photo.png'))).toBe(false);
+      const config = JSON.parse(fs.readFileSync(path.join(albumDir, 'poff.config.json'), 'utf8'));
+      const byName = new Map(config.tree.map((item) => [item.name, item]));
+      expect(byName.get('scan-a.tiff').visible).toBe(false);
+      expect(byName.get('scan-b.tiff').visible).toBe(false);
+      expect(byName.get('scan-a.png')).toEqual(expect.objectContaining({
+        visible: true,
+        generated: true,
+        sourceWork: 'scan-a.tiff',
+      }));
+      expect(byName.get('scan-b.png')).toEqual(expect.objectContaining({
+        visible: true,
+        generated: true,
+        sourceWork: 'scan-b.tiff',
+      }));
+      expect(byName.get('notes.txt').visible).toBe(true);
+      expect(byName.get('photo.jpg').visible).toBe(true);
+      expect(byName.get('thumb-photo.jpg').visible).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('discovers the text converter for text/plain', async () => {
     const result = await runConverterRoute('available', POFF_DIR, {
       mimeType: 'text/plain',
@@ -4398,6 +4650,22 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('?view&#x3D;1&amp;file&#x3D;viewer-folder%2Fchild.txt');
     expect(output).toContain('child.txt:file');
     expect(output).toContain('.layout/background.txt');
+  });
+
+  test('default folder cards show thumbnails for browser-readable images', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-folder-image-cards-'));
+    const name = `folder-image-cards-${Date.now()}`;
+    const folder = path.join(tempRoot, name);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(folder, 'photo.jpg'));
+
+    try {
+      const output = await runViewer(name, tempRoot);
+      expect(output).toContain('folder-view-card-preview');
+      expect(output).toMatch(/<img[^>]+src="[^"]*photo\.jpg"[^>]+loading="lazy"/);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('renders configured virtual links without nesting viewer urls', async () => {

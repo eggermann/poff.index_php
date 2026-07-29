@@ -169,7 +169,14 @@ export function createPanelActions({
             window.location.hash = nextPath ? `#/${nextPath}` : '';
             await refreshCurrentEditState(getSelection());
         },
-        onConvertWork: async ({ statusEl, converter }) => {
+        onConvertWork: async ({
+            statusEl,
+            converter,
+            convertAllOfType = false,
+            visibilityMode = 'converted-only',
+            hideThumbnails = true,
+            mimeType = '',
+        }) => {
             const selection = getSelection();
             const sourcePath = getEditTargetPath(selection);
             if (!sourcePath) {
@@ -177,6 +184,30 @@ export function createPanelActions({
             }
             if (!converter?.id) {
                 setStatusMessage(statusEl, 'Choose a converter first.');
+                return;
+            }
+            if (convertAllOfType) {
+                const folderPath = sourcePath.split('/').slice(0, -1).join('/');
+                const typeLabel = String(mimeType || 'matching type').trim();
+                setStatusMessage(statusEl, `Converting all ${typeLabel} files...`);
+                const result = await requestMcpRoute('bulk-convert', {
+                    path: folderPath,
+                    mimeType: typeLabel === 'matching type' ? '' : typeLabel,
+                    converter: {
+                        ...converter,
+                        saveMode: 'replace-generated-work',
+                    },
+                    visibilityMode,
+                    hideThumbnails,
+                });
+                if (!result || result.error || result.ok === false) {
+                    throw new Error(result?.error || 'Bulk conversion failed.');
+                }
+                await persistSelectedConverter(selection, converter, statusEl);
+                window.alert(
+                    `OK — ${Number(result.convertedCount || 0)} converted, ${Number(result.hiddenThumbnailCount || 0)} thumbnails hidden, ${Number(result.skippedCount || 0)} skipped, ${Number(result.failedCount || 0)} failed.`
+                );
+                await refreshCurrentEditState(selection);
                 return;
             }
             setStatusMessage(statusEl, 'Converting...');

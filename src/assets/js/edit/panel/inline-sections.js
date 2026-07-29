@@ -114,6 +114,21 @@ export function readMediaConfigFromForm(form, currentWork = {}) {
     const converterPath = String(selectedOption?.dataset?.converterPath || '').trim();
     const converterViewerHref = String(selectedOption?.dataset?.converterViewerHref || '').trim();
     const converterUrl = String(selectedOption?.dataset?.converterUrl || '').trim();
+    const converterLabel = String(selectedOption?.dataset?.converterLabel || '').trim();
+    const converterDescription = String(selectedOption?.dataset?.converterDescription || '').trim();
+    const parseConverterData = (key, fallback) => {
+        try {
+            const value = JSON.parse(selectedOption?.dataset?.[key] || '');
+            return value && typeof value === 'object' ? value : fallback;
+        } catch {
+            return fallback;
+        }
+    };
+    const converterNode = parseConverterData('converterNode', null);
+    const converterAccepts = parseConverterData('converterAccepts', []);
+    const converterOutputs = parseConverterData('converterOutputs', []);
+    const converterDefaults = parseConverterData('converterDefaults', {});
+    const converterUi = parseConverterData('converterUi', {});
     const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
         nextWork.converter = {
@@ -125,8 +140,15 @@ export function readMediaConfigFromForm(form, currentWork = {}) {
             path: converterPath,
             viewerHref: converterViewerHref,
             url: converterUrl,
+            label: converterLabel,
+            description: converterDescription,
+            accepts: Array.isArray(converterAccepts) ? converterAccepts : [],
+            outputs: Array.isArray(converterOutputs) ? converterOutputs : [],
+            formats: String(selectedOption?.dataset?.converterFormats || '').split(',').map((item) => item.trim()).filter(Boolean),
+            defaults: converterDefaults,
+            ui: converterUi,
             node: converterEngine === 'remote-node'
-                ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+                ? (converterNode || (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '', converterId: '' }))
                 : 'local',
             quality: String(form?.elements?.converter_quality?.value || 'default').trim() || 'default',
             format: String(form?.elements?.converter_format?.value || '').trim() || 'source',
@@ -195,20 +217,14 @@ export function renderConverterSection(config = {}) {
     const available = Array.isArray(catalog?.available) ? catalog.available : [];
     const work = (config?.work && typeof config.work === 'object') ? config.work : {};
     const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
-    const rawSourceUrl = String(converter.sourceUrl || config?.srcUrl || '').trim();
-    const sourceUrlValue = rawSourceUrl
-        ? (() => {
-            try {
-                const baseHref = typeof window?.location?.href === 'string' && window.location.href
-                    ? window.location.href
-                    : 'http://localhost/';
-                return new URL(rawSourceUrl, baseHref).toString();
-            } catch {
-                return rawSourceUrl;
-            }
-        })()
-        : '';
-    const selectedId = String(converter.id || '').trim();
+    const selectedId = String(converter.id || available.find((item) => item?.enabled !== false)?.id || '').trim();
+    const converterNode = converter.node && typeof converter.node === 'object' ? converter.node : {};
+    const remoteNodeUrl = String(catalog?.remoteNodeUrl || converterNode.baseUrl || 'https://pageoff.de/index.php').trim();
+    const conversionScope = config?.conversionScope && typeof config.conversionScope === 'object'
+        ? config.conversionScope
+        : {};
+    const sameTypeCount = Math.max(1, Number(conversionScope.sameTypeCount || 1));
+    const scopeMimeType = String(conversionScope.mimeType || config?.mimeType || 'this type').trim();
     const selectedDefinition = selectedId ? (available.find((item) => item?.id === selectedId) || null) : null;
     const defaults = selectedDefinition?.defaults || {};
     const ui = selectedDefinition?.ui && typeof selectedDefinition.ui === 'object' ? selectedDefinition.ui : {};
@@ -224,7 +240,7 @@ export function renderConverterSection(config = {}) {
         ...available.map((item) => {
             const disabled = item.enabled === false;
             const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
-            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-label="${escapeHtml(item.label || '')}" data-converter-description="${escapeHtml(item.description || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-accepts="${escapeHtml(JSON.stringify(item.accepts || []))}" data-converter-outputs="${escapeHtml(JSON.stringify(item.outputs || []))}" data-converter-node="${escapeHtml(JSON.stringify(item.node || null))}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
         }),
     ].join('');
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
@@ -251,23 +267,27 @@ export function renderConverterSection(config = {}) {
         <div class="edit-work-fields edit-work-converter">
             <div class="edit-work-fields-header">
                 <div>
-                    <div class="edit-work-fields-title">Converter</div>
-                    <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
+                    <div class="edit-work-fields-title">Convert image</div>
+                    <div class="small-note">Default converter node: pageoff.de. Converted files return to this folder.</div>
                 </div>
-                <button class="btn btn-secondary" type="button" id="editCreateConverter">New converter</button>
+                <button class="btn btn-secondary" type="button" id="editCreateConverter">Create converter</button>
             </div>
             ${unsupportedMessage}
+            <div class="edit-grid edit-grid-cols">
+                <div>
+                    <label class="edit-label" for="edit-converter-node-url">Converter node</label>
+                    <input class="form-input" id="edit-converter-node-url" name="converter_node_url" type="url" value="${escapeHtml(remoteNodeUrl)}">
+                </div>
+                <div class="edit-inline-actions">
+                    <button class="btn btn-secondary" type="button" id="editLoadConverterNode">Reload converter</button>
+                </div>
+            </div>
             <div class="edit-grid edit-grid-cols">
                 <div>
                     <label class="edit-label" for="edit-converter-id">Converter</label>
                     <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-source-url">Source URL</label>
-                    <input class="form-input" id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${escapeHtml(sourceUrlValue)}" placeholder="https://example.com/source.tiff">
-                    <div class="small-note">Optional override used by remote converters when they need a public source URL.</div>
                 </div>
                 <div>
                     <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
@@ -288,8 +308,22 @@ export function renderConverterSection(config = {}) {
                     </select>
                 </div>
             </div>
+            ${sameTypeCount > 1 ? `
+            <label class="edit-inline-toggle" for="edit-converter-all-of-type">
+                <input id="edit-converter-all-of-type" type="checkbox" checked>
+                Convert all ${sameTypeCount} <strong>${escapeHtml(scopeMimeType)}</strong> files in this folder
+            </label>
+            <label class="edit-inline-toggle" for="edit-converter-hide-originals">
+                <input id="edit-converter-hide-originals" type="checkbox" checked>
+                Show only converted files after conversion
+            </label>
+            <label class="edit-inline-toggle" for="edit-converter-hide-thumbnails">
+                <input id="edit-converter-hide-thumbnails" type="checkbox" checked>
+                Hide matching <strong>thumb*</strong> files
+            </label>
+            ` : ''}
             <div class="edit-inline-actions">
-                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>Convert</button>
+                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>${sameTypeCount > 1 ? `Convert all ${sameTypeCount}` : 'Convert'}</button>
             </div>
             <div class="small-note">
                 Generated works:

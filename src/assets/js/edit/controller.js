@@ -4,6 +4,7 @@ import {
     requestEditConfig,
     requestEditDelete,
     requestEditUpload,
+    requestMcpRoute,
     requestPromptTemplate,
     setEditorAuthToken,
 } from '../api/edit.js';
@@ -675,6 +676,46 @@ export function createEditController({ elements, context, editRequested }) {
             onDeleteTarget: panelActions.onDeleteTarget,
             onConvertWork: panelActions.onConvertWork,
             onCreateConverter: panelActions.onCreateConverter,
+            onLoadConverterNode: async ({ nodeUrl, statusEl }) => {
+                if (!nodeUrl) {
+                    setStatusMessage(statusEl, 'Enter a Poff node URL.');
+                    return;
+                }
+                const selection = getActiveSelection();
+                const sourcePath = getEditTargetPath(selection);
+                setStatusMessage(statusEl, 'Loading remote converter offers...');
+                let remote = null;
+                try {
+                    remote = await requestMcpRoute('remote-converters', {
+                        path: sourcePath,
+                        nodeUrl,
+                        mimeType: String(editConfig?.mimeType || '').trim(),
+                        kind: String(editConfig?.kind || '').trim(),
+                        extension: sourcePath.includes('.') ? sourcePath.split('.').pop() : '',
+                    });
+                } catch (error) {
+                    setStatusMessage(statusEl, error?.message || 'Remote Poff node unavailable.');
+                    return;
+                }
+                if (!remote || remote.ok === false || remote.error) {
+                    setStatusMessage(statusEl, remote?.error || 'Remote Poff node unavailable.');
+                    return;
+                }
+                const catalog = editConfig?.converterCatalog && typeof editConfig.converterCatalog === 'object'
+                    ? editConfig.converterCatalog
+                    : {};
+                editConfig.converterCatalog = {
+                    ...catalog,
+                    remoteNodeUrl: nodeUrl,
+                    available: Array.isArray(remote.available) ? remote.available : [],
+                };
+                renderEditUI(editConfig, status);
+                setStatusMessage(
+                    document.getElementById('editInlineStatus'),
+                    `Loaded ${Array.isArray(remote.available) ? remote.available.length : 0} converter offers from ${remote?.node?.id || nodeUrl}.`,
+                    true
+                );
+            },
             onResetFolderWork: panelActions.onResetFolderWork,
             onReturnToWork: panelActions.onReturnToWork,
             onSubmitLayout: panelActions.onSubmitLayout,

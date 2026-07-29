@@ -96,15 +96,15 @@ function loadEditController(documentMock = null, overrides = {}) {
     .replace(/export function /g, 'function ');
   const mediaConfigPath = path.join(__dirname, '..', 'src/assets/js/edit/controller/media-config.js');
   const mediaConfigSource = fs.readFileSync(mediaConfigPath, 'utf8')
-    .replace(/^import .*$/gm, '')
+    .replace(/import[\s\S]*?from\s+['"][^'"]+['"];\n/g, '')
     .replace(/export function /g, 'function ');
   const panelActionsPath = path.join(__dirname, '..', 'src/assets/js/edit/controller/panel-actions.js');
   const panelActionsSource = fs.readFileSync(panelActionsPath, 'utf8')
-    .replace(/^import .*$/gm, '')
+    .replace(/import[\s\S]*?from\s+['"][^'"]+['"];\n/g, '')
     .replace(/export function /g, 'function ');
   const filePath = path.join(__dirname, '..', 'src/assets/js/edit/controller.js');
   const source = fs.readFileSync(filePath, 'utf8')
-    .replace(/^import .*$/gm, '')
+    .replace(/import[\s\S]*?from\s+['"][^'"]+['"];\n/g, '')
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
@@ -538,6 +538,114 @@ test('creating a converter navigates to the new converter folder path', async ()
   });
 
   expect(windowMock.location.hash).toBe('#/converters/convert-image');
+});
+
+test('loading an external Poff node merges its converter offers into the editor catalog', async () => {
+  let loadConverterNode = null;
+  let renderedConfig = null;
+  let requestedPayload = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+  const remoteConverter = {
+    id: 'converter/remote-provider-convert-image',
+    engine: 'remote-node',
+    source: 'remote-node-catalog',
+    node: {
+      id: 'provider',
+      converterId: 'converter/convert-image',
+      endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+    },
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'file',
+      subjectTarget: 'file',
+      config: {
+        kind: 'image',
+        mimeType: 'image/heic',
+        converterCatalog: {
+          available: [
+            {
+              id: 'converter/convert-image',
+              source: 'legacy-static',
+            },
+          ],
+        },
+      },
+    }),
+    requestMcpRoute: async (route, payload) => {
+      expect(route).toBe('remote-converters');
+      requestedPayload = payload;
+      return {
+        ok: true,
+        node: { id: 'provider' },
+        available: [remoteConverter],
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'photo.heic',
+      previewPath: 'photo.heic',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'photo.heic',
+    renderEditPanel(options) {
+      renderedConfig = options.config;
+      loadConverterNode = loadConverterNode || options.onLoadConverterNode;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  await loadConverterNode({
+    nodeUrl: 'https://provider.example/index.php',
+    statusEl: { textContent: '' },
+  });
+
+  expect(requestedPayload).toEqual({
+    path: 'photo.heic',
+    nodeUrl: 'https://provider.example/index.php',
+    mimeType: 'image/heic',
+    kind: 'image',
+    extension: 'heic',
+  });
+  expect(renderedConfig.converterCatalog).toEqual(expect.objectContaining({
+    remoteNodeUrl: 'https://provider.example/index.php',
+    available: [remoteConverter],
+  }));
 });
 
 test('saving a selected converter persists converter work config even without existing work config', async () => {

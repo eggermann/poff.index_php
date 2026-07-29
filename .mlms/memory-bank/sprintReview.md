@@ -160,3 +160,91 @@
 - `scripts/watch-build.js` and `build/build.php` now include the new target names.
 ### Notes
 - The change assumes the same generated output tree should be mirrored to all sibling localhost folders.
+
+## Loop 1 Review
+### What Changed
+- Added authenticated `bulk-convert` route for up to 100 current-folder files.
+- Reused local or discovered remote converter metadata.
+- Added visibility modes: converted-only, originals-only, both.
+- Generated outputs overwrite same generated path; source files remain untouched.
+### Acceptance Criteria Result
+- [x] Two eligible files convert in one request.
+- [x] Non-image file is skipped.
+- [x] Converted-only hides sources and shows outputs.
+- [x] PHP lint passes.
+- [x] Targeted regression passes.
+### Verification Result
+- `php -l` passed for changed PHP files.
+- Targeted Jest bulk conversion test passed.
+### Issues / Gaps
+- UI not added yet.
+- Local CLI converter still respects existing `POFF_ENABLE_IMAGEMAGICK_CLI=1`.
+### User Demo Notes
+- Backend now returns converted/skipped/failed counts and output paths.
+
+## Loop 1 Retrospective
+### What Worked
+- Existing single-file convert/save path reused cleanly.
+- Tree visibility metadata supports reversible policies without deletion.
+### What Was Confusing
+- `PoffConfig::ensure()` creates config during scan; system config files needed explicit exclusion.
+### What To Improve Next Loop
+- Make node choice and eligible count obvious in folder UI.
+### Process Decision
+- Continue
+
+## Loop 2 Review
+### What Changed
+- Annotated folder edit config with eligible unsupported media and converter catalog data.
+- Added a folder-level conversion panel with “This node”, `pageoff.de`, and arbitrary Poff node choices.
+- Added output format, quality, and three reversible visibility choices.
+- Bound remote offer discovery and one-request folder conversion in the edit controller.
+### Acceptance Criteria Result
+- [x] Folder shows the eligible count and filenames.
+- [x] Local conversion requires no URL.
+- [x] Pageoff is a one-click preset.
+- [x] Any compatible Poff node URL can be loaded.
+- [x] Visibility choice is sent with the bulk request.
+### Verification Result
+- Related UI Jest tests pass.
+- Remote converter selection retains provider routing metadata.
+### Issues / Gaps
+- The public `pageoff.de` index currently lacks the new generic converter routes.
+### Process Decision
+- Continue
+
+## Loop 3 Review
+### What Changed
+- Added safe absolute ImageMagick CLI discovery for the MAMP runtime.
+- Added default folder-card thumbnails for browser-readable images.
+- Converted `IMG_1191.HEIC` through `IMG_1206.HEIC` to PNG in the live `apres` folder.
+- Applied converted-only visibility: 16 PNG results visible, 16 HEIC sources preserved and hidden.
+- Captured a Playwright contact sheet with all 16 real PNG results loaded.
+### Acceptance Criteria Result
+- [x] Folder has bulk conversion.
+- [x] Source visibility is policy-controlled without deletion.
+- [x] All 16 HEIC files converted successfully.
+- [x] Final screenshot shows every converted result.
+### Verification Result
+- `npm run test:mcp`: 166/166 passed.
+- Related UI Jest suites: 16/16 passed.
+- PHP lint passed for all converter-scope PHP files.
+- Playwright reported 16 cards and 16 loaded images.
+### Issues / Gaps
+- No build was run because project instructions require explicit user authorization.
+- The final contact sheet is a temporary Playwright DOM presentation of the live converted files; the source thumbnail template is implemented but not yet deployed.
+### User Demo Notes
+- Screenshot: `output/playwright/heic-bulk/heic-bulk-all-16.png`.
+
+## Loop 3 Retrospective
+### What Worked
+- Reusing the single-file converter contract kept local and remote bulk behavior aligned.
+- Visibility metadata made “hide originals” reversible and non-destructive.
+- Browser contact-sheet rendering proved every PNG was readable.
+### What Was Confusing
+- The new browser source was not reflected live because no watcher/build was active.
+- MAMP omitted Homebrew paths even though ImageMagick was installed.
+### What To Improve Next Loop
+- Deploy the same generated index to Pageoff, then test node-to-node discovery from a second Poff node.
+### Process Decision
+- Stop

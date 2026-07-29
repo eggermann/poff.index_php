@@ -51,6 +51,7 @@ export function renderEditPanel({
     onChangePassword,
     onConvertWork,
     onCreateConverter,
+    onLoadConverterNode,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -204,6 +205,8 @@ export function renderEditPanel({
     const addWorkFieldButton = editPanel.querySelector('#editWorkFieldAdd');
     const convertButton = editPanel.querySelector('#editConvertWork');
     const createConverterButton = editPanel.querySelector('#editCreateConverter');
+    const loadConverterNodeButton = editPanel.querySelector('#editLoadConverterNode');
+    const converterNodeUrlInput = editPanel.querySelector('#edit-converter-node-url');
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
 
@@ -309,7 +312,7 @@ export function renderEditPanel({
             workFieldEditor.addWorkField();
         });
     }
-    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-source-url, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode').forEach((input) => {
+    editPanel.querySelectorAll('[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode').forEach((input) => {
         if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
             return;
         }
@@ -361,6 +364,19 @@ export function renderEditPanel({
             await onCreateConverter({ statusEl, form });
         });
     }
+    if (loadConverterNodeButton && typeof onLoadConverterNode === 'function') {
+        loadConverterNodeButton.addEventListener('click', async () => {
+            await onLoadConverterNode({
+                nodeUrl: String(converterNodeUrlInput?.value || '').trim(),
+                statusEl,
+            });
+        });
+        const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
+        const hasRemote = available.some((item) => item?.engine === 'remote-node');
+        if (config?.converterCatalog?.autoLoadRemote === true && !hasRemote) {
+            Promise.resolve().then(() => loadConverterNodeButton.click());
+        }
+    }
     if (resetFolderWorkButton && typeof onResetFolderWork === 'function') {
         resetFolderWorkButton.addEventListener('click', async () => {
             const confirmed = window.confirm('Reset this folder work to the default inherited layout? This removes the local .layout override.');
@@ -386,6 +402,10 @@ export function renderEditPanel({
                 statusEl,
                 form,
                 converter: readMediaConfigFromForm(form, config?.work || {}).converter || null,
+                convertAllOfType: editPanel.querySelector('#edit-converter-all-of-type')?.checked === true,
+                visibilityMode: editPanel.querySelector('#edit-converter-hide-originals')?.checked === false ? 'both' : 'converted-only',
+                hideThumbnails: editPanel.querySelector('#edit-converter-hide-thumbnails')?.checked !== false,
+                mimeType: String(config?.conversionScope?.mimeType || config?.mimeType || '').trim(),
             });
         });
     }

@@ -331,6 +331,7 @@ PHP
         '/mcp/routes/remote-content.php',
         '/mcp/routes/converters.php',
         '/mcp/routes/convert.php',
+        '/mcp/routes/converter-network.php',
         '/mcp/routes/create-converter.php',
         '/mcp/routes/converter-prompt.php',
         '/mcp/routes/style.php',
@@ -441,6 +442,21 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $baseDir,
                     'payload' => mcpReadRequestData(),
                 ]));
+            case 'converter-offers':
+                mcpJsonResponse(handleConverterOffers([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'remote-converters':
+                mcpJsonResponse(handleRemoteConverters([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'convert-offered':
+                mcpJsonResponse(handleConvertOffered([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
             case 'create-converter':
                 mcpJsonResponse(handleCreateConverter([
                     'rootDir' => $baseDir,
@@ -449,6 +465,11 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                 ]));
             case 'save-converted-work':
                 mcpJsonResponse(handleSaveConvertedWork([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'bulk-convert':
+                mcpJsonResponse(handleBulkConvert([
                     'rootDir' => $baseDir,
                     'payload' => mcpReadRequestData(),
                 ]));

@@ -137,13 +137,54 @@ function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, st
         if (isset($config['work']['converter']) && is_array($config['work']['converter'])) {
             $config['work']['converter'] = Converter::normalizeSelectedConverter($config['work']['converter']);
         }
-        $rootDir = function_exists('cmsProjectRootDir') ? cmsProjectRootDir($targetDir) : $targetDir;
+        $availableConverters = [];
+        $selectedConverter = is_array($config['work']['converter'] ?? null)
+            ? $config['work']['converter']
+            : [];
+        $selectedNode = is_array($selectedConverter['node'] ?? null) ? $selectedConverter['node'] : [];
+        if (
+            trim((string) ($selectedConverter['id'] ?? '')) !== ''
+            && trim((string) ($selectedNode['endpoint'] ?? '')) !== ''
+            && !array_filter(
+                $availableConverters,
+                static fn(array $item): bool => (string) ($item['id'] ?? '') === (string) ($selectedConverter['id'] ?? '')
+            )
+        ) {
+            $availableConverters[] = array_merge($selectedConverter, [
+                'type' => 'converter',
+                'engine' => 'remote-node',
+                'enabled' => true,
+                'source' => 'remote-node-catalog',
+            ]);
+        }
         $config['converterCatalog'] = [
             'webReadable' => Converter::isWebReadableMime($mime),
-            'available' => Converter::availableFor($mime, $kind, $extension, $rootDir),
+            'available' => $availableConverters,
+            'remoteNodeUrl' => 'https://pageoff.de/index.php',
+            'autoLoadRemote' => true,
         ];
         $folderConfig = class_exists('PoffConfig') ? PoffConfig::read($targetDir) : [];
         $tree = is_array($folderConfig['tree'] ?? null) ? $folderConfig['tree'] : [];
+        $sameTypeFiles = array_values(array_filter($tree, static function ($item) use ($targetDir, $mime): bool {
+            if (
+                !is_array($item)
+                || (string) ($item['type'] ?? 'file') === 'folder'
+                || ($item['generated'] ?? false) === true
+            ) {
+                return false;
+            }
+            $name = trim((string) ($item['name'] ?? ''));
+            $fullPath = $name !== '' ? $targetDir . DIRECTORY_SEPARATOR . $name : '';
+            if ($name === '' || !is_file($fullPath)) {
+                return false;
+            }
+            $itemMime = strtolower(trim((string) ($item['mimeType'] ?? (MediaType::detectMimeType($fullPath, $name) ?? ''))));
+            return $itemMime !== '' && $itemMime === $mime;
+        }));
+        $config['conversionScope'] = [
+            'mimeType' => $mime,
+            'sameTypeCount' => count($sameTypeFiles),
+        ];
         $config['generatedWorks'] = array_values(array_filter($tree, static function ($item) use ($targetFile): bool {
             return is_array($item)
                 && ($item['generated'] ?? false) === true

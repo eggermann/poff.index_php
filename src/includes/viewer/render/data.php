@@ -277,6 +277,13 @@ function buildFolderViewerItems(string $relativePath, string $fullPath, ?array $
             'linkUrl' => $entryLinkUrl,
             'isFolder' => $isFolder,
             'isFile' => !$isFolder,
+            'isImage' => !$isFolder && $entryKind === 'image',
+            'isVideo' => !$isFolder && $entryKind === 'video',
+            'isAudio' => !$isFolder && $entryKind === 'audio',
+            'isPdf' => !$isFolder && $entryKind === 'pdf',
+            'isText' => !$isFolder && in_array($entryKind, ['text', 'htaccess'], true),
+            'isLink' => !$isFolder && $entryKind === 'link',
+            'isOther' => !$isFolder && $entryKind === 'other',
             'isVirtual' => !$hasPhysicalTarget,
         ]);
 

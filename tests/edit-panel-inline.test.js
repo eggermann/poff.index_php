@@ -105,7 +105,6 @@ function loadRenderEditPanel(overrides = {}) {
       return `
         <div class="edit-work-fields edit-work-converter">
           <select id="edit-converter-id" name="converter_id" form="inlineEditForm">${options}</select>
-          <input id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${sourceUrl}">
           <select id="edit-converter-quality" name="converter_quality" form="inlineEditForm"></select>
           <select id="edit-converter-format" name="converter_format" form="inlineEditForm"></select>
           <select id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"></select>
@@ -255,7 +254,6 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
       return `
         <div class="edit-work-fields edit-work-converter">
           <select id="edit-converter-id" name="converter_id" form="inlineEditForm">${options}</select>
-          <input id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${sourceUrl}">
           <select id="edit-converter-quality" name="converter_quality" form="inlineEditForm"></select>
           <select id="edit-converter-format" name="converter_format" form="inlineEditForm"></select>
           <select id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"></select>
@@ -311,6 +309,174 @@ function createEditPanel() {
     },
   };
 }
+
+function loadConverterSectionHelpers() {
+  const filePath = path.join(__dirname, '..', 'src', 'assets', 'js', 'edit', 'panel', 'inline-sections.js');
+  const source = fs.readFileSync(filePath, 'utf8')
+    .replace(/import[\s\S]*?from\s+['"][^'"]+['"];\n/g, '')
+    .replace(/export const /g, 'const ')
+    .replace(/export function /g, 'function ');
+  const module = { exports: {} };
+  const context = vm.createContext({
+    module,
+    exports: module.exports,
+    URL,
+    window: {
+      location: {
+        href: 'https://consumer.example/index.php?edit=true',
+      },
+    },
+    HTMLInputElement: function HTMLInputElement() {},
+    HTMLTextAreaElement: function HTMLTextAreaElement() {},
+    HTMLSelectElement: function HTMLSelectElement() {},
+    escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    },
+    extractWorkFields() {
+      return [];
+    },
+    normalizeWorkField(value) {
+      return value;
+    },
+    getWorkCategoryOptions() {
+      return [];
+    },
+    normalizeWorkCategories(value = []) {
+      return Array.isArray(value) ? value : [];
+    },
+    renderWorkCategorySection() {
+      return '';
+    },
+    renderPersistentDetailsSection() {
+      return '';
+    },
+  });
+
+  vm.runInContext(`${source}
+module.exports = { readMediaConfigFromForm, renderConverterSection };
+`, context);
+  return module.exports;
+}
+
+test('converter section loads offers from an external Poff node', () => {
+  const { renderConverterSection } = loadConverterSectionHelpers();
+  const html = renderConverterSection({
+    srcUrl: '/photo.heic',
+    work: {
+      converter: {
+        id: 'converter/remote-provider-convert-image',
+        node: {
+          baseUrl: 'https://provider.example/index.php',
+        },
+      },
+    },
+    converterCatalog: {
+      available: [
+        {
+          id: 'converter/remote-provider-convert-image',
+          name: 'remote-provider-convert-image',
+          label: 'Convert Image · provider',
+          engine: 'remote-node',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          formats: ['png'],
+          defaults: { format: 'png' },
+          ui: { format: { options: ['png'] } },
+          node: {
+            id: 'provider',
+            baseUrl: 'https://provider.example/index.php',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+      ],
+    },
+  });
+
+  expect(html).toContain('id="edit-converter-node-url"');
+  expect(html).toContain('value="https://provider.example/index.php"');
+  expect(html).toContain('id="editLoadConverterNode"');
+  expect(html).toContain('data-converter-engine="remote-node"');
+  expect(html).toContain('data-converter-node="{&quot;id&quot;:&quot;provider&quot;');
+});
+
+test('remote converter selection preserves provider routing metadata', () => {
+  const { readMediaConfigFromForm } = loadConverterSectionHelpers();
+  const node = {
+    id: 'provider',
+    baseUrl: 'https://provider.example/index.php',
+    endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+    converterId: 'converter/convert-image',
+  };
+  const selectedOption = {
+    dataset: {
+      converterName: 'remote-provider-convert-image',
+      converterType: 'converter',
+      converterLabel: 'Convert Image · provider',
+      converterDescription: 'Remote image conversion',
+      converterEngine: 'remote-node',
+      converterFormats: 'png',
+      converterAccepts: JSON.stringify(['image/*']),
+      converterOutputs: JSON.stringify(['image/png']),
+      converterDefaults: JSON.stringify({ format: 'png' }),
+      converterUi: JSON.stringify({ format: { options: ['png'] } }),
+      converterNode: JSON.stringify(node),
+    },
+  };
+  const form = {
+    elements: {
+      converter_id: {
+        value: 'converter/remote-provider-convert-image',
+        selectedOptions: [selectedOption],
+      },
+      converter_quality: { value: 'default' },
+      converter_format: { value: 'png' },
+      converter_save_mode: { value: 'new-hidden-work' },
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  const work = readMediaConfigFromForm(form, {});
+  expect(work.converter).toEqual(expect.objectContaining({
+    id: 'converter/remote-provider-convert-image',
+    label: 'Convert Image · provider',
+    accepts: ['image/*'],
+    outputs: ['image/png'],
+    formats: ['png'],
+    node,
+  }));
+});
+
+test('file converter defaults to pageoff and offers same-type bulk conversion', () => {
+  const { renderConverterSection } = loadConverterSectionHelpers();
+  const html = renderConverterSection({
+    mimeType: 'image/heic',
+    conversionScope: {
+      mimeType: 'image/heic',
+      sameTypeCount: 16,
+    },
+    converterCatalog: {
+      available: [],
+      autoLoadRemote: true,
+    },
+  });
+
+  expect(html).toContain('value="https://pageoff.de/index.php"');
+  expect(html).toContain('id="edit-converter-all-of-type" type="checkbox" checked');
+  expect(html).toContain('Convert all 16 <strong>image/heic</strong> files in this folder');
+  expect(html).toContain('id="edit-converter-hide-originals" type="checkbox" checked');
+  expect(html).toContain('id="edit-converter-hide-thumbnails" type="checkbox" checked');
+  expect(html).toContain('Hide matching <strong>thumb*</strong> files');
+  expect(html).not.toContain('Convert folder images');
+  expect(html).not.toContain('This node');
+});
 
 test('file edit mode shows a direct link to the original file in a new tab', () => {
   const renderEditPanel = loadRenderEditPanel();
@@ -405,8 +571,7 @@ test('converter controls stay attached to inline edit form after being moved bel
   });
 
   expect(editPanel.innerHTML).toContain('id="edit-converter-id" name="converter_id" form="inlineEditForm"');
-  expect(editPanel.innerHTML).toContain('id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm"');
-  expect(editPanel.innerHTML).toContain('value="/MAUSMAUS/files/example.tiff"');
+  expect(editPanel.innerHTML).not.toContain('id="edit-converter-source-url"');
   expect(editPanel.innerHTML).toContain('id="edit-converter-quality" name="converter_quality" form="inlineEditForm"');
   expect(editPanel.innerHTML).toContain('id="edit-converter-format" name="converter_format" form="inlineEditForm"');
   expect(editPanel.innerHTML).toContain('id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm"');

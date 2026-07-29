@@ -22,6 +22,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
     require_once __DIR__ . '/../mcp/routes/remote-content.php';
     require_once __DIR__ . '/../mcp/routes/converters.php';
     require_once __DIR__ . '/../mcp/routes/convert.php';
+    require_once __DIR__ . '/../mcp/routes/converter-network.php';
     require_once __DIR__ . '/../mcp/routes/create-converter.php';
     require_once __DIR__ . '/../mcp/routes/converter-prompt.php';
     require_once __DIR__ . '/../mcp/routes/style.php';
@@ -100,6 +101,21 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $rootDir,
                     'payload' => mcpReadRequestData(),
                 ]));
+            case 'converter-offers':
+                mcpJsonResponse(handleConverterOffers([
+                    'rootDir' => $rootDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'remote-converters':
+                mcpJsonResponse(handleRemoteConverters([
+                    'rootDir' => $rootDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'convert-offered':
+                mcpJsonResponse(handleConvertOffered([
+                    'rootDir' => $rootDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
             case 'create-converter':
                 mcpJsonResponse(handleCreateConverter([
                     'rootDir' => $rootDir,
@@ -108,6 +124,11 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                 ]));
             case 'save-converted-work':
                 mcpJsonResponse(handleSaveConvertedWork([
+                    'rootDir' => $rootDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'bulk-convert':
+                mcpJsonResponse(handleBulkConvert([
                     'rootDir' => $rootDir,
                     'payload' => mcpReadRequestData(),
                 ]));
