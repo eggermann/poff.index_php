@@ -119,6 +119,7 @@ function handleBulkConvert(array $opts): array
     }
 
     $format = strtolower(trim((string) ($converter['format'] ?? 'png')));
+    $outputExtension = $format === 'jpeg' || $format === 'jpg' ? 'jpg' : $format;
     $requestedMimeType = strtolower(trim((string) ($payload['mimeType'] ?? '')));
     $hideThumbnails = ($payload['hideThumbnails'] ?? false) === true;
     $visibilityMode = strtolower(trim((string) ($payload['visibilityMode'] ?? 'converted-only')));
@@ -169,7 +170,7 @@ function handleBulkConvert(array $opts): array
             'converter' => $itemConverter,
             'target' => [
                 'folder' => $folderPath,
-                'saveAs' => pathinfo($name, PATHINFO_FILENAME) . '.' . $format,
+                'saveAs' => pathinfo($name, PATHINFO_FILENAME) . '.' . $outputExtension,
                 'mode' => 'replace-generated-work',
                 'visibilityMode' => $visibilityMode,
             ],
@@ -185,7 +186,7 @@ function handleBulkConvert(array $opts): array
         }
         $conversion['target'] = [
             'folder' => $folderPath,
-            'saveAs' => pathinfo($name, PATHINFO_FILENAME) . '.' . $format,
+            'saveAs' => pathinfo($name, PATHINFO_FILENAME) . '.' . $outputExtension,
             'mode' => 'replace-generated-work',
             'visibilityMode' => $visibilityMode,
         ];

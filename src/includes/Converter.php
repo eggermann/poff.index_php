@@ -1450,6 +1450,9 @@ HTML;
     private static function normalizeFormat(string $format): string
     {
         $format = strtolower(trim($format));
+        if ($format === 'jpg') {
+            return 'jpeg';
+        }
         return in_array($format, ['source', 'webp', 'jpeg', 'png', 'json', 'txt', 'md', 'html'], true) ? $format : 'webp';
     }
 
@@ -1636,7 +1639,9 @@ HTML;
     private static function sanitizeOutputName(string $name): string
     {
         $name = basename(str_replace('\\', '/', trim($name)));
-        $extension = self::normalizeFormat(pathinfo($name, PATHINFO_EXTENSION));
+        $requestedExtension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        $format = self::normalizeFormat($requestedExtension);
+        $extension = $requestedExtension === 'jpg' ? 'jpg' : $format;
         $base = pathinfo($name, PATHINFO_FILENAME);
         $base = preg_replace('/[^a-z0-9._-]+/i', '-', $base) ?: 'converted';
         return trim($base, '.-') . '.' . $extension;

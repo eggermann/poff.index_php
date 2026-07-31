@@ -2630,6 +2630,36 @@ describe('Poff converters', () => {
     expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
   });
 
+  test('keeps a requested jpg filename for a jpeg result', async () => {
+    const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
+    const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      source: {
+        name: 'scan-001.tiff',
+        path: 'scan-001.tiff',
+        mimeType: 'image/tiff',
+        bodyBase64: body.toString('base64'),
+      },
+      converter: {
+        id: 'converter/convert-image',
+        format: 'jpeg',
+        quality: 'default',
+      },
+      target: {
+        saveAs: 'scan-001.jpg',
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      route: 'convert-offered',
+      output: expect.objectContaining({
+        name: 'scan-001.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    }));
+    expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 3).toString('hex')).toBe('ffd8ff');
+  });
+
   test('sends a local source to a discovered provider converter and receives its result', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-node-consumer-${Date.now()}`);
     fs.mkdirSync(tempRoot, { recursive: true });
