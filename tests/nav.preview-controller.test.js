@@ -443,6 +443,61 @@ describe('preview controller', () => {
     expect(contentFrame.children[0].textContent).toContain('poffConverterPayloadProvider');
   });
 
+  test('executes layout scripts for same-origin previews', async () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      DOMParser: class {
+        parseFromString() {
+          const layout = new FakeHTMLElement('section', '<button data-next>Next</button>');
+          layout.setAttribute('class', 'cinema');
+          const viewer = new FakeHTMLElement('div', layout.outerHTML);
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: { children: [] },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            querySelectorAll(selector) {
+              if (selector === 'script') {
+                const script = new FakeHTMLElement('script');
+                script.setAttribute('src', '/player/.layout/script.js');
+                return [script];
+              }
+              return [];
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+      fetch: async (url, options) => ({
+        ok: true,
+        url: `http://example.test${url}`,
+        text: async () => '<html></html>',
+        options,
+      }),
+    });
+    const contentFrame = new FakeHTMLElement();
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return null;
+      },
+    });
+
+    await controller.renderPreview('/?view=1&path=player');
+
+    expect(contentFrame.children).toHaveLength(1);
+    expect(contentFrame.children[0].src).toBe('http://example.test/player/.layout/script.js');
+  });
+
   test('uses a local preview fallback message instead of remote snapshot text for same-origin responses', async () => {
     const { createPreviewController, FakeHTMLElement } = loadPreviewController({
       DOMParser: class {

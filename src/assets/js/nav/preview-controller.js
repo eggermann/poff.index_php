@@ -482,7 +482,8 @@ export function createPreviewController({
             );
             let previewScripts = [];
             try {
-                previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview);
+                const localPreview = !isExternalPreviewUrl(response.url);
+                previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview || localPreview);
             } catch (err) {
                 previewScripts = [];
             }
