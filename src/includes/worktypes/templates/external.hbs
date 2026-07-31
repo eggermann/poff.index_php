@@ -90,7 +90,7 @@
         </div>
     {{else}}
         {{#if previewUrl}}
-            <iframe class="external-work__body external-work__body--iframe min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}"></iframe>
+            <iframe class="external-work__body external-work__body--iframe min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}" allow="autoplay; encrypted-media; picture-in-picture"></iframe>
         {{else}}
             {{#if external.resultWork.srcUrl}}
                 <figure class="external-work__body external-work__body--generated">

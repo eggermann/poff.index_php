@@ -5403,6 +5403,7 @@ describe('Worktype HBS renderer', () => {
 
       expect(rendered).toContain('<iframe');
       expect(rendered).toContain('src="https://example.org/player.php?word&#x3D;1984&amp;lang&#x3D;en"');
+      expect(rendered).toContain('allow="autoplay; encrypted-media; picture-in-picture"');
       expect(rendered).toContain('href="https://example.org/player.php?word&#x3D;1984&amp;lang&#x3D;en"');
       expect(rendered).not.toContain('REMOTE FETCH SHOULD NOT RUN');
     } finally {
