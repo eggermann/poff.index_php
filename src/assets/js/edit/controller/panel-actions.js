@@ -1,4 +1,4 @@
-import { requestEditAuth, requestEditDelete, requestEditReset, requestEditUpload, requestMcpRoute } from '../../api/edit.js';
+import { requestEditAuth, requestEditReset, requestEditUpload, requestMcpRoute } from '../../api/edit.js';
 import { buildConverterSaveAs, resolveConverterPayloadProvider, readMediaConfigFromElements } from './media-config.js';
 import { materializeWorkFields } from '../work-fields.js';
 import { setStatusMessage } from '../status.js';
@@ -29,6 +29,33 @@ function formatStoredNames(uploaded = []) {
         return `${names[0]} and ${names[1]}`;
     }
     return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+}
+
+function buildRemoteExportUrl(sourceUrl) {
+    const url = new URL(String(sourceUrl || '').trim());
+    if (url.searchParams.get('route') === 'export-content') {
+        return url.toString();
+    }
+
+    let sourcePath = url.searchParams.get('path') || '';
+    const sourceFile = url.searchParams.get('file') || '';
+    if (!sourcePath && sourceFile) {
+        const parts = sourceFile.split('/').filter(Boolean);
+        parts.pop();
+        sourcePath = parts.join('/');
+    }
+    if (!sourcePath && url.hash) {
+        sourcePath = decodeURIComponent(url.hash.replace(/^#\/?/, '')).replace(/^\/+/, '');
+    }
+
+    url.hash = '';
+    url.search = '';
+    url.searchParams.set('mcp', '1');
+    url.searchParams.set('route', 'export-content');
+    if (sourcePath) {
+        url.searchParams.set('path', sourcePath);
+    }
+    return url.toString();
 }
 
 export function createPanelActions({
@@ -147,27 +174,6 @@ export function createPanelActions({
             setDrawerOpen(false);
             syncDrawerVisibility();
             window.location.hash = `#/${nextPath}`;
-        },
-        onDeleteTarget: async ({ statusEl }) => {
-            const selection = getSelection();
-            const targetPath = getEditTargetPath(selection);
-            if (!targetPath) {
-                throw new Error('Delete target unavailable.');
-            }
-            const data = await requestEditDelete({
-                path: targetPath,
-                return: selection.previewPath || selection.path || '',
-            });
-            if (!data || data.error) {
-                throw new Error(data?.error || 'Delete failed.');
-            }
-            setDrawerOpen(false);
-            syncDrawerVisibility();
-            setStatusMessage(statusEl, 'Deleted.', true);
-            window.dispatchEvent(new CustomEvent('poff:content-updated'));
-            const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
-            window.location.hash = nextPath ? `#/${nextPath}` : '';
-            await refreshCurrentEditState(getSelection());
         },
         onConvertWork: async ({
             statusEl,
@@ -510,6 +516,40 @@ export function createPanelActions({
                 await refreshCurrentEditState(selection);
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             }
+        },
+        onImportRemote: async ({
+            sourceUrl,
+            takeoverMode,
+            destinationName,
+            closeDialog,
+        }) => {
+            const selection = getSelection();
+            const exportUrl = buildRemoteExportUrl(sourceUrl);
+            const data = await requestMcpRoute('import-remote', {
+                path: getAddWorkTargetPath(selection) || getContentTargetPath(selection),
+                url: exportUrl,
+                mode: takeoverMode === 'copy' ? 'copy' : 'follow',
+                destinationName,
+                createPlayer: takeoverMode === 'copy',
+            });
+            if (!data || data.ok === false || data.error) {
+                throw new Error(data?.error || 'Failed to use the remote Poff work.');
+            }
+            closeDialog?.();
+            const inlineStatus = document.getElementById('editInlineStatus');
+            if (inlineStatus) {
+                const message = takeoverMode === 'copy'
+                    ? `Copied ${data.copiedCount || 0} files into ${data.destinationPath || data.destinationName || 'a local folder'}${data.playerCreated ? ' and created a looping player' : ''}.`
+                    : `Following ${data.importedCount || 0} entries from the remote Poff node.`;
+                setStatusMessage(inlineStatus, message, true);
+            }
+            if (takeoverMode === 'copy' && data.destinationPath) {
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                window.location.hash = `#/${data.openPath || data.destinationPath}`;
+                return;
+            }
+            await refreshCurrentEditState(selection);
+            window.dispatchEvent(new CustomEvent('poff:content-updated'));
         },
         onChangePassword: async ({ elements, form, statusEl }) => {
             try {

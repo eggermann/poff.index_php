@@ -425,12 +425,16 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'path' => mcpRoutePath(),
                 ]));
             case 'import-remote':
+                $remoteInput = mcpReadRequestData();
                 mcpJsonResponse(handleImportRemote([
                     'rootDir' => $baseDir,
-                    'path' => mcpRoutePath(),
-                    'url' => mcpQueryString('url', '') ?? '',
-                    'sourceId' => mcpQueryString('sourceId', '') ?? '',
-                    'replace' => in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true),
+                    'path' => (string) ($remoteInput['path'] ?? mcpRoutePath()),
+                    'url' => (string) ($remoteInput['url'] ?? (mcpQueryString('url', '') ?? '')),
+                    'sourceId' => (string) ($remoteInput['sourceId'] ?? (mcpQueryString('sourceId', '') ?? '')),
+                    'replace' => (bool) ($remoteInput['replace'] ?? in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true)),
+                    'mode' => (string) ($remoteInput['mode'] ?? 'follow'),
+                    'destinationName' => (string) ($remoteInput['destinationName'] ?? ''),
+                    'createPlayer' => (bool) ($remoteInput['createPlayer'] ?? false),
                 ]));
             case 'converters':
                 mcpJsonResponse(handleConverters([
@@ -449,6 +453,11 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                 ]));
             case 'remote-converters':
                 mcpJsonResponse(handleRemoteConverters([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'register-node':
+                mcpJsonResponse(handleRegisterPoffNode([
                     'rootDir' => $baseDir,
                     'input' => mcpReadRequestData(),
                 ]));

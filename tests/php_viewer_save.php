@@ -31,8 +31,4 @@ $_POST = $payload;
 $_SERVER['REQUEST_METHOD'] = 'POST';
 
 chdir($cwd);
-$runtimeRoot = realpath(getcwd() ?: '.') ?: $cwd;
-if (!is_file($runtimeRoot . DIRECTORY_SEPARATOR . '.edit.allow')) {
-    touch($runtimeRoot . DIRECTORY_SEPARATOR . '.edit.allow');
-}
 cmsHandleEditAction();

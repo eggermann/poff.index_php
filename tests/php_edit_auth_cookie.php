@@ -24,7 +24,6 @@ if (!is_string($hash) || $hash === '') {
 }
 
 file_put_contents($cwd . DIRECTORY_SEPARATOR . '.poff-auth.php', "<?php return ['passwordHash' => '" . addslashes($hash) . "'];\n");
-file_put_contents($cwd . DIRECTORY_SEPARATOR . '.edit.allow', '');
 
 $config = cmsLoadAuthConfig($cwd);
 $passwordOk = password_verify($password, (string) ($config['passwordHash'] ?? ''));

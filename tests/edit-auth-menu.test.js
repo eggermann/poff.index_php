@@ -648,6 +648,92 @@ test('loading an external Poff node merges its converter offers into the editor 
   }));
 });
 
+test('registering a folder publishes its public work URL through the Poff registry route', async () => {
+  let capturedPanelOptions = null;
+  let requestedRoute = null;
+  let requestedPayload = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+      auth,
+      allowed: true,
+      target: 'folder',
+      subjectTarget: 'folder',
+      config: {
+        title: 'Gallery',
+        work: {
+          type: 'folder',
+          categories: ['image', 'collection'],
+        },
+      },
+    }),
+    requestMcpRoute: async (route, payload) => {
+      requestedRoute = route;
+      requestedPayload = payload;
+      return {
+        ok: true,
+        pendingApproval: true,
+        categories: ['image', 'collection'],
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'gallery',
+      previewPath: 'gallery',
+      previewIsFile: false,
+      isFile: false,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'gallery',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  const result = await capturedPanelOptions.onRegisterPoff({
+    statusEl: { textContent: '' },
+  });
+
+  expect(requestedRoute).toBe('register-node');
+  expect(requestedPayload).toEqual({
+    path: 'gallery',
+    pageUrl: 'http://example.test/MAUSMAUS/?view=1&path=gallery',
+  });
+  expect(result.pendingApproval).toBe(true);
+});
+
 test('saving a selected converter persists converter work config even without existing work config', async () => {
   let capturedPanelOptions = null;
   let savedPayload = null;

@@ -1,18 +1,19 @@
 # Active Context
 ## Current Goal
-Obvious folder-level HEIC bulk conversion using local or Pageoff Poff nodes, with original/generated visibility policy and final screenshot.
+Build a local looping six-video `player` work and an excellent external-work takeover UX, with two Playwright screenshots.
 ## Current Loop
-Loop: 3
+Loop: 2
 Phase: Complete
 ## Current Focus
-Bulk conversion implementation and live proof are complete.
+Local player, guarded external-copy API, intent-based takeover UI, tests, and screenshots are complete.
 ## Assumptions
-- Default bulk mode should show converted works and hide originals.
-- Local converter should require no URL.
-- Pageoff should be a one-click preset, while arbitrary Poff URLs remain possible.
+- `Prothagonia` is the source work.
+- Local target content root is `/Users/eggermann/Projekte/dominikeggermann.com/page`.
+- `player` should copy, not move, all six MP4 files.
+- Playlist should advance on `ended` and return to item 1 after item 6.
 ## Risks / Unknowns
-- Existing dirty files belong to user or prior work and must remain untouched unless directly in converter scope.
-- `pageoff.de` still serves an older index without the generic converter-offer route.
-- Source UI changes require the user's later explicit build/deployment before Pageoff can advertise converters.
+- Repo still contains unrelated uncommitted build, auth, layout, prompt, and fixture changes.
+- Source UI/API changes are not rebuilt into generated output because no build was requested.
+- The takeover screenshot is a faithful UX preview of the implemented source state; the player screenshot is the real local viewer.
 ## Next Action
-Deploy the newly built `index.php` to `pageoff.de` when the user explicitly requests a build.
+Wait for an explicit rebuild/deploy or commit request.

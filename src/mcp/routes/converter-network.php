@@ -192,6 +192,169 @@ function handleRemoteConverters(array $opts): array
     ];
 }
 
+function mcpPoffRegistryEndpoint(string $registryUrl, string $registryPath = ''): string
+{
+    $parts = parse_url(trim($registryUrl));
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return '';
+    }
+
+    $scheme = strtolower((string) $parts['scheme']);
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return '';
+    }
+
+    $host = (string) $parts['host'];
+    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+    $path = (string) ($parts['path'] ?? '');
+    if ($path === '' || str_ends_with($path, '/')) {
+        $path = rtrim($path, '/') . '/index.php';
+    }
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+    unset($query['mcp'], $query['route'], $query['authToken']);
+    $query['edit'] = 'upload';
+    if (trim($registryPath) !== '') {
+        $query['path'] = trim($registryPath, "/\\");
+    }
+
+    return $scheme . '://' . $host . $port . $path . '?' . http_build_query($query);
+}
+
+function mcpPoffRegistryCategories(mixed $value): array
+{
+    $source = is_array($value)
+        ? $value
+        : (is_string($value) ? (preg_split('/\r?\n|,/', $value) ?: []) : []);
+    $categories = [];
+    foreach ($source as $candidate) {
+        if (!is_scalar($candidate)) {
+            continue;
+        }
+        $normalized = strtolower(trim((string) $candidate));
+        $normalized = substr($normalized, 0, 24);
+        if ($normalized === '' || in_array($normalized, $categories, true)) {
+            continue;
+        }
+        $categories[] = $normalized;
+        if (count($categories) >= 12) {
+            break;
+        }
+    }
+    return $categories;
+}
+
+function mcpPoffNodeCatalogUrls(string $pageUrl, string $path): array
+{
+    $parts = parse_url($pageUrl);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return [];
+    }
+
+    $base = strtolower((string) $parts['scheme']) . '://' . (string) $parts['host'];
+    if (isset($parts['port'])) {
+        $base .= ':' . (int) $parts['port'];
+    }
+    $base .= (string) ($parts['path'] ?? '/index.php');
+
+    return [
+        'protocol' => 'poff-node/1',
+        'baseUrl' => $base,
+        'workCatalogUrl' => $base . '?' . http_build_query([
+            'mcp' => '1',
+            'route' => 'export-content',
+            'path' => trim($path, "/\\"),
+        ]),
+        'converterCatalogUrl' => $base . '?' . http_build_query([
+            'mcp' => '1',
+            'route' => 'converter-offers',
+        ]),
+    ];
+}
+
+function mcpPoffRegistryRequest(string $url, array $payload): array
+{
+    $override = $GLOBALS['__poff_registry_post'] ?? null;
+    if (is_callable($override)) {
+        $response = $override($url, $payload);
+        return is_array($response) ? $response : ['ok' => false, 'status' => 0, 'body' => ''];
+    }
+    return mcpConverterCatalogRequest($url, $payload);
+}
+
+function handleRegisterPoffNode(array $opts): array
+{
+    $rootDir = (string) ($opts['rootDir'] ?? '');
+    $input = is_array($opts['input'] ?? null) ? $opts['input'] : mcpReadRequestData();
+    $path = trim((string) ($input['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'register-node'], $access);
+    }
+
+    $target = mcpResolvePathInsideRoot($rootDir, $path);
+    if ($target === null) {
+        return ['ok' => false, 'route' => 'register-node', 'error' => 'Current work is unavailable.'];
+    }
+    $config = is_file($target)
+        ? PoffConfig::ensureFileConfig(dirname($target), basename($target))
+        : PoffConfig::read($target);
+    $work = is_array($config['work'] ?? null) ? $config['work'] : [];
+    $categories = mcpPoffRegistryCategories($work['categories'] ?? ($work['category'] ?? []));
+    $title = trim((string) ($config['title'] ?? $config['name'] ?? basename($target)));
+    if ($title === '') {
+        $title = $path !== '' ? basename($path) : 'Poff node';
+    }
+
+    $pageUrl = trim((string) ($input['pageUrl'] ?? ''));
+    $pageValidation = Converter::validateRemoteEndpoint($pageUrl);
+    if ($pageValidation !== null) {
+        return ['ok' => false, 'route' => 'register-node', 'error' => 'Current page needs a public http or https URL.'];
+    }
+
+    $registryUrl = trim((string) ($input['registryUrl'] ?? 'https://pageoff.de/index.php'));
+    $registryEndpoint = mcpPoffRegistryEndpoint(
+        $registryUrl,
+        (string) ($input['registryPath'] ?? '')
+    );
+    if ($registryEndpoint === '' || Converter::validateRemoteEndpoint($registryEndpoint) !== null) {
+        return ['ok' => false, 'route' => 'register-node', 'error' => 'Poff registry URL is invalid.'];
+    }
+
+    $node = mcpPoffNodeCatalogUrls($pageUrl, $path);
+    $response = mcpPoffRegistryRequest($registryEndpoint, [
+        'source' => 'url',
+        'linkName' => $title,
+        'linkUrl' => $pageUrl,
+        'categories' => $categories,
+        'poffNode' => $node,
+    ]);
+    $decoded = json_decode((string) ($response['body'] ?? ''), true);
+    if (!is_array($decoded)) {
+        $decoded = [];
+    }
+    if (($response['ok'] ?? false) !== true || !empty($decoded['error'])) {
+        return [
+            'ok' => false,
+            'route' => 'register-node',
+            'error' => (string) ($decoded['error'] ?? 'Poff registry unavailable.'),
+            'status' => (int) ($response['status'] ?? 0),
+        ];
+    }
+
+    $uploaded = is_array($decoded['uploaded'][0] ?? null) ? $decoded['uploaded'][0] : [];
+    return [
+        'ok' => true,
+        'route' => 'register-node',
+        'registry' => $registryUrl,
+        'pageUrl' => $pageUrl,
+        'categories' => $categories,
+        'node' => $node,
+        'pendingApproval' => !empty($decoded['pendingApproval']) || !empty($uploaded['pendingApproval']),
+        'updatedRegistration' => !empty($uploaded['updatedRegistration']),
+    ];
+}
+
 function handleConvertOffered(array $opts): array
 {
     $rootDir = (string) ($opts['rootDir'] ?? '');

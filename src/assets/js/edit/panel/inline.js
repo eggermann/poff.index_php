@@ -6,7 +6,7 @@ import {
     extractWorkFields,
     normalizeWorkField,
 } from '../work-fields.js';
-import { bindWorkCategoryControls } from './categories.js';
+import { bindWorkCategoryControls, normalizeWorkCategories } from './categories.js';
 import {
     bindStoredDetailsState,
     layoutOverlayState,
@@ -24,6 +24,24 @@ import {
     renderWorkConfigFieldsSection,
 } from './inline-sections.js';
 import { createWorkFieldEditor } from './inline-work-fields.js';
+
+function renderPoffRegistrationSection(config, isFileTarget) {
+    if (isFileTarget) {
+        return '';
+    }
+    const work = config?.work && typeof config.work === 'object' ? config.work : {};
+    const categories = normalizeWorkCategories(work.categories ?? work.category ?? []);
+    const filterLabel = categories.length ? categories.join(' · ') : 'current work type';
+    return `
+        <div class="edit-poff-register">
+            <div>
+                <div class="edit-work-fields-title">Poff network</div>
+                <div class="small-note">Share work catalog and converter offers. Filters: ${escapeHtml(filterLabel)}.</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editRegisterPoff">Register with Poff</button>
+        </div>
+    `;
+}
 
 export function renderEditPanel({
     editPanel,
@@ -46,8 +64,9 @@ export function renderEditPanel({
     onCreateBlankFile,
     onCreateFolder,
     onCreateLink,
+    onImportRemote,
+    onRegisterPoff,
     onResetFolderWork,
-    onDeleteTarget,
     onChangePassword,
     onConvertWork,
     onCreateConverter,
@@ -108,6 +127,7 @@ export function renderEditPanel({
             onCreateBlankFile,
             onCreateFolder,
             onCreateLink,
+            onImportRemote,
         });
     }
 
@@ -167,23 +187,21 @@ export function renderEditPanel({
        
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
-                <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
-                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-                ${!isFileTarget && typeof onResetFolderWork === 'function' ? `
+                <button class="btn btn-secondary" type="button" id="editMoreToggle">Settings</button>
+                <button class="btn btn-secondary" type="button" id="editChangeLayout">Layout</button>
+                ${!isFileTarget && (overlayState.wrapperWasLocal || overlayState.sectionWasLocal) && typeof onResetFolderWork === 'function' ? `
                 <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
-                    Reset
-                </button>
-                ` : ''}
-                ${typeof onDeleteTarget === 'function' ? `
-                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDeleteTarget">
-                    <img class="block" src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16">
-                    Delete
+                    Reset layout
                 </button>
                 ` : ''}
             </div>
-            <div class="small-note">Layout: ${escapeHtml(overlayState.wrapperSourceLabel)} · parent: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code> · mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+            <details class="edit-inline-meta">
+                <summary>Layout source</summary>
+                <div class="small-note">Layout: ${escapeHtml(overlayState.wrapperSourceLabel)} · parent: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code> · mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+            </details>
 
         </form>
+        ${renderPoffRegistrationSection(config, isFileTarget)}
         <div class="edit-panel-stack">
             ${uploadSectionHtml}
             ${status?.target === 'file' ? renderConverterSection(config) : ''}
@@ -197,15 +215,14 @@ export function renderEditPanel({
     const statusEl = editPanel.querySelector('#editInlineStatus');
     const moreToggle = editPanel.querySelector('#editMoreToggle');
     const passwordDetailsEl = editPanel.querySelector('#editPasswordDetails');
-    const deleteTargetButton = editPanel.querySelector('#editDeleteTarget');
     const resetFolderWorkButton = editPanel.querySelector('#editResetFolderWork');
     const changeLayoutButton = editPanel.querySelector('#editChangeLayout');
+    const registerPoffButton = editPanel.querySelector('#editRegisterPoff');
     const titleInput = editPanel.querySelector('#edit-title');
     const descInput = editPanel.querySelector('#edit-description');
     const addWorkFieldButton = editPanel.querySelector('#editWorkFieldAdd');
     const convertButton = editPanel.querySelector('#editConvertWork');
     const createConverterButton = editPanel.querySelector('#editCreateConverter');
-    const loadConverterNodeButton = editPanel.querySelector('#editLoadConverterNode');
     const converterNodeUrlInput = editPanel.querySelector('#edit-converter-node-url');
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
@@ -359,22 +376,38 @@ export function renderEditPanel({
     if (changeLayoutButton && typeof onOpenLayoutPage === 'function') {
         changeLayoutButton.addEventListener('click', () => onOpenLayoutPage());
     }
+    if (registerPoffButton && typeof onRegisterPoff === 'function') {
+        registerPoffButton.addEventListener('click', async () => {
+            const originalLabel = registerPoffButton.textContent;
+            registerPoffButton.disabled = true;
+            registerPoffButton.textContent = 'Registering...';
+            try {
+                const result = await onRegisterPoff({ statusEl });
+                registerPoffButton.textContent = result?.pendingApproval ? 'Registration pending' : 'Registered';
+            } catch (error) {
+                registerPoffButton.disabled = false;
+                registerPoffButton.textContent = originalLabel;
+                setStatusMessage(statusEl, error?.message || 'Poff registration failed.');
+            }
+        });
+    }
     if (createConverterButton && typeof onCreateConverter === 'function') {
         createConverterButton.addEventListener('click', async () => {
             await onCreateConverter({ statusEl, form });
         });
     }
-    if (loadConverterNodeButton && typeof onLoadConverterNode === 'function') {
-        loadConverterNodeButton.addEventListener('click', async () => {
+    if (converterNodeUrlInput && typeof onLoadConverterNode === 'function') {
+        const loadConverterNode = async () => {
             await onLoadConverterNode({
                 nodeUrl: String(converterNodeUrlInput?.value || '').trim(),
                 statusEl,
             });
-        });
+        };
+        converterNodeUrlInput.addEventListener('change', loadConverterNode);
         const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
         const hasRemote = available.some((item) => item?.engine === 'remote-node');
         if (config?.converterCatalog?.autoLoadRemote === true && !hasRemote) {
-            Promise.resolve().then(() => loadConverterNodeButton.click());
+            Promise.resolve().then(loadConverterNode);
         }
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === 'function') {
@@ -384,15 +417,6 @@ export function renderEditPanel({
                 return;
             }
             await onResetFolderWork({ statusEl });
-        });
-    }
-    if (deleteTargetButton && typeof onDeleteTarget === 'function') {
-        deleteTargetButton.addEventListener('click', async () => {
-            const confirmed = window.confirm('Delete this item? This cannot be undone.');
-            if (!confirmed) {
-                return;
-            }
-            await onDeleteTarget({ statusEl });
         });
     }
     if (convertButton && typeof onConvertWork === 'function') {
@@ -419,6 +443,7 @@ export function renderEditPanel({
         onCreateBlankFile,
         onCreateFolder,
         onCreateLink,
+        onImportRemote,
     });
 
     return { statusEl, promptRoot };

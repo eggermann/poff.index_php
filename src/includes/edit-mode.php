@@ -1,10 +1,5 @@
 <?php
 
-function cmsEditModeAllowedMarkers(): array
-{
-    return ['.edit.allow', 'edit.allow'];
-}
-
 function cmsEditModeDeniedMarkers(): array
 {
     return ['.edit.not-allow', 'edit.not-allow'];
@@ -29,12 +24,6 @@ function cmsEditModeAllowedForDirectory(string $directory, ?string $scopeRoot = 
             }
         }
 
-        foreach (cmsEditModeAllowedMarkers() as $marker) {
-            if (is_file($current . DIRECTORY_SEPARATOR . $marker)) {
-                return true;
-            }
-        }
-
         if ($root !== null && $current === $root) {
             break;
         }
@@ -46,5 +35,5 @@ function cmsEditModeAllowedForDirectory(string $directory, ?string $scopeRoot = 
         $current = realpath($parent);
     }
 
-    return false;
+    return true;
 }

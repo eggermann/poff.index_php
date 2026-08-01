@@ -41,6 +41,8 @@ function cmsHandleEditUploadAction(array $ctx): void
             [
                 'pendingApproval' => !$editorAuthenticated,
                 'htaccessDir' => $rootDir,
+                'categories' => $data['categories'] ?? [],
+                'poffNode' => $data['poffNode'] ?? [],
             ]
         ),
         default => function () use ($targetDir, $uploadTarget): array {

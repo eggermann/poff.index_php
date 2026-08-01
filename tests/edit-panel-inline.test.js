@@ -57,6 +57,9 @@ function loadRenderEditPanel(overrides = {}) {
     normalizeWorkField(value) {
       return value;
     },
+    normalizeWorkCategories(value) {
+      return Array.isArray(value) ? value : [];
+    },
     schemaFieldTypeOptions() {
       return [];
     },
@@ -205,6 +208,9 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     },
     normalizeWorkField(value) {
       return value;
+    },
+    normalizeWorkCategories(value) {
+      return Array.isArray(value) ? value : [];
     },
     schemaFieldTypeOptions() {
       return [];
@@ -400,7 +406,8 @@ test('converter section loads offers from an external Poff node', () => {
 
   expect(html).toContain('id="edit-converter-node-url"');
   expect(html).toContain('value="https://provider.example/index.php"');
-  expect(html).toContain('id="editLoadConverterNode"');
+  expect(html).not.toContain('id="editLoadConverterNode"');
+  expect(html).toContain('Offers load automatically when URL changes.');
   expect(html).toContain('data-converter-engine="remote-node"');
   expect(html).toContain('data-converter-node="{&quot;id&quot;:&quot;provider&quot;');
 });
@@ -474,6 +481,12 @@ test('file converter defaults to pageoff and offers same-type bulk conversion', 
   expect(html).toContain('id="edit-converter-hide-originals" type="checkbox" checked');
   expect(html).toContain('id="edit-converter-hide-thumbnails" type="checkbox" checked');
   expect(html).toContain('Hide matching <strong>thumb*</strong> files');
+  expect(html).toContain('<summary>Output and visibility</summary>');
+  expect(html).toContain('<summary>Converter node</summary>');
+  expect(html).toContain('Offer your own converter');
+  expect(html).toContain('No converted files yet.');
+  expect(html).not.toContain('[show]');
+  expect(html).not.toContain('Reload converter');
   expect(html).not.toContain('Convert folder images');
   expect(html).not.toContain('This node');
 });
@@ -507,6 +520,43 @@ test('file edit mode shows a direct link to the original file in a new tab', () 
   expect(editPanel.innerHTML).toContain('href="/MAUSMAUS/files/example.json"');
   expect(editPanel.innerHTML).toContain('target="_blank"');
   expect(editPanel.innerHTML).toContain('rel="noopener noreferrer"');
+});
+
+test('primary edit actions avoid duplicate destructive controls and hide layout diagnostics', () => {
+  const renderEditPanel = loadRenderEditPanel();
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: {
+      title: 'Collection',
+      description: '',
+      work: {
+        type: 'folder',
+        categories: ['folder', 'collection'],
+      },
+    },
+    status: {
+      allowed: true,
+      target: 'folder',
+      relativePath: 'collection',
+      auth: {
+        canEdit: true,
+      },
+    },
+    onResetFolderWork() {},
+    onDeleteTarget() {},
+  });
+
+  expect(editPanel.innerHTML).toContain('id="editMoreToggle">Settings</button>');
+  expect(editPanel.innerHTML).toContain('id="editChangeLayout">Layout</button>');
+  expect(editPanel.innerHTML).toContain('<summary>Layout source</summary>');
+  expect(editPanel.innerHTML).toContain('id="editRegisterPoff"');
+  expect(editPanel.innerHTML).toContain('Filters: folder · collection.');
+  expect(editPanel.innerHTML).not.toContain('id="editDeleteTarget"');
+  expect(editPanel.innerHTML).not.toContain('id="editResetFolderWork"');
+  expect(editPanel.innerHTML).not.toContain('More...');
 });
 
 test('convert button renders disabled when no converter is selected', () => {

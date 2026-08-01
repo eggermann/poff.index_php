@@ -42,3 +42,21 @@ Decision:
 Offer “This node” and `pageoff.de` as explicit presets while retaining an arbitrary Poff node URL field. All remote providers use the same converter-offer and inline-result protocol.
 Consequences:
 Pageoff is convenient without becoming a hardcoded special protocol, and every Poff node can offer converters after deploying the same route implementation.
+
+### D-0006: External takeover must expose intent before transfer
+Status: Accepted
+Context:
+Current UI conflates copying a name, linking a work, importing remote metadata, and copying media.
+Decision:
+Use one “Use this work” entry point with three explicit modes: Follow live source, Embed remote work, and Copy locally. Local copy should optionally create a suitable work such as a looping playlist.
+Consequences:
+Users understand ownership and update behavior before acting. Binary copying requires a guarded extension to the remote import API.
+
+### D-0007: Local copy uses a guarded same-host export contract
+Status: Accepted
+Context:
+Remote manifests can otherwise point a receiving node at arbitrary hosts or oversized content.
+Decision:
+Copy mode accepts only public HTTP(S), disables redirects, requires asset hosts to match the export host, limits file count and bytes, sanitizes names, stages in a hidden temporary folder, and never overwrites an existing destination.
+Consequences:
+Any Poff node can offer a portable work while the receiver retains clear resource and SSRF boundaries.

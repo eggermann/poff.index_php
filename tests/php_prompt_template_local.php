@@ -15,10 +15,9 @@ if ($rootDir === false || !is_dir($rootDir)) {
 }
 
 $relativePath = $argv[2] ?? '';
-$allowFile = $argv[3] ?? __FILE__;
-$payloadArg = $argv[4] ?? '{}';
-$mockResponseArg = $argv[5] ?? '';
-$capturePath = $argv[6] ?? '';
+$payloadArg = $argv[3] ?? '{}';
+$mockResponseArg = $argv[4] ?? '';
+$capturePath = $argv[5] ?? '';
 $payload = json_decode($payloadArg, true);
 if (!is_array($payload)) {
     $payload = [];
@@ -48,7 +47,6 @@ $_POST = $payload;
 $result = handlePromptTemplate([
     'rootDir' => $rootDir,
     'path' => $relativePath,
-    'allowFile' => $allowFile,
 ]);
 
 echo json_encode($result, JSON_UNESCAPED_SLASHES);

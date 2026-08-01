@@ -20,6 +20,16 @@ import { getAddWorkTargetPath, getContentTargetPath, getEditTargetPath } from '.
 import { createPanelActions } from './controller/panel-actions.js';
 import { setStatusMessage } from './status.js';
 
+function buildPublicPoffWorkUrl(path, isFile = false) {
+    const currentUrl = new URL(window.location.href);
+    const url = new URL(window.location.pathname, currentUrl.origin);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('view', '1');
+    url.searchParams.set(isFile ? 'file' : 'path', String(path || '.'));
+    return url.toString();
+}
+
 export function createEditController({ elements, context, editRequested }) {
     const {
         editPanel,
@@ -673,7 +683,6 @@ export function createEditController({ elements, context, editRequested }) {
             onSubmit: panelActions.onSubmit,
             onToggleDrawer: panelActions.onToggleDrawer,
             onOpenLayoutPage: () => panelActions.onOpenLayoutPage(buildVirtualLayoutPath),
-            onDeleteTarget: panelActions.onDeleteTarget,
             onConvertWork: panelActions.onConvertWork,
             onCreateConverter: panelActions.onCreateConverter,
             onLoadConverterNode: async ({ nodeUrl, statusEl }) => {
@@ -724,6 +733,30 @@ export function createEditController({ elements, context, editRequested }) {
             onCreateBlankFile: panelActions.onCreateBlankFile,
             onCreateFolder: panelActions.onCreateFolder,
             onCreateLink: panelActions.onCreateLink,
+            onImportRemote: panelActions.onImportRemote,
+            onRegisterPoff: async ({ statusEl }) => {
+                const selection = getActiveSelection();
+                const path = getEditTargetPath(selection);
+                setStatusMessage(statusEl, 'Registering with Poff...');
+                const result = await requestMcpRoute('register-node', {
+                    path,
+                    pageUrl: buildPublicPoffWorkUrl(path, false),
+                });
+                if (!result || result.ok === false || result.error) {
+                    throw new Error(result?.error || 'Poff registration failed.');
+                }
+                const filterText = Array.isArray(result.categories) && result.categories.length
+                    ? ` Filters: ${result.categories.join(', ')}.`
+                    : '';
+                setStatusMessage(
+                    statusEl,
+                    result.pendingApproval
+                        ? `Registration submitted for approval.${filterText}`
+                        : `Registered with Poff.${filterText}`,
+                    true
+                );
+                return result;
+            },
             onChangePassword: panelActions.onChangePassword,
         });
 

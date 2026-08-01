@@ -25,6 +25,7 @@ export function renderEditLayoutPanel({
     onCreateBlankFile,
     onCreateFolder,
     onCreateLink,
+    onImportRemote,
     onResetFolderWork,
 }) {
     const settings = loadPromptSettings();
@@ -137,6 +138,7 @@ export function renderEditLayoutPanel({
         onCreateBlankFile,
         onCreateFolder,
         onCreateLink,
+        onImportRemote,
         onResetFolderWork,
     });
 

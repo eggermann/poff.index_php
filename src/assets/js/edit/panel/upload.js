@@ -32,7 +32,8 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
-                            <option value="url">Poff link</option>
+                            <option value="poff">Poff work</option>
+                            <option value="url">Web link</option>
                         </select>
                     </div>
         `;
@@ -87,7 +88,37 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                     </div>
                     <div id="editLinkWrap" hidden>
                         <label class="edit-label" for="edit-link-url">Link URL</label>
-                        <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/index.php?view=1&path=folder">
+                        <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/?view=1&path=folder">
+                    </div>
+                    <div class="edit-poff-takeover" id="editPoffTakeoverWrap" hidden>
+                        <div>
+                            <label class="edit-label" for="edit-poff-url">Poff work URL</label>
+                            <div class="edit-poff-url-row">
+                                <input class="form-input" id="edit-poff-url" type="url" name="poff_url" placeholder="https://pageoff.de/?path=collection">
+                                <span class="edit-poff-node" id="editPoffNode"><i></i>Poff node</span>
+                            </div>
+                        </div>
+                        <fieldset class="edit-poff-modes">
+                            <legend class="edit-label">Use mode</legend>
+                            <div class="edit-poff-primary-modes">
+                                <label class="edit-poff-mode">
+                                    <input type="radio" name="poff_takeover_mode" value="copy" checked>
+                                    <span><strong>Local copy</strong><small>Own files. Video collections become looping players.</small></span>
+                                    <em>Recommended</em>
+                                </label>
+                                <label class="edit-poff-mode">
+                                    <input type="radio" name="poff_takeover_mode" value="follow">
+                                    <span><strong>Live connection</strong><small>No file copy. Changes stay on source node.</small></span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <div class="edit-poff-copy-options" id="editPoffCopyOptions">
+                            <div>
+                                <label class="edit-label" for="edit-poff-destination">Folder name <span class="edit-label-optional">optional</span></label>
+                                <input class="form-input" id="edit-poff-destination" type="text" name="poff_destination" placeholder="Use remote work title">
+                            </div>
+                            <div class="edit-poff-copy-note">After copy: open folder → convert unsupported files only when needed.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="small-note" id="editUploadSummary">${externalOnly ? 'Use a Poff viewer URL from another system. Max 5 pending links per folder.' : 'No files selected.'}</div>
@@ -109,6 +140,7 @@ export function bindUploadDialog({
     onCreateBlankFile,
     onCreateFolder,
     onCreateLink,
+    onImportRemote,
 }) {
     const uploadDialog = editPanel.querySelector('#editUploadDialog');
     const openUploadDialogButton = editPanel.querySelector('#editOpenUploadDialog');
@@ -127,11 +159,18 @@ export function bindUploadDialog({
     const blankFileNameEl = editPanel.querySelector('#edit-blank-file-name');
     const linkWrapEl = editPanel.querySelector('#editLinkWrap');
     const linkUrlEl = editPanel.querySelector('#edit-link-url');
+    const poffTakeoverWrapEl = editPanel.querySelector('#editPoffTakeoverWrap');
+    const poffUrlEl = editPanel.querySelector('#edit-poff-url');
+    const poffNodeEl = editPanel.querySelector('#editPoffNode');
+    const poffModeEls = Array.from(editPanel.querySelectorAll('input[name="poff_takeover_mode"]'));
+    const poffCopyOptionsEl = editPanel.querySelector('#editPoffCopyOptions');
+    const poffDestinationEl = editPanel.querySelector('#edit-poff-destination');
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector('label') : null;
     const uploadNameDrafts = {
         blank: '',
         folder: '',
         url: '',
+        poff: '',
     };
     const uploadUrlDrafts = {
         url: '',
@@ -141,9 +180,21 @@ export function bindUploadDialog({
     let uploadMode = readUploadMode();
     let unregisterEscapeClose = null;
 
-    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== 'function' || typeof onCreateBlankFile !== 'function' || typeof onCreateFolder !== 'function' || typeof onCreateLink !== 'function') {
+    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== 'function' || typeof onCreateBlankFile !== 'function' || typeof onCreateFolder !== 'function' || typeof onCreateLink !== 'function' || typeof onImportRemote !== 'function') {
         return;
     }
+
+    const poffNodeLabel = () => {
+        const sourceUrl = poffUrlEl?.value?.trim() || '';
+        if (!sourceUrl) {
+            return 'Poff node';
+        }
+        try {
+            return new URL(sourceUrl).host || 'Poff node';
+        } catch (err) {
+            return 'Check URL';
+        }
+    };
 
     const setUploadSummary = () => {
         const files = uploadFilesEl?.files ? Array.from(uploadFilesEl.files) : [];
@@ -164,6 +215,17 @@ export function bindUploadDialog({
             uploadSummaryEl.textContent = linkUrl
                 ? (externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}${saveSuffix}`)
                 : 'Enter a link URL.';
+            return;
+        }
+        if (mode === 'poff') {
+            const sourceUrl = poffUrlEl?.value?.trim() || '';
+            const takeoverMode = poffModeEls.find((input) => input.checked)?.value || 'copy';
+            const destination = poffDestinationEl?.value?.trim() || 'new local folder';
+            uploadSummaryEl.textContent = sourceUrl
+                ? (takeoverMode === 'copy'
+                    ? `${poffNodeLabel()} → ${destination} → player or converter when needed.`
+                    : `Live connection: ${poffNodeLabel()}.`)
+                : 'Paste a public Poff work URL.';
             return;
         }
         const validationError = uploadValidationError(files, uploadLimits);
@@ -203,8 +265,11 @@ export function bindUploadDialog({
         if (linkWrapEl) {
             linkWrapEl.hidden = mode !== 'url';
         }
+        if (poffTakeoverWrapEl) {
+            poffTakeoverWrapEl.hidden = mode !== 'poff';
+        }
         if (uploadSaveTargetWrapEl) {
-            uploadSaveTargetWrapEl.hidden = mode === 'folder';
+            uploadSaveTargetWrapEl.hidden = mode === 'folder' || mode === 'poff';
         }
         if (blankFileLabelEl) {
             blankFileLabelEl.textContent = mode === 'folder'
@@ -226,6 +291,7 @@ export function bindUploadDialog({
         if (linkUrlEl) {
             linkUrlEl.value = mode === 'url' ? (uploadUrlDrafts.url || linkUrlEl.value || '') : linkUrlEl.value || '';
         }
+        const takeoverMode = poffModeEls.find((input) => input.checked)?.value || 'copy';
         if (uploadSubmitButton) {
             uploadSubmitButton.textContent = mode === 'blank'
                 ? 'Create blank file'
@@ -233,7 +299,16 @@ export function bindUploadDialog({
                     ? 'Create folder'
                     : mode === 'url'
                         ? (externalOnly ? 'Submit for review' : 'Add link')
+                    : mode === 'poff'
+                        ? (takeoverMode === 'copy' ? 'Copy work' : 'Connect work')
                     : 'Upload';
+        }
+        if (poffCopyOptionsEl) {
+            poffCopyOptionsEl.hidden = mode !== 'poff' || takeoverMode !== 'copy';
+        }
+        const nodeLabel = poffNodeLabel();
+        if (poffNodeEl) {
+            poffNodeEl.lastChild.textContent = nodeLabel;
         }
         setUploadSummary();
     };
@@ -325,6 +400,9 @@ export function bindUploadDialog({
     if (blankFileNameEl) {
         blankFileNameEl.addEventListener('input', setUploadSummary);
     }
+    poffModeEls.forEach((input) => input.addEventListener('change', syncUploadMode));
+    poffUrlEl?.addEventListener('input', syncUploadMode);
+    poffDestinationEl?.addEventListener('input', setUploadSummary);
     if (uploadSubmitButton) {
         uploadSubmitButton.addEventListener('click', async () => {
             const source = readUploadMode();
@@ -367,6 +445,22 @@ export function bindUploadDialog({
                         source,
                         linkName,
                         linkUrl,
+                        saveTarget: readSaveTarget(),
+                        statusEl,
+                        closeDialog: closeUploadDialog,
+                    });
+                } else if (source === 'poff') {
+                    const sourceUrl = poffUrlEl?.value?.trim() || '';
+                    const takeoverMode = poffModeEls.find((input) => input.checked)?.value || 'copy';
+                    if (!sourceUrl) {
+                        setStatusMessage(statusEl, 'Paste a public Poff work URL.');
+                        return;
+                    }
+                    await onImportRemote({
+                        source,
+                        sourceUrl,
+                        takeoverMode,
+                        destinationName: poffDestinationEl?.value?.trim() || '',
                         saveTarget: readSaveTarget(),
                         statusEl,
                         closeDialog: closeUploadDialog,

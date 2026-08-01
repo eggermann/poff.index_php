@@ -94,6 +94,85 @@
 ### Process Decision
 - Stop
 
+## External Player Loop 1 Review
+### What Changed
+- Studied create-work, upload, link, navigation-copy, remote export/import, worktype, and layout mechanisms.
+- Located and inspected the six Prothagonia MP4s and their video work configs.
+- Defined a takeover UX direction: Follow, Embed, or Copy locally.
+- No media or source code was changed.
+### Acceptance Criteria Result
+- [x] Existing create-work mechanism understood.
+- [x] Existing external-work mechanism understood.
+- [x] Source videos and local content root resolved.
+- [x] Playlist implementation path identified through `allVideos` plus layout JS.
+- [ ] Local `player` work created.
+- [ ] External takeover UX implemented.
+- [ ] Requested screenshots captured.
+### Verification Result
+- Playwright loaded the live Prothagonia folder and found six video entries.
+- Filesystem inspection confirmed six H.264 MP4 files and six work configs.
+- Source inspection confirmed `import-remote` has no UI caller and does not copy binary media.
+### Issues / Gaps
+- MLMS stop condition triggered because unrelated dirty changes exist.
+- A local-copy mode changes the public remote-import API and requires explicit approval.
+### User Demo Notes
+- Current live folder is available at the local dominikeggermann project route and contains all six source videos.
+
+## External Player Loop 1 Retrospective
+### What Worked
+- Live Playwright state revealed the real content root and verified the screenshot state.
+- Source and filesystem inspection separated name-copy, link, metadata import, and binary-copy behavior.
+### What Was Confusing
+- “Copy + paste” sounds like work takeover but copies only a short name.
+- The remote import backend exists without a discoverable UI.
+### What To Improve Next Loop
+- Start with a prominent intent-based takeover dialog and make local ownership explicit.
+### Process Decision
+- Stop pending dirty-tree and API approval.
+
+## External Player Loop 2 Review
+### What Changed
+- Created the live local `player` folder-work and copied all six Prothagonia MP4 files.
+- Added the custom cinema layout, sequential playback, queue controls, and playlist loop.
+- Fixed nested filesystem layout asset resolution and same-origin preview script execution.
+- Added an intent-first Poff takeover dialog: Copy locally, Follow source, or Embed view.
+- Extended remote import with guarded binary copy and optional looping-player creation.
+- Exposed public read-only folder exports for node-to-node interoperability.
+### Acceptance Criteria Result
+- [x] Six source videos copied without changing originals.
+- [x] Local player advances and loops.
+- [x] External takeover modes are explicit.
+- [x] Copy mode creates real local files and can create a video player.
+- [x] Local player screenshot captured.
+- [x] Improved takeover UI screenshot captured.
+- [x] Required tests and lints pass.
+### Verification Result
+- Playwright: player ready, current source local, playback active.
+- Playwright: item 6 `ended` returned to item 1.
+- `npm run test:mcp`: 168/168 passed.
+- `tests/edit-panel-upload.test.js`: 2/2 passed.
+- `tests/nav.preview-controller.test.js`: 7/7 passed.
+- PHP lint passed for every changed PHP file; Node syntax checks passed for changed JS files.
+### Issues / Gaps
+- No source build or deployment was run because project instructions require an explicit request.
+- Unrelated pre-existing worktree changes remain untouched.
+### User Demo Notes
+- Real local player screenshot: `output/playwright/external-player-study/player-local-1440.png`.
+- Takeover dialog preview: `output/playwright/external-player-study/external-work-takeover-ui.png`.
+
+## External Player Loop 2 Retrospective
+### What Worked
+- Studying the existing export/import and layout contracts first exposed the smallest interoperable extension.
+- A direct viewer route proved real playback independently of editor authentication.
+- Explicit ownership modes made the UX much easier to understand than “Poff link”.
+### What Was Confusing
+- Fetch-mounted previews stripped all layout scripts except converter scripts.
+- Nested local filesystem layouts emitted root-relative `.layout` asset paths in the existing live build.
+### What To Improve Next Loop
+- After explicit build authorization, verify the new dialog end-to-end in the authenticated live editor and copy from a deployed second node.
+### Process Decision
+- Stop: goal complete; build/deploy remains a separate authorization.
+
 ## Loop 4 Review
 ### What Changed
 - Created a `success-story` folder under the live `node-2` mount.

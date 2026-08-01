@@ -267,67 +267,72 @@ export function renderConverterSection(config = {}) {
         <div class="edit-work-fields edit-work-converter">
             <div class="edit-work-fields-header">
                 <div>
-                    <div class="edit-work-fields-title">Convert image</div>
-                    <div class="small-note">Default converter node: pageoff.de. Converted files return to this folder.</div>
+                    <div class="edit-work-fields-title">Convert file</div>
+                    <div class="small-note">Converter found through Poff node. Results return to this folder.</div>
                 </div>
-                <button class="btn btn-secondary" type="button" id="editCreateConverter">Create converter</button>
             </div>
             ${unsupportedMessage}
-            <div class="edit-grid edit-grid-cols">
-                <div>
-                    <label class="edit-label" for="edit-converter-node-url">Converter node</label>
-                    <input class="form-input" id="edit-converter-node-url" name="converter_node_url" type="url" value="${escapeHtml(remoteNodeUrl)}">
-                </div>
-                <div class="edit-inline-actions">
-                    <button class="btn btn-secondary" type="button" id="editLoadConverterNode">Reload converter</button>
-                </div>
-            </div>
-            <div class="edit-grid edit-grid-cols">
+            <div class="edit-converter-primary">
                 <div>
                     <label class="edit-label" for="edit-converter-id">Converter</label>
                     <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
                 </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
-                    <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
-                        ${renderSelectOptions(qualityOptions, selectedQuality)}
-                    </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
-                    <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
-                        ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
-                    </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
-                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
-                        ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
-                    </select>
-                </div>
+                <button class="btn" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>${sameTypeCount > 1 ? `Convert all ${sameTypeCount}` : 'Convert'}</button>
             </div>
             ${sameTypeCount > 1 ? `
             <label class="edit-inline-toggle" for="edit-converter-all-of-type">
                 <input id="edit-converter-all-of-type" type="checkbox" checked>
                 Convert all ${sameTypeCount} <strong>${escapeHtml(scopeMimeType)}</strong> files in this folder
             </label>
-            <label class="edit-inline-toggle" for="edit-converter-hide-originals">
-                <input id="edit-converter-hide-originals" type="checkbox" checked>
-                Show only converted files after conversion
-            </label>
-            <label class="edit-inline-toggle" for="edit-converter-hide-thumbnails">
-                <input id="edit-converter-hide-thumbnails" type="checkbox" checked>
-                Hide matching <strong>thumb*</strong> files
-            </label>
             ` : ''}
-            <div class="edit-inline-actions">
-                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>${sameTypeCount > 1 ? `Convert all ${sameTypeCount}` : 'Convert'}</button>
-            </div>
+            <details class="edit-converter-options">
+                <summary>Output and visibility</summary>
+                <div class="edit-grid edit-grid-cols">
+                    <div>
+                        <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
+                        <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
+                            ${renderSelectOptions(qualityOptions, selectedQuality)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
+                        <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
+                            ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
+                        <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
+                            ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
+                        </select>
+                    </div>
+                </div>
+                ${sameTypeCount > 1 ? `
+                <label class="edit-inline-toggle" for="edit-converter-hide-originals">
+                    <input id="edit-converter-hide-originals" type="checkbox" checked>
+                    Show only converted files after conversion
+                </label>
+                <label class="edit-inline-toggle" for="edit-converter-hide-thumbnails">
+                    <input id="edit-converter-hide-thumbnails" type="checkbox" checked>
+                    Hide matching <strong>thumb*</strong> files
+                </label>
+                ` : ''}
+            </details>
+            <details class="edit-converter-options">
+                <summary>Converter node</summary>
+                <div class="edit-converter-node-settings">
+                    <div>
+                        <label class="edit-label" for="edit-converter-node-url">Node URL</label>
+                        <input class="form-input" id="edit-converter-node-url" name="converter_node_url" type="url" value="${escapeHtml(remoteNodeUrl)}">
+                        <div class="small-note">Offers load automatically when URL changes.</div>
+                    </div>
+                    <button class="btn btn-secondary" type="button" id="editCreateConverter">Offer your own converter</button>
+                </div>
+            </details>
             <div class="small-note">
-                Generated works:
-                ${generated.length ? generated.map((item) => `[${escapeHtml(item.name || '')}] [show] [make visible] [delete] [regenerate]`).join(' ') : 'none'}
+                ${generated.length ? `${generated.length} converted ${generated.length === 1 ? 'file' : 'files'} available.` : 'No converted files yet.'}
             </div>
         </div>
     `;

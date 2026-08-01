@@ -2630,7 +2630,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/status.js
-  function setStatusMessage(statusEl, message, success = false) {
+  function setStatusMessage2(statusEl, message, success = false) {
     if (!statusEl) {
       return;
     }
@@ -2829,7 +2829,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       layout: defaultLayoutSystemPrompt
     });
     const currentSystemPromptSettingKey = () => getSystemPromptSettingKeyForMode(currentPromptMode());
-    const setPromptStatus = (message, success = false) => setStatusMessage(statusEl, message, success);
+    const setPromptStatus = (message, success = false) => setStatusMessage2(statusEl, message, success);
     const getLayoutPreset = () => getLayoutPresetValue();
     const forceLayoutPromptToCustom = () => {
       const presetEl = document.getElementById("edit-layout-preset");
@@ -4909,7 +4909,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
-                            <option value="url">Poff link</option>
+                            <option value="poff">Poff work</option>
+                            <option value="url">Web link</option>
                         </select>
                     </div>
         `;
@@ -4958,7 +4959,37 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     </div>
                     <div id="editLinkWrap" hidden>
                         <label class="edit-label" for="edit-link-url">Link URL</label>
-                        <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/index.php?view=1&path=folder">
+                        <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/?view=1&path=folder">
+                    </div>
+                    <div class="edit-poff-takeover" id="editPoffTakeoverWrap" hidden>
+                        <div>
+                            <label class="edit-label" for="edit-poff-url">Poff work URL</label>
+                            <div class="edit-poff-url-row">
+                                <input class="form-input" id="edit-poff-url" type="url" name="poff_url" placeholder="https://pageoff.de/?path=collection">
+                                <span class="edit-poff-node" id="editPoffNode"><i></i>Poff node</span>
+                            </div>
+                        </div>
+                        <fieldset class="edit-poff-modes">
+                            <legend class="edit-label">Use mode</legend>
+                            <div class="edit-poff-primary-modes">
+                                <label class="edit-poff-mode">
+                                    <input type="radio" name="poff_takeover_mode" value="copy" checked>
+                                    <span><strong>Local copy</strong><small>Own files. Video collections become looping players.</small></span>
+                                    <em>Recommended</em>
+                                </label>
+                                <label class="edit-poff-mode">
+                                    <input type="radio" name="poff_takeover_mode" value="follow">
+                                    <span><strong>Live connection</strong><small>No file copy. Changes stay on source node.</small></span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <div class="edit-poff-copy-options" id="editPoffCopyOptions">
+                            <div>
+                                <label class="edit-label" for="edit-poff-destination">Folder name <span class="edit-label-optional">optional</span></label>
+                                <input class="form-input" id="edit-poff-destination" type="text" name="poff_destination" placeholder="Use remote work title">
+                            </div>
+                            <div class="edit-poff-copy-note">After copy: open folder \u2192 convert unsupported files only when needed.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="small-note" id="editUploadSummary">${externalOnly ? "Use a Poff viewer URL from another system. Max 5 pending links per folder." : "No files selected."}</div>
@@ -4978,7 +5009,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onUploadFiles,
     onCreateBlankFile,
     onCreateFolder,
-    onCreateLink
+    onCreateLink,
+    onImportRemote
   }) {
     const uploadDialog = editPanel.querySelector("#editUploadDialog");
     const openUploadDialogButton = editPanel.querySelector("#editOpenUploadDialog");
@@ -4997,11 +5029,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const blankFileNameEl = editPanel.querySelector("#edit-blank-file-name");
     const linkWrapEl = editPanel.querySelector("#editLinkWrap");
     const linkUrlEl = editPanel.querySelector("#edit-link-url");
+    const poffTakeoverWrapEl = editPanel.querySelector("#editPoffTakeoverWrap");
+    const poffUrlEl = editPanel.querySelector("#edit-poff-url");
+    const poffNodeEl = editPanel.querySelector("#editPoffNode");
+    const poffModeEls = Array.from(editPanel.querySelectorAll('input[name="poff_takeover_mode"]'));
+    const poffCopyOptionsEl = editPanel.querySelector("#editPoffCopyOptions");
+    const poffDestinationEl = editPanel.querySelector("#edit-poff-destination");
     const blankFileLabelEl = blankFileWrapEl ? blankFileWrapEl.querySelector("label") : null;
     const uploadNameDrafts = {
       blank: "",
       folder: "",
-      url: ""
+      url: "",
+      poff: ""
     };
     const uploadUrlDrafts = {
       url: ""
@@ -5010,11 +5049,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const readSaveTarget = () => externalOnly ? "current" : (uploadSaveTargetEl == null ? void 0 : uploadSaveTargetEl.value) || "current";
     let uploadMode = readUploadMode();
     let unregisterEscapeClose = null;
-    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== "function" || typeof onCreateBlankFile !== "function" || typeof onCreateFolder !== "function" || typeof onCreateLink !== "function") {
+    if (!uploadDialog || !openUploadDialogButton || typeof onUploadFiles !== "function" || typeof onCreateBlankFile !== "function" || typeof onCreateFolder !== "function" || typeof onCreateLink !== "function" || typeof onImportRemote !== "function") {
       return;
     }
+    const poffNodeLabel = () => {
+      var _a;
+      const sourceUrl = ((_a = poffUrlEl == null ? void 0 : poffUrlEl.value) == null ? void 0 : _a.trim()) || "";
+      if (!sourceUrl) {
+        return "Poff node";
+      }
+      try {
+        return new URL(sourceUrl).host || "Poff node";
+      } catch (err) {
+        return "Check URL";
+      }
+    };
     const setUploadSummary = () => {
-      var _a, _b, _c;
+      var _a, _b, _c, _d, _e, _f;
       const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
       if (!uploadSummaryEl) {
         return;
@@ -5033,6 +5084,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         uploadSummaryEl.textContent = linkUrl ? externalOnly ? `Will submit for review: ${linkName || linkUrl}` : `Will add link: ${linkName || linkUrl}${saveSuffix}` : "Enter a link URL.";
         return;
       }
+      if (mode === "poff") {
+        const sourceUrl = ((_d = poffUrlEl == null ? void 0 : poffUrlEl.value) == null ? void 0 : _d.trim()) || "";
+        const takeoverMode = ((_e = poffModeEls.find((input) => input.checked)) == null ? void 0 : _e.value) || "copy";
+        const destination = ((_f = poffDestinationEl == null ? void 0 : poffDestinationEl.value) == null ? void 0 : _f.trim()) || "new local folder";
+        uploadSummaryEl.textContent = sourceUrl ? takeoverMode === "copy" ? `${poffNodeLabel()} \u2192 ${destination} \u2192 player or converter when needed.` : `Live connection: ${poffNodeLabel()}.` : "Paste a public Poff work URL.";
+        return;
+      }
       const validationError = uploadValidationError(files, uploadLimits);
       if (validationError) {
         uploadSummaryEl.textContent = validationError;
@@ -5045,6 +5103,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       uploadSummaryEl.textContent = files.length ? `${files.map((file) => file.name).join(", ")}${saveSuffix}` : saveTarget === "work-folder" ? "Will create folder with the active work fullview." : "No files selected.";
     };
     const syncUploadMode = () => {
+      var _a;
       const mode = readUploadMode();
       if ((uploadMode === "blank" || uploadMode === "folder") && blankFileNameEl) {
         uploadNameDrafts[uploadMode] = blankFileNameEl.value || "";
@@ -5065,8 +5124,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (linkWrapEl) {
         linkWrapEl.hidden = mode !== "url";
       }
+      if (poffTakeoverWrapEl) {
+        poffTakeoverWrapEl.hidden = mode !== "poff";
+      }
       if (uploadSaveTargetWrapEl) {
-        uploadSaveTargetWrapEl.hidden = mode === "folder";
+        uploadSaveTargetWrapEl.hidden = mode === "folder" || mode === "poff";
       }
       if (blankFileLabelEl) {
         blankFileLabelEl.textContent = mode === "folder" ? "Folder name" : mode === "url" ? "Link label" : "Blank file name";
@@ -5080,8 +5142,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (linkUrlEl) {
         linkUrlEl.value = mode === "url" ? uploadUrlDrafts.url || linkUrlEl.value || "" : linkUrlEl.value || "";
       }
+      const takeoverMode = ((_a = poffModeEls.find((input) => input.checked)) == null ? void 0 : _a.value) || "copy";
       if (uploadSubmitButton) {
-        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? externalOnly ? "Submit for review" : "Add link" : "Upload";
+        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? externalOnly ? "Submit for review" : "Add link" : mode === "poff" ? takeoverMode === "copy" ? "Copy work" : "Connect work" : "Upload";
+      }
+      if (poffCopyOptionsEl) {
+        poffCopyOptionsEl.hidden = mode !== "poff" || takeoverMode !== "copy";
+      }
+      const nodeLabel = poffNodeLabel();
+      if (poffNodeEl) {
+        poffNodeEl.lastChild.textContent = nodeLabel;
       }
       setUploadSummary();
     };
@@ -5168,16 +5238,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (blankFileNameEl) {
       blankFileNameEl.addEventListener("input", setUploadSummary);
     }
+    poffModeEls.forEach((input) => input.addEventListener("change", syncUploadMode));
+    poffUrlEl == null ? void 0 : poffUrlEl.addEventListener("input", syncUploadMode);
+    poffDestinationEl == null ? void 0 : poffDestinationEl.addEventListener("input", setUploadSummary);
     if (uploadSubmitButton) {
       uploadSubmitButton.addEventListener("click", async () => {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f, _g;
         const source = readUploadMode();
         try {
           uploadSubmitButton.disabled = true;
           if (source === "blank") {
             const fileName = ((_a = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _a.trim()) || "";
             if (!fileName) {
-              setStatusMessage(statusEl, "Enter a file name.");
+              setStatusMessage2(statusEl, "Enter a file name.");
               return;
             }
             await onCreateBlankFile({
@@ -5190,7 +5263,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           } else if (source === "folder") {
             const folderName = ((_b = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _b.trim()) || "";
             if (!folderName) {
-              setStatusMessage(statusEl, "Enter a folder name.");
+              setStatusMessage2(statusEl, "Enter a folder name.");
               return;
             }
             await onCreateFolder({
@@ -5204,7 +5277,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             const linkName = ((_c = blankFileNameEl == null ? void 0 : blankFileNameEl.value) == null ? void 0 : _c.trim()) || "";
             const linkUrl = ((_d = linkUrlEl == null ? void 0 : linkUrlEl.value) == null ? void 0 : _d.trim()) || "";
             if (!linkUrl) {
-              setStatusMessage(statusEl, "Enter a link URL.");
+              setStatusMessage2(statusEl, "Enter a link URL.");
               return;
             }
             await onCreateLink({
@@ -5215,15 +5288,31 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               statusEl,
               closeDialog: closeUploadDialog
             });
+          } else if (source === "poff") {
+            const sourceUrl = ((_e = poffUrlEl == null ? void 0 : poffUrlEl.value) == null ? void 0 : _e.trim()) || "";
+            const takeoverMode = ((_f = poffModeEls.find((input) => input.checked)) == null ? void 0 : _f.value) || "copy";
+            if (!sourceUrl) {
+              setStatusMessage2(statusEl, "Paste a public Poff work URL.");
+              return;
+            }
+            await onImportRemote({
+              source,
+              sourceUrl,
+              takeoverMode,
+              destinationName: ((_g = poffDestinationEl == null ? void 0 : poffDestinationEl.value) == null ? void 0 : _g.trim()) || "",
+              saveTarget: readSaveTarget(),
+              statusEl,
+              closeDialog: closeUploadDialog
+            });
           } else {
             const files = (uploadFilesEl == null ? void 0 : uploadFilesEl.files) ? Array.from(uploadFilesEl.files) : [];
             if (files.length === 0 && readSaveTarget() !== "work-folder") {
-              setStatusMessage(statusEl, "Choose at least one file.");
+              setStatusMessage2(statusEl, "Choose at least one file.");
               return;
             }
             const validationError = uploadValidationError(files, uploadLimits);
             if (validationError) {
-              setStatusMessage(statusEl, validationError);
+              setStatusMessage2(statusEl, validationError);
               return;
             }
             await onUploadFiles({
@@ -5235,7 +5324,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             });
           }
         } catch (err) {
-          setStatusMessage(statusEl, err.message || "Upload failed.");
+          setStatusMessage2(statusEl, err.message || "Upload failed.");
         } finally {
           uploadSubmitButton.disabled = false;
         }
@@ -5804,6 +5893,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onCreateBlankFile,
     onCreateFolder,
     onCreateLink,
+    onImportRemote,
     onResetFolderWork
   }) {
     const settings = loadPromptSettings();
@@ -5911,6 +6001,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       onCreateBlankFile,
       onCreateFolder,
       onCreateLink,
+      onImportRemote,
       onResetFolderWork
     });
     return { statusEl: elements2.statusEl, promptRoot };
@@ -5949,7 +6040,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return `<input class="form-input edit-work-field-value" id="${escapeHtml(inputId)}" data-work-config-field data-work-config-key="${escapeHtml(normalizedKey)}" data-work-config-kind="text"${isNullable ? ' data-work-config-nullable="true"' : ""} type="text" value="${escapeHtml(value === null || value === void 0 ? "" : String(value))}" placeholder="Value">`;
   }
   function readMediaConfigFromForm(form, currentWork = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const typeField = (_a = form == null ? void 0 : form.elements) == null ? void 0 : _a.work_type;
     if (typeField && typeof typeField.value === "string") {
@@ -6010,6 +6101,22 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const converterPath = String(((_h = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _h.converterPath) || "").trim();
     const converterViewerHref = String(((_i = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _i.converterViewerHref) || "").trim();
     const converterUrl = String(((_j = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _j.converterUrl) || "").trim();
+    const converterLabel = String(((_k = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _k.converterLabel) || "").trim();
+    const converterDescription = String(((_l = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _l.converterDescription) || "").trim();
+    const parseConverterData = (key, fallback) => {
+      var _a2;
+      try {
+        const value = JSON.parse(((_a2 = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _a2[key]) || "");
+        return value && typeof value === "object" ? value : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    };
+    const converterNode = parseConverterData("converterNode", null);
+    const converterAccepts = parseConverterData("converterAccepts", []);
+    const converterOutputs = parseConverterData("converterOutputs", []);
+    const converterDefaults = parseConverterData("converterDefaults", {});
+    const converterUi = parseConverterData("converterUi", {});
     const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
     if (converterId) {
       nextWork.converter = {
@@ -6021,10 +6128,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         path: converterPath,
         viewerHref: converterViewerHref,
         url: converterUrl,
-        node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
-        quality: String(((_l = (_k = form == null ? void 0 : form.elements) == null ? void 0 : _k.converter_quality) == null ? void 0 : _l.value) || "default").trim() || "default",
-        format: String(((_n = (_m = form == null ? void 0 : form.elements) == null ? void 0 : _m.converter_format) == null ? void 0 : _n.value) || "").trim() || "source",
-        saveMode: String(((_p = (_o = form == null ? void 0 : form.elements) == null ? void 0 : _o.converter_save_mode) == null ? void 0 : _p.value) || "new-hidden-work").trim() || "new-hidden-work",
+        label: converterLabel,
+        description: converterDescription,
+        accepts: Array.isArray(converterAccepts) ? converterAccepts : [],
+        outputs: Array.isArray(converterOutputs) ? converterOutputs : [],
+        formats: String(((_m = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _m.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean),
+        defaults: converterDefaults,
+        ui: converterUi,
+        node: converterEngine === "remote-node" ? converterNode || (existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "", converterId: "" }) : "local",
+        quality: String(((_o = (_n = form == null ? void 0 : form.elements) == null ? void 0 : _n.converter_quality) == null ? void 0 : _o.value) || "default").trim() || "default",
+        format: String(((_q = (_p = form == null ? void 0 : form.elements) == null ? void 0 : _p.converter_format) == null ? void 0 : _q.value) || "").trim() || "source",
+        saveMode: String(((_s = (_r = form == null ? void 0 : form.elements) == null ? void 0 : _r.converter_save_mode) == null ? void 0 : _s.value) || "new-hidden-work").trim() || "new-hidden-work",
         hiddenByDefault: true
       };
     } else if (Object.prototype.hasOwnProperty.call(nextWork, "converter")) {
@@ -6078,22 +6192,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     `;
   }
   function renderConverterSection(config = {}) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const catalog = (config == null ? void 0 : config.converterCatalog) && typeof config.converterCatalog === "object" ? config.converterCatalog : null;
     const available = Array.isArray(catalog == null ? void 0 : catalog.available) ? catalog.available : [];
     const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
     const converter = work.converter && typeof work.converter === "object" ? work.converter : {};
-    const rawSourceUrl = String(converter.sourceUrl || (config == null ? void 0 : config.srcUrl) || "").trim();
-    const sourceUrlValue = rawSourceUrl ? (() => {
-      var _a2;
-      try {
-        const baseHref = typeof ((_a2 = window == null ? void 0 : window.location) == null ? void 0 : _a2.href) === "string" && window.location.href ? window.location.href : "http://localhost/";
-        return new URL(rawSourceUrl, baseHref).toString();
-      } catch (e) {
-        return rawSourceUrl;
-      }
-    })() : "";
-    const selectedId = String(converter.id || "").trim();
+    const selectedId = String(converter.id || ((_a = available.find((item) => (item == null ? void 0 : item.enabled) !== false)) == null ? void 0 : _a.id) || "").trim();
+    const converterNode = converter.node && typeof converter.node === "object" ? converter.node : {};
+    const remoteNodeUrl = String((catalog == null ? void 0 : catalog.remoteNodeUrl) || converterNode.baseUrl || "https://pageoff.de/index.php").trim();
+    const conversionScope = (config == null ? void 0 : config.conversionScope) && typeof config.conversionScope === "object" ? config.conversionScope : {};
+    const sameTypeCount = Math.max(1, Number(conversionScope.sameTypeCount || 1));
+    const scopeMimeType = String(conversionScope.mimeType || (config == null ? void 0 : config.mimeType) || "this type").trim();
     const selectedDefinition = selectedId ? available.find((item) => (item == null ? void 0 : item.id) === selectedId) || null : null;
     const defaults = (selectedDefinition == null ? void 0 : selectedDefinition.defaults) || {};
     const ui = (selectedDefinition == null ? void 0 : selectedDefinition.ui) && typeof selectedDefinition.ui === "object" ? selectedDefinition.ui : {};
@@ -6107,7 +6216,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       ...available.map((item) => {
         const disabled = item.enabled === false;
         const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ""}`;
-        return `<option value="${escapeHtml(item.id || "")}" data-converter-type="${escapeHtml(item.type || "converter")}" data-converter-name="${escapeHtml(item.name || "")}" data-converter-engine="${escapeHtml(item.engine || "")}" data-converter-path="${escapeHtml(item.path || "")}" data-converter-viewer-href="${escapeHtml(item.viewerHref || "")}" data-converter-url="${escapeHtml(item.url || "")}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(",") : "")}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(",") : "")}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? " selected" : ""}${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
+        return `<option value="${escapeHtml(item.id || "")}" data-converter-type="${escapeHtml(item.type || "converter")}" data-converter-name="${escapeHtml(item.name || "")}" data-converter-label="${escapeHtml(item.label || "")}" data-converter-description="${escapeHtml(item.description || "")}" data-converter-engine="${escapeHtml(item.engine || "")}" data-converter-path="${escapeHtml(item.path || "")}" data-converter-viewer-href="${escapeHtml(item.viewerHref || "")}" data-converter-url="${escapeHtml(item.url || "")}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(",") : "")}" data-converter-accepts="${escapeHtml(JSON.stringify(item.accepts || []))}" data-converter-outputs="${escapeHtml(JSON.stringify(item.outputs || []))}" data-converter-node="${escapeHtml(JSON.stringify(item.node || null))}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? " selected" : ""}${disabled ? " disabled" : ""}>${escapeHtml(label)}</option>`;
       })
     ].join("");
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
@@ -6120,59 +6229,82 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const label = typeof labeler === "function" ? labeler(normalized) : normalized;
       return `<option value="${escapeHtml(normalized)}"${normalized === String(selected || "") ? " selected" : ""}>${escapeHtml(label)}</option>`;
     }).join("") : "";
-    const formatOptions = Array.isArray((_a = ui == null ? void 0 : ui.format) == null ? void 0 : _a.options) && ui.format.options.length ? ui.format.options : Array.isArray(selectedDefinition == null ? void 0 : selectedDefinition.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ["source"];
-    const qualityOptions = Array.isArray((_b = ui == null ? void 0 : ui.quality) == null ? void 0 : _b.options) && ui.quality.options.length ? ui.quality.options : ["preview", "default", "archival", "small-web"];
-    const saveModeOptions = Array.isArray((_c = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _c.options) && ui.saveMode.options.length ? ui.saveMode.options : ["new-hidden-work", "replace-generated-work", "temporary-preview-only"];
-    const formatLabel = String(((_d = ui == null ? void 0 : ui.format) == null ? void 0 : _d.label) || "Output format");
-    const qualityLabel = String(((_e = ui == null ? void 0 : ui.quality) == null ? void 0 : _e.label) || "Quality");
-    const saveModeLabel = String(((_f = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _f.label) || "Save mode");
+    const formatOptions = Array.isArray((_b = ui == null ? void 0 : ui.format) == null ? void 0 : _b.options) && ui.format.options.length ? ui.format.options : Array.isArray(selectedDefinition == null ? void 0 : selectedDefinition.formats) && selectedDefinition.formats.length ? selectedDefinition.formats : ["source"];
+    const qualityOptions = Array.isArray((_c = ui == null ? void 0 : ui.quality) == null ? void 0 : _c.options) && ui.quality.options.length ? ui.quality.options : ["preview", "default", "archival", "small-web"];
+    const saveModeOptions = Array.isArray((_d = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _d.options) && ui.saveMode.options.length ? ui.saveMode.options : ["new-hidden-work", "replace-generated-work", "temporary-preview-only"];
+    const formatLabel = String(((_e = ui == null ? void 0 : ui.format) == null ? void 0 : _e.label) || "Output format");
+    const qualityLabel = String(((_f = ui == null ? void 0 : ui.quality) == null ? void 0 : _f.label) || "Quality");
+    const saveModeLabel = String(((_g = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _g.label) || "Save mode");
     return `
         <div class="edit-work-fields edit-work-converter">
             <div class="edit-work-fields-header">
                 <div>
-                    <div class="edit-work-fields-title">Converter</div>
-                    <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
+                    <div class="edit-work-fields-title">Convert file</div>
+                    <div class="small-note">Converter found through Poff node. Results return to this folder.</div>
                 </div>
-                <button class="btn btn-secondary" type="button" id="editCreateConverter">New converter</button>
             </div>
             ${unsupportedMessage}
-            <div class="edit-grid edit-grid-cols">
+            <div class="edit-converter-primary">
                 <div>
                     <label class="edit-label" for="edit-converter-id">Converter</label>
                     <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
                 </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-source-url">Source URL</label>
-                    <input class="form-input" id="edit-converter-source-url" name="converter_source_url" form="inlineEditForm" type="url" value="${escapeHtml(sourceUrlValue)}" placeholder="https://example.com/source.tiff">
-                    <div class="small-note">Optional override used by remote converters when they need a public source URL.</div>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
-                    <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
-                        ${renderSelectOptions(qualityOptions, selectedQuality)}
-                    </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
-                    <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
-                        ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
-                    </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
-                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
-                        ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
-                    </select>
-                </div>
+                <button class="btn" type="button" id="editConvertWork"${convertDisabled ? " disabled" : ""}>${sameTypeCount > 1 ? `Convert all ${sameTypeCount}` : "Convert"}</button>
             </div>
-            <div class="edit-inline-actions">
-                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? " disabled" : ""}>Convert</button>
-            </div>
+            ${sameTypeCount > 1 ? `
+            <label class="edit-inline-toggle" for="edit-converter-all-of-type">
+                <input id="edit-converter-all-of-type" type="checkbox" checked>
+                Convert all ${sameTypeCount} <strong>${escapeHtml(scopeMimeType)}</strong> files in this folder
+            </label>
+            ` : ""}
+            <details class="edit-converter-options">
+                <summary>Output and visibility</summary>
+                <div class="edit-grid edit-grid-cols">
+                    <div>
+                        <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
+                        <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
+                            ${renderSelectOptions(qualityOptions, selectedQuality)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
+                        <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
+                            ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
+                        <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
+                            ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
+                        </select>
+                    </div>
+                </div>
+                ${sameTypeCount > 1 ? `
+                <label class="edit-inline-toggle" for="edit-converter-hide-originals">
+                    <input id="edit-converter-hide-originals" type="checkbox" checked>
+                    Show only converted files after conversion
+                </label>
+                <label class="edit-inline-toggle" for="edit-converter-hide-thumbnails">
+                    <input id="edit-converter-hide-thumbnails" type="checkbox" checked>
+                    Hide matching <strong>thumb*</strong> files
+                </label>
+                ` : ""}
+            </details>
+            <details class="edit-converter-options">
+                <summary>Converter node</summary>
+                <div class="edit-converter-node-settings">
+                    <div>
+                        <label class="edit-label" for="edit-converter-node-url">Node URL</label>
+                        <input class="form-input" id="edit-converter-node-url" name="converter_node_url" type="url" value="${escapeHtml(remoteNodeUrl)}">
+                        <div class="small-note">Offers load automatically when URL changes.</div>
+                    </div>
+                    <button class="btn btn-secondary" type="button" id="editCreateConverter">Offer your own converter</button>
+                </div>
+            </details>
             <div class="small-note">
-                Generated works:
-                ${generated.length ? generated.map((item) => `[${escapeHtml(item.name || "")}] [show] [make visible] [delete] [regenerate]`).join(" ") : "none"}
+                ${generated.length ? `${generated.length} converted ${generated.length === 1 ? "file" : "files"} available.` : "No converted files yet."}
             </div>
         </div>
     `;
@@ -6556,6 +6688,24 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/panel/inline.js
+  function renderPoffRegistrationSection(config, isFileTarget) {
+    var _a, _b;
+    if (isFileTarget) {
+      return "";
+    }
+    const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
+    const categories = normalizeWorkCategories2((_b = (_a = work.categories) != null ? _a : work.category) != null ? _b : []);
+    const filterLabel = categories.length ? categories.join(" \xB7 ") : "current work type";
+    return `
+        <div class="edit-poff-register">
+            <div>
+                <div class="edit-work-fields-title">Poff network</div>
+                <div class="small-note">Share work catalog and converter offers. Filters: ${escapeHtml(filterLabel)}.</div>
+            </div>
+            <button class="btn btn-secondary" type="button" id="editRegisterPoff">Register with Poff</button>
+        </div>
+    `;
+  }
   function renderEditPanel({
     editPanel,
     editRequested: editRequested2,
@@ -6577,13 +6727,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onCreateBlankFile,
     onCreateFolder,
     onCreateLink,
+    onImportRemote,
+    onRegisterPoff,
     onResetFolderWork,
-    onDeleteTarget,
     onChangePassword,
     onConvertWork,
-    onCreateConverter
+    onCreateConverter,
+    onLoadConverterNode
   }) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     if (!editPanel) {
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
@@ -6635,7 +6787,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onUploadFiles,
         onCreateBlankFile,
         onCreateFolder,
-        onCreateLink
+        onCreateLink,
+        onImportRemote
       });
     }
     const label = (status == null ? void 0 : status.target) === "file" ? "Edit mode (file)" : "Edit mode (folder)";
@@ -6691,23 +6844,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
        
             <div class="edit-inline-actions">
                 <button class="btn" type="submit">Save</button>
-                <button class="btn btn-secondary" type="button" id="editMoreToggle">More...</button>
-                <button class="btn btn-secondary" type="button" id="editChangeLayout">Change layout</button>
-                ${!isFileTarget && typeof onResetFolderWork === "function" ? `
+                <button class="btn btn-secondary" type="button" id="editMoreToggle">Settings</button>
+                <button class="btn btn-secondary" type="button" id="editChangeLayout">Layout</button>
+                ${!isFileTarget && (overlayState.wrapperWasLocal || overlayState.sectionWasLocal) && typeof onResetFolderWork === "function" ? `
                 <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editResetFolderWork">
-                    Reset
-                </button>
-                ` : ""}
-                ${typeof onDeleteTarget === "function" ? `
-                <button class="btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" type="button" id="editDeleteTarget">
-                    <img class="block" src="https://cdn.jsdelivr.net/npm/heroicons@2.2.0/24/outline/trash.svg" alt="" width="16" height="16">
-                    Delete
+                    Reset layout
                 </button>
                 ` : ""}
             </div>
-            <div class="small-note">Layout: ${escapeHtml(overlayState.wrapperSourceLabel)} \xB7 parent: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code> \xB7 mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+            <details class="edit-inline-meta">
+                <summary>Layout source</summary>
+                <div class="small-note">Layout: ${escapeHtml(overlayState.wrapperSourceLabel)} \xB7 parent: <code>${escapeHtml(overlayState.inheritedLayoutLabel)}</code> \xB7 mode: <code>${escapeHtml(overlayState.displayMode)}</code></div>
+            </details>
 
         </form>
+        ${renderPoffRegistrationSection(config, isFileTarget)}
         <div class="edit-panel-stack">
             ${uploadSectionHtml}
             ${(status == null ? void 0 : status.target) === "file" ? renderConverterSection(config) : ""}
@@ -6720,14 +6871,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const statusEl = editPanel.querySelector("#editInlineStatus");
     const moreToggle = editPanel.querySelector("#editMoreToggle");
     const passwordDetailsEl = editPanel.querySelector("#editPasswordDetails");
-    const deleteTargetButton = editPanel.querySelector("#editDeleteTarget");
     const resetFolderWorkButton = editPanel.querySelector("#editResetFolderWork");
     const changeLayoutButton = editPanel.querySelector("#editChangeLayout");
+    const registerPoffButton = editPanel.querySelector("#editRegisterPoff");
     const titleInput = editPanel.querySelector("#edit-title");
     const descInput = editPanel.querySelector("#edit-description");
     const addWorkFieldButton = editPanel.querySelector("#editWorkFieldAdd");
     const convertButton = editPanel.querySelector("#editConvertWork");
     const createConverterButton = editPanel.querySelector("#editCreateConverter");
+    const converterNodeUrlInput = editPanel.querySelector("#edit-converter-node-url");
     const promptRoot = editPanel.querySelector("#promptLayer");
     syncPromptDock(promptRoot);
     if (passwordDetailsEl) {
@@ -6740,11 +6892,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       onMediaInput(readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}));
     };
     const syncConverterDependentOptions = ({ preserveCurrentValues = false } = {}) => {
-      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+      var _a2, _b2, _c2, _d2, _e, _f, _g, _h, _i, _j;
       const converterSelect = (_a2 = form == null ? void 0 : form.elements) == null ? void 0 : _a2.converter_id;
       const formatSelect = (_b2 = form == null ? void 0 : form.elements) == null ? void 0 : _b2.converter_format;
-      const qualitySelect = (_c = form == null ? void 0 : form.elements) == null ? void 0 : _c.converter_quality;
-      const saveModeSelect = (_d = form == null ? void 0 : form.elements) == null ? void 0 : _d.converter_save_mode;
+      const qualitySelect = (_c2 = form == null ? void 0 : form.elements) == null ? void 0 : _c2.converter_quality;
+      const saveModeSelect = (_d2 = form == null ? void 0 : form.elements) == null ? void 0 : _d2.converter_save_mode;
       if (!(converterSelect instanceof HTMLSelectElement)) {
         return;
       }
@@ -6818,7 +6970,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         workFieldEditor.addWorkField();
       });
     }
-    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-source-url, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode").forEach((input) => {
+    editPanel.querySelectorAll("[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode").forEach((input) => {
       if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
         return;
       }
@@ -6865,10 +7017,39 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     if (changeLayoutButton && typeof onOpenLayoutPage === "function") {
       changeLayoutButton.addEventListener("click", () => onOpenLayoutPage());
     }
+    if (registerPoffButton && typeof onRegisterPoff === "function") {
+      registerPoffButton.addEventListener("click", async () => {
+        const originalLabel = registerPoffButton.textContent;
+        registerPoffButton.disabled = true;
+        registerPoffButton.textContent = "Registering...";
+        try {
+          const result = await onRegisterPoff({ statusEl });
+          registerPoffButton.textContent = (result == null ? void 0 : result.pendingApproval) ? "Registration pending" : "Registered";
+        } catch (error) {
+          registerPoffButton.disabled = false;
+          registerPoffButton.textContent = originalLabel;
+          setStatusMessage(statusEl, (error == null ? void 0 : error.message) || "Poff registration failed.");
+        }
+      });
+    }
     if (createConverterButton && typeof onCreateConverter === "function") {
       createConverterButton.addEventListener("click", async () => {
         await onCreateConverter({ statusEl, form });
       });
+    }
+    if (converterNodeUrlInput && typeof onLoadConverterNode === "function") {
+      const loadConverterNode = async () => {
+        await onLoadConverterNode({
+          nodeUrl: String((converterNodeUrlInput == null ? void 0 : converterNodeUrlInput.value) || "").trim(),
+          statusEl
+        });
+      };
+      converterNodeUrlInput.addEventListener("change", loadConverterNode);
+      const available = Array.isArray((_c = config == null ? void 0 : config.converterCatalog) == null ? void 0 : _c.available) ? config.converterCatalog.available : [];
+      const hasRemote = available.some((item) => (item == null ? void 0 : item.engine) === "remote-node");
+      if (((_d = config == null ? void 0 : config.converterCatalog) == null ? void 0 : _d.autoLoadRemote) === true && !hasRemote) {
+        Promise.resolve().then(loadConverterNode);
+      }
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === "function") {
       resetFolderWorkButton.addEventListener("click", async () => {
@@ -6879,22 +7060,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         await onResetFolderWork({ statusEl });
       });
     }
-    if (deleteTargetButton && typeof onDeleteTarget === "function") {
-      deleteTargetButton.addEventListener("click", async () => {
-        const confirmed = window.confirm("Delete this item? This cannot be undone.");
-        if (!confirmed) {
-          return;
-        }
-        await onDeleteTarget({ statusEl });
-      });
-    }
     if (convertButton && typeof onConvertWork === "function") {
       convertButton.addEventListener("click", async () => {
+        var _a2, _b2, _c2, _d2;
         syncMediaState();
         await onConvertWork({
           statusEl,
           form,
-          converter: readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}).converter || null
+          converter: readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}).converter || null,
+          convertAllOfType: ((_a2 = editPanel.querySelector("#edit-converter-all-of-type")) == null ? void 0 : _a2.checked) === true,
+          visibilityMode: ((_b2 = editPanel.querySelector("#edit-converter-hide-originals")) == null ? void 0 : _b2.checked) === false ? "both" : "converted-only",
+          hideThumbnails: ((_c2 = editPanel.querySelector("#edit-converter-hide-thumbnails")) == null ? void 0 : _c2.checked) !== false,
+          mimeType: String(((_d2 = config == null ? void 0 : config.conversionScope) == null ? void 0 : _d2.mimeType) || (config == null ? void 0 : config.mimeType) || "").trim()
         });
       });
     }
@@ -6906,7 +7083,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       onUploadFiles,
       onCreateBlankFile,
       onCreateFolder,
-      onCreateLink
+      onCreateLink,
+      onImportRemote
     });
     return { statusEl, promptRoot };
   }
@@ -7075,7 +7253,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     return null;
   }
   function readMediaConfigFromElements(elements2, form, currentWork = {}) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const nextWork = { ...currentWork && typeof currentWork === "object" ? currentWork : {} };
     const normalizeSourceUrl = (value) => {
       var _a2;
@@ -7146,7 +7324,23 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const converterPath = String(((_d = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _d.converterPath) || "").trim();
     const converterViewerHref = String(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterViewerHref) || "").trim();
     const converterUrl = String(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterUrl) || "").trim();
-    const converterSourceUrl = normalizeSourceUrl(((_g = elements2.converter_source_url) == null ? void 0 : _g.value) || "");
+    const converterLabel = String(((_g = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _g.converterLabel) || "").trim();
+    const converterDescription = String(((_h = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _h.converterDescription) || "").trim();
+    const parseConverterData = (key, fallback) => {
+      var _a2;
+      try {
+        const value = JSON.parse(((_a2 = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _a2[key]) || "");
+        return value && typeof value === "object" ? value : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    };
+    const converterNode = parseConverterData("converterNode", null);
+    const converterAccepts = parseConverterData("converterAccepts", []);
+    const converterOutputs = parseConverterData("converterOutputs", []);
+    const converterDefaults = parseConverterData("converterDefaults", {});
+    const converterUi = parseConverterData("converterUi", {});
+    const converterSourceUrl = normalizeSourceUrl(((_i = elements2.converter_source_url) == null ? void 0 : _i.value) || "");
     const existingConverter = nextWork.converter && typeof nextWork.converter === "object" ? nextWork.converter : {};
     if (converterId) {
       const nextConverter = {
@@ -7158,11 +7352,18 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         path: converterPath,
         viewerHref: converterViewerHref,
         url: converterUrl,
+        label: converterLabel,
+        description: converterDescription,
+        accepts: Array.isArray(converterAccepts) ? converterAccepts : [],
+        outputs: Array.isArray(converterOutputs) ? converterOutputs : [],
+        formats: String(((_j = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _j.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean),
+        defaults: converterDefaults,
+        ui: converterUi,
         sourceUrl: converterSourceUrl || String(existingConverter.sourceUrl || "").trim(),
-        node: converterEngine === "remote-node" ? existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "" } : "local",
-        quality: String(((_h = elements2.converter_quality) == null ? void 0 : _h.value) || "default").trim() || "default",
-        format: String(((_i = elements2.converter_format) == null ? void 0 : _i.value) || "").trim() || "source",
-        saveMode: String(((_j = elements2.converter_save_mode) == null ? void 0 : _j.value) || "new-hidden-work").trim() || "new-hidden-work",
+        node: converterEngine === "remote-node" ? converterNode || (existingConverter.node && typeof existingConverter.node === "object" ? existingConverter.node : { id: "", baseUrl: "", mcpUrl: "", endpoint: "", converterId: "" }) : "local",
+        quality: String(((_k = elements2.converter_quality) == null ? void 0 : _k.value) || "default").trim() || "default",
+        format: String(((_l = elements2.converter_format) == null ? void 0 : _l.value) || "").trim() || "source",
+        saveMode: String(((_m = elements2.converter_save_mode) == null ? void 0 : _m.value) || "new-hidden-work").trim() || "new-hidden-work",
         hiddenByDefault: true
       };
       if (converterSourceUrl) {
@@ -7201,6 +7402,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       return `${names[0]} and ${names[1]}`;
     }
     return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+  }
+  function buildRemoteExportUrl(sourceUrl) {
+    const url = new URL(String(sourceUrl || "").trim());
+    if (url.searchParams.get("route") === "export-content") {
+      return url.toString();
+    }
+    let sourcePath = url.searchParams.get("path") || "";
+    const sourceFile = url.searchParams.get("file") || "";
+    if (!sourcePath && sourceFile) {
+      const parts = sourceFile.split("/").filter(Boolean);
+      parts.pop();
+      sourcePath = parts.join("/");
+    }
+    if (!sourcePath && url.hash) {
+      sourcePath = decodeURIComponent(url.hash.replace(/^#\/?/, "")).replace(/^\/+/, "");
+    }
+    url.hash = "";
+    url.search = "";
+    url.searchParams.set("mcp", "1");
+    url.searchParams.set("route", "export-content");
+    if (sourcePath) {
+      url.searchParams.set("path", sourcePath);
+    }
+    return url.toString();
   }
   function createPanelActions({
     getSelection,
@@ -7316,28 +7541,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         syncDrawerVisibility();
         window.location.hash = `#/${nextPath}`;
       },
-      onDeleteTarget: async ({ statusEl }) => {
-        const selection2 = getSelection();
-        const targetPath = getEditTargetPath2(selection2);
-        if (!targetPath) {
-          throw new Error("Delete target unavailable.");
-        }
-        const data = await requestEditDelete({
-          path: targetPath,
-          return: selection2.previewPath || selection2.path || ""
-        });
-        if (!data || data.error) {
-          throw new Error((data == null ? void 0 : data.error) || "Delete failed.");
-        }
-        setDrawerOpen(false);
-        syncDrawerVisibility();
-        setStatusMessage(statusEl, "Deleted.", true);
-        window.dispatchEvent(new CustomEvent("poff:content-updated"));
-        const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
-        window.location.hash = nextPath ? `#/${nextPath}` : "";
-        await refreshCurrentEditState(getSelection());
-      },
-      onConvertWork: async ({ statusEl, converter }) => {
+      onConvertWork: async ({
+        statusEl,
+        converter,
+        convertAllOfType = false,
+        visibilityMode = "converted-only",
+        hideThumbnails = true,
+        mimeType = ""
+      }) => {
         var _a;
         const selection2 = getSelection();
         const sourcePath = getEditTargetPath2(selection2);
@@ -7345,10 +7556,34 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           throw new Error("Convert target unavailable.");
         }
         if (!(converter == null ? void 0 : converter.id)) {
-          setStatusMessage(statusEl, "Choose a converter first.");
+          setStatusMessage2(statusEl, "Choose a converter first.");
           return;
         }
-        setStatusMessage(statusEl, "Converting...");
+        if (convertAllOfType) {
+          const folderPath = sourcePath.split("/").slice(0, -1).join("/");
+          const typeLabel = String(mimeType || "matching type").trim();
+          setStatusMessage2(statusEl, `Converting all ${typeLabel} files...`);
+          const result = await requestMcpRoute("bulk-convert", {
+            path: folderPath,
+            mimeType: typeLabel === "matching type" ? "" : typeLabel,
+            converter: {
+              ...converter,
+              saveMode: "replace-generated-work"
+            },
+            visibilityMode,
+            hideThumbnails
+          });
+          if (!result || result.error || result.ok === false) {
+            throw new Error((result == null ? void 0 : result.error) || "Bulk conversion failed.");
+          }
+          await persistSelectedConverter(selection2, converter, statusEl);
+          window.alert(
+            `OK \u2014 ${Number(result.convertedCount || 0)} converted, ${Number(result.hiddenThumbnailCount || 0)} thumbnails hidden, ${Number(result.skippedCount || 0)} skipped, ${Number(result.failedCount || 0)} failed.`
+          );
+          await refreshCurrentEditState(selection2);
+          return;
+        }
+        setStatusMessage2(statusEl, "Converting...");
         const currentConfig = getEditConfig() && typeof getEditConfig() === "object" ? getEditConfig() : {};
         const sourceName = sourcePath.split("/").pop() || sourcePath;
         const sourceUrl = String((converter == null ? void 0 : converter.sourceUrl) || currentConfig.srcUrl || "").trim();
@@ -7440,10 +7675,10 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
         const name = requestedName.trim();
         if (!name) {
-          setStatusMessage(statusEl, "Converter creation cancelled.");
+          setStatusMessage2(statusEl, "Converter creation cancelled.");
           return;
         }
-        setStatusMessage(statusEl, "Creating converter...");
+        setStatusMessage2(statusEl, "Creating converter...");
         const created = await requestMcpRoute("create-converter", {
           path: sourcePath,
           name
@@ -7470,7 +7705,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           refreshedSelect.dispatchEvent(new Event("input", { bubbles: true }));
           refreshedSelect.dispatchEvent(new Event("change", { bubbles: true }));
         }
-        setStatusMessage(
+        setStatusMessage2(
           document.getElementById("editInlineStatus") || statusEl,
           `Created converter ${(definition == null ? void 0 : definition.label) || (definition == null ? void 0 : definition.name) || name} at ${created.folder || ""}. Select it to continue.`,
           true
@@ -7491,7 +7726,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
         setDrawerOpen(false);
         syncDrawerVisibility();
-        setStatusMessage(statusEl, "Folder work reset to default.", true);
+        setStatusMessage2(statusEl, "Folder work reset to default.", true);
         window.dispatchEvent(new CustomEvent("poff:content-updated"));
         await refreshCurrentEditState(getSelection());
       },
@@ -7554,7 +7789,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           const targetLabel = describeUploadDestination(data, selection2);
           const fallbackCount = uploaded.length || files.length;
           const message = names ? `Uploaded ${names}${targetLabel}.` : fallbackCount === 1 ? `Uploaded 1 file${targetLabel}.` : `Uploaded ${fallbackCount} files${targetLabel}.`;
-          setStatusMessage(inlineStatus, message, true);
+          setStatusMessage2(inlineStatus, message, true);
         }
         window.dispatchEvent(new CustomEvent("poff:content-updated"));
       },
@@ -7577,7 +7812,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const inlineStatus = document.getElementById("editInlineStatus");
         if (inlineStatus) {
           const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : fileName;
-          setStatusMessage(inlineStatus, `Created ${createdName}${describeUploadDestination(data, selection2)}.`, true);
+          setStatusMessage2(inlineStatus, `Created ${createdName}${describeUploadDestination(data, selection2)}.`, true);
         }
         window.dispatchEvent(new CustomEvent("poff:content-updated"));
       },
@@ -7600,7 +7835,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const inlineStatus = document.getElementById("editInlineStatus");
         if (inlineStatus) {
           const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : folderName;
-          setStatusMessage(inlineStatus, `Created folder ${createdName}${describeUploadDestination(data, selection2)}.`, true);
+          setStatusMessage2(inlineStatus, `Created folder ${createdName}${describeUploadDestination(data, selection2)}.`, true);
         }
         window.dispatchEvent(new CustomEvent("poff:content-updated"));
       },
@@ -7628,17 +7863,49 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         if (inlineStatus) {
           const createdName = Array.isArray(data.uploaded) && ((_a = data.uploaded[0]) == null ? void 0 : _a.name) ? data.uploaded[0].name : linkName || linkUrl;
           const message = data.pendingApproval ? `Submitted ${createdName} for approval${describeAddWorkTarget(selection2)}.` : `Created link ${createdName}${describeUploadDestination(data, selection2)}.`;
-          setStatusMessage(inlineStatus, message, true);
+          setStatusMessage2(inlineStatus, message, true);
         }
         if (!(data.pendingApproval && !getAuthState().canEdit)) {
           await refreshCurrentEditState(selection2);
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
         }
       },
+      onImportRemote: async ({
+        sourceUrl,
+        takeoverMode,
+        destinationName,
+        closeDialog
+      }) => {
+        const selection2 = getSelection();
+        const exportUrl = buildRemoteExportUrl(sourceUrl);
+        const data = await requestMcpRoute("import-remote", {
+          path: getAddWorkTargetPath2(selection2) || getContentTargetPath2(selection2),
+          url: exportUrl,
+          mode: takeoverMode === "copy" ? "copy" : "follow",
+          destinationName,
+          createPlayer: takeoverMode === "copy"
+        });
+        if (!data || data.ok === false || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Failed to use the remote Poff work.");
+        }
+        closeDialog == null ? void 0 : closeDialog();
+        const inlineStatus = document.getElementById("editInlineStatus");
+        if (inlineStatus) {
+          const message = takeoverMode === "copy" ? `Copied ${data.copiedCount || 0} files into ${data.destinationPath || data.destinationName || "a local folder"}${data.playerCreated ? " and created a looping player" : ""}.` : `Following ${data.importedCount || 0} entries from the remote Poff node.`;
+          setStatusMessage2(inlineStatus, message, true);
+        }
+        if (takeoverMode === "copy" && data.destinationPath) {
+          window.dispatchEvent(new CustomEvent("poff:content-updated"));
+          window.location.hash = `#/${data.openPath || data.destinationPath}`;
+          return;
+        }
+        await refreshCurrentEditState(selection2);
+        window.dispatchEvent(new CustomEvent("poff:content-updated"));
+      },
       onChangePassword: async ({ elements: elements2, form, statusEl }) => {
         var _a, _b, _c;
         try {
-          setStatusMessage(statusEl, "Changing password...");
+          setStatusMessage2(statusEl, "Changing password...");
           const selection2 = getSelection();
           const data = await requestEditAuth({
             path: getEditTargetPath2(selection2),
@@ -7656,15 +7923,24 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           if (form && typeof form.reset === "function") {
             form.reset();
           }
-          setStatusMessage(statusEl, "Password changed.", true);
+          setStatusMessage2(statusEl, "Password changed.", true);
         } catch (err) {
-          setStatusMessage(statusEl, err.message || "Password change failed.");
+          setStatusMessage2(statusEl, err.message || "Password change failed.");
         }
       }
     };
   }
 
   // src/assets/js/edit/controller.js
+  function buildPublicPoffWorkUrl(path, isFile = false) {
+    const currentUrl = new URL(window.location.href);
+    const url = new URL(window.location.pathname, currentUrl.origin);
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("view", "1");
+    url.searchParams.set(isFile ? "file" : "path", String(path || "."));
+    return url.toString();
+  }
   function createEditController({ elements: elements2, context, editRequested: editRequested2 }) {
     const {
       editPanel,
@@ -7995,7 +8271,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const setDropStatus = (message, success = false) => {
         const inlineStatus = document.getElementById("editInlineStatus") || editAuthStatus;
         if (inlineStatus) {
-          setStatusMessage(inlineStatus, message, success);
+          setStatusMessage2(inlineStatus, message, success);
         }
       };
       const onDragEnter = (event) => {
@@ -8117,7 +8393,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     async function saveConfig(payload, statusEl) {
       var _a, _b;
       try {
-        setStatusMessage(statusEl, "Saving...");
+        setStatusMessage2(statusEl, "Saving...");
         const data = await requestEditConfig("save", payload);
         if (!data || data.error) {
           throw new Error((data == null ? void 0 : data.error) || "Save failed.");
@@ -8128,7 +8404,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           folderConfig = editConfig;
           renderFolderMeta();
         }
-        setStatusMessage(statusEl, "Config saved.", true);
+        setStatusMessage2(statusEl, "Config saved.", true);
         window.dispatchEvent(new CustomEvent("poff:content-updated", {
           detail: {
             path: data.routePath || (payload == null ? void 0 : payload.path) || "",
@@ -8141,7 +8417,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }));
         return data.config;
       } catch (err) {
-        setStatusMessage(statusEl, err.message || "Save failed.");
+        setStatusMessage2(statusEl, err.message || "Save failed.");
         throw err;
       }
     }
@@ -8261,9 +8537,47 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onSubmit: panelActions.onSubmit,
         onToggleDrawer: panelActions.onToggleDrawer,
         onOpenLayoutPage: () => panelActions.onOpenLayoutPage(buildVirtualLayoutPath),
-        onDeleteTarget: panelActions.onDeleteTarget,
         onConvertWork: panelActions.onConvertWork,
         onCreateConverter: panelActions.onCreateConverter,
+        onLoadConverterNode: async ({ nodeUrl, statusEl }) => {
+          var _a;
+          if (!nodeUrl) {
+            setStatusMessage2(statusEl, "Enter a Poff node URL.");
+            return;
+          }
+          const selection2 = getActiveSelection();
+          const sourcePath = getEditTargetPath(selection2);
+          setStatusMessage2(statusEl, "Loading remote converter offers...");
+          let remote = null;
+          try {
+            remote = await requestMcpRoute("remote-converters", {
+              path: sourcePath,
+              nodeUrl,
+              mimeType: String((editConfig == null ? void 0 : editConfig.mimeType) || "").trim(),
+              kind: String((editConfig == null ? void 0 : editConfig.kind) || "").trim(),
+              extension: sourcePath.includes(".") ? sourcePath.split(".").pop() : ""
+            });
+          } catch (error) {
+            setStatusMessage2(statusEl, (error == null ? void 0 : error.message) || "Remote Poff node unavailable.");
+            return;
+          }
+          if (!remote || remote.ok === false || remote.error) {
+            setStatusMessage2(statusEl, (remote == null ? void 0 : remote.error) || "Remote Poff node unavailable.");
+            return;
+          }
+          const catalog = (editConfig == null ? void 0 : editConfig.converterCatalog) && typeof editConfig.converterCatalog === "object" ? editConfig.converterCatalog : {};
+          editConfig.converterCatalog = {
+            ...catalog,
+            remoteNodeUrl: nodeUrl,
+            available: Array.isArray(remote.available) ? remote.available : []
+          };
+          renderEditUI(editConfig, status);
+          setStatusMessage2(
+            document.getElementById("editInlineStatus"),
+            `Loaded ${Array.isArray(remote.available) ? remote.available.length : 0} converter offers from ${((_a = remote == null ? void 0 : remote.node) == null ? void 0 : _a.id) || nodeUrl}.`,
+            true
+          );
+        },
         onResetFolderWork: panelActions.onResetFolderWork,
         onReturnToWork: panelActions.onReturnToWork,
         onSubmitLayout: panelActions.onSubmitLayout,
@@ -8272,6 +8586,26 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         onCreateBlankFile: panelActions.onCreateBlankFile,
         onCreateFolder: panelActions.onCreateFolder,
         onCreateLink: panelActions.onCreateLink,
+        onImportRemote: panelActions.onImportRemote,
+        onRegisterPoff: async ({ statusEl }) => {
+          const selection2 = getActiveSelection();
+          const path = getEditTargetPath(selection2);
+          setStatusMessage2(statusEl, "Registering with Poff...");
+          const result = await requestMcpRoute("register-node", {
+            path,
+            pageUrl: buildPublicPoffWorkUrl(path, false)
+          });
+          if (!result || result.ok === false || result.error) {
+            throw new Error((result == null ? void 0 : result.error) || "Poff registration failed.");
+          }
+          const filterText = Array.isArray(result.categories) && result.categories.length ? ` Filters: ${result.categories.join(", ")}.` : "";
+          setStatusMessage2(
+            statusEl,
+            result.pendingApproval ? `Registration submitted for approval.${filterText}` : `Registered with Poff.${filterText}`,
+            true
+          );
+          return result;
+        },
         onChangePassword: panelActions.onChangePassword
       });
       const drawerState = renderEditDrawer({
@@ -8337,7 +8671,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           }
           drawerOpen = false;
           syncDrawerVisibility();
-          setStatusMessage(statusEl, "Deleted.", true);
+          setStatusMessage2(statusEl, "Deleted.", true);
           window.dispatchEvent(new CustomEvent("poff:content-updated"));
           const nextPath = selection2.previewPath ? selection2.previewPath.split("/").slice(0, -1).join("/") : "";
           window.location.hash = nextPath ? `#/${nextPath}` : "";
@@ -8585,6 +8919,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let previewDisabled = false;
     let lastPreviewKey = "";
     let previewMountRoot = null;
+    let previewAbortController = null;
     function stripPreviewChrome(root) {
       if (!root || typeof root.querySelectorAll !== "function") {
         return root;
@@ -8937,6 +9272,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       const requestId = ++previewRequestId;
+      previewAbortController == null ? void 0 : previewAbortController.abort();
+      const requestController = typeof AbortController === "function" ? new AbortController() : null;
+      previewAbortController = requestController;
       const nextPreview = previewStateFromUrl(url);
       const shouldPreserveScroll = !!nextPreview.key && nextPreview.key === lastPreviewKey;
       const preservedScrollTop = shouldPreserveScroll ? contentFrame.scrollTop : 0;
@@ -8948,7 +9286,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           headers: {
             "Accept": "text/html,application/xhtml+xml",
             "X-Requested-With": "fetch-preview"
-          }
+          },
+          ...requestController ? { signal: requestController.signal } : {}
         });
         if (!response.ok) {
           throw new Error(`Preview request failed: ${response.status}`);
@@ -8985,7 +9324,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         );
         let previewScripts = [];
         try {
-          previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview);
+          const localPreview = !isExternalPreviewUrl(response.url);
+          previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview || localPreview);
         } catch (err) {
           previewScripts = [];
         }
@@ -9007,12 +9347,15 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           contentFrame.scrollLeft = 0;
         }
       } catch (error) {
-        if (requestId !== previewRequestId) {
+        if (requestId !== previewRequestId || (error == null ? void 0 : error.name) === "AbortError") {
           return;
         }
         previewMountRoot = null;
         contentFrame.innerHTML = '<div class="viewer-error">Preview failed to load.</div>';
       } finally {
+        if (previewAbortController === requestController) {
+          previewAbortController = null;
+        }
         if (requestId === previewRequestId) {
           setLoadingVisible(iframeLoading, false);
         }
@@ -9232,6 +9575,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }) {
     let activeLink = null;
     let currentFolderPath = "";
+    let navRequestId = 0;
+    let navAbortController = null;
     function scrollActiveLinkIntoView(link = activeLink) {
       if (!link || typeof link.scrollIntoView !== "function") {
         return;
@@ -9322,29 +9667,57 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setActiveLink(nextLink);
       }
     }
-    function showNavLoading() {
+    function showNavLoading(label = "") {
       if (typeof setLoadingVisible === "function") {
-        setLoadingVisible(sidebarLoading, true);
+        setLoadingVisible(sidebarLoading, true, label);
       }
     }
-    function loadNav(relPath = "") {
+    function loadNav(relPath = "", options = {}) {
       if (!navList) {
         return Promise.resolve("");
       }
+      const requestId = ++navRequestId;
+      navAbortController == null ? void 0 : navAbortController.abort();
+      const requestController = typeof AbortController === "function" ? new AbortController() : null;
+      navAbortController = requestController;
       currentFolderPath = relPath || "";
-      showNavLoading();
-      return fetch(`?ajax=nav&path=${encodeURIComponent(relPath)}${editQuery2}`).then((response) => response.text()).then((html) => {
+      showNavLoading(options.loadingLabel || "Loading navigation...");
+      return fetch(`?ajax=nav&path=${encodeURIComponent(relPath)}${editQuery2}`, {
+        credentials: "same-origin",
+        headers: {
+          "Accept": "text/html",
+          "X-Requested-With": "fetch-navigation"
+        },
+        ...requestController ? { signal: requestController.signal } : {}
+      }).then((response) => {
+        if (!response.ok) {
+          throw new Error(`Navigation request failed: ${response.status}`);
+        }
+        return response.text();
+      }).then((html) => {
+        if (requestId !== navRequestId) {
+          return "";
+        }
         const extracted = extractNavHtml(html) || "";
         if (extracted.trim()) {
           navList.innerHTML = extracted;
           navList.dataset.loaded = "1";
+          delete navList.dataset.error;
+          delete navList.dataset.stale;
         } else {
           navList.dataset.stale = "1";
         }
         return extracted;
-      }).catch(() => {
+      }).catch((error) => {
+        if (requestId !== navRequestId || (error == null ? void 0 : error.name) === "AbortError") {
+          return "";
+        }
         navList.dataset.error = "1";
         return "";
+      }).finally(() => {
+        if (navAbortController === requestController) {
+          navAbortController = null;
+        }
       });
     }
     function collectVisibleTreePaths() {
@@ -9533,14 +9906,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
     let ignoreNextHashSync = false;
+    let sidebarSyncId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get("path") || "";
     const routeResolver = createRouteResolver({ navList });
-    function setLoadingVisible(element, visible) {
+    function setLoadingVisible(element, visible, label = "") {
+      var _a, _b;
       if (!element) {
         return;
       }
       element.classList.toggle("flex", visible);
       element.classList.toggle("items-center", visible);
+      (_a = element.setAttribute) == null ? void 0 : _a.call(element, "aria-busy", visible ? "true" : "false");
+      const labelElement = (_b = element.querySelector) == null ? void 0 : _b.call(element, ".loader-label");
+      if (visible && labelElement && label) {
+        labelElement.textContent = label;
+      }
     }
     function readHashPath() {
       return routeResolver.readHashPath();
@@ -9623,7 +10003,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const previewIsFile = !!selection2.previewIsFile;
       const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
       const previewUrl = resolveSelectionPreviewUrl(selection2, options == null ? void 0 : options.previewUrl);
-      setLoadingVisible(iframeLoading, true);
+      const targetLabel = String(selection2.path || previewPath || "home").split("/").filter(Boolean).pop() || "home";
+      setLoadingVisible(iframeLoading, true, `Loading ${targetLabel}...`);
       if (contentFrame) {
         contentFrame.classList.toggle("content-frame-layout-target", !!selection2.isLayout);
         previewController.syncPreviewDisabledState(!!selection2.isLayout);
@@ -9633,11 +10014,19 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         writeHashPath(selection2.path || "");
       }
       if (navList && !skipSidebarReload) {
-        setLoadingVisible(sidebarLoading, true);
-        sidebarController2.loadNav(folderPath).then(() => {
+        const currentSidebarSyncId = ++sidebarSyncId;
+        sidebarController2.loadNav(folderPath, {
+          loadingLabel: `Loading navigation for ${targetLabel}...`
+        }).then(() => {
+          if (currentSidebarSyncId !== sidebarSyncId) {
+            return;
+          }
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
           setLoadingVisible(sidebarLoading, false);
         }).catch(() => {
+          if (currentSidebarSyncId !== sidebarSyncId) {
+            return;
+          }
           sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
           setLoadingVisible(sidebarLoading, false);
         });

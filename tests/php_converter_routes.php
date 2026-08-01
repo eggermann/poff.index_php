@@ -138,6 +138,34 @@ if ($mode === 'remote-catalog') {
     exit(0);
 }
 
+if ($mode === 'register-node') {
+    $mockRegistry = is_array($payload['mockRegistry'] ?? null) ? $payload['mockRegistry'] : [];
+    $captured = [];
+    $GLOBALS['__poff_registry_post'] = static function (string $url, array $requestPayload) use ($mockRegistry, &$captured): array {
+        $captured = [
+            'url' => $url,
+            'payload' => $requestPayload,
+        ];
+        return [
+            'ok' => (bool) ($mockRegistry['ok'] ?? true),
+            'status' => (int) ($mockRegistry['status'] ?? 200),
+            'body' => json_encode($mockRegistry['body'] ?? [
+                'allowed' => true,
+                'pendingApproval' => true,
+                'uploaded' => [['pendingApproval' => true]],
+            ], JSON_UNESCAPED_SLASHES),
+        ];
+    };
+    unset($payload['mockRegistry']);
+    $result = handleRegisterPoffNode([
+        'rootDir' => $rootDir,
+        'input' => $payload,
+    ]);
+    $result['_capturedRegistry'] = $captured;
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($mode === 'convert-offered') {
     echo json_encode(handleConvertOffered([
         'rootDir' => $rootDir,

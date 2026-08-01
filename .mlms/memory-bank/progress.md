@@ -24,5 +24,29 @@
 ## In Progress
 - None.
 ## Next
-- Build and deploy `index.php` only when explicitly requested.
-- After deployment, verify `pageoff.de` advertises its converter offers to another Poff node.
+- Rebuild/deploy only when explicitly requested.
+- Commit only when explicitly requested.
+
+## External Player Study
+- Located six physical H.264 MP4 files under `/Users/eggermann/Projekte/dominikeggermann.com/page/Prothagonia`.
+- Confirmed each file already has a standard video work config.
+- Confirmed folder render context exposes `allVideos`, each with `srcUrl`.
+- Confirmed custom folder layouts support HBS, CSS, and JS.
+- Confirmed “Copy + paste” copies only the item name into prompt/clipboard.
+- Confirmed “Add work → Poff link” creates a link/iframe, not a local media copy.
+- Confirmed `export-content` and `import-remote` exist, but no editor UI calls them.
+- Confirmed `import-remote` imports remote metadata/links only.
+- Player source totals six 448×336 H.264 videos; originals remain untouched.
+
+## External Player Implementation
+- Copied all six Prothagonia MP4 files into `/Users/eggermann/Projekte/dominikeggermann.com/page/player`.
+- Created a polished folder layout with one autoplaying muted player, clickable queue, previous/next controls, and continuous playlist loop.
+- Verified in Playwright that item 1 is playing and a synthetic `ended` event from item 6 returns to item 1.
+- Fixed local filesystem layout asset URLs so nested `.layout` CSS/JS resolve against the item path.
+- Enabled same-origin folder layout scripts in the fetch-mounted preview.
+- Added “Poff work” to Add work with explicit Copy locally, Follow source, and Embed view modes.
+- Extended `import-remote` with guarded local copying: public HTTP(S), same source host, redirects disabled, file/count/total limits, safe names, temporary import folder, and no overwrite.
+- Added optional looping-player generation for copied video folders.
+- Made `export-content` a public read-only interoperability surface for public Poff works.
+- Captured `player-local-1440.png` and `external-work-takeover-ui.png`.
+- Verified 168/168 MCP tests, 2/2 upload UI tests, 7/7 preview tests, PHP lint, and JS syntax.
