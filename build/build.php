@@ -20,15 +20,17 @@ $legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileNam
 $buildMode = getenv('POFF_BUILD_MODE') === 'production' ? 'production' : 'development';
 $isProductionBuild = $buildMode === 'production';
 $skipDistributionCopies = getenv('POFF_SKIP_DISTRIBUTION_COPIES') === '1';
-$standaloneCopyTargets = [
-    '/Applications/MAMP/htdocs/MAUSMAUS',
-    '/Applications/MAMP/htdocs/node-1',
-    '/Applications/MAMP/htdocs/node-2',
-    '/Applications/MAMP/htdocs/pageoff',
-];
-$additionalIndexCopyTargets = [
-    '/Applications/MAMP/htdocs/dominikeggermann-project/page',
-];
+$mampHtdocs = rtrim((string) ($config['mampHtdocs'] ?? ''), '/\\');
+$standaloneCopyTargets = is_array($config['standaloneCopyTargets'] ?? null)
+    ? $config['standaloneCopyTargets']
+    : [];
+$additionalIndexCopyTargets = is_array($config['additionalIndexCopyTargets'] ?? null)
+    ? $config['additionalIndexCopyTargets']
+    : [];
+if ($mampHtdocs === '') {
+    $standaloneCopyTargets = [];
+    $additionalIndexCopyTargets = [];
+}
 // Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
 if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {
     unlink($legacyOutputFile);
@@ -604,8 +606,8 @@ PHP;
     }
 
     if (!$skipDistributionCopies) {
-        foreach ($standaloneCopyTargets as $targetDir) {
-            $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+        foreach ($standaloneCopyTargets as $targetName) {
+            $resolvedTargetDir = $mampHtdocs . DIRECTORY_SEPARATOR . trim((string) $targetName, '/\\');
             if ($resolvedTargetDir === '') {
                 continue;
             }
@@ -629,8 +631,10 @@ PHP;
             }
         }
 
-        foreach ($additionalIndexCopyTargets as $targetDir) {
-            $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+        foreach ($additionalIndexCopyTargets as $target) {
+            $targetName = is_array($target) ? (string) ($target['name'] ?? '') : (string) $target;
+            $cleanSubdirectories = !is_array($target) || (bool) ($target['cleanSubdirectories'] ?? true);
+            $resolvedTargetDir = $mampHtdocs . DIRECTORY_SEPARATOR . trim($targetName, '/\\');
             if ($resolvedTargetDir === '') {
                 continue;
             }
@@ -642,7 +646,9 @@ PHP;
             if (!copy($outputFile, $targetFile)) {
                 throw new Exception("Failed to copy additional index build to: $targetFile");
             }
-            FileCopier::removeGeneratedEntrypointsFromSubdirectories($resolvedTargetDir, $outputFileName);
+            if ($cleanSubdirectories) {
+                FileCopier::removeGeneratedEntrypointsFromSubdirectories($resolvedTargetDir, $outputFileName);
+            }
         }
 
         FileCopier::removeGeneratedEntrypointsFromSubdirectories($outputDir, $outputFileName);

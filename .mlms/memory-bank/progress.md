@@ -24,8 +24,23 @@
 ## In Progress
 - None.
 ## Next
-- Rebuild/deploy only when explicitly requested.
+- Rebuild generated entrypoints only when explicitly requested.
 - Commit only when explicitly requested.
+
+## Three-Node Pageoff Study
+- Loop 1 started with independent targets: `pageoff-artist`, `pageoff-writer`, and `pageoff-curator`.
+- Existing Pageoff index will be copied opaquely; generated repo output remains untouched.
+- Existing JPEG/TIFF/text works will be copied, not moved.
+- Three personas: artist, texter, curator-engineer.
+- Created all three MAMP roots with opaque, byte-identical single-file entrypoints.
+- Created three visually distinct low-code layouts and populated them with existing JPEG and text works.
+- Verified live `.webloc` follow/embed from curator to artist.
+- Copied an artist JPEG and writer text into curator with a provenance ledger.
+- Copied artist filesystem layout into a curator-owned nested edition and verified it renders independently.
+- Centralized build/watcher distribution targets in `BuildConfig.shared.json` and added all three nodes.
+- Hid `index.php` from the public content tree and added regression coverage.
+- Verified 171 MCP tests, 2 builder tests, PHP/JS syntax, diff whitespace, and zero browser errors.
+- Captured and inspected three final 1440×1000 screenshots.
 
 ## External Player Study
 - Located six physical H.264 MP4 files under `/Users/eggermann/Projekte/dominikeggermann.com/page/Prothagonia`.

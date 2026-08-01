@@ -4,13 +4,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
-const mampHtdocs = '/Applications/MAMP/htdocs';
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
-const standaloneCopyTargets = ['MAUSMAUS', 'node-1', 'node-2', 'pageoff'];
-const additionalIndexCopyTargets = [
-  { name: 'dominikeggermann-project/page', cleanSubdirectories: true },
-  { name: 'dominikeggermann-project', cleanSubdirectories: false },
-];
 const bundledLayoutAsset = path.join(rootDir, 'src', 'includes', 'worktypes', 'templates', 'layout', 'default', 'poff.profile.jpg');
 
 function logBrowseUrl(linkName) {
@@ -37,9 +31,13 @@ function readBuildConfig() {
   }
 }
 
-function ensureSymlink(outputDir) {
+function ensureSymlink(outputDir, config) {
+  if (!config.mampHtdocs) {
+    console.warn('[watch] MAMP htdocs is not configured, skipping symlink.');
+    return null;
+  }
   const resolvedOutput = path.resolve(outputDir);
-  const resolvedHtdocs = path.resolve(mampHtdocs);
+  const resolvedHtdocs = path.resolve(config.mampHtdocs);
   const linkName = path.basename(resolvedOutput);
 
   if (!fs.existsSync(resolvedHtdocs)) {
@@ -79,8 +77,14 @@ function ensureSymlink(outputDir) {
   return linkName;
 }
 
-function ensureStandaloneCopies(outputDir, outputFile) {
-  const resolvedHtdocs = path.resolve(mampHtdocs);
+function ensureStandaloneCopies(outputDir, outputFile, config) {
+  if (!config.mampHtdocs) {
+    console.warn('[watch] MAMP htdocs is not configured, skipping standalone copies.');
+    return;
+  }
+  const resolvedHtdocs = path.resolve(config.mampHtdocs);
+  const standaloneCopyTargets = Array.isArray(config.standaloneCopyTargets) ? config.standaloneCopyTargets : [];
+  const additionalIndexCopyTargets = Array.isArray(config.additionalIndexCopyTargets) ? config.additionalIndexCopyTargets : [];
   if (!fs.existsSync(resolvedHtdocs)) {
     console.warn(`[watch] MAMP htdocs not found at ${resolvedHtdocs}, skipping standalone copies.`);
     return;
@@ -227,8 +231,8 @@ function startWatcher() {
       if (code === 0) {
         try {
           const freshConfig = readBuildConfig();
-          ensureSymlink(freshConfig.outputDir);
-          ensureStandaloneCopies(freshConfig.outputDir, freshConfig.outputFile);
+          ensureSymlink(freshConfig.outputDir, freshConfig);
+          ensureStandaloneCopies(freshConfig.outputDir, freshConfig.outputFile, freshConfig);
           refreshBrowser();
         } catch (err) {
           console.error(`[watch] Post-build step failed: ${err.message}`);

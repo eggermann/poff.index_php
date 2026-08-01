@@ -4772,6 +4772,20 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('keeps the single-file index entrypoint out of the content tree', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-single-file-root-'));
+    fs.writeFileSync(path.join(tempDir, 'index.php'), '<?php // generated entrypoint');
+    fs.writeFileSync(path.join(tempDir, 'public-note.txt'), 'hello');
+
+    try {
+      const config = JSON.parse(await runLayoutFilesystem('ensure-folder', tempDir));
+      expect(config.tree.map((item) => item.name)).toContain('public-note.txt');
+      expect(config.tree.map((item) => item.name)).not.toContain('index.php');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('renders configured virtual links without nesting viewer urls', async () => {
     const output = await runViewer('virtual-links');
 

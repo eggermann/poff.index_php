@@ -43,6 +43,7 @@ function cmsIsHiddenSystemEntry(string $entry): bool
         'edit.allow',
         '.edit.not-allow',
         'edit.not-allow',
+        'index.php',
     ], true);
 }
 

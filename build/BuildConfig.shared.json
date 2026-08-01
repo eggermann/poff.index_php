@@ -2,5 +2,25 @@
   "sourceDir": "src",
   "pagesDir": "pages",
   "siteHost": "dominikeggermann.com",
-  "outputFile": "index.php"
+  "outputFile": "index.php",
+  "mampHtdocs": "/Applications/MAMP/htdocs",
+  "standaloneCopyTargets": [
+    "MAUSMAUS",
+    "node-1",
+    "node-2",
+    "pageoff",
+    "pageoff-artist",
+    "pageoff-writer",
+    "pageoff-curator"
+  ],
+  "additionalIndexCopyTargets": [
+    {
+      "name": "dominikeggermann-project/page",
+      "cleanSubdirectories": true
+    },
+    {
+      "name": "dominikeggermann-project",
+      "cleanSubdirectories": false
+    }
+  ]
 }

@@ -1,5 +1,49 @@
 # Sprint Review
 ## Loop Reviews
+## Three-Node Loop 1 Review
+### What Changed
+- Created independent artist, writer, and curator-engineer roots under MAMP htdocs.
+- Added three compact filesystem layouts with clearly different gallery, editorial, and network-ledger looks.
+- Added existing JPEGs, three text works, neighbour `.webloc` links, a local work-copy ledger, and a curator-owned copy of the artist layout.
+- Centralized build/watcher distribution targets and added the three new roots.
+- Hid generated `index.php` from folder content trees.
+### Acceptance Criteria Result
+- [x] Three independent Pageoff nodes load.
+- [x] Three looks are visually distinct and responsive.
+- [x] Existing media/text works are used.
+- [x] Live follow/embed works between nodes.
+- [x] Local work and layout copies preserve source independence and provenance.
+- [x] Builder fixes are minimal and tested.
+- [x] Three screenshots are captured and inspected.
+### Verification Result
+- Playwright snapshots verified artist, writer, curator, embedded artist follow, and copied-layout edition.
+- Browser console: zero errors.
+- `tests/mcp.create.test.js`: 171/171 passed on MAMP PHP 8.3.14.
+- `tests/build.poffconfig.test.js`: 2/2 passed.
+- PHP lint, Node syntax, and `git diff --check` passed.
+### Issues / Gaps
+- No `npm run build` was run; generated entrypoints still contain the pre-fix source until explicit rebuild authorization.
+- Localhost is intentionally blocked by guarded remote-import SSRF policy, so local exchange used same-origin `.webloc` follow/embed and explicit copies.
+- Public `pageoff.de` deployment was not requested.
+### User Demo Notes
+- Artist: `output/playwright/three-webspaces/pageoff-artist-final.png`.
+- Writer: `output/playwright/three-webspaces/pageoff-writer-final.png`.
+- Curator: `output/playwright/three-webspaces/pageoff-curator-final.png`.
+
+## Three-Node Loop 1 Retrospective
+### What Worked
+- Three persona agents produced genuinely different visual authorship while sharing one tiny filesystem contract.
+- `.webloc` gave a clear live-follow path; copied files and `.layout` made ownership changes tangible.
+- Real browser use exposed builder duplication and the visible-entrypoint defect immediately.
+### What Was Confusing
+- Public remote-copy security correctly rejects localhost, which differs from local same-origin link embedding.
+- Runtime config hid the entrypoint for screenshots, while the permanent source fix awaits rebuild.
+### What To Improve Next Loop
+- Add explicit provenance metadata/UI for copied layouts, not only a human-readable Markdown ledger.
+- After rebuild authorization, exercise the new source end-to-end without runtime config workaround.
+### Process Decision
+- Stop: goal complete; commit/rebuild/deploy require explicit next request.
+
 ## Loop 1 Review
 ### What Changed
 - `cmsUploadActiveWorkFolderName()` now treats any existing path as a collision.

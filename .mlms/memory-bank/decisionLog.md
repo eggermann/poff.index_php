@@ -60,3 +60,30 @@ Decision:
 Copy mode accepts only public HTTP(S), disables redirects, requires asset hosts to match the export host, limits file count and bytes, sanitizes names, stages in a hidden temporary folder, and never overwrites an existing destination.
 Consequences:
 Any Poff node can offer a portable work while the receiver retains clear resource and SSRF boundaries.
+
+### D-0008: Three persona nodes remain independent and visually authored
+Status: Accepted
+Context:
+The study must demonstrate decentralization rather than three mirrored copies of one site.
+Decision:
+Create separate MAMP roots for an artist, a writer, and a curator-engineer. Share selected work or layout assets explicitly while preserving each node's own layout and attribution.
+Consequences:
+The demo can expose exchange UX honestly, compare three looks, and keep each node portable as one entrypoint plus filesystem content.
+
+### D-0009: Distribution targets belong in one shared build config
+Status: Accepted
+Context:
+PHP build and JavaScript watcher duplicated hardcoded MAMP targets, and the normal build missed the project-root target already supported by the watcher.
+Decision:
+Store MAMP root, standalone targets, and additional-index cleanup policy in `BuildConfig.shared.json`; both build paths consume the exported config.
+Consequences:
+Adding a node requires one config edit, builder and watcher stay aligned, and nested cleanup can be disabled for a parent target that must retain child entrypoints.
+
+### D-0010: The single-file entrypoint is never content
+Status: Accepted
+Context:
+New node roots exposed generated `index.php` as a public work card.
+Decision:
+Treat `index.php` as a hidden system entry during Poff tree scans.
+Consequences:
+Visitors see authored works only; single-file implementation remains portable but invisible.
