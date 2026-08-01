@@ -58,7 +58,9 @@ export function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
         }, { label: 'sidebar-toggle' });
     };
 
-    syncSidebarState(true);
+    const isNarrowViewport = typeof globalThis.matchMedia === 'function'
+        && globalThis.matchMedia('(max-width: 45rem)').matches;
+    syncSidebarState(!isNarrowViewport);
     bindEscapeClose();
 
     const onToggleClick = () => {

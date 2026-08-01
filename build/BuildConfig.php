@@ -25,10 +25,6 @@ $standaloneCopyTargets = array_values(array_filter(array_map(
 )));
 $additionalIndexCopyTargets = array_values(array_filter(array_map(
     static function (mixed $target): ?array {
-        if (is_string($target)) {
-            $name = trim($target, '/\\');
-            return $name !== '' ? ['name' => $name, 'cleanSubdirectories' => true] : null;
-        }
         if (!is_array($target)) {
             return null;
         }
@@ -51,7 +47,6 @@ return [
     'pagesDir' => __DIR__ . '/../' . $pagesDir,
     'siteHost' => $siteHost,
     'outputDir' => $outputDir,
-    // 'outputDir' => '/Applications/MAMP/htdocs/',
     'outputFile' => $outputFile,
     'mampHtdocs' => $mampHtdocs,
     'standaloneCopyTargets' => $standaloneCopyTargets,

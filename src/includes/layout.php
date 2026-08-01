@@ -76,6 +76,7 @@
                     <details id="editAuthDetails" class="edit-auth-details">
                         <summary id="editToggle" class="edit-toggle">Enable edit mode</summary>
                         <form id="editAuthForm" class="edit-form edit-auth-bubble">
+                            <input type="text" name="username" value="pageoff-editor" autocomplete="username" hidden>
                             <label class="edit-label" for="editAuthPassword">Editor password</label>
                             <input id="editAuthPassword" class="form-input" type="password" name="password" autocomplete="current-password">
                             <button id="editAuthSubmit" class="btn" type="submit">Unlock</button>

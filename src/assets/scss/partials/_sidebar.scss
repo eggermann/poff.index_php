@@ -828,4 +828,15 @@
         margin-bottom: 8px;
         padding: 0.6rem;
     }
+
+    #appSidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 11;
+        max-width: calc(100vw - 48px);
+    }
+
+    .sidebar-toggle {
+        position: fixed;
+    }
 }

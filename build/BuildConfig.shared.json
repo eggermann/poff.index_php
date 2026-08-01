@@ -11,7 +11,8 @@
     "pageoff",
     "pageoff-artist",
     "pageoff-writer",
-    "pageoff-curator"
+    "pageoff-curator",
+    "pageoff-civic"
   ],
   "additionalIndexCopyTargets": [
     {

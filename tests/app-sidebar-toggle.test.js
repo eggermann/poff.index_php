@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function loadAppHelpers() {
+function loadAppHelpers({ narrowViewport = false } = {}) {
   const constantsPath = path.join(__dirname, '..', 'src/assets/js/app/constants.js');
   const escapeStackPath = path.join(__dirname, '..', 'src/assets/js/core/escape-stack.js');
   const helpersPath = path.join(__dirname, '..', 'src/assets/js/app/helpers.js');
@@ -81,14 +81,15 @@ function loadAppHelpers() {
   };
 
   const module = { exports: {} };
-  const context = vm.createContext({
+    const context = vm.createContext({
     module,
     exports: module.exports,
     console,
     require,
     document,
     __dirname: path.dirname(helpersPath),
-    __filename: helpersPath,
+        __filename: helpersPath,
+        matchMedia: () => ({ matches: narrowViewport }),
   });
 
   vm.runInContext(`${constantsSource}
@@ -186,5 +187,17 @@ describe('app sidebar toggle wiring', () => {
     expect(appShell.classList.contains('sidebar-collapsed')).toBe(true);
     expect(appSidebar.hidden).toBe(true);
     expect(sidebarToggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  test('starts collapsed on narrow viewports', () => {
+    const mobileHelpers = loadAppHelpers({ narrowViewport: true });
+    const elements = mobileHelpers.createAppElements();
+    const controller = mobileHelpers.bindSidebarToggle(elements);
+
+    expect(controller).not.toBeNull();
+    expect(elements.appShell.classList.contains('sidebar-collapsed')).toBe(true);
+    expect(elements.appSidebar.hidden).toBe(true);
+    expect(elements.sidebarToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(elements.sidebarToggle.getAttribute('aria-label')).toBe(APP_LABELS.openNavigation);
   });
 });

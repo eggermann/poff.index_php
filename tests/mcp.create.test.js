@@ -4345,6 +4345,26 @@ describe('Worktype HBS renderer', () => {
       .toContain('DOMContentLoaded');
   });
 
+  test('uses the file name when persisted file title is blank', async () => {
+    const tempDir = path.join(POFF_DIR, `blank-viewer-title-${Date.now()}`);
+    const fileName = 'public-note.txt';
+    fs.mkdirSync(path.join(tempDir, '.works'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'Public note', 'utf8');
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.config.json`),
+      JSON.stringify({ title: '', work: { type: 'text', template: 'text' } }),
+      'utf8',
+    );
+
+    try {
+      const output = await runViewer(fileName, tempDir);
+      expect(output).toContain('public-note.txt');
+      expect(output).toContain('<title>public-note.txt</title>');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('falls back to the default layout script when a filesystem layout has no script.js', async () => {
     const tempDir = path.join(POFF_DIR, 'missing-script-layout');
     const fileName = 'poster.png';

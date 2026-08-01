@@ -1319,11 +1319,6 @@ HTML;
         return null;
     }
 
-    private static function matchesDefinition(array $definition, string $mime, string $kind, string $extension): bool
-    {
-        return self::matches($definition, $mime, $kind, $extension);
-    }
-
     private static function definitionFromRemoteSelection(array $converter): ?array
     {
         $node = is_array($converter['node'] ?? null) ? $converter['node'] : [];

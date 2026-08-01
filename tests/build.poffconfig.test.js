@@ -35,6 +35,7 @@ test('build and watcher share one distribution target config', () => {
     'pageoff-artist',
     'pageoff-writer',
     'pageoff-curator',
+    'pageoff-civic',
   ]));
   expect(config.additionalIndexCopyTargets).toContainEqual({
     name: 'dominikeggermann-project',
@@ -46,4 +47,6 @@ test('build and watcher share one distribution target config', () => {
   expect(buildSource).toContain("$config['standaloneCopyTargets']");
   expect(watcherSource).toContain('config.standaloneCopyTargets');
   expect(watcherSource).not.toContain("const standaloneCopyTargets = ['MAUSMAUS'");
+  expect(buildSource).not.toMatch(/legacy/i);
+  expect(buildSource).not.toContain('is_array($target)');
 });

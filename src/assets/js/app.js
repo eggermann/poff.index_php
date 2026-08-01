@@ -54,9 +54,6 @@ editController.setPreviewRefreshHandler(() => {
 const sidebarController = bindSidebarToggle(elements);
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (sidebarController) {
-        sidebarController.syncSidebarState(true);
-    }
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();

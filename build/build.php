@@ -12,11 +12,9 @@ require_once __DIR__ . '/PoffConfigBuilder.php';
 
 // Extract configuration
 $sourceDir = $config['sourceDir'];
-$outputDir = $config['outputDir'];
-$outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
+$outputDir = rtrim((string) $config['outputDir'], '/\\') . DIRECTORY_SEPARATOR;
 $outputFileName = $config['outputFile'];
 $outputFile = $outputDir . $outputFileName;
-$legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileName;
 $buildMode = getenv('POFF_BUILD_MODE') === 'production' ? 'production' : 'development';
 $isProductionBuild = $buildMode === 'production';
 $skipDistributionCopies = getenv('POFF_SKIP_DISTRIBUTION_COPIES') === '1';
@@ -31,11 +29,6 @@ if ($mampHtdocs === '') {
     $standaloneCopyTargets = [];
     $additionalIndexCopyTargets = [];
 }
-// Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
-if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {
-    unlink($legacyOutputFile);
-}
-
 // Ensure output directory exists
 if (!is_dir($outputDir)) {
     mkdir($outputDir, 0755, true);
@@ -632,8 +625,8 @@ PHP;
         }
 
         foreach ($additionalIndexCopyTargets as $target) {
-            $targetName = is_array($target) ? (string) ($target['name'] ?? '') : (string) $target;
-            $cleanSubdirectories = !is_array($target) || (bool) ($target['cleanSubdirectories'] ?? true);
+            $targetName = (string) $target['name'];
+            $cleanSubdirectories = (bool) $target['cleanSubdirectories'];
             $resolvedTargetDir = $mampHtdocs . DIRECTORY_SEPARATOR . trim($targetName, '/\\');
             if ($resolvedTargetDir === '') {
                 continue;

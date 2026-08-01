@@ -214,7 +214,7 @@ export function layoutOverlayState(config, status) {
             : `${isFile ? 'File layout' : 'Folder layout'}: ${resolvedDirectory}`)
         : layoutState.storage === 'shared'
             ? (layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || 'shared'}`)
-        : 'PHP built-in poff-layout';
+        : 'Built-in default';
     const inheritedLayoutLabel = hasInheritedLayout
         ? layoutState.inheritedDirectory
         : 'No parent .layout found';
@@ -222,7 +222,7 @@ export function layoutOverlayState(config, status) {
         ? `Editable source: ${originalTarget}`
         : layoutState.storage === 'shared'
             ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || 'shared'}`
-        : 'PHP built-in poff-layout is read-only until a parent .layout exists';
+        : 'Built-in default is read-only until a local .layout exists';
     const displayMode = layoutState.mode === 'filesystem-layout'
         ? (layoutState.directory === localLayoutDirectory ? 'custom-layout' : 'inherit-layout')
         : layoutState.mode;

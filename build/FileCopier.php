@@ -1,24 +1,5 @@
 <?php
 class FileCopier {
-    public static function copyFileToAllDirectories($sourceFile, $targetDir) {
-        $projectRoot = $targetDir;
-        
-        if (!file_exists($sourceFile)) {
-            throw new Exception("Source file not found: $sourceFile");
-        }
-
-        // Get all directories recursively
-        $dirs = self::findAllDirectories($projectRoot);
-        foreach ($dirs as $dir) {
-            $destination = $dir . DIRECTORY_SEPARATOR . 'index.php';
-            if (copy($sourceFile, $destination)) {
-                echo "Copied to: $destination\n";
-            } else {
-                echo "Failed to copy to: $destination\n";
-            }
-        }
-    }
-
     public static function copyFileToLayoutDirectories(string $sourceFile, string $targetDir, ?string $targetFileName = null, string $layoutDirName = '.layout'): void {
         $projectRoot = rtrim($targetDir, '/\\');
 
@@ -58,24 +39,6 @@ class FileCopier {
             } else {
                 echo "Failed to remove subdirectory entrypoint: $candidate\n";
             }
-        }
-    }
-
-    public static function copyDirectoryToAllDirectories(string $sourceDir, string $targetDir, string $targetSubdir = ''): void {
-        $projectRoot = rtrim($targetDir, '/\\');
-
-        if (!is_dir($sourceDir)) {
-            throw new Exception("Source directory not found: $sourceDir");
-        }
-
-        $dirs = array_merge([$projectRoot], self::findAllDirectories($projectRoot));
-        foreach ($dirs as $dir) {
-            $destinationDir = $dir;
-            if ($targetSubdir !== '') {
-                $destinationDir .= DIRECTORY_SEPARATOR . trim($targetSubdir, '/\\');
-            }
-
-            self::copyDirectory($sourceDir, $destinationDir);
         }
     }
 
