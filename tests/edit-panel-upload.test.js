@@ -61,11 +61,14 @@ test('Poff work source presents reduced copy and live choices', () => {
     externalOnly: false,
   });
 
-  expect(html).toContain('<option value="poff">Poff work</option>');
-  expect(html).toContain('value="copy" checked');
-  expect(html).toContain('Local copy');
-  expect(html).toContain('value="follow"');
-  expect(html).toContain('Live connection');
+  expect(html).toContain('<option value="poff">External Poff work</option>');
+  expect(html).toContain('Add work from another Pageoff page');
+  expect(html).toContain('appears here as an <b>External work</b>');
+  expect(html).toContain('value="follow" checked');
+  expect(html).toContain('External work · live');
+  expect(html).toContain('value="copy"');
+  expect(html).toContain('Local copy · fork');
+  expect(html).toContain('Later source changes do not sync.');
   expect(html).not.toContain('value="embed"');
   expect(html).not.toContain('Embed only');
   expect(html).not.toContain('id="edit-poff-create-player"');

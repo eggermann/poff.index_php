@@ -273,7 +273,8 @@ function cmsRenderNavListMarkup(array $context): string
             $isHidden = isset($item['visible']) && $item['visible'] === false;
             $approvalStatus = trim((string) ($item['approvalStatus'] ?? ''));
             $isPendingApproval = $approvalStatus === 'pending';
-            $isApprovedExternal = !empty($item['externalSubmission']) && $approvalStatus === 'approved';
+            $isApprovedExternal = !empty($item['externalWork'])
+                || (!empty($item['externalSubmission']) && $approvalStatus === 'approved');
             if ($isPendingApproval && !$navEditorAuthenticated) {
                 continue;
             }

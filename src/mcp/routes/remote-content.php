@@ -350,6 +350,7 @@ function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $s
             'remoteFeedUrl' => $sourceUrl,
             'remotePath' => trim((string) ($item['path'] ?? '')),
             'remoteKind' => trim((string) ($item['kind'] ?? $type)),
+            'externalWork' => true,
             'importedAt' => date('c'),
         ];
         $entries[] = $entry;

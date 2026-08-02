@@ -3,9 +3,48 @@
  * Upload helpers for link entries and iframe policy.
  */
 
-function cmsPendingExternalLinkLimit(): int
+function cmsExternalSubmissionSettings(array $config): array
 {
-    return 5;
+    $source = is_array($config['externalSubmissions'] ?? null) ? $config['externalSubmissions'] : [];
+    $whitelist = [];
+    foreach (is_array($source['whitelist'] ?? null) ? $source['whitelist'] : [] as $entry) {
+        if (!is_scalar($entry)) {
+            continue;
+        }
+        $candidate = trim((string) $entry);
+        if ($candidate === '') {
+            continue;
+        }
+        $parts = parse_url(str_contains($candidate, '://') ? $candidate : "https://{$candidate}");
+        $host = strtolower(trim((string) (is_array($parts) ? ($parts['host'] ?? '') : '')));
+        if ($host !== '' && !in_array($host, $whitelist, true)) {
+            $whitelist[] = $host;
+        }
+    }
+
+    return [
+        'enabled' => !empty($source['enabled']),
+        'whitelistEnabled' => array_key_exists('whitelistEnabled', $source) ? !empty($source['whitelistEnabled']) : true,
+        'whitelist' => $whitelist,
+        'maxPending' => min(20, max(1, (int) ($source['maxPending'] ?? 5))),
+    ];
+}
+
+function cmsPendingExternalLinkLimit(array $settings = []): int
+{
+    return min(20, max(1, (int) ($settings['maxPending'] ?? 5)));
+}
+
+function cmsExternalSubmissionUrlAllowed(string $url, array $settings): bool
+{
+    if (empty($settings['enabled'])) {
+        return false;
+    }
+    if (empty($settings['whitelistEnabled'])) {
+        return true;
+    }
+    $host = strtolower(trim((string) (parse_url($url, PHP_URL_HOST) ?? '')));
+    return $host !== '' && in_array($host, $settings['whitelist'] ?? [], true);
 }
 
 function cmsCountPendingExternalLinks(array $tree): int
@@ -121,8 +160,17 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
     }
 
     $pendingApproval = !empty($options['pendingApproval']);
+    $externalSettings = is_array($options['externalSubmissionSettings'] ?? null)
+        ? $options['externalSubmissionSettings']
+        : [];
+    if ($pendingApproval && empty($externalSettings['enabled'])) {
+        return cmsUploadErrorResult('This node does not accept external work submissions.');
+    }
     if ($pendingApproval && !cmsIsAllowedExternalPoffLink($target)) {
         return cmsUploadErrorResult('Only links from another Poff system are allowed. Use a viewer URL with ?view=1&path=..., ?view=1&file=..., or a hash route like #/work-name.');
+    }
+    if ($pendingApproval && !cmsExternalSubmissionUrlAllowed($target, $externalSettings)) {
+        return cmsUploadErrorResult('This Poff node is not on this host\'s external-work whitelist.');
     }
 
     $baseUrl = cmsNormalizeRemoteBaseUrl($target);
@@ -177,7 +225,7 @@ function cmsCreateLinkEntry(string $targetDir, string $label, string $linkUrl, a
         }
         unset($existingItem);
     }
-    if ($pendingApproval && cmsCountPendingExternalLinks($tree) >= cmsPendingExternalLinkLimit()) {
+    if ($pendingApproval && cmsCountPendingExternalLinks($tree) >= cmsPendingExternalLinkLimit($externalSettings)) {
         return cmsUploadErrorResult('Too many external links are waiting for approval in this folder.');
     }
 

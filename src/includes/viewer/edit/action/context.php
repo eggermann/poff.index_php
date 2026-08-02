@@ -19,7 +19,23 @@ function cmsBuildEditActionContext(): array
     $runtimeAllowDir = $runtimeTarget['dir'] ?? $runtimeRootDir;
     $editModeAllowed = cmsEditModeAllowedForDirectory((string) $runtimeAllowDir, $runtimeRootDir);
     $editorAuthenticated = cmsAuthBypassEnabled() || cmsIsEditorAuthenticated($runtimeRootDir);
-    $publicExternalLinkSubmission = $action === 'upload' && trim((string) ($data['source'] ?? '')) === 'url';
+    $isExternalLinkUpload = $action === 'upload' && trim((string) ($data['source'] ?? '')) === 'url';
+    $directExternalLinkSubmission = $isExternalLinkUpload
+        && trim((string) ($data['submissionIntent'] ?? '')) === 'external-link';
+    $publicExternalLinkSubmission = $isExternalLinkUpload;
+    $externalSubmissionSettings = [];
+    if ($publicExternalLinkSubmission && is_array($runtimeTarget) && ($runtimeTarget['type'] ?? '') === 'folder' && class_exists('PoffConfig')) {
+        $externalSubmissionSettings = cmsExternalSubmissionSettings(PoffConfig::read((string) ($runtimeTarget['dir'] ?? $runtimeRootDir)));
+        $publicExternalLinkSubmission = !empty($externalSubmissionSettings['enabled']) || $directExternalLinkSubmission;
+        if ($directExternalLinkSubmission && empty($externalSubmissionSettings['enabled'])) {
+            $externalSubmissionSettings = [
+                'enabled' => true,
+                'whitelistEnabled' => false,
+                'whitelist' => [],
+                'maxPending' => 5,
+            ];
+        }
+    }
 
     if ($action === 'auth') {
         return [
@@ -97,5 +113,6 @@ function cmsBuildEditActionContext(): array
         'folderViewData' => $folderViewData,
         'editorAuthenticated' => $editorAuthenticated,
         'publicExternalLinkSubmission' => $publicExternalLinkSubmission,
+        'externalSubmissionSettings' => $externalSubmissionSettings,
     ];
 }

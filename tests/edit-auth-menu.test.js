@@ -315,6 +315,59 @@ describe('edit auth disclosure', () => {
     expect(openUploadDialogButton.clickCalled).toBe(true);
   });
 
+  test('guest add work button explains when external submissions are disabled', () => {
+    const documentMock = {
+      getElementById() {
+        return null;
+      },
+      querySelector() {
+        return null;
+      },
+    };
+    const { createEditController } = loadEditController(documentMock, {
+      setStatusMessage(element, message) {
+        element.textContent = message;
+      },
+    });
+    const editAddWork = Object.assign(Object.create(HTMLButtonElement.prototype), {
+      addEventListener(type, handler) {
+        this.listener = handler;
+      },
+    });
+    const editAuthDetails = createElementMock();
+    const editAuthStatus = createElementMock();
+
+    const controller = createEditController({
+      elements: {
+        editPanel: null,
+        editDrawer: null,
+        editAuthDetails,
+        editToggle: null,
+        editAddWork,
+        editAuthForm: null,
+        editAuthPassword: null,
+        editAuthSubmit: null,
+        editAuthStatus,
+      },
+      context: {
+        currentPoffConfig: { externalSubmissions: { enabled: false } },
+        cmsAuth: {
+          configured: true,
+          authenticated: false,
+          editModeAllowed: true,
+          canEdit: false,
+        },
+      },
+      editRequested: true,
+    });
+
+    controller.bindAddWorkButton();
+    editAddWork.listener();
+
+    expect(editAuthDetails.open).toBe(true);
+    expect(editAuthStatus.textContent).toBe('This node is not accepting external work submissions.');
+  });
+
   test('jump to section button scrolls to the visible edit surface', () => {
     const editActionsMenu = {
       scrollCalls: [],
@@ -859,6 +912,101 @@ test('saving a selected converter persists converter work config even without ex
     quality: 'default',
     saveMode: 'new-hidden-work',
   }));
+});
+
+test('reusing a compatible remote work presentation requests atomic HBS CSS and JS copy', async () => {
+  let capturedPanelOptions = null;
+  let requestedRoute = null;
+  let requestedPayload = null;
+  const editPanel = {
+    querySelector() {
+      return null;
+    },
+  };
+  const auth = {
+    configured: true,
+    authenticated: true,
+    editModeAllowed: true,
+    canEdit: true,
+  };
+
+  const { createEditController } = loadEditController(null, {
+    requestEditAuth: async () => ({ auth }),
+    requestEditConfig: async () => ({
+        auth,
+        allowed: true,
+        target: 'file',
+        subjectTarget: 'file',
+        routePath: 'photo.jpg',
+        config: {
+          kind: 'image',
+          mimeType: 'image/jpeg',
+          work: {},
+        },
+    }),
+    requestMcpRoute: async (route, payload) => {
+      requestedRoute = route;
+      requestedPayload = payload;
+      return {
+        ok: true,
+        copied: true,
+        backupPath: '.works/photo.jpg.layout.history/backup',
+      };
+    },
+    getActiveSelection: () => ({
+      path: 'photo.jpg',
+      previewPath: 'photo.jpg',
+      previewIsFile: true,
+      isFile: true,
+      isLayout: false,
+    }),
+    getEditTargetPath: () => 'photo.jpg',
+    renderEditPanel(options) {
+      capturedPanelOptions = options;
+      return { statusEl: null, promptRoot: null };
+    },
+  });
+
+  const controller = createEditController({
+    elements: {
+      editPanel,
+      editDrawer: null,
+      editAuthDetails: null,
+      editToggle: null,
+      editAddWork: null,
+      editAuthForm: null,
+      editAuthPassword: null,
+      editAuthSubmit: null,
+      editAuthStatus: null,
+    },
+    context: {
+      currentPoffConfig: null,
+      cmsAuth: auth,
+    },
+    editRequested: true,
+  });
+
+  await controller.initEditMode();
+  await capturedPanelOptions.onApplyRemotePresentation({
+    statusEl: { textContent: '' },
+    offer: {
+      compatible: true,
+      localPresentation: { hasPresentation: true },
+      remote: {
+        url: 'https://pageoff.de/gallery/?view=1&file=hero.jpg',
+        title: 'Fullscreen image',
+        mimeType: 'image/jpeg',
+      },
+    },
+  });
+
+  expect(requestedRoute).toBe('remote-work-presentation');
+  expect(requestedPayload).toEqual({
+    path: 'photo.jpg',
+    url: 'https://pageoff.de/gallery/?view=1&file=hero.jpg',
+    action: 'copy',
+    confirmReplace: true,
+  });
 });
 
 test('init edit mode refreshes preview when a file already has a selected converter', async () => {

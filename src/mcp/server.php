@@ -20,6 +20,7 @@ require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/edit-config.php';
 require_once __DIR__ . '/routes/prompt-template.php';
 require_once __DIR__ . '/routes/remote-content.php';
+require_once __DIR__ . '/routes/remote-presentation.php';
 require_once __DIR__ . '/routes/converters.php';
 require_once __DIR__ . '/routes/convert.php';
 require_once __DIR__ . '/routes/converter-network.php';
@@ -78,6 +79,11 @@ switch ($route) {
             'mode' => (string) ($remoteInput['mode'] ?? 'follow'),
             'destinationName' => (string) ($remoteInput['destinationName'] ?? ''),
             'createPlayer' => (bool) ($remoteInput['createPlayer'] ?? false),
+        ]));
+    case 'remote-work-presentation':
+        mcpJsonResponse(handleRemoteWorkPresentation([
+            'rootDir' => $rootDir,
+            'input' => mcpReadRequestData(),
         ]));
     case 'converters':
         mcpJsonResponse(handleConverters([

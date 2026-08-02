@@ -215,7 +215,7 @@ test('pending external links stay hidden from visitors and show review state for
   }
 });
 
-test('approved external links expose direct preview urls in sidebar markup', () => {
+test('approved submissions and live external works expose external identity in sidebar markup', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-nav-external-'));
   try {
     fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
@@ -235,6 +235,15 @@ test('approved external links expose direct preview urls in sidebar markup', () 
           externalSubmission: true,
           approvalStatus: 'approved',
         },
+        {
+          name: 'followed-work',
+          slug: 'followed-work',
+          type: 'file',
+          path: 'followed-work',
+          pageLink: 'https://artist.example/index.php?view=1&file=portrait.jpg',
+          visible: true,
+          externalWork: true,
+        },
       ],
     }, null, 2), 'utf8');
 
@@ -248,6 +257,8 @@ test('approved external links expose direct preview urls in sidebar markup', () 
     expect(result.stdout).toContain('data-path="remote-link"');
     expect(result.stdout).toContain('data-view-url="https://remote.example/index.php?view=1&amp;path=portfolio"');
     expect(result.stdout).toContain('nav-link-approved-external');
+    expect(result.stdout).toContain('data-path="followed-work"');
+    expect(result.stdout).toContain('external</span>');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

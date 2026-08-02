@@ -32,7 +32,7 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
-                            <option value="poff">Poff work</option>
+                            <option value="poff">External Poff work</option>
                             <option value="url">Web link</option>
                         </select>
                     </div>
@@ -91,8 +91,12 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                         <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/?view=1&path=folder">
                     </div>
                     <div class="edit-poff-takeover" id="editPoffTakeoverWrap" hidden>
+                        <div class="edit-poff-social-note">
+                            <strong>Add work from another Pageoff page</strong>
+                            <span>Paste its public work or collection URL. It appears here as an <b>External work</b>, while source creator keeps files and layout.</span>
+                        </div>
                         <div>
-                            <label class="edit-label" for="edit-poff-url">Poff work URL</label>
+                            <label class="edit-label" for="edit-poff-url">Remote Poff work URL</label>
                             <div class="edit-poff-url-row">
                                 <input class="form-input" id="edit-poff-url" type="url" name="poff_url" placeholder="https://pageoff.de/?path=collection">
                                 <span class="edit-poff-node" id="editPoffNode"><i></i>Poff node</span>
@@ -102,17 +106,17 @@ export function renderUploadSectionHtml({ isFileTarget, isEmptyFolder, externalO
                             <legend class="edit-label">Use mode</legend>
                             <div class="edit-poff-primary-modes">
                                 <label class="edit-poff-mode">
-                                    <input type="radio" name="poff_takeover_mode" value="copy" checked>
-                                    <span><strong>Local copy</strong><small>Own files. Video collections become looping players.</small></span>
+                                    <input type="radio" name="poff_takeover_mode" value="follow" checked>
+                                    <span><strong>External work · live</strong><small>Show it on this page. Source files and template stay remote; source changes appear here.</small></span>
                                     <em>Recommended</em>
                                 </label>
                                 <label class="edit-poff-mode">
-                                    <input type="radio" name="poff_takeover_mode" value="follow">
-                                    <span><strong>Live connection</strong><small>No file copy. Changes stay on source node.</small></span>
+                                    <input type="radio" name="poff_takeover_mode" value="copy">
+                                    <span><strong>Local copy · fork</strong><small>Copy files here for independent editing. Later source changes do not sync.</small></span>
                                 </label>
                             </div>
                         </fieldset>
-                        <div class="edit-poff-copy-options" id="editPoffCopyOptions">
+                        <div class="edit-poff-copy-options" id="editPoffCopyOptions" hidden>
                             <div>
                                 <label class="edit-label" for="edit-poff-destination">Folder name <span class="edit-label-optional">optional</span></label>
                                 <input class="form-input" id="edit-poff-destination" type="text" name="poff_destination" placeholder="Use remote work title">
@@ -224,7 +228,7 @@ export function bindUploadDialog({
             uploadSummaryEl.textContent = sourceUrl
                 ? (takeoverMode === 'copy'
                     ? `${poffNodeLabel()} → ${destination} → player or converter when needed.`
-                    : `Live connection: ${poffNodeLabel()}.`)
+                    : `External work: ${poffNodeLabel()} → shown on this page. Source stays remote and updates live.`)
                 : 'Paste a public Poff work URL.';
             return;
         }
@@ -300,7 +304,7 @@ export function bindUploadDialog({
                     : mode === 'url'
                         ? (externalOnly ? 'Submit for review' : 'Add link')
                     : mode === 'poff'
-                        ? (takeoverMode === 'copy' ? 'Copy work' : 'Connect work')
+                        ? (takeoverMode === 'copy' ? 'Create local copy' : 'Add external work')
                     : 'Upload';
         }
         if (poffCopyOptionsEl) {
@@ -445,6 +449,7 @@ export function bindUploadDialog({
                         source,
                         linkName,
                         linkUrl,
+                        submissionIntent: externalOnly ? 'external-link' : '',
                         saveTarget: readSaveTarget(),
                         statusEl,
                         closeDialog: closeUploadDialog,

@@ -10,7 +10,7 @@ import {
 } from './categories.js';
 import { renderPersistentDetailsSection } from './shared.js';
 
-export const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
+export const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter', 'presentationSource']);
 export const PASSWORD_DETAILS_STORAGE_KEY = 'password-details';
 
 function renderMediaTypeOptions(selectedValue = '', catalog = null) {
@@ -208,6 +208,58 @@ export function renderWorkConfigFieldsSection(config = {}) {
                 `).join('')}
             </div>
             ` : ''}
+        </div>
+    `;
+}
+
+export function renderRemoteWorkPresentationSection(config = {}) {
+    const work = config?.work && typeof config.work === 'object' ? config.work : {};
+    const layout = work?.layout && typeof work.layout === 'object' ? work.layout : {};
+    const source = work?.presentationSource && typeof work.presentationSource === 'object' ? work.presentationSource : {};
+    const localLayoutDirectory = `.works/${String(config?.name || config?.path || 'item').split('/').pop()}.layout`;
+    const hasLocalPresentation = String(layout.sectionDirectory || '').trim() === localLayoutDirectory || Boolean(source.url);
+    const sourceUrl = String(source.url || '').trim();
+    const sourceTitle = String(source.title || '').trim();
+    return `
+        <div class="edit-work-fields edit-remote-presentation">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Reuse complete work presentation</div>
+                    <div class="small-note">Copy <code>work.hbs</code>, <code>style.css</code>, and <code>script.js</code> from another file work. Your local media stays unchanged.</div>
+                </div>
+            </div>
+            ${sourceUrl ? `
+            <div class="edit-remote-presentation-current">
+                <span>Current presentation source:</span>
+                <a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceTitle || sourceUrl)}</a>
+            </div>
+            ` : ''}
+            <div class="edit-remote-presentation-check">
+                <div>
+                    <label class="edit-label" for="edit-remote-presentation-url">Remote file-work URL</label>
+                    <input class="form-input" id="edit-remote-presentation-url" type="url" value="${escapeHtml(sourceUrl)}" placeholder="https://pageoff.de/?view=1&file=works%2Fimage.jpg">
+                    <div class="small-note">Poff checks file type and all three presentation files. Existing local presentation files are backed up, then replaced together.</div>
+                </div>
+                <button class="btn btn-secondary" type="button" id="editCheckRemotePresentation">Check presentation</button>
+            </div>
+            <div class="edit-status" id="editRemotePresentationStatus"></div>
+            <div class="edit-remote-presentation-offer" id="editRemotePresentationOffer" role="status" hidden>
+                <div class="edit-remote-presentation-offer-head">
+                    <span class="edit-remote-presentation-offer-dot" aria-hidden="true"></span>
+                    <div>
+                        <strong id="editRemotePresentationOfferTitle">Remote presentation</strong>
+                        <small id="editRemotePresentationOfferMeta"></small>
+                    </div>
+                </div>
+                <a id="editRemotePresentationSource" target="_blank" rel="noopener noreferrer">View source work</a>
+                <div class="edit-remote-presentation-conflict" id="editRemotePresentationConflict" hidden></div>
+                <div class="edit-remote-presentation-files">
+                    <details><summary id="editRemotePresentationHbsMeta">work.hbs</summary><pre><code id="editRemotePresentationHbs"></code></pre></details>
+                    <details><summary id="editRemotePresentationCssMeta">style.css</summary><pre><code id="editRemotePresentationCss"></code></pre></details>
+                    <details><summary id="editRemotePresentationJsMeta">script.js</summary><pre><code id="editRemotePresentationJs"></code></pre></details>
+                </div>
+                <button class="btn" type="button" id="editApplyRemotePresentation" disabled>${hasLocalPresentation ? 'Replace complete presentation' : 'Copy complete presentation'}</button>
+            </div>
         </div>
     `;
 }

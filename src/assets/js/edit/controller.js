@@ -281,6 +281,14 @@ export function createEditController({ elements, context, editRequested }) {
             }
 
             if (editRequested) {
+                const externalSubmissionsEnabled = currentPoffConfig?.externalSubmissions?.enabled === true;
+                if (!authState.canEdit && !externalSubmissionsEnabled) {
+                    if (editAuthDetails) {
+                        editAuthDetails.open = true;
+                    }
+                    setStatusMessage(editAuthStatus, 'This node is not accepting external work submissions.');
+                    return;
+                }
                 let attempts = 0;
                 const maxAttempts = 24;
                 const openWhenReady = () => {
@@ -725,6 +733,8 @@ export function createEditController({ elements, context, editRequested }) {
                     true
                 );
             },
+            onInspectRemotePresentation: panelActions.onInspectRemotePresentation,
+            onApplyRemotePresentation: panelActions.onApplyRemotePresentation,
             onResetFolderWork: panelActions.onResetFolderWork,
             onReturnToWork: panelActions.onReturnToWork,
             onSubmitLayout: panelActions.onSubmitLayout,

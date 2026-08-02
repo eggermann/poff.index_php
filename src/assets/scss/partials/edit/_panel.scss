@@ -142,6 +142,21 @@
     border-radius: var(--poff-control-radius-lg);
     background: var(--poff-color-surface-primary);
 }
+.edit-external-submissions {
+    display: grid;
+    gap: var(--poff-space-sm);
+    margin: 0;
+    padding: var(--poff-space-sm);
+    border: 1px solid var(--poff-color-border-primary-strong);
+    border-radius: var(--poff-control-radius-lg);
+    background: var(--poff-color-surface-primary);
+}
+.edit-external-submissions-options {
+    display: grid;
+    gap: var(--poff-space-sm);
+    padding-top: var(--poff-space-xs);
+    border-top: 1px solid var(--poff-color-border-primary);
+}
 .edit-poff-register .small-note {
     margin-top: 0.2rem;
 }
@@ -547,6 +562,23 @@
     grid-column: 1 / -1;
     gap: var(--poff-space-md);
 }
+.edit-poff-social-note {
+    display: grid;
+    gap: var(--poff-space-3xs);
+    padding: var(--poff-space-sm);
+    border-left: 3px solid var(--poff-color-primary-500);
+    border-radius: 0 var(--poff-control-radius-lg) var(--poff-control-radius-lg) 0;
+    background: var(--poff-color-surface-primary);
+}
+.edit-poff-social-note strong {
+    color: var(--poff-color-text);
+    font-size: var(--poff-font-size-sm);
+}
+.edit-poff-social-note span {
+    color: var(--poff-color-text-secondary);
+    font-size: var(--poff-font-size-xs);
+    line-height: 1.45;
+}
 .edit-poff-url-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -669,6 +701,87 @@
     align-items: end;
     gap: var(--poff-space-sm);
 }
+.edit-remote-presentation-check {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--poff-space-sm);
+}
+.edit-remote-presentation-current,
+.edit-remote-presentation-offer-head {
+    display: flex;
+    align-items: center;
+    gap: var(--poff-space-xs);
+}
+.edit-remote-presentation-current {
+    flex-wrap: wrap;
+    font-size: var(--poff-font-size-xs);
+}
+.edit-remote-presentation-offer {
+    display: grid;
+    gap: var(--poff-space-sm);
+    padding: var(--poff-space-sm);
+    border: 1px solid var(--poff-color-border);
+    border-radius: var(--poff-control-radius-lg);
+    background: var(--poff-color-surface-secondary);
+}
+.edit-remote-presentation-offer[hidden],
+.edit-remote-presentation-conflict[hidden] {
+    display: none;
+}
+.edit-remote-presentation-offer.is-compatible {
+    border-color: var(--poff-color-border-success);
+    background: var(--poff-color-surface-success);
+}
+.edit-remote-presentation-offer.is-incompatible {
+    border-color: var(--poff-color-danger-200);
+}
+.edit-remote-presentation-offer-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--poff-color-border-strong);
+}
+.edit-remote-presentation-offer.is-compatible .edit-remote-presentation-offer-dot {
+    background: var(--poff-color-success-600);
+    box-shadow: var(--poff-shadow-success-dot);
+}
+.edit-remote-presentation-offer small {
+    display: block;
+    margin-top: var(--poff-space-3xs);
+    color: var(--poff-color-text-secondary);
+}
+.edit-remote-presentation-offer details summary {
+    width: fit-content;
+    cursor: pointer;
+    font-size: var(--poff-font-size-xs);
+    font-weight: 800;
+}
+.edit-remote-presentation-offer pre {
+    overflow: auto;
+    max-height: 14rem;
+    margin: var(--poff-space-xs) 0 0;
+    padding: var(--poff-space-sm);
+    border-radius: var(--poff-control-radius-md);
+    color: var(--poff-color-neutral-100);
+    background: var(--poff-color-neutral-900);
+    font-size: var(--poff-font-size-xs);
+    white-space: pre-wrap;
+}
+.edit-remote-presentation-conflict {
+    padding: var(--poff-space-sm);
+    border: 1px solid var(--poff-color-warning-300);
+    border-radius: var(--poff-control-radius-md);
+    color: var(--poff-color-warning-900);
+    background: var(--poff-color-warning-100);
+    font-size: var(--poff-font-size-xs);
+    font-weight: 700;
+}
+.edit-remote-presentation-files {
+    display: grid;
+    gap: var(--poff-space-xs);
+}
 @media (max-width: 720px) {
     .edit-poff-primary-modes,
     .edit-converter-primary,
@@ -678,5 +791,8 @@
     .edit-poff-register {
         align-items: stretch;
         flex-direction: column;
+    }
+    .edit-remote-presentation-check {
+        grid-template-columns: 1fr;
     }
 }

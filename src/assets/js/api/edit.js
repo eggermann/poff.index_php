@@ -281,6 +281,9 @@ export async function requestEditUpload(payload) {
     if (typeof payload.linkUrl === 'string') {
         formData.set('linkUrl', payload.linkUrl);
     }
+    if (payload.submissionIntent === 'external-link') {
+        formData.set('submissionIntent', 'external-link');
+    }
     if (typeof payload.contents === 'string') {
         formData.set('contents', payload.contents);
     }

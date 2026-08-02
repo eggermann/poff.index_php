@@ -43,6 +43,7 @@ function cmsHandleEditUploadAction(array $ctx): void
                 'htaccessDir' => $rootDir,
                 'categories' => $data['categories'] ?? [],
                 'poffNode' => $data['poffNode'] ?? [],
+                'externalSubmissionSettings' => $ctx['externalSubmissionSettings'] ?? [],
             ]
         ),
         default => function () use ($targetDir, $uploadTarget): array {

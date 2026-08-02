@@ -155,6 +155,17 @@ export function createPanelActions({
                 title: (elements.title?.value || '').trim(),
                 description: (elements.description?.value || '').trim(),
             };
+            if (elements.external_submissions_enabled) {
+                payload.externalSubmissions = {
+                    enabled: !!elements.external_submissions_enabled.checked,
+                    whitelistEnabled: !!elements.external_submissions_whitelist_enabled?.checked,
+                    whitelist: String(elements.external_submissions_whitelist?.value || '')
+                        .split(/\r?\n|,/)
+                        .map((item) => item.trim())
+                        .filter(Boolean),
+                    maxPending: Number(elements.external_submissions_max?.value || 5),
+                };
+            }
             if (mediaWork && typeof mediaWork === 'object' && Object.keys(mediaWork).length > 0) {
                 payload.work = materializeWorkFields(mediaWork);
             }
@@ -174,6 +185,41 @@ export function createPanelActions({
             setDrawerOpen(false);
             syncDrawerVisibility();
             window.location.hash = `#/${nextPath}`;
+        },
+        onInspectRemotePresentation: async ({ sourceUrl }) => {
+            const selection = getSelection();
+            const targetPath = getEditTargetPath(selection);
+            if (!targetPath || !sourceUrl) {
+                throw new Error('Enter a remote file-work URL.');
+            }
+            const data = await requestMcpRoute('remote-work-presentation', {
+                path: targetPath,
+                url: sourceUrl,
+                action: 'inspect',
+            });
+            if (!data || data.ok === false || data.error) {
+                throw new Error(data?.error || 'Remote work presentation unavailable.');
+            }
+            return data;
+        },
+        onApplyRemotePresentation: async ({ offer }) => {
+            const selection = getSelection();
+            const targetPath = getEditTargetPath(selection);
+            const sourceUrl = String(offer?.remote?.url || '').trim();
+            if (!targetPath || offer?.compatible !== true || !sourceUrl) {
+                throw new Error('Compatible remote work presentation required.');
+            }
+            const result = await requestMcpRoute('remote-work-presentation', {
+                path: targetPath,
+                url: sourceUrl,
+                action: 'copy',
+                confirmReplace: offer?.localPresentation?.hasPresentation === true,
+            });
+            if (!result || result.ok === false || result.error) {
+                throw new Error(result?.error || 'Copying complete work presentation failed.');
+            }
+            await refreshCurrentEditState(selection, { forcePreviewRefresh: true });
+            return result;
         },
         onConvertWork: async ({
             statusEl,
@@ -483,13 +529,14 @@ export function createPanelActions({
             }
             window.dispatchEvent(new CustomEvent('poff:content-updated'));
         },
-        onCreateLink: async ({ source, linkName, linkUrl, saveTarget, closeDialog }) => {
+        onCreateLink: async ({ source, linkName, linkUrl, submissionIntent, saveTarget, closeDialog }) => {
             const selection = getSelection();
             const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                 source,
                 linkName,
                 fileName: linkName,
                 linkUrl,
+                submissionIntent,
                 saveTarget,
                 files: [],
             }));
@@ -540,7 +587,7 @@ export function createPanelActions({
             if (inlineStatus) {
                 const message = takeoverMode === 'copy'
                     ? `Copied ${data.copiedCount || 0} files into ${data.destinationPath || data.destinationName || 'a local folder'}${data.playerCreated ? ' and created a looping player' : ''}.`
-                    : `Following ${data.importedCount || 0} entries from the remote Poff node.`;
+                    : `Added ${data.importedCount || 0} external ${data.importedCount === 1 ? 'work' : 'works'}. Source files and layout stay remote; updates remain live.`;
                 setStatusMessage(inlineStatus, message, true);
             }
             if (takeoverMode === 'copy' && data.destinationPath) {

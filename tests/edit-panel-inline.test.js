@@ -9,7 +9,7 @@ function loadRenderEditPanel(overrides = {}) {
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
-  const reservedKeys = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
+  const reservedKeys = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter', 'presentationSource']);
   const context = vm.createContext({
     module,
     exports: module.exports,
@@ -96,6 +96,9 @@ function loadRenderEditPanel(overrides = {}) {
     },
     renderWorkConfigFieldsSection() {
       return '';
+    },
+    renderRemoteWorkPresentationSection() {
+      return '<div class="edit-remote-presentation">Reuse complete work presentation</div>';
     },
     renderConverterSection(config = {}) {
       const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
@@ -161,7 +164,7 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     .replace(/export function /g, 'function ');
 
   const module = { exports: {} };
-  const reservedKeys = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
+  const reservedKeys = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter', 'presentationSource']);
   const context = vm.createContext({
     module,
     exports: module.exports,
@@ -248,6 +251,9 @@ function loadRenderEditPanelWithHooks(overrides = {}) {
     },
     renderWorkConfigFieldsSection() {
       return '';
+    },
+    renderRemoteWorkPresentationSection() {
+      return '<div class="edit-remote-presentation">Reuse complete work presentation</div>';
     },
     renderConverterSection(config = {}) {
       const available = Array.isArray(config?.converterCatalog?.available) ? config.converterCatalog.available : [];
@@ -316,6 +322,99 @@ function createEditPanel() {
   };
 }
 
+test('guest host with external submissions enabled renders URL-only submission flow', () => {
+  const renderEditPanel = loadRenderEditPanelWithHooks({
+    renderUploadSectionHtml(options) {
+      return options.externalOnly ? '<div id="publicExternalUpload">URL submission</div>' : '';
+    },
+  });
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: { tree: [], externalSubmissions: { enabled: true } },
+    status: { target: 'folder', auth: { canEdit: false, editModeAllowed: true } },
+    onUploadFiles() {}, onCreateBlankFile() {}, onCreateFolder() {}, onCreateLink() {}, onImportRemote() {},
+  });
+
+  expect(editPanel.innerHTML).toContain('Submit external work');
+  expect(editPanel.innerHTML).toContain('publicExternalUpload');
+});
+
+test('guest host without opt-in keeps editor login flow', () => {
+  const renderEditPanel = loadRenderEditPanel();
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: { tree: [] },
+    status: { target: 'folder', auth: { canEdit: false, editModeAllowed: true } },
+  });
+
+  expect(editPanel.innerHTML).toContain('Enter the editor password to unlock editing.');
+  expect(editPanel.innerHTML).not.toContain('Submit external work');
+});
+
+test('guest add=url intent cannot bypass host opt-in', () => {
+  let bindUploadDialogArgs = null;
+  const renderEditPanel = loadRenderEditPanelWithHooks({
+    window: {
+      location: { href: 'http://example.test/?edit=true&add=url' },
+      prompt() { return null; },
+      confirm() { return false; },
+    },
+    renderUploadSectionHtml(options) {
+      return options.externalOnly ? '<div id="directExternalUpload">URL submission</div>' : '';
+    },
+    bindUploadDialog(args) {
+      bindUploadDialogArgs = args;
+    },
+  });
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: { tree: [] },
+    status: { target: 'folder', auth: { canEdit: false, editModeAllowed: true } },
+    onUploadFiles() {}, onCreateBlankFile() {}, onCreateFolder() {}, onCreateLink() {}, onImportRemote() {},
+  });
+
+  expect(editPanel.innerHTML).toContain('Enter the editor password to unlock editing.');
+  expect(editPanel.innerHTML).not.toContain('Submit external work');
+  expect(editPanel.innerHTML).not.toContain('directExternalUpload');
+  expect(bindUploadDialogArgs).toBeNull();
+});
+
+test('editor configures external work opt-in, whitelist, and pending limit', () => {
+  const renderEditPanel = loadRenderEditPanel();
+  const editPanel = createEditPanel();
+
+  renderEditPanel({
+    editPanel,
+    editRequested: true,
+    config: {
+      title: 'Host node',
+      tree: [],
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['artist.example'],
+        maxPending: 4,
+      },
+    },
+    status: { allowed: true, target: 'folder', auth: { canEdit: true, editModeAllowed: true } },
+    onUploadFiles() {}, onCreateBlankFile() {}, onCreateFolder() {}, onCreateLink() {}, onImportRemote() {},
+  });
+
+  expect(editPanel.innerHTML).toContain('Allow external work');
+  expect(editPanel.innerHTML).toContain('Use host whitelist');
+  expect(editPanel.innerHTML).toContain('artist.example');
+  expect(editPanel.innerHTML).toContain('value="4"');
+});
+
 function loadConverterSectionHelpers() {
   const filePath = path.join(__dirname, '..', 'src', 'assets', 'js', 'edit', 'panel', 'inline-sections.js');
   const source = fs.readFileSync(filePath, 'utf8')
@@ -364,7 +463,7 @@ function loadConverterSectionHelpers() {
   });
 
   vm.runInContext(`${source}
-module.exports = { readMediaConfigFromForm, renderConverterSection };
+module.exports = { readMediaConfigFromForm, renderConverterSection, renderRemoteWorkPresentationSection };
 `, context);
   return module.exports;
 }
@@ -410,6 +509,31 @@ test('converter section loads offers from an external Poff node', () => {
   expect(html).toContain('Offers load automatically when URL changes.');
   expect(html).toContain('data-converter-engine="remote-node"');
   expect(html).toContain('data-converter-node="{&quot;id&quot;:&quot;provider&quot;');
+});
+
+test('remote work presentation section explains atomic HBS CSS and JS replacement', () => {
+  const { renderRemoteWorkPresentationSection } = loadConverterSectionHelpers();
+  const html = renderRemoteWorkPresentationSection({
+    name: 'local-image.jpg',
+    work: {
+      type: 'image',
+      layout: {
+        sectionDirectory: '.works/local-image.jpg.layout',
+      },
+      presentationSource: {
+        url: 'https://artist.example/?view=1&file=fullscreen.jpg',
+        title: 'Fullscreen image',
+      },
+    },
+  });
+
+  expect(html).toContain('Reuse complete work presentation');
+  expect(html).toContain('<code>work.hbs</code>, <code>style.css</code>, and <code>script.js</code>');
+  expect(html).toContain('Your local media stays unchanged.');
+  expect(html).toContain('id="editCheckRemotePresentation"');
+  expect(html).toContain('id="editApplyRemotePresentation" disabled>Replace complete presentation</button>');
+  expect(html).toContain('Current presentation source:');
+  expect(html).toContain('Fullscreen image');
 });
 
 test('remote converter selection preserves provider routing metadata', () => {

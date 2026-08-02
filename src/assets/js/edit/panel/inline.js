@@ -21,6 +21,7 @@ import {
     renderConverterSection,
     renderDirectFileLink,
     renderPasswordChangeSection,
+    renderRemoteWorkPresentationSection,
     renderWorkConfigFieldsSection,
 } from './inline-sections.js';
 import { createWorkFieldEditor } from './inline-work-fields.js';
@@ -40,6 +41,43 @@ function renderPoffRegistrationSection(config, isFileTarget) {
             </div>
             <button class="btn btn-secondary" type="button" id="editRegisterPoff">Register with Poff</button>
         </div>
+    `;
+}
+
+function renderExternalSubmissionsSection(config, isFileTarget) {
+    if (isFileTarget) {
+        return '';
+    }
+    const settings = config?.externalSubmissions && typeof config.externalSubmissions === 'object'
+        ? config.externalSubmissions
+        : {};
+    const enabled = settings.enabled === true;
+    const whitelistEnabled = settings.whitelistEnabled !== false;
+    const whitelist = Array.isArray(settings.whitelist) ? settings.whitelist.join('\n') : '';
+    const maxPending = Math.min(20, Math.max(1, Number(settings.maxPending || 5)));
+    return `
+        <fieldset class="edit-external-submissions">
+            <legend class="edit-work-fields-title">External work submissions</legend>
+            <label class="edit-inline-toggle" for="edit-external-submissions-enabled">
+                <input id="edit-external-submissions-enabled" type="checkbox" name="external_submissions_enabled"${enabled ? ' checked' : ''}>
+                <span><strong>Allow external work</strong><small>Visitors may submit a Pageoff work URL. It stays hidden until you approve it in Settings.</small></span>
+            </label>
+            <div class="edit-external-submissions-options"${enabled ? '' : ' hidden'}>
+                <label class="edit-inline-toggle" for="edit-external-submissions-whitelist-enabled">
+                    <input id="edit-external-submissions-whitelist-enabled" type="checkbox" name="external_submissions_whitelist_enabled"${whitelistEnabled ? ' checked' : ''}>
+                    <span><strong>Use host whitelist</strong><small>Only accept URLs from listed Pageoff hosts.</small></span>
+                </label>
+                <div id="editExternalWhitelistWrap"${whitelistEnabled ? '' : ' hidden'}>
+                    <label class="edit-label" for="edit-external-submissions-whitelist">Allowed hosts</label>
+                    <textarea class="form-textarea" id="edit-external-submissions-whitelist" name="external_submissions_whitelist" rows="3" placeholder="pageoff.de&#10;artist.example">${escapeHtml(whitelist)}</textarea>
+                    <div class="small-note">One hostname per line. No path needed.</div>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-external-submissions-max">Maximum pending submissions</label>
+                    <input class="form-input" id="edit-external-submissions-max" type="number" name="external_submissions_max" min="1" max="20" value="${maxPending}">
+                </div>
+            </div>
+        </fieldset>
     `;
 }
 
@@ -71,6 +109,8 @@ export function renderEditPanel({
     onConvertWork,
     onCreateConverter,
     onLoadConverterNode,
+    onInspectRemotePresentation,
+    onApplyRemotePresentation,
 }) {
     if (!editPanel) {
         syncPromptDock();
@@ -81,7 +121,40 @@ export function renderEditPanel({
         syncPromptDock();
         return { statusEl: null, promptRoot: null };
     }
+    const canRenderPublicExternalSubmission = !status?.auth?.canEdit
+        && status?.auth?.editModeAllowed !== false
+        && status?.target !== 'file'
+        && config?.externalSubmissions?.enabled === true;
     editPanel.hidden = false;
+    if (canRenderPublicExternalSubmission) {
+        const treeItems = Array.isArray(config?.tree) ? config.tree : [];
+        const uploadSectionHtml = renderUploadSectionHtml({
+            isFileTarget: false,
+            isEmptyFolder: treeItems.length === 0,
+            externalOnly: true,
+            showLauncher: true,
+            activeWorkName,
+        });
+        editPanel.innerHTML = `
+            <h3 class="edit-panel-title">Submit external work</h3>
+            <div class="edit-status" id="editInlineStatus">This host reviews every submission before publishing it.</div>
+            ${uploadSectionHtml}
+        `;
+        const statusEl = editPanel.querySelector('#editInlineStatus');
+        bindUploadDialog({
+            editPanel,
+            statusEl,
+            uploadLimits: status?.uploadLimits || null,
+            externalOnly: true,
+            onUploadFiles,
+            onCreateBlankFile,
+            onCreateFolder,
+            onCreateLink,
+            onImportRemote,
+        });
+        syncPromptDock();
+        return { statusEl, promptRoot: null };
+    }
     if (!status?.auth?.canEdit && status?.auth?.editModeAllowed !== false && status?.target !== 'file') {
         editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
@@ -172,6 +245,7 @@ export function renderEditPanel({
             ${status?.target === 'file' || status?.target === 'folder' || (config?.work && typeof config.work === 'object' && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === 'type'))
                 ? renderWorkConfigFieldsSection(config)
                 : ''}
+            ${renderExternalSubmissionsSection(config, isFileTarget)}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -204,6 +278,7 @@ export function renderEditPanel({
         ${renderPoffRegistrationSection(config, isFileTarget)}
         <div class="edit-panel-stack">
             ${uploadSectionHtml}
+            ${status?.target === 'file' ? renderRemoteWorkPresentationSection(config) : ''}
             ${status?.target === 'file' ? renderConverterSection(config) : ''}
             ${renderPromptWindow(settings, { mode: isFileTarget ? 'file' : 'folder' })}
         </div>
@@ -224,8 +299,28 @@ export function renderEditPanel({
     const convertButton = editPanel.querySelector('#editConvertWork');
     const createConverterButton = editPanel.querySelector('#editCreateConverter');
     const converterNodeUrlInput = editPanel.querySelector('#edit-converter-node-url');
+    const remotePresentationUrlInput = editPanel.querySelector('#edit-remote-presentation-url');
+    const remotePresentationCheckButton = editPanel.querySelector('#editCheckRemotePresentation');
+    const remotePresentationApplyButton = editPanel.querySelector('#editApplyRemotePresentation');
+    const remotePresentationStatus = editPanel.querySelector('#editRemotePresentationStatus');
+    const remotePresentationOffer = editPanel.querySelector('#editRemotePresentationOffer');
+    const remotePresentationOfferTitle = editPanel.querySelector('#editRemotePresentationOfferTitle');
+    const remotePresentationOfferMeta = editPanel.querySelector('#editRemotePresentationOfferMeta');
+    const remotePresentationSource = editPanel.querySelector('#editRemotePresentationSource');
+    const remotePresentationConflict = editPanel.querySelector('#editRemotePresentationConflict');
+    const remotePresentationHbs = editPanel.querySelector('#editRemotePresentationHbs');
+    const remotePresentationCss = editPanel.querySelector('#editRemotePresentationCss');
+    const remotePresentationJs = editPanel.querySelector('#editRemotePresentationJs');
+    const remotePresentationHbsMeta = editPanel.querySelector('#editRemotePresentationHbsMeta');
+    const remotePresentationCssMeta = editPanel.querySelector('#editRemotePresentationCssMeta');
+    const remotePresentationJsMeta = editPanel.querySelector('#editRemotePresentationJsMeta');
+    const externalSubmissionsEnabled = editPanel.querySelector('#edit-external-submissions-enabled');
+    const externalWhitelistEnabled = editPanel.querySelector('#edit-external-submissions-whitelist-enabled');
+    const externalSubmissionsOptions = editPanel.querySelector('.edit-external-submissions-options');
+    const externalWhitelistWrap = editPanel.querySelector('#editExternalWhitelistWrap');
     const promptRoot = editPanel.querySelector('#promptLayer');
     syncPromptDock(promptRoot);
+    let inspectedRemotePresentation = null;
 
     if (passwordDetailsEl) {
         bindStoredDetailsState(passwordDetailsEl, PASSWORD_DETAILS_STORAGE_KEY);
@@ -329,6 +424,17 @@ export function renderEditPanel({
             workFieldEditor.addWorkField();
         });
     }
+    const syncExternalSubmissionOptions = () => {
+        if (externalSubmissionsOptions) {
+            externalSubmissionsOptions.hidden = !externalSubmissionsEnabled?.checked;
+        }
+        if (externalWhitelistWrap) {
+            externalWhitelistWrap.hidden = !externalSubmissionsEnabled?.checked || !externalWhitelistEnabled?.checked;
+        }
+    };
+    externalSubmissionsEnabled?.addEventListener('change', syncExternalSubmissionOptions);
+    externalWhitelistEnabled?.addEventListener('change', syncExternalSubmissionOptions);
+    syncExternalSubmissionOptions();
     editPanel.querySelectorAll('[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode').forEach((input) => {
         if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
             return;
@@ -409,6 +515,102 @@ export function renderEditPanel({
         if (config?.converterCatalog?.autoLoadRemote === true && !hasRemote) {
             Promise.resolve().then(loadConverterNode);
         }
+    }
+    if (remotePresentationUrlInput && remotePresentationCheckButton && typeof onInspectRemotePresentation === 'function') {
+        remotePresentationCheckButton.addEventListener('click', async () => {
+            const sourceUrl = String(remotePresentationUrlInput.value || '').trim();
+            inspectedRemotePresentation = null;
+            remotePresentationCheckButton.disabled = true;
+            remotePresentationCheckButton.textContent = 'Checking...';
+            if (remotePresentationOffer) {
+                remotePresentationOffer.hidden = true;
+                remotePresentationOffer.classList.remove('is-compatible', 'is-incompatible');
+            }
+            if (remotePresentationApplyButton) {
+                remotePresentationApplyButton.disabled = true;
+            }
+            try {
+                const offer = await onInspectRemotePresentation({ sourceUrl, statusEl: remotePresentationStatus });
+                inspectedRemotePresentation = offer;
+                const compatible = offer?.compatible === true;
+                const remote = offer?.remote && typeof offer.remote === 'object' ? offer.remote : {};
+                const presentation = offer?.presentation && typeof offer.presentation === 'object' ? offer.presentation : {};
+                const bytes = offer?.presentationBytes && typeof offer.presentationBytes === 'object' ? offer.presentationBytes : {};
+                const localPresentation = offer?.localPresentation && typeof offer.localPresentation === 'object' ? offer.localPresentation : {};
+                const matches = Array.isArray(offer?.matches) ? offer.matches.join(' · ') : '';
+                const safetyIssues = Array.isArray(offer?.safetyIssues) ? offer.safetyIssues : [];
+                if (remotePresentationOffer) {
+                    remotePresentationOffer.hidden = false;
+                    remotePresentationOffer.classList.add(compatible ? 'is-compatible' : 'is-incompatible');
+                }
+                if (remotePresentationOfferTitle) {
+                    remotePresentationOfferTitle.textContent = remote.title || remote.path || 'Remote work presentation';
+                }
+                if (remotePresentationOfferMeta) {
+                    remotePresentationOfferMeta.textContent = compatible
+                        ? `Compatible: ${matches || 'matching work type'}`
+                        : (safetyIssues.join(' ') || `Not compatible with this local work (${remote.mimeType || remote.kind || remote.extension || 'unknown type'}).`);
+                }
+                if (remotePresentationSource) {
+                    remotePresentationSource.href = remote.url || sourceUrl;
+                }
+                if (remotePresentationHbs) remotePresentationHbs.textContent = String(presentation.workHbs || '');
+                if (remotePresentationCss) remotePresentationCss.textContent = String(presentation.styleCss || '');
+                if (remotePresentationJs) remotePresentationJs.textContent = String(presentation.scriptJs || '');
+                if (remotePresentationHbsMeta) remotePresentationHbsMeta.textContent = `work.hbs · ${Number(bytes['work.hbs'] || 0)} bytes`;
+                if (remotePresentationCssMeta) remotePresentationCssMeta.textContent = `style.css · ${Number(bytes['style.css'] || 0)} bytes`;
+                if (remotePresentationJsMeta) remotePresentationJsMeta.textContent = `script.js · ${Number(bytes['script.js'] || 0)} bytes`;
+                if (remotePresentationConflict) {
+                    const existingFiles = Object.entries(localPresentation.files || {})
+                        .filter(([, state]) => state?.exists === true)
+                        .map(([name]) => name);
+                    remotePresentationConflict.hidden = existingFiles.length === 0;
+                    remotePresentationConflict.textContent = existingFiles.length
+                        ? `Conflict: ${existingFiles.join(', ')} will be backed up, then all three presentation files will be replaced together.`
+                        : '';
+                }
+                if (remotePresentationApplyButton) {
+                    remotePresentationApplyButton.disabled = !compatible;
+                    remotePresentationApplyButton.textContent = localPresentation.hasPresentation
+                        ? 'Replace complete presentation'
+                        : 'Copy complete presentation';
+                }
+                setStatusMessage(
+                    remotePresentationStatus,
+                    compatible ? 'Complete presentation ready: HBS + CSS + JS.' : 'Presentation cannot be copied.',
+                    compatible
+                );
+            } catch (error) {
+                setStatusMessage(remotePresentationStatus, error?.message || 'Remote work presentation unavailable.');
+            } finally {
+                remotePresentationCheckButton.disabled = false;
+                remotePresentationCheckButton.textContent = 'Check presentation';
+            }
+        });
+    }
+    if (remotePresentationApplyButton && typeof onApplyRemotePresentation === 'function') {
+        remotePresentationApplyButton.addEventListener('click', async () => {
+            if (!inspectedRemotePresentation?.compatible) {
+                return;
+            }
+            remotePresentationApplyButton.disabled = true;
+            remotePresentationApplyButton.textContent = 'Copying complete presentation...';
+            try {
+                const result = await onApplyRemotePresentation({ offer: inspectedRemotePresentation, statusEl: remotePresentationStatus });
+                remotePresentationApplyButton.textContent = 'Presentation copied';
+                setStatusMessage(
+                    remotePresentationStatus,
+                    result?.backupPath ? `Presentation replaced. Backup: ${result.backupPath}` : 'Complete presentation copied.',
+                    true
+                );
+            } catch (error) {
+                remotePresentationApplyButton.disabled = false;
+                remotePresentationApplyButton.textContent = inspectedRemotePresentation?.localPresentation?.hasPresentation
+                    ? 'Replace complete presentation'
+                    : 'Copy complete presentation';
+                setStatusMessage(remotePresentationStatus, error?.message || 'Presentation copy failed.');
+            }
+        });
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === 'function') {
         resetFolderWorkButton.addEventListener('click', async () => {

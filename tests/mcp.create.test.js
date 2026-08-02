@@ -1187,6 +1187,18 @@ describe('MCP create route helper (CLI)', () => {
     const hash = await makePasswordHash('secret-pass');
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
     fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
+    fs.writeFileSync(path.join(tempDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-pending-link',
+      slug: 'poff-pending-link',
+      type: 'folder',
+      tree: [],
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['remote.example'],
+        maxPending: 3,
+      },
+    }, null, 2));
 
     const submitted = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
@@ -1249,20 +1261,28 @@ describe('MCP create route helper (CLI)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test('guest external submissions reject non-poff urls and enforce the pending limit', async () => {
+  test('guest external submissions require host opt-in, honor whitelist, and enforce the pending limit', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-limit-'));
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
 
-    const invalid = await runEditRequest(tempDir, 'upload', '', {
+    const disabled = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
-      linkName: 'not-poff',
-      linkUrl: 'https://example.com/plain-page',
+      linkName: 'disabled-node',
+      linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
     });
-    expect(invalid.allowed).toBe(true);
-    expect(invalid.error).toContain('Only links from another Poff system are allowed');
+    expect(disabled.allowed).toBe(false);
+
+    const direct = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      submissionIntent: 'external-link',
+      linkName: 'direct-link',
+      linkUrl: 'https://remote.example/index.php?view=1&path=direct-work',
+    });
+    expect(direct.allowed).toBe(true);
+    expect(direct.pendingApproval).toBe(true);
 
     const tree = [];
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 2; index += 1) {
       tree.push({
         name: `pending-${index}`,
         slug: `pending-${index}`,
@@ -1281,7 +1301,29 @@ describe('MCP create route helper (CLI)', () => {
       slug: 'pending-limit',
       type: 'folder',
       tree,
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['remote.example'],
+        maxPending: 2,
+      },
     }, null, 2));
+
+    const invalid = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'not-poff',
+      linkUrl: 'https://example.com/plain-page',
+    });
+    expect(invalid.allowed).toBe(true);
+    expect(invalid.error).toContain('Only links from another Poff system are allowed');
+
+    const notWhitelisted = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'not-whitelisted',
+      linkUrl: 'https://other.example/index.php?view=1&path=portfolio',
+    });
+    expect(notWhitelisted.allowed).toBe(true);
+    expect(notWhitelisted.error).toContain('whitelist');
 
     const overLimit = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
@@ -1297,6 +1339,18 @@ describe('MCP create route helper (CLI)', () => {
   test('guest external submissions accept poff hash routes', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-hash-link-'));
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-pending-hash-link',
+      slug: 'poff-pending-hash-link',
+      type: 'folder',
+      tree: [],
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['dominikeggermann.com'],
+        maxPending: 5,
+      },
+    }, null, 2));
 
     const submitted = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
@@ -5442,7 +5496,8 @@ describe('Worktype HBS renderer', () => {
       });
 
       expect(rendered).toContain('external-work--embedded__toolbar');
-      expect(rendered).toContain('Direct link');
+      expect(rendered).toContain('External work · live');
+      expect(rendered).toContain('Visit source');
       expect(rendered).toContain('href="https://dominikeggermann.com/#/joined-test-1762176567798-mp4"');
       expect(rendered).toContain('width: 100%');
     } finally {
@@ -5504,6 +5559,113 @@ describe('Worktype HBS renderer', () => {
         routePath: 'viewer-folder/nested-child',
       }),
     ]));
+  });
+
+  test('inspects and atomically replaces a compatible remote work presentation', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-presentation-'));
+    const localName = 'local-image.jpg';
+    const workUrl = 'https://origin.example/index.php?view=1&file=works%2Ffullscreen.jpg';
+    const snapshotUrl = 'https://origin.example/index.php?ajax=snapshot&file=works%2Ffullscreen.jpg';
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(tempRoot, localName));
+
+    try {
+      const request = {
+        url: workUrl,
+        mockResponses: {
+          [snapshotUrl]: {
+            status: 200,
+            body: {
+              resolved: true,
+              kind: 'image',
+              meta: {
+                title: 'Fullscreen image',
+                path: 'works/fullscreen.jpg',
+              },
+              context: {
+                mimeType: 'image/jpeg',
+                work: {
+                  type: 'image',
+                  layout: {
+                    sectionTemplate: '<div class="fullscreen"><img src="{{srcUrl}}" alt="{{title}}" onerror="bad()"><script>bad()</script></div>',
+                    css: '.fullscreen{position:fixed;inset:0}.fullscreen img{width:100%;height:100%;object-fit:cover}',
+                    js: 'document.addEventListener("DOMContentLoaded",()=>document.body.classList.add("fullscreen-ready"));',
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+      const result = await runRemoteContent('presentation', tempRoot, localName, request);
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        route: 'remote-work-presentation',
+        compatible: true,
+        matches: expect.arrayContaining(['same suffix', 'same MIME', 'same work type']),
+      }));
+      expect(result.remote).toEqual(expect.objectContaining({
+        title: 'Fullscreen image',
+        path: 'works/fullscreen.jpg',
+        url: workUrl,
+      }));
+      expect(result.presentation.workHbs).toContain('class="fullscreen"');
+      expect(result.presentation.workHbs).toContain('{{srcUrl}}');
+      expect(result.presentation.workHbs).not.toContain('<script>');
+      expect(result.presentation.workHbs).not.toContain('onerror=');
+      expect(result.presentation.styleCss).toContain('object-fit:cover');
+      expect(result.presentation.scriptJs).toContain('fullscreen-ready');
+      expect(result.localPresentation.hasPresentation).toBe(false);
+      expect(fs.existsSync(path.join(tempRoot, '.works', `${localName}.layout`, 'work.hbs'))).toBe(false);
+
+      const copied = await runRemoteContent('presentation', tempRoot, localName, {
+        ...request,
+        action: 'copy',
+      });
+      const layoutDir = path.join(tempRoot, '.works', `${localName}.layout`);
+      expect(copied).toEqual(expect.objectContaining({
+        ok: true,
+        copied: true,
+        replaced: false,
+        backupPath: '',
+      }));
+      expect(fs.readFileSync(path.join(layoutDir, 'work.hbs'), 'utf8')).toContain('class="fullscreen"');
+      expect(fs.readFileSync(path.join(layoutDir, 'style.css'), 'utf8')).toContain('object-fit:cover');
+      expect(fs.readFileSync(path.join(layoutDir, 'script.js'), 'utf8')).toContain('fullscreen-ready');
+      expect(fs.existsSync(path.join(layoutDir, 'template.hbs'))).toBe(true);
+
+      fs.writeFileSync(path.join(layoutDir, 'style.css'), '.local-before-replace{display:block}');
+      const blockedReplace = await runRemoteContent('presentation', tempRoot, localName, {
+        ...request,
+        action: 'copy',
+      });
+      expect(blockedReplace).toEqual(expect.objectContaining({
+        ok: false,
+        requiresConfirmation: true,
+      }));
+      expect(fs.readFileSync(path.join(layoutDir, 'style.css'), 'utf8')).toContain('local-before-replace');
+
+      const replaced = await runRemoteContent('presentation', tempRoot, localName, {
+        ...request,
+        action: 'copy',
+        confirmReplace: true,
+      });
+      expect(replaced.replaced).toBe(true);
+      expect(replaced.backupPath).toContain(`.works/${localName}.layout.history/`);
+      expect(fs.readFileSync(path.join(tempRoot, replaced.backupPath, 'style.css'), 'utf8')).toContain('local-before-replace');
+      expect(fs.readFileSync(path.join(layoutDir, 'style.css'), 'utf8')).toContain('object-fit:cover');
+
+      const config = JSON.parse(fs.readFileSync(path.join(tempRoot, '.works', `${localName}.config.json`), 'utf8'));
+      expect(config.work.presentationSource).toEqual(expect.objectContaining({
+        url: workUrl,
+        files: ['work.hbs', 'style.css', 'script.js'],
+      }));
+      expect(config.work.layout).not.toHaveProperty('sectionTemplate');
+      expect(config.work.layout).not.toHaveProperty('css');
+      expect(config.work.layout).not.toHaveProperty('js');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('public remote exports reject hidden implementation folders', async () => {
@@ -5586,6 +5748,7 @@ describe('Worktype HBS renderer', () => {
         type: 'folder',
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
         remoteSource: 'origin-example',
+        externalWork: true,
         routeSlug: 'nested-child',
         routePath: 'viewer-folder/nested-child',
       }),
@@ -5594,6 +5757,7 @@ describe('Worktype HBS renderer', () => {
         type: 'file',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
         remoteSource: 'origin-example',
+        externalWork: true,
         routeSlug: 'child-txt',
         routePath: 'viewer-folder/child.txt',
       }),

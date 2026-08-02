@@ -38,3 +38,28 @@ function cmsEditSaveApplyBasicFields(array &$config, array $data, string $subjec
         $config['promptHistory'] = array_slice($promptHistory, -12);
     }
 }
+
+function cmsEditSaveApplyExternalSubmissionSettings(array &$config, array $data, string $subjectType): void
+{
+    if ($subjectType !== 'folder' || !array_key_exists('externalSubmissions', $data) || !is_array($data['externalSubmissions'])) {
+        return;
+    }
+
+    $source = $data['externalSubmissions'];
+    $whitelist = [];
+    foreach (is_array($source['whitelist'] ?? null) ? $source['whitelist'] : [] as $entry) {
+        if (!is_scalar($entry)) {
+            continue;
+        }
+        $candidate = trim((string) $entry);
+        if ($candidate !== '' && !in_array($candidate, $whitelist, true)) {
+            $whitelist[] = $candidate;
+        }
+    }
+    $config['externalSubmissions'] = [
+        'enabled' => !empty($source['enabled']),
+        'whitelistEnabled' => !empty($source['whitelistEnabled']),
+        'whitelist' => array_slice($whitelist, 0, 24),
+        'maxPending' => min(20, max(1, (int) ($source['maxPending'] ?? 5))),
+    ];
+}

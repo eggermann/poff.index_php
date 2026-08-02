@@ -20,6 +20,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
     require_once __DIR__ . '/../mcp/routes/edit-config.php';
     require_once __DIR__ . '/../mcp/routes/prompt-template.php';
     require_once __DIR__ . '/../mcp/routes/remote-content.php';
+    require_once __DIR__ . '/../mcp/routes/remote-presentation.php';
     require_once __DIR__ . '/../mcp/routes/converters.php';
     require_once __DIR__ . '/../mcp/routes/convert.php';
     require_once __DIR__ . '/../mcp/routes/converter-network.php';
@@ -94,6 +95,11 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'mode' => (string) ($remoteInput['mode'] ?? 'follow'),
                     'destinationName' => (string) ($remoteInput['destinationName'] ?? ''),
                     'createPlayer' => (bool) ($remoteInput['createPlayer'] ?? false),
+                ]));
+            case 'remote-work-presentation':
+                mcpJsonResponse(handleRemoteWorkPresentation([
+                    'rootDir' => $rootDir,
+                    'input' => mcpReadRequestData(),
                 ]));
             case 'converters':
                 mcpJsonResponse(handleConverters([

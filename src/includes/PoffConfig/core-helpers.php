@@ -502,6 +502,9 @@ trait PoffConfigCoreHelpers
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
             }
+            if (isset($existing['externalSubmissions']) && is_array($existing['externalSubmissions'])) {
+                $data['externalSubmissions'] = $existing['externalSubmissions'];
+            }
             $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
         }
         $data['work'] = array_merge($workDefault, $existingWork);
@@ -790,6 +793,9 @@ trait PoffConfigCoreHelpers
             }
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
+            }
+            if (isset($existing['externalSubmissions']) && is_array($existing['externalSubmissions'])) {
+                $data['externalSubmissions'] = $existing['externalSubmissions'];
             }
             $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
         }
