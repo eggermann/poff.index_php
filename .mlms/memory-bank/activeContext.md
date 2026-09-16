@@ -1,19 +1,20 @@
 # Active Context
 ## Current Goal
-Create and study three independent Pageoff-style single-file CMS webspaces, improve concrete exchange/builder defects, and capture three screenshots.
+Make dominikeggermann.com a fast, clear, clickable portfolio: one calm navigation layer and an owner-led story that makes the work easy to discover.
 ## Current Loop
-Loop: 1
-Phase: Complete
+Loop: 3
+Phase: Complete and deployed
 ## Current Focus
-Three persona nodes, work/layout exchange, builder fixes, checks, and final screenshots are complete.
+The rebuilt index is deployed to eggman1 and verified on dominikeggermann.com. The owner story is inside the preview-preserved layout main, Explore work lazy-loads navigation, and HRMueller-2/auswahl is reachable with 11 images.
 ## Assumptions
-- “From pageoff.de” means Pageoff-powered local webspaces, not public deployment.
-- Targets are `/Applications/MAMP/htdocs/pageoff-artist`, `pageoff-writer`, and `pageoff-curator`.
-- Existing generated `index.php` is copied opaquely and never read as source context.
-- Existing media is copied, never moved.
+- The existing selected-work route is `HRMueller-2`.
+- The owner story copy is a first draft based on the visible image/film archive.
+- Existing generated `index.php` remains unedited until an explicit rebuild.
 ## Risks / Unknowns
-- Guarded remote-import correctly rejects localhost; local development exchange used `.webloc` follow/embed plus explicit filesystem copies.
-- Source fixes are not rebuilt into generated `index.php` because no rebuild was requested.
-- External runtime configs and old Playwright artifacts stay outside commits.
+- The standard `npm run deploy` target resolves to the old eggman4/dodi path, not eggman1. The live deployment used the dedicated eggman1 connection config and checksum verification.
+- Production has two pre-existing benign 404s: favicon and `.layout/poff.profile.jpg`.
 ## Next Action
-Wait for an explicit commit, rebuild, or public deployment request.
+Await owner feedback on story copy and any desired cleanup of the legacy deployment target.
+
+## Previous Goal
+The three-node Pageoff study is complete. Its detailed record remains in progress and sprint review history.

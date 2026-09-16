@@ -1,0 +1,93 @@
+- generic [ref=f4e2]:
+  - button "Close navigation" [expanded] [ref=f4e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f4e8]:
+    - group [ref=f4e10]:
+      - generic "Toggle editor tools" [ref=f4e11] [cursor=pointer]: Editor tools
+    - list [ref=f4e18]:
+      - listitem [ref=f4e69]:
+        - link "page" [ref=f4e70] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f4e73]:
+        - link "Go Up" [ref=f4e74] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=f4e77]:
+        - link "./ Player" [ref=f4e78] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fplayer"
+      - listitem [ref=f4e79]:
+        - link "35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e80] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f4e84]:
+        - link "46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e85] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f4e89]:
+        - link "64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e90] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f4e94]:
+        - link "83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e95] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f4e99]:
+        - link "85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e100] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f4e104]:
+        - link "87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4" [ref=f4e105] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f4e68]:
+    - main [ref=f4e109]:
+      - generic [ref=f4e110]:
+        - generic [ref=f4e111]:
+          - generic [ref=f4e112]:
+            - paragraph [ref=f4e113]: LOCAL COLLECTION · CONTINUOUS PLAY
+            - heading "Player" [level=1] [ref=f4e114]
+            - paragraph [ref=f4e115]: Six films copied locally from Prothagonia. The playlist advances automatically and loops continuously.
+          - button "Turn playlist loop off" [pressed] [ref=f4e116] [cursor=pointer]:
+            - generic [ref=f4e117]: ↻
+            - generic [ref=f4e118]: Loop on
+        - generic [ref=f4e119]:
+          - generic [ref=f4e122]:
+            - generic [ref=f4e123]:
+              - generic [ref=f4e124]: 01 / 06
+              - strong [ref=f4e125]: freshweb prompt fast wan strict 4 3 test merged web
+            - generic "Playlist controls" [ref=f4e126]:
+              - button "Previous film" [ref=f4e127] [cursor=pointer]: ←
+              - button "Next film" [ref=f4e128] [cursor=pointer]: →
+          - complementary [ref=f4e129]:
+            - generic [ref=f4e130]:
+              - generic [ref=f4e131]: Up next
+              - generic [ref=f4e132]: films
+            - list [ref=f4e133]:
+              - listitem [ref=f4e134]:
+                - button "35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e135] [cursor=pointer]:
+                  - generic [ref=f4e136]:
+                    - strong [ref=f4e137]: 35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f4e138]: HRMueller-2/player/35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f4e139]: ▶
+              - listitem [ref=f4e140]:
+                - button "46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e141] [cursor=pointer]:
+                  - generic [ref=f4e142]:
+                    - strong [ref=f4e143]: 46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f4e144]: HRMueller-2/player/46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f4e145]: ▶
+              - listitem [ref=f4e146]:
+                - button "64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e147] [cursor=pointer]:
+                  - generic [ref=f4e148]:
+                    - strong [ref=f4e149]: 64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f4e150]: HRMueller-2/player/64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f4e151]: ▶
+              - listitem [ref=f4e152]:
+                - button "83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e153] [cursor=pointer]:
+                  - generic [ref=f4e154]:
+                    - strong [ref=f4e155]: 83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f4e156]: HRMueller-2/player/83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f4e157]: ▶
+              - listitem [ref=f4e158]:
+                - button "85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f4e159] [cursor=pointer]:
+                  - generic [ref=f4e160]:
+                    - strong [ref=f4e161]: 85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f4e162]: HRMueller-2/player/85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f4e163]: ▶
+              - listitem [ref=f4e164]:
+                - button "87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4 HRMueller-2/player/87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4" [ref=f4e165] [cursor=pointer]:
+                  - generic [ref=f4e166]:
+                    - strong [ref=f4e167]: 87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4
+                    - generic [ref=f4e168]: HRMueller-2/player/87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4
+                  - generic [ref=f4e169]: ▶

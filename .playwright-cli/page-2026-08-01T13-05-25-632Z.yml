@@ -1,0 +1,62 @@
+- generic [ref=f2e2]:
+  - button "Close navigation" [expanded] [ref=f2e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f2e8]:
+    - group [ref=f2e10]:
+      - generic "Toggle editor tools" [ref=f2e11] [cursor=pointer]: Editor tools
+    - list [ref=f2e18]:
+      - listitem [ref=f2e280]:
+        - link "pageoff-civic" [ref=f2e281] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f2e284]:
+        - link "Go Up" [ref=f2e285] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f2e288]:
+        - link "./ 01-democracy" [ref=f2e289] [cursor=pointer]:
+          - /url: "?path=01-democracy"
+      - listitem [ref=f2e290]:
+        - link "01-power-is-a-public-loan.md" [ref=f2e291] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f2e295]:
+        - link "02-opposition-is-infrastructure.md" [ref=f2e296] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f2e53]:
+    - region "Civic Archive file browser" [ref=f2e301]:
+      - generic [ref=f2e302]:
+        - strong [ref=f2e304]: Civic Archive —
+        - generic [ref=f2e305]:
+          - generic [ref=f2e306]: _
+          - generic [ref=f2e307]: □
+          - generic [ref=f2e308]: ×
+      - navigation "Archive menu" [ref=f2e309]:
+        - generic [ref=f2e310]: File
+        - generic [ref=f2e311]: Edit
+        - generic [ref=f2e312]: View
+        - generic [ref=f2e313]: Favorites
+        - generic [ref=f2e314]: Tools
+        - generic [ref=f2e315]: Help
+      - generic "Location shortcuts" [ref=f2e316]:
+        - link "Back to root" [ref=f2e317] [cursor=pointer]:
+          - /url: http://localhost:8888/pageoff-civic/?view=1
+          - generic [ref=f2e318]: ←
+          - text: Back to root
+        - link "Democracy" [ref=f2e320] [cursor=pointer]:
+          - /url: http://localhost:8888/pageoff-civic/?view=1&path=01-democracy
+        - link "Commons" [ref=f2e322] [cursor=pointer]:
+          - /url: http://localhost:8888/pageoff-civic/?view=1&path=02-commons
+        - link "Rights" [ref=f2e324] [cursor=pointer]:
+          - /url: http://localhost:8888/pageoff-civic/?view=1&path=03-rights
+      - generic [ref=f2e326]:
+        - generic [ref=f2e327]: Address
+        - generic [ref=f2e328]: /pageoff-civic/01-democracy/01-power-is-a-public-loan.md
+        - generic [ref=f2e330]: Go
+      - main [ref=f2e331]:
+        - generic [ref=f2e332]:
+          - generic [ref=f2e333]:
+            - paragraph [ref=f2e334]: POLITICAL TEXT · LOCAL FILE
+            - heading [level=1]
+            - generic [ref=f2e335]: 01-democracy/01-power-is-a-public-loan.md
+          - iframe [ref=f2e337]:
+            - generic [ref=f3e1]: "# Power Is a Public Loan Political power is not property. It is a temporary loan from people who retain the right to inspect its use, limit its reach, and withdraw their trust. Every office should therefore leave a readable trail: what was decided, who advised it, who benefited, what it cost, and when it will be reviewed. Secrecy may protect a person in danger; it should not protect routine power from embarrassment. An institution earns legitimacy less by claiming virtue than by making correction possible. Terms end. Decisions expire. Records remain open. Appeals remain practical. The democratic question is not only “Who rules?” It is also “How easily can the ruled understand, challenge, and change the rule?”"
+      - generic [ref=f2e338]:
+        - generic [ref=f2e339]: 1 object
+        - generic [ref=f2e340]: Local filesystem layout · no global theme

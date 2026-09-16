@@ -219,6 +219,30 @@ module.exports = {
 }
 
 describe('preview controller', () => {
+  test('reuses a rendered preview response until a refresh is requested', async () => {
+    const fetchMock = jest.fn(async (url) => ({
+      ok: true,
+      url: `http://example.test${url}`,
+      text: async () => '<!doctype html><html><head></head><body><div class="viewer"></div></body></html>',
+    }));
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({ fetch: fetchMock });
+    const controller = createPreviewController({
+      contentFrame: new FakeHTMLElement(),
+      iframeLoading: new FakeHTMLElement(),
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return { previewPath: '', previewIsFile: false };
+      },
+    });
+
+    await controller.renderPreview('/?view=1&path=work');
+    await controller.renderPreview('/?view=1&path=work');
+    await controller.renderPreview('/?view=1&path=work&_refresh=1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   test('aborts an obsolete preview request when navigation changes', async () => {
     const requests = [];
     const fetchMock = jest.fn((url, options = {}) => new Promise((resolve, reject) => {

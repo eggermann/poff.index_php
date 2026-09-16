@@ -1,0 +1,75 @@
+- generic [ref=f3e2]:
+  - button "Close navigation" [expanded] [ref=f3e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f3e8]:
+    - group [ref=f3e10]:
+      - generic "Toggle editor tools" [ref=f3e11] [cursor=pointer]: Editor tools
+    - list [ref=f3e18]:
+      - listitem [ref=f3e69]:
+        - link "page" [ref=f3e70] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f3e73]:
+        - link "Go Up" [ref=f3e74] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=f3e77]:
+        - link "./ Après Gallery" [ref=f3e78] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fapres-2-gallery"
+      - listitem [ref=f3e79]:
+        - link "IMG_1191" [ref=f3e80] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e84]:
+        - link "IMG_1192" [ref=f3e85] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e89]:
+        - link "IMG_1193" [ref=f3e90] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e94]:
+        - link "IMG_1194" [ref=f3e95] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e99]:
+        - link "IMG_1195" [ref=f3e100] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e104]:
+        - link "IMG_1196" [ref=f3e105] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e109]:
+        - link "IMG_1197" [ref=f3e110] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e114]:
+        - link "IMG_1198" [ref=f3e115] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e119]:
+        - link "IMG_1199" [ref=f3e120] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e124]:
+        - link "IMG_1200" [ref=f3e125] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e129]:
+        - link "IMG_1201" [ref=f3e130] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e134]:
+        - link "IMG_1202" [ref=f3e135] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e139]:
+        - link "IMG_1203" [ref=f3e140] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e144]:
+        - link "IMG_1204" [ref=f3e145] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e149]:
+        - link "IMG_1205" [ref=f3e150] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f3e154]:
+        - link "IMG_1206" [ref=f3e155] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f3e68]:
+    - main [ref=f3e159]:
+      - article [ref=f3e160]:
+        - generic [ref=f3e161]:
+          - link "← Gallery" [ref=f3e162] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&path=apres-2-gallery
+          - heading "IMG_1191" [level=1] [ref=f3e163]
+          - link "Download JPG" [ref=f3e164] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/HRMueller-2/apres-2-gallery/IMG_1191.jpg
+        - link [ref=f3e165] [cursor=pointer]:
+          - /url: http://localhost:8888/dominikeggermann-project/page/HRMueller-2/apres-2-gallery/IMG_1191.jpg
+          - img "IMG_1191" [ref=f3e166]

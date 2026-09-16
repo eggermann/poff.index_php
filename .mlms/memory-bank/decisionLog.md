@@ -87,3 +87,30 @@ Decision:
 Treat `index.php` as a hidden system entry during Poff tree scans.
 Consequences:
 Visitors see authored works only; single-file implementation remains portable but invisible.
+
+### D-0011: Public navigation is progressive, editor navigation stays immediate
+Status: Accepted
+Context:
+The public root displayed the same work tree in both the sidebar and the main surface, while each route also made a separate slow navigation request.
+Decision:
+Start public visitors on the work surface with an explicit Explore work control. Fetch the sidebar only when it opens; preserve the always-open sidebar for editor mode. Keep a small in-session preview cache for backtracking.
+Consequences:
+The first route renders fewer competing layers and follow-up visits are immediate when cached. Editor workflows retain their full navigation tree.
+
+### D-0012: Layout source stays static across the single-file build
+Status: Accepted
+Context:
+The entrypoint builder strips PHP tags from `src/includes/layout.php`, so PHP branching in that source rendered literal PHP variables in the generated output.
+Decision:
+Keep the public layout markup static and let client JavaScript open the sidebar when editor mode is active.
+Consequences:
+The generated entrypoint is valid in both public and editor paths without depending on PHP execution inside this build-time template.
+
+### D-0013: Production owner story is host-scoped and layout-native
+Status: Accepted
+Context:
+The production root's persisted folder name did not identify the site, and preview extraction discarded story markup placed before the layout wrapper.
+Decision:
+Show the story for the production hostname (or an explicitly matching stored folder name), and pass it into the default layout main as trusted rendered markup.
+Consequences:
+The public domain receives the intended entry story while nested works and other nodes remain unchanged; client preview navigation retains the story.

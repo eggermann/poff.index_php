@@ -200,4 +200,25 @@ describe('app sidebar toggle wiring', () => {
     expect(elements.sidebarToggle.getAttribute('aria-expanded')).toBe('false');
     expect(elements.sidebarToggle.getAttribute('aria-label')).toBe(APP_LABELS.openNavigation);
   });
+
+  test('allows the public work surface to start with navigation collapsed', () => {
+    const helpers = loadAppHelpers();
+    const elements = helpers.createAppElements();
+    const states = [];
+    const controller = helpers.bindSidebarToggle({
+      ...elements,
+      initiallyOpen: false,
+      onStateChange(isOpen) {
+        states.push(isOpen);
+      },
+    });
+
+    expect(controller).not.toBeNull();
+    expect(elements.appShell.classList.contains('sidebar-collapsed')).toBe(true);
+    expect(elements.appSidebar.hidden).toBe(true);
+    expect(states).toEqual([]);
+
+    helpers.listeners.get('sidebarToggle:click')();
+    expect(states).toEqual([true]);
+  });
 });

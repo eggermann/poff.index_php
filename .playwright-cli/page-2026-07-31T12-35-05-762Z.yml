@@ -1,0 +1,169 @@
+- generic [ref=f27e2]:
+  - button "Close navigation" [expanded] [ref=f27e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f27e8]:
+    - group [ref=f27e10]:
+      - generic "Toggle editor tools" [ref=f27e11] [cursor=pointer]: Editor tools
+    - list [ref=f27e18]:
+      - listitem [ref=f27e138]:
+        - link "dominikeggermann.com" [ref=f27e139] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f27e142]:
+        - link "Go Up" [ref=f27e143] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=f27e146]:
+        - link "./ Après Gallery" [ref=f27e147] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fapres-2-gallery"
+      - listitem [ref=f27e148]:
+        - link "IMG_1191" [ref=f27e149] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e153]:
+        - link "IMG_1192" [ref=f27e154] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e158]:
+        - link "IMG_1193" [ref=f27e159] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e163]:
+        - link "IMG_1194" [ref=f27e164] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e168]:
+        - link "IMG_1195" [ref=f27e169] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e173]:
+        - link "IMG_1196" [ref=f27e174] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e178]:
+        - link "IMG_1197" [ref=f27e179] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e183]:
+        - link "IMG_1198" [ref=f27e184] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e188]:
+        - link "IMG_1199" [ref=f27e189] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e193]:
+        - link "IMG_1200" [ref=f27e194] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e198]:
+        - link "IMG_1201" [ref=f27e199] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e203]:
+        - link "IMG_1202" [ref=f27e204] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e208]:
+        - link "IMG_1203" [ref=f27e209] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e213]:
+        - link "IMG_1204" [ref=f27e214] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e218]:
+        - link "IMG_1205" [ref=f27e219] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e223]:
+        - link "IMG_1206" [ref=f27e224] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f27e56]:
+    - main [ref=f27e228]:
+      - generic [ref=f27e229]:
+        - generic [ref=f27e230]:
+          - generic [ref=f27e231]:
+            - paragraph [ref=f27e232]: CONVERTED COLLECTION · JPG
+            - heading "Après Gallery" [level=1] [ref=f27e233]
+            - paragraph [ref=f27e234]: Sixteen HEIC photographs converted through an external Pageoff node. Open any image for the full JPG.
+          - generic [ref=f27e235]: 16 images
+        - generic "Après Gallery" [ref=f27e236]:
+          - link "Open IMG_1191" [ref=f27e237] [cursor=pointer]:
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1191.jpg
+            - img "IMG_1191" [ref=f27e238]
+            - generic [ref=f27e239]:
+              - strong [ref=f27e240]: IMG_1191
+              - generic [ref=f27e241]: ↗
+          - link "Open IMG_1192":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1192.jpg
+            - img "IMG_1192"
+            - generic [ref=f27e242] [cursor=pointer]:
+              - strong [ref=f27e243]: IMG_1192
+              - generic [ref=f27e244]: ↗
+          - link "Open IMG_1193":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1193.jpg
+            - img "IMG_1193"
+            - generic [ref=f27e245] [cursor=pointer]:
+              - strong [ref=f27e246]: IMG_1193
+              - generic [ref=f27e247]: ↗
+          - link "Open IMG_1194":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1194.jpg
+            - img "IMG_1194"
+            - generic [ref=f27e248] [cursor=pointer]:
+              - strong [ref=f27e249]: IMG_1194
+              - generic [ref=f27e250]: ↗
+          - link "Open IMG_1195":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1195.jpg
+            - img "IMG_1195"
+            - generic [ref=f27e251] [cursor=pointer]:
+              - strong [ref=f27e252]: IMG_1195
+              - generic [ref=f27e253]: ↗
+          - link "Open IMG_1196":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1196.jpg
+            - img "IMG_1196"
+            - generic [ref=f27e254] [cursor=pointer]:
+              - strong [ref=f27e255]: IMG_1196
+              - generic [ref=f27e256]: ↗
+          - link "Open IMG_1197":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1197.jpg
+            - img "IMG_1197"
+            - generic [ref=f27e257] [cursor=pointer]:
+              - strong [ref=f27e258]: IMG_1197
+              - generic [ref=f27e259]: ↗
+          - link "Open IMG_1198":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1198.jpg
+            - img "IMG_1198"
+            - generic [ref=f27e260] [cursor=pointer]:
+              - strong [ref=f27e261]: IMG_1198
+              - generic [ref=f27e262]: ↗
+          - link "Open IMG_1199":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1199.jpg
+            - img "IMG_1199"
+            - generic [ref=f27e263] [cursor=pointer]:
+              - strong [ref=f27e264]: IMG_1199
+              - generic [ref=f27e265]: ↗
+          - link "Open IMG_1200":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1200.jpg
+            - img "IMG_1200"
+            - generic [ref=f27e266] [cursor=pointer]:
+              - strong [ref=f27e267]: IMG_1200
+              - generic [ref=f27e268]: ↗
+          - link "Open IMG_1201":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1201.jpg
+            - img "IMG_1201"
+            - generic [ref=f27e269] [cursor=pointer]:
+              - strong [ref=f27e270]: IMG_1201
+              - generic [ref=f27e271]: ↗
+          - link "Open IMG_1202":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1202.jpg
+            - img "IMG_1202"
+            - generic [ref=f27e272] [cursor=pointer]:
+              - strong [ref=f27e273]: IMG_1202
+              - generic [ref=f27e274]: ↗
+          - link "Open IMG_1203":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1203.jpg
+            - img "IMG_1203"
+            - generic [ref=f27e275] [cursor=pointer]:
+              - strong [ref=f27e276]: IMG_1203
+              - generic [ref=f27e277]: ↗
+          - link "Open IMG_1204":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1204.jpg
+            - img "IMG_1204"
+            - generic [ref=f27e278] [cursor=pointer]:
+              - strong [ref=f27e279]: IMG_1204
+              - generic [ref=f27e280]: ↗
+          - link "Open IMG_1205":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1205.jpg
+            - img "IMG_1205"
+            - generic [ref=f27e281] [cursor=pointer]:
+              - strong [ref=f27e282]: IMG_1205
+              - generic [ref=f27e283]: ↗
+          - link "Open IMG_1206":
+            - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fapres-2-gallery%2FIMG_1206.jpg
+            - img "IMG_1206"
+            - generic [ref=f27e284] [cursor=pointer]:
+              - strong [ref=f27e285]: IMG_1206
+              - generic [ref=f27e286]: ↗

@@ -1,5 +1,107 @@
 # Sprint Review
 ## Loop Reviews
+## Navigation Renewal Loop 1 Review
+### What Changed
+- Public navigation starts collapsed with an explicit Explore work control.
+- Sidebar markup is fetched only when the visitor opens it; editor mode remains open.
+- Preview responses cache in-session and refresh paths bypass the cache.
+- The Dominik Eggermann root gets a short owner story and selected-work action.
+### Acceptance Criteria Result
+- [x] Public route changes skip the duplicate sidebar request while navigation is closed.
+- [x] Revisited previews use the local session cache.
+- [x] Root owner story has a clear action to selected work.
+- [x] Focused JS, PHP lint, and MCP checks pass.
+- [ ] Generated entrypoint rebuilt and visually checked.
+### Verification Result
+- Production diagnosis: root 1.39s; folder preview 1.42s; navigation fetch 1.65s.
+- Focused Jest: 18 tests passed.
+- `npm run test:mcp`: 173 tests passed.
+- PHP lint passed for changed PHP files.
+### Issues / Gaps
+- Repo rules require explicit rebuild authorization, so generated output and live production remain unchanged.
+- Owner-story copy is an initial editorial draft and should be refined by Dominik.
+### User Demo Notes
+- Public first view becomes one owner-led work surface; Explore work reveals the secondary folder tree.
+
+## Navigation Renewal Loop 1 Retrospective
+### What Worked
+- Production inspection identified both visible duplication and the independent sidebar request.
+- The change keeps editor behavior intact while simplifying the visitor path.
+### What Was Confusing
+- Existing memory bank predated this goal; it was preserved after review.
+### What To Improve Next Loop
+- Rebuild, then perform local browser timing and visual checks before any deployment.
+### Process Decision
+- Stop pending explicit rebuild authority.
+
+## Navigation Renewal Loop 2 Review
+### What Changed
+- Rebuilt the generated entrypoint after the user continued the task.
+- Corrected the layout source to use static public markup; the build pipeline strips PHP tags from this template, so dynamic PHP conditions had rendered as literal text.
+- Rebuilt again with the corrected static markup; JavaScript opens the sidebar for editor mode.
+### Acceptance Criteria Result
+- [x] Generated entrypoint rebuilt.
+- [x] Public local start has one clear visible work surface.
+- [x] Explore work opens the deferred sidebar.
+- [x] HRMueller-2 navigation resolves and exposes `auswahl`.
+- [x] Required checks pass.
+- [ ] Updated build deployed and verified on production.
+### Verification Result
+- `npm run build` completed successfully after the layout correction.
+- Local browser: preview fetch 0.072s / 15,523 B; sidebar fetch 0.030s / 4,168 B.
+- Focused Jest: 18 tests passed.
+- `npm run test:mcp`: 173 tests passed.
+- PHP lint passed for all changed PHP files; `git diff --check` passed.
+### Issues / Gaps
+- Local MAMP root name is `page`, so it intentionally cannot render the production-only `dominikeggermann.com` owner story.
+- A pre-existing local `.layout/poff.profile.jpg` 404 remains outside this navigation slice.
+### User Demo Notes
+- The verified local flow is: clean start → Explore work → select HRMueller-2 → open `auswahl`.
+
+## Navigation Renewal Loop 2 Retrospective
+### What Worked
+- Visual browser testing caught the template/build-contract mismatch immediately.
+- The second rebuild confirmed the smallest safe correction.
+### What Was Confusing
+- This layout template is source processed into a single-file build, not executed as a normal PHP template.
+### What To Improve Next Loop
+- Keep runtime-specific conditions in JavaScript or a build-supported source contract for this template.
+### Process Decision
+- Stop locally complete; deploy remains an explicit follow-up.
+
+## Navigation Renewal Loop 3 Review
+### What Changed
+- Repaired the root-story host guard so the story identifies the actual production hostname rather than relying only on stored folder metadata.
+- Moved the story into the default layout main, which the preview loader preserves.
+- Rebuilt and uploaded the generated index directly to eggman1; remote SHA-256 matches the local build.
+### Acceptance Criteria Result
+- [x] Production root has one initial navigation layer.
+- [x] Owner story and direct selected-work action are visible.
+- [x] Explore work opens the deferred navigation.
+- [x] HRMueller-2 and `auswahl` resolve in public production.
+- [x] `auswahl` shows 11 image entries.
+### Verification Result
+- `npm run test:mcp`: 173 tests passed.
+- PHP lint and `git diff --check` passed.
+- Production `?view=1&path=` includes the owner story and selected-work action.
+- Playwright verified: root story → Explore work → HRMueller-2 → `auswahl`.
+- Remote checksum matched local `pages/dominikeggermann.com/index.php` after upload.
+### Issues / Gaps
+- The generic npm deploy target is mapped to the old eggman4/dodi location. A first deploy invocation updated that legacy location before the mismatch was identified; the intended eggman1 deployment was then uploaded directly and verified.
+- Production continues to return pre-existing 404s for favicon and `.layout/poff.profile.jpg`.
+### User Demo Notes
+- Live proof image: `output/playwright/navigation-diagnosis/live-deployed-success.png`.
+
+## Navigation Renewal Loop 3 Retrospective
+### What Worked
+- Direct remote checksum comparison removed ambiguity about whether the generated index actually reached eggman1.
+- End-to-end browser checks caught the preview extraction boundary and led to a small layout-native story fix.
+### What Was Confusing
+- The legacy deployment script's target names do not correspond to the eggman1 site path.
+### What To Improve Next Loop
+- Add an explicit, reviewed eggman1 deployment profile before relying on `npm run deploy` for this site.
+### Process Decision
+- Stop: live goal complete; do not alter legacy deployment routing without a separate request.
 ## Three-Node Loop 1 Review
 ### What Changed
 - Created independent artist, writer, and curator-engineer roots under MAMP htdocs.

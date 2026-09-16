@@ -1,0 +1,169 @@
+- generic [ref=f1e2]:
+  - button "Close navigation" [expanded] [ref=f1e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f1e8]:
+    - group [ref=f1e10]:
+      - generic "Toggle editor tools" [ref=f1e11] [cursor=pointer]: Editor tools
+    - list [ref=f1e18]:
+      - listitem [ref=f1e162]:
+        - link "page" [ref=f1e163] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f1e166]:
+        - link "Go Up" [ref=f1e167] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f1e170]:
+        - link "./ Après Gallery" [ref=f1e171] [cursor=pointer]:
+          - /url: "?path=apres-2-gallery"
+      - listitem [ref=f1e172]:
+        - link "IMG_1191" [ref=f1e173] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e177]:
+        - link "IMG_1192" [ref=f1e178] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e182]:
+        - link "IMG_1193" [ref=f1e183] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e187]:
+        - link "IMG_1194" [ref=f1e188] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e192]:
+        - link "IMG_1195" [ref=f1e193] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e197]:
+        - link "IMG_1196" [ref=f1e198] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e202]:
+        - link "IMG_1197" [ref=f1e203] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e207]:
+        - link "IMG_1198" [ref=f1e208] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e212]:
+        - link "IMG_1199" [ref=f1e213] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e217]:
+        - link "IMG_1200" [ref=f1e218] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e222]:
+        - link "IMG_1201" [ref=f1e223] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e227]:
+        - link "IMG_1202" [ref=f1e228] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e232]:
+        - link "IMG_1203" [ref=f1e233] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e237]:
+        - link "IMG_1204" [ref=f1e238] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e242]:
+        - link "IMG_1205" [ref=f1e243] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e247]:
+        - link "IMG_1206" [ref=f1e248] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f1e63]:
+    - main [ref=f1e252]:
+      - generic [ref=f1e253]:
+        - generic [ref=f1e254]:
+          - generic [ref=f1e255]:
+            - paragraph [ref=f1e256]: CONVERTED COLLECTION · JPG
+            - heading "Après Gallery" [level=1] [ref=f1e257]
+            - paragraph [ref=f1e258]: Sixteen HEIC photographs converted through an external Pageoff node. Open any image for the full JPG.
+          - generic [ref=f1e259]: 16 images
+        - generic "Après Gallery" [ref=f1e260]:
+          - link "Open IMG_1191" [ref=f1e261] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1191.jpg
+            - img "IMG_1191" [ref=f1e262]
+            - generic [ref=f1e263]:
+              - strong [ref=f1e264]: IMG_1191
+              - generic [ref=f1e265]: ↗
+          - link "Open IMG_1192" [ref=f1e266] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1192.jpg
+            - img "IMG_1192" [ref=f1e267]
+            - generic [ref=f1e268]:
+              - strong [ref=f1e269]: IMG_1192
+              - generic [ref=f1e270]: ↗
+          - link "Open IMG_1193" [ref=f1e271] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1193.jpg
+            - img "IMG_1193" [ref=f1e272]
+            - generic [ref=f1e273]:
+              - strong [ref=f1e274]: IMG_1193
+              - generic [ref=f1e275]: ↗
+          - link "Open IMG_1194" [ref=f1e276] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1194.jpg
+            - img "IMG_1194" [ref=f1e277]
+            - generic [ref=f1e278]:
+              - strong [ref=f1e279]: IMG_1194
+              - generic [ref=f1e280]: ↗
+          - link "Open IMG_1195" [ref=f1e281] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1195.jpg
+            - img "IMG_1195" [ref=f1e282]
+            - generic [ref=f1e283]:
+              - strong [ref=f1e284]: IMG_1195
+              - generic [ref=f1e285]: ↗
+          - link "Open IMG_1196" [ref=f1e286] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1196.jpg
+            - img "IMG_1196" [ref=f1e287]
+            - generic [ref=f1e288]:
+              - strong [ref=f1e289]: IMG_1196
+              - generic [ref=f1e290]: ↗
+          - link "Open IMG_1197" [ref=f1e291] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1197.jpg
+            - img "IMG_1197" [ref=f1e292]
+            - generic [ref=f1e293]:
+              - strong [ref=f1e294]: IMG_1197
+              - generic [ref=f1e295]: ↗
+          - link "Open IMG_1198" [ref=f1e296] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1198.jpg
+            - img "IMG_1198" [ref=f1e297]
+            - generic [ref=f1e298]:
+              - strong [ref=f1e299]: IMG_1198
+              - generic [ref=f1e300]: ↗
+          - link "Open IMG_1199" [ref=f1e301] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1199.jpg
+            - img "IMG_1199" [ref=f1e302]
+            - generic [ref=f1e303]:
+              - strong [ref=f1e304]: IMG_1199
+              - generic [ref=f1e305]: ↗
+          - link "Open IMG_1200" [ref=f1e306] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1200.jpg
+            - img "IMG_1200" [ref=f1e307]
+            - generic [ref=f1e308]:
+              - strong [ref=f1e309]: IMG_1200
+              - generic [ref=f1e310]: ↗
+          - link "Open IMG_1201" [ref=f1e311] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1201.jpg
+            - img "IMG_1201" [ref=f1e312]
+            - generic [ref=f1e313]:
+              - strong [ref=f1e314]: IMG_1201
+              - generic [ref=f1e315]: ↗
+          - link "Open IMG_1202" [ref=f1e316] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1202.jpg
+            - img "IMG_1202" [ref=f1e317]
+            - generic [ref=f1e318]:
+              - strong [ref=f1e319]: IMG_1202
+              - generic [ref=f1e320]: ↗
+          - link "Open IMG_1203" [ref=f1e321] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1203.jpg
+            - img "IMG_1203" [ref=f1e322]
+            - generic [ref=f1e323]:
+              - strong [ref=f1e324]: IMG_1203
+              - generic [ref=f1e325]: ↗
+          - link "Open IMG_1204" [ref=f1e326] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1204.jpg
+            - img "IMG_1204" [ref=f1e327]
+            - generic [ref=f1e328]:
+              - strong [ref=f1e329]: IMG_1204
+              - generic [ref=f1e330]: ↗
+          - link "Open IMG_1205" [ref=f1e331] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1205.jpg
+            - img "IMG_1205" [ref=f1e332]
+            - generic [ref=f1e333]:
+              - strong [ref=f1e334]: IMG_1205
+              - generic [ref=f1e335]: ↗
+          - link "Open IMG_1206" [ref=f1e336] [cursor=pointer]:
+            - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres-2-gallery%2FIMG_1206.jpg
+            - img "IMG_1206" [ref=f1e337]
+            - generic [ref=f1e338]:
+              - strong [ref=f1e339]: IMG_1206
+              - generic [ref=f1e340]: ↗

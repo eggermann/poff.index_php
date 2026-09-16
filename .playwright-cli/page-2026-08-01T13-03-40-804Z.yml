@@ -1,0 +1,28 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ pageoff-civic" [ref=e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e21]:
+        - link "01-democracy" [ref=e22] [cursor=pointer]:
+          - /url: "?path=01-democracy"
+      - listitem [ref=e26]:
+        - link "02-commons" [ref=e27] [cursor=pointer]:
+          - /url: "?path=02-commons"
+      - listitem [ref=e31]:
+        - link "03-rights" [ref=e32] [cursor=pointer]:
+          - /url: "?path=03-rights"
+      - listitem [ref=e36]:
+        - link "04-methods" [ref=e37] [cursor=pointer]:
+          - /url: "?path=04-methods"
+      - listitem [ref=e41]:
+        - link "05-neighbours" [ref=e42] [cursor=pointer]:
+          - /url: "?path=05-neighbours"
+      - listitem [ref=e46]:
+        - link "README.txt" [ref=e47] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e53]

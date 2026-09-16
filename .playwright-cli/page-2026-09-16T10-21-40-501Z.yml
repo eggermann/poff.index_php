@@ -1,0 +1,123 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e154] [cursor=pointer]
+  - complementary "Navigation" [ref=e155]:
+    - group [ref=e157]:
+      - generic "Toggle editor tools" [ref=e158] [cursor=pointer]: Editor tools
+    - list [ref=e165]:
+      - listitem [ref=e284]:
+        - link "dominikeggermann.com" [ref=e285] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e288]:
+        - link "Go Up" [ref=e289] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e292]:
+        - link "./ HRMueller-2" [ref=e293] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=e294]:
+        - link "Après Gallery" [ref=e295] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fapres-2-gallery"
+      - listitem [ref=e299]:
+        - link "auswahl" [ref=e300] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fauswahl"
+      - listitem [ref=e304]:
+        - link "Player" [ref=e305] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fplayer"
+      - listitem [ref=e309]:
+        - link "Bildschirmfoto-2026-08-26-um-08.35.01.png" [ref=e310] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e314]:
+        - link "long.jpg" [ref=e315] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e319]:
+        - link "MyBrother TV 1" [ref=e320] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e324]:
+        - link "MyBrother TV 2" [ref=e325] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e329]:
+        - link "MyBrother TV 3" [ref=e330] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e334]:
+        - link "Mybrother.tv.webloc" [ref=e335] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e11]:
+    - generic [ref=e339]:
+      - banner [ref=e340]:
+        - img "Poff profile" [ref=e342]
+        - generic [ref=e343]:
+          - heading "HRMueller-2" [level=1] [ref=e344]
+          - generic "Categories" [ref=e345]:
+            - generic [ref=e346]: folder
+            - generic [ref=e347]: collection
+            - generic [ref=e348]: gallery
+            - generic [ref=e349]: video
+            - generic [ref=e350]: links
+          - paragraph [ref=e351]: Après image gallery, looping film player, and MyBrother TV links.
+      - main [ref=e352]:
+        - generic [ref=e353]:
+          - generic [ref=e354]:
+            - generic [ref=e355]: HRMueller-2
+            - generic [ref=e356]: 9 entries
+          - generic [ref=e357]:
+            - article [ref=e358]:
+              - link [ref=e359] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2FBildschirmfoto-2026-08-26-um-08.35.01.png
+                - img "Bildschirmfoto-2026-08-26-um-08.35.01.png" [ref=e360]
+              - generic [ref=e361]: File
+              - strong [ref=e362]:
+                - link "Bildschirmfoto-2026-08-26-um-08.35.01.png" [ref=e363] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2FBildschirmfoto-2026-08-26-um-08.35.01.png
+              - generic [ref=e364]: HRMueller-2/Bildschirmfoto-2026-08-26-um-08.35.01.png
+            - article [ref=e365]:
+              - generic [ref=e366]: File
+              - strong [ref=e367]:
+                - link "Mybrother.tv-1.webloc" [ref=e368] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2FMybrother.tv-1.webloc
+              - generic [ref=e369]: HRMueller-2/Mybrother.tv-1.webloc
+            - article [ref=e370]:
+              - generic [ref=e371]: File
+              - strong [ref=e372]:
+                - link "Mybrother.tv-2.webloc" [ref=e373] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2FMybrother.tv-2.webloc
+              - generic [ref=e374]: HRMueller-2/Mybrother.tv-2.webloc
+            - article [ref=e375]:
+              - generic [ref=e376]: File
+              - strong [ref=e377]:
+                - link "Mybrother.tv-3.webloc" [ref=e378] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2FMybrother.tv-3.webloc
+              - generic [ref=e379]: HRMueller-2/Mybrother.tv-3.webloc
+            - article [ref=e380]:
+              - generic [ref=e381]: File
+              - strong [ref=e382]:
+                - link "Mybrother.tv.webloc" [ref=e383] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2FMybrother.tv.webloc
+              - generic [ref=e384]: HRMueller-2/Mybrother.tv.webloc
+            - article [ref=e385]:
+              - generic [ref=e386]: Folder
+              - strong [ref=e387]:
+                - link "apres-2-gallery" [ref=e388] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=HRMueller-2%2Fapres-2-gallery
+              - generic [ref=e389]: HRMueller-2/apres-2-gallery
+            - article [ref=e390]:
+              - generic [ref=e391]: Folder
+              - strong [ref=e392]:
+                - link "auswahl" [ref=e393] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=HRMueller-2%2Fauswahl
+              - generic [ref=e394]: HRMueller-2/auswahl
+            - article [ref=e395]:
+              - link [ref=e396] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Flong.jpg
+                - img "long.jpg" [ref=e397]
+              - generic [ref=e398]: File
+              - strong [ref=e399]:
+                - link "long.jpg" [ref=e400] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Flong.jpg
+              - generic [ref=e401]: HRMueller-2/long.jpg
+            - article [ref=e402]:
+              - generic [ref=e403]: Folder
+              - strong [ref=e404]:
+                - link "player" [ref=e405] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=HRMueller-2%2Fplayer
+              - generic [ref=e406]: HRMueller-2/player
+      - contentinfo [ref=e407]:
+        - generic [ref=e408]: Copyright eggman

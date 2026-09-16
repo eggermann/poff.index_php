@@ -1,0 +1,37 @@
+- generic [ref=f6e2]:
+  - button "Close navigation" [expanded] [ref=f6e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f6e8]:
+    - group [ref=f6e10]:
+      - generic "Toggle editor tools" [ref=f6e11] [cursor=pointer]: Editor tools
+    - list [ref=f6e18]:
+      - listitem [ref=f6e19]:
+        - link "./ page" [ref=f6e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f6e21]:
+        - link "apres" [ref=f6e22] [cursor=pointer]:
+          - /url: "?path=apres"
+      - listitem [ref=f6e26]:
+        - link "apres-2" [ref=f6e27] [cursor=pointer]:
+          - /url: "?path=apres-2"
+      - listitem [ref=f6e31]:
+        - link "apres-2-gallery" [ref=f6e32] [cursor=pointer]:
+          - /url: "?path=apres-2-gallery"
+      - listitem [ref=f6e36]:
+        - link "HRMueller-2" [ref=f6e37] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=f6e41]:
+        - link "player" [ref=f6e42] [cursor=pointer]:
+          - /url: "?path=player"
+      - listitem [ref=f6e46]:
+        - link "Prothagonia" [ref=f6e47] [cursor=pointer]:
+          - /url: "?path=Prothagonia"
+      - listitem [ref=f6e51]:
+        - link "Mybrother.tv-1.webloc" [ref=f6e52] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f6e56]:
+        - link "Mybrother.tv-2.webloc" [ref=f6e57] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f6e61]:
+        - link "Mybrother.tv-3.webloc" [ref=f6e62] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f6e68]

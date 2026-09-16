@@ -1,0 +1,31 @@
+- generic [ref=f27e2]:
+  - button "Close navigation" [expanded] [ref=f27e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f27e8]:
+    - group [ref=f27e10]:
+      - generic "Toggle editor tools" [ref=f27e11] [cursor=pointer]: Editor tools
+    - list [ref=f27e18]:
+      - listitem [ref=f27e19]:
+        - link "dominikeggermann.com" [ref=f27e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f27e23]:
+        - link "Go Up" [ref=f27e24] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f27e27]:
+        - link "./ HRMueller-2" [ref=f27e28] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=f27e29]:
+        - link "Après Gallery" [ref=f27e30] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fapres-2-gallery"
+      - listitem [ref=f27e34]:
+        - link "Player" [ref=f27e35] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fplayer"
+      - listitem [ref=f27e39]:
+        - link "MyBrother TV 1" [ref=f27e40] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e44]:
+        - link "MyBrother TV 2" [ref=f27e45] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f27e49]:
+        - link "MyBrother TV 3" [ref=f27e50] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f27e56]

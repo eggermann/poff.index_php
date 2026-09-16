@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Iteration 2 · Reduced Poff work flow</title>
+    <link rel="stylesheet" href="iteration-shared.css">
+</head>
+<body>
+<div class="app">
+    <nav class="nav">
+        <div class="tools">☰ &nbsp; Editor tools</div>
+        <ul><li>⌂ &nbsp; page</li><li>↑ &nbsp; Go up</li><li class="active">./ Player</li><li>35-freshweb-prompt…</li><li>46-freshweb-prompt…</li></ul>
+    </nav>
+    <main class="workspace">
+        <div class="ghost"><p>LOCAL COLLECTION · CONTINUOUS PLAY</p><h1>Player</h1><div class="ghost-grid"><div></div><div></div></div></div>
+        <div class="veil"></div>
+        <section class="dialog">
+            <header class="dialog-head">
+                <div><p class="eyebrow">Poff network</p><h2>Use external work</h2></div>
+                <button class="close">×</button>
+            </header>
+            <div class="content">
+                <div>
+                    <label class="caption" for="url">Work URL</label>
+                    <div class="url-row"><input id="url" type="url" value="https://pageoff.de/?path=Prothagonia"><span class="node"><i class="dot"></i> pageoff.de</span></div>
+                </div>
+                <div class="work-row">
+                    <span class="work-icon">P</span>
+                    <span class="work-copy"><strong>Prothagonia</strong><small>Public folder work · source node connected</small></span>
+                    <span class="pills"><span class="pill">6 videos</span><span class="pill">70.5 MB</span></span>
+                </div>
+                <fieldset>
+                    <legend>Ownership</legend>
+                    <div class="choices">
+                        <label class="choice selected"><input type="radio" checked><span><strong>Copy here</strong><small>Independent local files. Source stays unchanged.</small></span><em class="recommended">Recommended</em></label>
+                        <label class="choice"><input type="radio"><span><strong>Keep connected</strong><small>Use remote entries and receive source updates.</small></span></label>
+                    </div>
+                    <div class="tertiary">Need only remote presentation? <a href="#">Embed view instead</a></div>
+                </fieldset>
+                <div class="copy-box">
+                    <div><label class="caption" for="name">Local folder</label><input id="name" type="text" value="player"></div>
+                    <label class="toggle"><input type="checkbox" checked><span><strong>Loop copied videos</strong><small>Detected video collection. Create one continuous player.</small></span></label>
+                </div>
+            </div>
+            <footer class="dialog-foot">
+                <div class="summary"><strong>6 files</strong> become local work <strong>./player</strong>.</div>
+                <div class="actions"><button class="action cancel">Cancel</button><button class="action primary">Copy here</button></div>
+            </footer>
+        </section>
+    </main>
+</div>
+</body>
+</html>

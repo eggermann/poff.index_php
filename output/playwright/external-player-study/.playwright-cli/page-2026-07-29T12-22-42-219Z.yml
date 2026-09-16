@@ -1,0 +1,61 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ page" [ref=e20] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=e22] [cursor=pointer]
+      - listitem [ref=e26]:
+        - link "apres" [ref=e27] [cursor=pointer]:
+          - /url: "?path=apres&edit=true"
+        - generic [ref=e31]:
+          - button "Copy + paste" [ref=e32] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e36] [cursor=pointer]
+          - button "Delete item" [ref=e40] [cursor=pointer]
+      - listitem [ref=e44]:
+        - link "apres-2" [ref=e45] [cursor=pointer]:
+          - /url: "?path=apres-2&edit=true"
+        - generic [ref=e49]:
+          - button "Copy + paste" [ref=e50] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e54] [cursor=pointer]
+          - button "Delete item" [ref=e58] [cursor=pointer]
+      - listitem [ref=e62]:
+        - link "Prothagonia" [ref=e63] [cursor=pointer]:
+          - /url: "?path=Prothagonia&edit=true"
+        - generic [ref=e67]:
+          - button "Copy + paste" [ref=e68] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e72] [cursor=pointer]
+          - button "Delete item" [ref=e76] [cursor=pointer]
+      - listitem [ref=e80]:
+        - link ".layout" [ref=e81] [cursor=pointer]:
+          - /url: "#/.layout"
+        - button "Copy + paste" [ref=e85] [cursor=pointer]
+      - listitem [ref=e89]:
+        - link "Mybrother.tv-1.webloc" [ref=e90] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e94]:
+          - button "Copy + paste" [ref=e95] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e99] [cursor=pointer]
+          - button "Delete item" [ref=e103] [cursor=pointer]
+      - listitem [ref=e107]:
+        - link "Mybrother.tv-2.webloc" [ref=e108] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e112]:
+          - button "Copy + paste" [ref=e113] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e117] [cursor=pointer]
+          - button "Delete item" [ref=e121] [cursor=pointer]
+      - listitem [ref=e125]:
+        - link "Mybrother.tv-3.webloc" [ref=e126] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e130]:
+          - button "Copy + paste" [ref=e131] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e135] [cursor=pointer]
+          - button "Delete item" [ref=e139] [cursor=pointer]
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - document [ref=e145]

@@ -1,0 +1,63 @@
+- generic [ref=f8e2]:
+  - button "Close navigation" [expanded] [ref=f8e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f8e8]:
+    - group [ref=f8e10]:
+      - generic "Toggle editor tools" [ref=f8e11] [cursor=pointer]: Editor tools
+    - list [ref=f8e18]:
+      - listitem [ref=f8e148]:
+        - link "pageoff-curator" [ref=f8e149] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f8e152]:
+        - link "Go Up" [ref=f8e153] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f8e156]:
+        - link "./ artist-layout-edition" [ref=f8e157] [cursor=pointer]:
+          - /url: "?path=artist-layout-edition"
+      - listitem [ref=f8e158]:
+        - link "artist-edition-portrait.jpg" [ref=f8e159] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f8e163]:
+        - link "artist-edition-table.jpg" [ref=f8e164] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f8e168]:
+        - link "provenance.md" [ref=f8e169] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f8e53]:
+    - generic [ref=f8e173]:
+      - banner [ref=f8e174]:
+        - paragraph [ref=f8e175]: Open studio · node 01
+        - heading "artist-layout-edition" [level=1] [ref=f8e176]
+        - paragraph [ref=f8e177]: Images are not inventory. They are invitations to look, borrow, answer, and rearrange.
+      - main [ref=f8e178]:
+        - region "Studio works and exchanges" [ref=f8e179]:
+          - article [ref=f8e180]:
+            - link [ref=f8e181] [cursor=pointer]:
+              - /url: http://localhost:8888/pageoff-curator/?view=1&file=artist-layout-edition%2Fartist-edition-portrait.jpg
+              - img "artist-edition-portrait.jpg" [ref=f8e182]
+            - generic [ref=f8e183]:
+              - text: work
+              - heading [level=2] [ref=f8e184]:
+                - link "artist-edition-portrait.jpg" [ref=f8e185] [cursor=pointer]:
+                  - /url: http://localhost:8888/pageoff-curator/?view=1&file=artist-layout-edition%2Fartist-edition-portrait.jpg
+              - text: artist-layout-edition/artist-edition-portrait.jpg
+          - article [ref=f8e186]:
+            - link [ref=f8e187] [cursor=pointer]:
+              - /url: http://localhost:8888/pageoff-curator/?view=1&file=artist-layout-edition%2Fartist-edition-table.jpg
+              - img "artist-edition-table.jpg" [ref=f8e188]
+            - generic [ref=f8e189]:
+              - text: work
+              - heading [level=2] [ref=f8e190]:
+                - link "artist-edition-table.jpg" [ref=f8e191] [cursor=pointer]:
+                  - /url: http://localhost:8888/pageoff-curator/?view=1&file=artist-layout-edition%2Fartist-edition-table.jpg
+              - text: artist-layout-edition/artist-edition-table.jpg
+          - article [ref=f8e192]:
+            - generic [ref=f8e193]:
+              - text: text
+              - heading [level=2] [ref=f8e194]:
+                - link "provenance.md" [ref=f8e195] [cursor=pointer]:
+                  - /url: http://localhost:8888/pageoff-curator/?view=1&file=artist-layout-edition%2Fprovenance.md
+              - text: artist-layout-edition/provenance.md
+      - contentinfo [ref=f8e196]:
+        - text: One file. One studio. Many neighbours.
+        - link "Back to works ↑" [ref=f8e197] [cursor=pointer]:
+          - /url: "#works"

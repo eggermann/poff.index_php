@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Use external Poff work</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            color-scheme: light;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #172033;
+            background: #eaf0f6;
+        }
+        body { min-height: 100vh; margin: 0; }
+        .app {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: 272px minmax(0, 1fr);
+        }
+        .nav {
+            padding: 26px 18px;
+            border-right: 1px solid #dce4ed;
+            background: rgba(249, 252, 255, 0.94);
+        }
+        .tools {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 17px;
+            border-radius: 18px;
+            color: white;
+            background: linear-gradient(135deg, #17243a, #302b74);
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .tools b { font-size: 1.3rem; }
+        .nav ul { display: grid; gap: 8px; margin: 28px 0 0; padding: 0; list-style: none; }
+        .nav li {
+            padding: 13px 14px;
+            border-radius: 14px;
+            color: #43516a;
+            background: #f5f8fb;
+            font-weight: 700;
+        }
+        .nav li.active { color: #087c76; background: #def3f1; }
+        .workspace {
+            position: relative;
+            min-width: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 30% 5%, rgba(232, 119, 94, 0.2), transparent 26rem),
+                #0c1116;
+        }
+        .ghost-player { padding: 54px 64px; color: white; opacity: 0.28; }
+        .ghost-player p { color: #e7775e; font-size: 0.7rem; font-weight: 900; letter-spacing: 0.16em; }
+        .ghost-player h1 { margin: 12px 0 40px; font: 400 6rem/.9 Georgia, serif; }
+        .ghost-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 26px; }
+        .ghost-screen, .ghost-list { min-height: 420px; border: 1px solid #697078; border-radius: 20px; background: #111; }
+        .veil { position: absolute; inset: 0; background: rgba(10, 16, 25, 0.58); backdrop-filter: blur(6px); }
+        .dialog {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: min(920px, calc(100% - 70px));
+            max-height: calc(100vh - 58px);
+            overflow: auto;
+            transform: translate(-50%, -50%);
+            border: 1px solid rgba(255, 255, 255, 0.48);
+            border-radius: 26px;
+            background: #fbfcfd;
+            box-shadow: 0 40px 110px rgba(0, 0, 0, 0.44);
+        }
+        .dialog-head {
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 25px 28px 19px;
+            border-bottom: 1px solid #e2e8ef;
+        }
+        .eyebrow { margin: 0 0 6px; color: #16867e; font-size: 0.7rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; }
+        h2 { margin: 0; color: #111a2c; font-size: 1.65rem; letter-spacing: -0.03em; }
+        .close { border: 0; color: #6d7787; background: transparent; font-size: 1.8rem; cursor: pointer; }
+        .content { display: grid; gap: 18px; padding: 22px 28px; }
+        label.caption { display: block; margin-bottom: 7px; color: #3d485a; font-size: 0.77rem; font-weight: 800; }
+        .url-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+        input[type="url"], input[type="text"] {
+            width: 100%;
+            height: 45px;
+            padding: 0 13px;
+            border: 1px solid #cbd5e1;
+            border-radius: 11px;
+            color: #182238;
+            background: white;
+            font: inherit;
+        }
+        .connected {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 0 14px;
+            border: 1px solid #9ed6c8;
+            border-radius: 11px;
+            color: #137665;
+            background: #e8f7f2;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #22ad82; box-shadow: 0 0 0 4px rgba(34, 173, 130, 0.14); }
+        .source-preview {
+            display: grid;
+            grid-template-columns: 54px minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: center;
+            padding: 14px;
+            border: 1px solid #dbe4ec;
+            border-radius: 16px;
+            background: #f4f7fa;
+        }
+        .source-icon {
+            display: grid;
+            width: 54px;
+            height: 54px;
+            place-items: center;
+            border-radius: 14px;
+            color: white;
+            background: linear-gradient(145deg, #14253d, #1a827a);
+            font-size: 1.35rem;
+        }
+        .source-preview strong, .source-preview small { display: block; }
+        .source-preview small { margin-top: 4px; color: #68758a; }
+        .source-meta { display: flex; gap: 7px; }
+        .pill { padding: 5px 8px; border-radius: 999px; color: #5a6678; background: white; font-size: 0.68rem; font-weight: 800; }
+        fieldset { margin: 0; padding: 0; border: 0; }
+        legend { margin-bottom: 8px; color: #3d485a; font-size: 0.77rem; font-weight: 800; }
+        .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .mode {
+            position: relative;
+            display: grid;
+            min-height: 128px;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            padding: 14px;
+            border: 1px solid #d7e0e8;
+            border-radius: 15px;
+            background: white;
+        }
+        .mode.selected { border-color: #158c83; background: #eef9f6; box-shadow: 0 0 0 1px #158c83; }
+        .mode input { margin: 3px 0 0; accent-color: #16867e; }
+        .mode strong, .mode small { display: block; }
+        .mode strong { margin-bottom: 5px; color: #152035; font-size: 0.84rem; }
+        .mode small { color: #6b7688; font-size: 0.72rem; line-height: 1.35; }
+        .recommended {
+            position: absolute;
+            top: -9px;
+            right: 10px;
+            padding: 4px 7px;
+            border-radius: 999px;
+            color: white;
+            background: #16867e;
+            font-size: 0.58rem;
+            font-style: normal;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .copy-options {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+            gap: 16px;
+            padding: 15px;
+            border: 1px dashed #c8d3dd;
+            border-radius: 15px;
+            background: #f7f9fb;
+        }
+        .check {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: start;
+            padding-top: 23px;
+        }
+        .check input { margin-top: 3px; accent-color: #16867e; }
+        .check strong, .check small { display: block; }
+        .check strong { color: #1e293b; font-size: 0.8rem; }
+        .check small { margin-top: 3px; color: #6b7688; font-size: 0.69rem; line-height: 1.3; }
+        .dialog-foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 17px 28px 21px;
+            border-top: 1px solid #e2e8ef;
+            background: #f7f9fb;
+        }
+        .summary { color: #697588; font-size: 0.76rem; }
+        .summary strong { color: #1a263a; }
+        .actions { display: flex; gap: 9px; }
+        button.action { padding: 11px 17px; border: 0; border-radius: 11px; font-weight: 800; cursor: pointer; }
+        .cancel { color: #4f5d71; background: #e8edf2; }
+        .primary { color: white; background: #142136; box-shadow: 0 8px 20px rgba(20, 33, 54, 0.18); }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <nav class="nav">
+            <div class="tools"><b>☰</b> Editor tools</div>
+            <ul>
+                <li>⌂ &nbsp; page</li>
+                <li>↑ &nbsp; Go up</li>
+                <li class="active">./ Player</li>
+                <li>35-freshweb-prompt…</li>
+                <li>46-freshweb-prompt…</li>
+                <li>64-freshweb-prompt…</li>
+            </ul>
+        </nav>
+        <main class="workspace">
+            <div class="ghost-player">
+                <p>LOCAL COLLECTION · CONTINUOUS PLAY</p>
+                <h1>Player</h1>
+                <div class="ghost-grid"><div class="ghost-screen"></div><div class="ghost-list"></div></div>
+            </div>
+            <div class="veil"></div>
+            <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+                <header class="dialog-head">
+                    <div>
+                        <p class="eyebrow">External Poff work</p>
+                        <h2 id="dialog-title">Use work from another webspace</h2>
+                    </div>
+                    <button class="close" aria-label="Close">×</button>
+                </header>
+                <div class="content">
+                    <div>
+                        <label class="caption" for="poff-url">Poff work URL</label>
+                        <div class="url-row">
+                            <input id="poff-url" type="url" value="https://pageoff.de/?path=Prothagonia">
+                            <span class="connected"><i class="dot"></i> Source found</span>
+                        </div>
+                    </div>
+                    <article class="source-preview">
+                        <div class="source-icon">P</div>
+                        <div><strong>Prothagonia</strong><small>pageoff.de · Public folder work</small></div>
+                        <div class="source-meta"><span class="pill">6 videos</span><span class="pill">70.5 MB</span></div>
+                    </article>
+                    <fieldset>
+                        <legend>How should this work be used?</legend>
+                        <div class="modes">
+                            <label class="mode selected">
+                                <input type="radio" checked>
+                                <span><strong>Copy locally</strong><small>Independent copy. All files live on this Poff node.</small></span>
+                                <em class="recommended">Recommended</em>
+                            </label>
+                            <label class="mode">
+                                <input type="radio">
+                                <span><strong>Follow source</strong><small>Keep remote entries connected to source updates.</small></span>
+                            </label>
+                            <label class="mode">
+                                <input type="radio">
+                                <span><strong>Embed view</strong><small>Show the remote work without copying its files.</small></span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div class="copy-options">
+                        <div>
+                            <label class="caption" for="folder-name">Local folder name</label>
+                            <input id="folder-name" type="text" value="player">
+                        </div>
+                        <label class="check">
+                            <input type="checkbox" checked>
+                            <span><strong>Create looping player</strong><small>Play copied videos in order, then continue again from the first film.</small></span>
+                        </label>
+                    </div>
+                </div>
+                <footer class="dialog-foot">
+                    <div class="summary"><strong>Ready:</strong> copy 6 files to <strong>./player</strong>; source files stay unchanged.</div>
+                    <div class="actions">
+                        <button class="action cancel">Cancel</button>
+                        <button class="action primary">Copy 6 files</button>
+                    </div>
+                </footer>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

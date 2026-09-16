@@ -1,0 +1,28 @@
+- generic [ref=f8e2]:
+  - button "Close navigation" [expanded] [ref=f8e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f8e8]:
+    - group [ref=f8e10]:
+      - generic "Toggle editor tools" [ref=f8e11] [cursor=pointer]: Editor tools
+    - list [ref=f8e18]:
+      - listitem [ref=f8e19]:
+        - link "./ pageoff-curator" [ref=f8e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f8e21]:
+        - link "artist-layout-edition" [ref=f8e22] [cursor=pointer]:
+          - /url: "?path=artist-layout-edition"
+      - listitem [ref=f8e26]:
+        - link "artist-live.webloc" [ref=f8e27] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f8e31]:
+        - link "exchange-ledger.md" [ref=f8e32] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f8e36]:
+        - link "received-from-artist.jpg" [ref=f8e37] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f8e41]:
+        - link "received-from-writer.md" [ref=f8e42] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f8e46]:
+        - link "writer-live.webloc" [ref=f8e47] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f8e53]

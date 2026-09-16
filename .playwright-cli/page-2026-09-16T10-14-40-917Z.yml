@@ -1,0 +1,113 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e79] [cursor=pointer]
+  - complementary "Navigation" [ref=e80]:
+    - group [ref=e82]:
+      - generic "Toggle editor tools" [ref=e83] [cursor=pointer]: Editor tools
+    - list [ref=e90]:
+      - listitem [ref=e229]:
+        - link "./ page" [ref=e230] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e231]:
+        - link "apres" [ref=e232] [cursor=pointer]:
+          - /url: "?path=apres"
+      - listitem [ref=e236]:
+        - link "apres-2" [ref=e237] [cursor=pointer]:
+          - /url: "?path=apres-2"
+      - listitem [ref=e241]:
+        - link "apres-2-gallery" [ref=e242] [cursor=pointer]:
+          - /url: "?path=apres-2-gallery"
+      - listitem [ref=e246]:
+        - link "HRMueller-2" [ref=e247] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=e251]:
+        - link "player" [ref=e252] [cursor=pointer]:
+          - /url: "?path=player"
+      - listitem [ref=e256]:
+        - link "Prothagonia" [ref=e257] [cursor=pointer]:
+          - /url: "?path=Prothagonia"
+      - listitem [ref=e261]:
+        - link "Mybrother.tv-1.webloc" [ref=e262] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e266]:
+        - link "Mybrother.tv-2.webloc" [ref=e267] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e271]:
+        - link "Mybrother.tv-3.webloc" [ref=e272] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e11]:
+    - generic [ref=e276]:
+      - banner [ref=e277]:
+        - img "Poff profile" [ref=e279]
+        - generic [ref=e280]:
+          - heading "page" [level=1] [ref=e281]
+          - generic "Categories" [ref=e282]:
+            - generic [ref=e283]: folder
+            - generic [ref=e284]: collection
+      - main [ref=e285]:
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - generic [ref=e288]: .
+            - generic [ref=e289]: 10 entries
+          - generic [ref=e290]:
+            - article [ref=e291]:
+              - generic [ref=e292]: Folder
+              - strong [ref=e293]:
+                - link "apres" [ref=e294] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&path=apres
+              - generic [ref=e295]: apres
+            - article [ref=e296]:
+              - generic [ref=e297]: Folder
+              - strong [ref=e298]:
+                - link "apres-2" [ref=e299] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&path=apres-2
+              - generic [ref=e300]: apres-2
+            - article [ref=e301]:
+              - generic [ref=e302]: Folder
+              - strong [ref=e303]:
+                - link "apres-2-gallery" [ref=e304] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&path=apres-2-gallery
+              - generic [ref=e305]: apres-2-gallery
+            - article [ref=e306]:
+              - generic [ref=e307]: Folder
+              - strong [ref=e308]:
+                - link "HRMueller-2" [ref=e309] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&path=HRMueller-2
+              - generic [ref=e310]: HRMueller-2
+            - article [ref=e311]:
+              - generic [ref=e312]: File
+              - strong [ref=e313]:
+                - link "index.php" [ref=e314] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&file=index.php
+              - generic [ref=e315]: index.php
+            - article [ref=e316]:
+              - generic [ref=e317]: File
+              - strong [ref=e318]:
+                - link "Mybrother.tv-1.webloc" [ref=e319] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&file=Mybrother.tv-1.webloc
+              - generic [ref=e320]: Mybrother.tv-1.webloc
+            - article [ref=e321]:
+              - generic [ref=e322]: File
+              - strong [ref=e323]:
+                - link "Mybrother.tv-2.webloc" [ref=e324] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&file=Mybrother.tv-2.webloc
+              - generic [ref=e325]: Mybrother.tv-2.webloc
+            - article [ref=e326]:
+              - generic [ref=e327]: File
+              - strong [ref=e328]:
+                - link "Mybrother.tv-3.webloc" [ref=e329] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&file=Mybrother.tv-3.webloc
+              - generic [ref=e330]: Mybrother.tv-3.webloc
+            - article [ref=e331]:
+              - generic [ref=e332]: Folder
+              - strong [ref=e333]:
+                - link "player" [ref=e334] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&path=player
+              - generic [ref=e335]: player
+            - article [ref=e336]:
+              - generic [ref=e337]: Folder
+              - strong [ref=e338]:
+                - link "Prothagonia" [ref=e339] [cursor=pointer]:
+                  - /url: http://localhost:8888/dominikeggermann-project/page/?view=1&path=Prothagonia
+              - generic [ref=e340]: Prothagonia
+      - contentinfo [ref=e341]:
+        - generic [ref=e342]: Copyright eggman

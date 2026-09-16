@@ -1,0 +1,28 @@
+- generic [ref=f10e2]:
+  - button "Close navigation" [expanded] [ref=f10e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f10e8]:
+    - group [ref=f10e10]:
+      - generic "Toggle editor tools" [ref=f10e11] [cursor=pointer]: Editor tools
+    - list [ref=f10e18]:
+      - listitem [ref=f10e19]:
+        - link "./ pageoff-writer" [ref=f10e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f10e21]:
+        - link "01-margin-notes.md" [ref=f10e22] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f10e26]:
+        - link "02-letter-to-a-node.md" [ref=f10e27] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f10e31]:
+        - link "03-small-protocol.md" [ref=f10e32] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f10e36]:
+        - link "artist.webloc" [ref=f10e37] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f10e41]:
+        - link "borrowed-cover.jpg" [ref=f10e42] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f10e46]:
+        - link "curator.webloc" [ref=f10e47] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f10e53]

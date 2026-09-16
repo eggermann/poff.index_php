@@ -289,7 +289,11 @@ PHP
         '/includes/viewer/edit/prompt-context/parent.php',
         '/includes/viewer/edit/prompt/context-state.php',
         '/includes/viewer/edit/prompt/context-build.php',
-        '/includes/viewer/edit/upload.php',
+        // upload.php only wires these helpers together with require_once. Inline the
+        // implementations so the generated single-file runtime keeps folder uploads.
+        '/includes/viewer/edit/upload/core.php',
+        '/includes/viewer/edit/upload/work-folder.php',
+        '/includes/viewer/edit/upload/links.php',
         '/includes/viewer/edit/delete.php',
         '/includes/viewer/edit/reset.php',
         '/includes/viewer/edit/action/context.php',

@@ -1,0 +1,68 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]: ☰ Editor tools
+    - list [ref=e5]:
+      - listitem [ref=e6]: ⌂ page
+      - listitem [ref=e7]: ↑ Go up
+      - listitem [ref=e8]: ./ Player
+      - listitem [ref=e9]: 35-freshweb-prompt…
+      - listitem [ref=e10]: 46-freshweb-prompt…
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - paragraph [ref=e13]: LOCAL COLLECTION · CONTINUOUS PLAY
+      - heading "Player" [level=1] [ref=e14]
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - paragraph [ref=e22]: Poff network
+          - heading "Use external work" [level=2] [ref=e23]
+        - button "×" [ref=e24]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Work URL
+          - generic [ref=e28]:
+            - textbox "Work URL" [ref=e29]: https://pageoff.de/?path=Prothagonia
+            - generic [ref=e30]: pageoff.de
+        - generic [ref=e32]:
+          - generic [ref=e33]: P
+          - generic [ref=e34]:
+            - strong [ref=e35]: Prothagonia
+            - generic [ref=e36]: Public folder work · source node connected
+          - generic [ref=e37]:
+            - generic [ref=e38]: 6 videos
+            - generic [ref=e39]: 70.5 MB
+        - group "Ownership" [ref=e40]:
+          - generic [ref=e42]:
+            - generic [ref=e43]:
+              - radio "Copy here Independent local files. Source stays unchanged. Recommended" [checked] [ref=e44]
+              - generic [ref=e45]:
+                - strong [ref=e46]: Copy here
+                - generic [ref=e47]: Independent local files. Source stays unchanged.
+              - emphasis [ref=e48]: Recommended
+            - generic [ref=e49]:
+              - radio "Keep connected Use remote entries and receive source updates." [ref=e50]
+              - generic [ref=e51]:
+                - strong [ref=e52]: Keep connected
+                - generic [ref=e53]: Use remote entries and receive source updates.
+          - generic [ref=e54]:
+            - text: Need only remote presentation?
+            - link "Embed view instead" [ref=e55] [cursor=pointer]:
+              - /url: "#"
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - generic [ref=e58]: Local folder
+            - textbox "Local folder" [ref=e59]: player
+          - generic [ref=e60]:
+            - checkbox "Loop copied videos Detected video collection. Create one continuous player." [checked] [ref=e61]
+            - generic [ref=e62]:
+              - strong [ref=e63]: Loop copied videos
+              - generic [ref=e64]: Detected video collection. Create one continuous player.
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - strong [ref=e67]: 6 files
+          - text: become local work
+          - strong [ref=e68]: ./player
+          - text: .
+        - generic [ref=e69]:
+          - button "Cancel" [ref=e70]
+          - button "Copy here" [ref=e71]

@@ -1,0 +1,68 @@
+- generic [ref=f2e2]:
+  - button "Close navigation" [expanded] [ref=f2e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f2e8]:
+    - group [ref=f2e10]:
+      - generic "Toggle editor tools" [ref=f2e11] [cursor=pointer]: Editor tools
+    - list [ref=f2e18]:
+      - listitem [ref=f2e19]:
+        - link "./ page" [ref=f2e20] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=f2e22] [cursor=pointer]
+      - listitem [ref=f2e26]:
+        - link "apres" [ref=f2e27] [cursor=pointer]:
+          - /url: "?path=apres&edit=true"
+        - generic [ref=f2e31]:
+          - button "Copy + paste" [ref=f2e32] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e36] [cursor=pointer]
+          - button "Delete item" [ref=f2e40] [cursor=pointer]
+      - listitem [ref=f2e44]:
+        - link "apres-2" [ref=f2e45] [cursor=pointer]:
+          - /url: "?path=apres-2&edit=true"
+        - generic [ref=f2e49]:
+          - button "Copy + paste" [ref=f2e50] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e54] [cursor=pointer]
+          - button "Delete item" [ref=f2e58] [cursor=pointer]
+      - listitem [ref=f2e62]:
+        - link "player" [ref=f2e63] [cursor=pointer]:
+          - /url: "?path=player&edit=true"
+        - generic [ref=f2e67]:
+          - button "Copy + paste" [ref=f2e68] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e72] [cursor=pointer]
+          - button "Delete item" [ref=f2e76] [cursor=pointer]
+      - listitem [ref=f2e80]:
+        - link "Prothagonia" [ref=f2e81] [cursor=pointer]:
+          - /url: "?path=Prothagonia&edit=true"
+        - generic [ref=f2e85]:
+          - button "Copy + paste" [ref=f2e86] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e90] [cursor=pointer]
+          - button "Delete item" [ref=f2e94] [cursor=pointer]
+      - listitem [ref=f2e98]:
+        - link ".layout" [ref=f2e99] [cursor=pointer]:
+          - /url: "#/.layout"
+        - button "Copy + paste" [ref=f2e103] [cursor=pointer]
+      - listitem [ref=f2e107]:
+        - link "Mybrother.tv-1.webloc" [ref=f2e108] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=f2e112]:
+          - button "Copy + paste" [ref=f2e113] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e117] [cursor=pointer]
+          - button "Delete item" [ref=f2e121] [cursor=pointer]
+      - listitem [ref=f2e125]:
+        - link "Mybrother.tv-2.webloc" [ref=f2e126] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=f2e130]:
+          - button "Copy + paste" [ref=f2e131] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e135] [cursor=pointer]
+          - button "Delete item" [ref=f2e139] [cursor=pointer]
+      - listitem [ref=f2e143]:
+        - link "Mybrother.tv-3.webloc" [ref=f2e144] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=f2e148]:
+          - button "Copy + paste" [ref=f2e149] [cursor=pointer]
+          - button "Hide from sidebar" [ref=f2e153] [cursor=pointer]
+          - button "Delete item" [ref=f2e157] [cursor=pointer]
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - document [ref=f2e163]

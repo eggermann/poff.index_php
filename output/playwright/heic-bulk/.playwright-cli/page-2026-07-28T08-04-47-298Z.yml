@@ -1,0 +1,265 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [active] [ref=e11] [cursor=pointer]: Editor tools
+      - generic [ref=e545]:
+        - group [ref=e546]:
+          - generic "Enable edit mode" [ref=e547] [cursor=pointer]
+          - generic [ref=e548]:
+            - generic [ref=e549]: Editor password
+            - textbox "Editor password" [ref=e550]
+            - button "Unlock" [ref=e551] [cursor=pointer]
+            - generic [ref=e552]: Enter the editor password to unlock editing.
+        - generic [ref=e553]:
+          - button "Add work" [ref=e554] [cursor=pointer]
+          - button "Jump to edit section" [ref=e555] [cursor=pointer]
+    - list [ref=e18]:
+      - listitem [ref=e128]:
+        - link "page" [ref=e129] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+      - listitem [ref=e132]:
+        - link "Go Up" [ref=e133] [cursor=pointer]:
+          - /url: "?path=&edit=true"
+        - button "Copy + paste" [ref=e137] [cursor=pointer]
+      - listitem [ref=e141]:
+        - link "./ apres" [ref=e142] [cursor=pointer]:
+          - /url: "?path=apres&edit=true"
+        - button "Copy + paste" [ref=e144] [cursor=pointer]
+      - listitem [ref=e148]:
+        - link ".layout" [ref=e149] [cursor=pointer]:
+          - /url: "#/apres/.layout"
+        - button "Copy + paste" [ref=e153] [cursor=pointer]
+      - listitem [ref=e157]:
+        - link "IMG_1191.HEIC" [ref=e158] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e162]:
+          - button "Copy + paste" [ref=e163] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e167] [cursor=pointer]
+          - button "Delete item" [ref=e171] [cursor=pointer]
+      - listitem [ref=e175]:
+        - link "IMG_1192.HEIC" [ref=e176] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e180]:
+          - button "Copy + paste" [ref=e181] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e185] [cursor=pointer]
+          - button "Delete item" [ref=e189] [cursor=pointer]
+      - listitem [ref=e193]:
+        - link "IMG_1193.HEIC" [ref=e194] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e198]:
+          - button "Copy + paste" [ref=e199] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e203] [cursor=pointer]
+          - button "Delete item" [ref=e207] [cursor=pointer]
+      - listitem [ref=e211]:
+        - link "IMG_1194.HEIC" [ref=e212] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e216]:
+          - button "Copy + paste" [ref=e217] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e221] [cursor=pointer]
+          - button "Delete item" [ref=e225] [cursor=pointer]
+      - listitem [ref=e229]:
+        - link "IMG_1195.HEIC" [ref=e230] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e234]:
+          - button "Copy + paste" [ref=e235] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e239] [cursor=pointer]
+          - button "Delete item" [ref=e243] [cursor=pointer]
+      - listitem [ref=e247]:
+        - link "IMG_1196.HEIC" [ref=e248] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e252]:
+          - button "Copy + paste" [ref=e253] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e257] [cursor=pointer]
+          - button "Delete item" [ref=e261] [cursor=pointer]
+      - listitem [ref=e265]:
+        - link "IMG_1197.HEIC" [ref=e266] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e270]:
+          - button "Copy + paste" [ref=e271] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e275] [cursor=pointer]
+          - button "Delete item" [ref=e279] [cursor=pointer]
+      - listitem [ref=e283]:
+        - link "IMG_1198.HEIC" [ref=e284] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e288]:
+          - button "Copy + paste" [ref=e289] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e293] [cursor=pointer]
+          - button "Delete item" [ref=e297] [cursor=pointer]
+      - listitem [ref=e301]:
+        - link "IMG_1199.HEIC" [ref=e302] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e306]:
+          - button "Copy + paste" [ref=e307] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e311] [cursor=pointer]
+          - button "Delete item" [ref=e315] [cursor=pointer]
+      - listitem [ref=e319]:
+        - link "IMG_1200.HEIC" [ref=e320] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e324]:
+          - button "Copy + paste" [ref=e325] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e329] [cursor=pointer]
+          - button "Delete item" [ref=e333] [cursor=pointer]
+      - listitem [ref=e337]:
+        - link "IMG_1201.HEIC" [ref=e338] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e342]:
+          - button "Copy + paste" [ref=e343] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e347] [cursor=pointer]
+          - button "Delete item" [ref=e351] [cursor=pointer]
+      - listitem [ref=e355]:
+        - link "IMG_1202.HEIC" [ref=e356] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e360]:
+          - button "Copy + paste" [ref=e361] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e365] [cursor=pointer]
+          - button "Delete item" [ref=e369] [cursor=pointer]
+      - listitem [ref=e373]:
+        - link "IMG_1203.HEIC" [ref=e374] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e378]:
+          - button "Copy + paste" [ref=e379] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e383] [cursor=pointer]
+          - button "Delete item" [ref=e387] [cursor=pointer]
+      - listitem [ref=e391]:
+        - link "IMG_1204.HEIC" [ref=e392] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e396]:
+          - button "Copy + paste" [ref=e397] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e401] [cursor=pointer]
+          - button "Delete item" [ref=e405] [cursor=pointer]
+      - listitem [ref=e409]:
+        - link "IMG_1205.HEIC" [ref=e410] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e414]:
+          - button "Copy + paste" [ref=e415] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e419] [cursor=pointer]
+          - button "Delete item" [ref=e423] [cursor=pointer]
+      - listitem [ref=e427]:
+        - link "IMG_1206.HEIC" [ref=e428] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e432]:
+          - button "Copy + paste" [ref=e433] [cursor=pointer]
+          - button "Hide from sidebar" [ref=e437] [cursor=pointer]
+          - button "Delete item" [ref=e441] [cursor=pointer]
+    - generic:
+      - generic:
+        - strong: Drop files
+        - generic: Add to current folder
+  - generic [ref=e125]:
+    - generic [ref=e445]:
+      - heading "Edit mode" [level=3] [ref=e446]
+      - generic [ref=e447]: Enter the editor password to unlock editing.
+    - document [ref=e127]:
+      - generic [ref=e448]:
+        - banner [ref=e449]:
+          - img "Poff profile" [ref=e451]
+          - generic [ref=e452]:
+            - heading "apres" [level=1] [ref=e453]
+            - generic "Categories" [ref=e454]:
+              - generic [ref=e455]: folder
+              - generic [ref=e456]: collection
+        - main [ref=e457]:
+          - generic [ref=e458]:
+            - generic [ref=e459]:
+              - generic [ref=e460]: apres
+              - generic [ref=e461]: 16 entries
+            - generic [ref=e462]:
+              - article [ref=e463]:
+                - generic [ref=e464]: File
+                - strong [ref=e465]:
+                  - link "IMG_1191.HEIC" [ref=e466] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1191.HEIC
+                - generic [ref=e467]: apres/IMG_1191.HEIC
+              - article [ref=e468]:
+                - generic [ref=e469]: File
+                - strong [ref=e470]:
+                  - link "IMG_1192.HEIC" [ref=e471] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1192.HEIC
+                - generic [ref=e472]: apres/IMG_1192.HEIC
+              - article [ref=e473]:
+                - generic [ref=e474]: File
+                - strong [ref=e475]:
+                  - link "IMG_1193.HEIC" [ref=e476] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1193.HEIC
+                - generic [ref=e477]: apres/IMG_1193.HEIC
+              - article [ref=e478]:
+                - generic [ref=e479]: File
+                - strong [ref=e480]:
+                  - link "IMG_1194.HEIC" [ref=e481] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1194.HEIC
+                - generic [ref=e482]: apres/IMG_1194.HEIC
+              - article [ref=e483]:
+                - generic [ref=e484]: File
+                - strong [ref=e485]:
+                  - link "IMG_1195.HEIC" [ref=e486] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1195.HEIC
+                - generic [ref=e487]: apres/IMG_1195.HEIC
+              - article [ref=e488]:
+                - generic [ref=e489]: File
+                - strong [ref=e490]:
+                  - link "IMG_1196.HEIC" [ref=e491] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1196.HEIC
+                - generic [ref=e492]: apres/IMG_1196.HEIC
+              - article [ref=e493]:
+                - generic [ref=e494]: File
+                - strong [ref=e495]:
+                  - link "IMG_1197.HEIC" [ref=e496] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1197.HEIC
+                - generic [ref=e497]: apres/IMG_1197.HEIC
+              - article [ref=e498]:
+                - generic [ref=e499]: File
+                - strong [ref=e500]:
+                  - link "IMG_1198.HEIC" [ref=e501] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1198.HEIC
+                - generic [ref=e502]: apres/IMG_1198.HEIC
+              - article [ref=e503]:
+                - generic [ref=e504]: File
+                - strong [ref=e505]:
+                  - link "IMG_1199.HEIC" [ref=e506] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1199.HEIC
+                - generic [ref=e507]: apres/IMG_1199.HEIC
+              - article [ref=e508]:
+                - generic [ref=e509]: File
+                - strong [ref=e510]:
+                  - link "IMG_1200.HEIC" [ref=e511] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1200.HEIC
+                - generic [ref=e512]: apres/IMG_1200.HEIC
+              - article [ref=e513]:
+                - generic [ref=e514]: File
+                - strong [ref=e515]:
+                  - link "IMG_1201.HEIC" [ref=e516] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1201.HEIC
+                - generic [ref=e517]: apres/IMG_1201.HEIC
+              - article [ref=e518]:
+                - generic [ref=e519]: File
+                - strong [ref=e520]:
+                  - link "IMG_1202.HEIC" [ref=e521] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1202.HEIC
+                - generic [ref=e522]: apres/IMG_1202.HEIC
+              - article [ref=e523]:
+                - generic [ref=e524]: File
+                - strong [ref=e525]:
+                  - link "IMG_1203.HEIC" [ref=e526] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1203.HEIC
+                - generic [ref=e527]: apres/IMG_1203.HEIC
+              - article [ref=e528]:
+                - generic [ref=e529]: File
+                - strong [ref=e530]:
+                  - link "IMG_1204.HEIC" [ref=e531] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1204.HEIC
+                - generic [ref=e532]: apres/IMG_1204.HEIC
+              - article [ref=e533]:
+                - generic [ref=e534]: File
+                - strong [ref=e535]:
+                  - link "IMG_1205.HEIC" [ref=e536] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1205.HEIC
+                - generic [ref=e537]: apres/IMG_1205.HEIC
+              - article [ref=e538]:
+                - generic [ref=e539]: File
+                - strong [ref=e540]:
+                  - link "IMG_1206.HEIC" [ref=e541] [cursor=pointer]:
+                    - /url: http://localhost:8888/dominikeggermann-project/page/index.php?view=1&file=apres%2FIMG_1206.HEIC
+                - generic [ref=e542]: apres/IMG_1206.HEIC
+        - contentinfo [ref=e543]:
+          - generic [ref=e544]: Copyright eggman

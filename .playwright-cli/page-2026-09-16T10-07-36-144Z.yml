@@ -1,0 +1,81 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ dominikeggermann.com" [ref=e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e21]:
+        - link "1er" [ref=e22] [cursor=pointer]:
+          - /url: "?path=1er"
+      - listitem [ref=e26]:
+        - link "AAA" [ref=e27] [cursor=pointer]:
+          - /url: "?path=AAA"
+      - listitem [ref=e31]:
+        - link "ai-movs" [ref=e32] [cursor=pointer]:
+          - /url: "?path=ai-movs"
+      - listitem [ref=e36]:
+        - link "asasdasdadasd" [ref=e37] [cursor=pointer]:
+          - /url: "?path=asasdasdadasd"
+      - listitem [ref=e41]:
+        - link "coporate" [ref=e42] [cursor=pointer]:
+          - /url: "?path=coporate"
+      - listitem [ref=e46]:
+        - link "deploy" [ref=e47] [cursor=pointer]:
+          - /url: "?path=deploy"
+      - listitem [ref=e51]:
+        - link "for_Fx_hash" [ref=e52] [cursor=pointer]:
+          - /url: "?path=for_Fx_hash"
+      - listitem [ref=e56]:
+        - link "HrMueller" [ref=e57] [cursor=pointer]:
+          - /url: "?path=HrMueller"
+      - listitem [ref=e61]:
+        - link "HRMueller-2" [ref=e62] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=e66]:
+        - link "HrMueller-maerz" [ref=e67] [cursor=pointer]:
+          - /url: "?path=HrMueller-maerz"
+      - listitem [ref=e71]:
+        - link "html" [ref=e72] [cursor=pointer]:
+          - /url: "?path=html"
+      - listitem [ref=e76]:
+        - link "malerei-video" [ref=e77] [cursor=pointer]:
+          - /url: "?path=malerei-video"
+      - listitem [ref=e81]:
+        - link "mybrother-tv" [ref=e82] [cursor=pointer]:
+          - /url: "?path=mybrother-tv"
+      - listitem [ref=e86]:
+        - link "tests" [ref=e87] [cursor=pointer]:
+          - /url: "?path=tests"
+      - listitem [ref=e91]:
+        - link "the7" [ref=e92] [cursor=pointer]:
+          - /url: "?path=the7"
+      - listitem [ref=e96]:
+        - link "worktypes" [ref=e97] [cursor=pointer]:
+          - /url: "?path=worktypes"
+      - listitem [ref=e101]:
+        - link ".htaccess" [ref=e102] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e106]:
+        - link "DailyDoase.webloc" [ref=e107] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e111]:
+        - link "dominikeggermann.com external" [ref=e112] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e115]: dominikeggermann.com
+          - generic [ref=e116]: external
+      - listitem [ref=e117]:
+        - link "DominikEggermann_export.pdf" [ref=e118] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e122]:
+        - link "f-body - YouTube.webloc" [ref=e123] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e127]:
+        - link "localhost_3000_scenetimeline_1.png" [ref=e128] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e132]:
+        - link "NULL.jpg" [ref=e133] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e139]

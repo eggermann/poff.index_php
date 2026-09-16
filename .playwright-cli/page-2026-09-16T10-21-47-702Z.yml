@@ -1,0 +1,164 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e154] [cursor=pointer]
+  - complementary "Navigation" [ref=e155]:
+    - group [ref=e157]:
+      - generic "Toggle editor tools" [ref=e158] [cursor=pointer]: Editor tools
+    - list [ref=e165]:
+      - listitem [ref=e409]:
+        - link "dominikeggermann.com" [ref=e410] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e413]:
+        - link "Go Up" [ref=e414] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=e417]:
+        - link "./ auswahl" [ref=e418] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fauswahl"
+      - listitem [ref=e419]:
+        - link "0CAEEAFB-B384-443F-A227-79108F22BF75_1_105_c.jpeg" [ref=e420] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e424]:
+        - link "0ED5B6F9-E934-40D2-869F-9D0AD30414F1_1_105_c.jpeg" [ref=e425] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e429]:
+        - link "3507C80B-7AE1-40B5-9FB1-CD9B3C1E4FEB_1_105_c.jpeg" [ref=e430] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e434]:
+        - link "4900CF52-AF4A-4AC0-AC07-FE5A481434F3_1_105_c.jpeg" [ref=e435] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e439]:
+        - link "5D601AAA-AEA3-40F4-B6CB-D23166B86837_1_105_c.jpeg" [ref=e440] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e444]:
+        - link "8330F797-B600-4CE4-81E8-FB445EC311E9_1_105_c.jpeg" [ref=e445] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e449]:
+        - link "9F948478-8AC9-480A-837E-EF4A40C3067D_1_105_c.jpeg" [ref=e450] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e454]:
+        - link "AFF34DCD-CBED-4475-9745-6F96B591B552_1_105_c.jpeg" [ref=e455] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e459]:
+        - link "F365F468-E2EA-45A6-9FE6-578BCC09F69B_1_105_c.jpeg" [ref=e460] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e464]:
+        - link "F41C2237-BFFD-44D7-B08F-71B2A74E8E62_1_105_c.jpeg" [ref=e465] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e469]:
+        - link "IMG_0086-Kopie.jpeg" [ref=e470] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e11]:
+    - generic [ref=e474]:
+      - banner [ref=e475]:
+        - img "Poff profile" [ref=e477]
+        - generic [ref=e478]:
+          - heading "auswahl" [level=1] [ref=e479]
+          - generic "Categories" [ref=e480]:
+            - generic [ref=e481]: folder
+            - generic [ref=e482]: collection
+      - main [ref=e483]:
+        - generic [ref=e484]:
+          - generic [ref=e485]:
+            - generic [ref=e486]: HRMueller-2/auswahl
+            - generic [ref=e487]: 11 entries
+          - generic [ref=e488]:
+            - article [ref=e489]:
+              - link [ref=e490] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F0CAEEAFB-B384-443F-A227-79108F22BF75_1_105_c.jpeg
+                - img "0CAEEAFB-B384-443F-A227-79108F22BF75_1_105_c.jpeg" [ref=e491]
+              - generic [ref=e492]: File
+              - strong [ref=e493]:
+                - link "0CAEEAFB-B384-443F-A227-79108F22BF75_1_105_c.jpeg" [ref=e494] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F0CAEEAFB-B384-443F-A227-79108F22BF75_1_105_c.jpeg
+              - generic [ref=e495]: HRMueller-2/auswahl/0CAEEAFB-B384-443F-A227-79108F22BF75_1_105_c.jpeg
+            - article [ref=e496]:
+              - link [ref=e497] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F0ED5B6F9-E934-40D2-869F-9D0AD30414F1_1_105_c.jpeg
+                - img "0ED5B6F9-E934-40D2-869F-9D0AD30414F1_1_105_c.jpeg" [ref=e498]
+              - generic [ref=e499]: File
+              - strong [ref=e500]:
+                - link "0ED5B6F9-E934-40D2-869F-9D0AD30414F1_1_105_c.jpeg" [ref=e501] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F0ED5B6F9-E934-40D2-869F-9D0AD30414F1_1_105_c.jpeg
+              - generic [ref=e502]: HRMueller-2/auswahl/0ED5B6F9-E934-40D2-869F-9D0AD30414F1_1_105_c.jpeg
+            - article [ref=e503]:
+              - link [ref=e504] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F3507C80B-7AE1-40B5-9FB1-CD9B3C1E4FEB_1_105_c.jpeg
+                - img "3507C80B-7AE1-40B5-9FB1-CD9B3C1E4FEB_1_105_c.jpeg" [ref=e505]
+              - generic [ref=e506]: File
+              - strong [ref=e507]:
+                - link "3507C80B-7AE1-40B5-9FB1-CD9B3C1E4FEB_1_105_c.jpeg" [ref=e508] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F3507C80B-7AE1-40B5-9FB1-CD9B3C1E4FEB_1_105_c.jpeg
+              - generic [ref=e509]: HRMueller-2/auswahl/3507C80B-7AE1-40B5-9FB1-CD9B3C1E4FEB_1_105_c.jpeg
+            - article [ref=e510]:
+              - link [ref=e511] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F4900CF52-AF4A-4AC0-AC07-FE5A481434F3_1_105_c.jpeg
+                - img "4900CF52-AF4A-4AC0-AC07-FE5A481434F3_1_105_c.jpeg" [ref=e512]
+              - generic [ref=e513]: File
+              - strong [ref=e514]:
+                - link "4900CF52-AF4A-4AC0-AC07-FE5A481434F3_1_105_c.jpeg" [ref=e515] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F4900CF52-AF4A-4AC0-AC07-FE5A481434F3_1_105_c.jpeg
+              - generic [ref=e516]: HRMueller-2/auswahl/4900CF52-AF4A-4AC0-AC07-FE5A481434F3_1_105_c.jpeg
+            - article [ref=e517]:
+              - link [ref=e518] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F5D601AAA-AEA3-40F4-B6CB-D23166B86837_1_105_c.jpeg
+                - img "5D601AAA-AEA3-40F4-B6CB-D23166B86837_1_105_c.jpeg" [ref=e519]
+              - generic [ref=e520]: File
+              - strong [ref=e521]:
+                - link "5D601AAA-AEA3-40F4-B6CB-D23166B86837_1_105_c.jpeg" [ref=e522] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F5D601AAA-AEA3-40F4-B6CB-D23166B86837_1_105_c.jpeg
+              - generic [ref=e523]: HRMueller-2/auswahl/5D601AAA-AEA3-40F4-B6CB-D23166B86837_1_105_c.jpeg
+            - article [ref=e524]:
+              - link [ref=e525] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F8330F797-B600-4CE4-81E8-FB445EC311E9_1_105_c.jpeg
+                - img "8330F797-B600-4CE4-81E8-FB445EC311E9_1_105_c.jpeg" [ref=e526]
+              - generic [ref=e527]: File
+              - strong [ref=e528]:
+                - link "8330F797-B600-4CE4-81E8-FB445EC311E9_1_105_c.jpeg" [ref=e529] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F8330F797-B600-4CE4-81E8-FB445EC311E9_1_105_c.jpeg
+              - generic [ref=e530]: HRMueller-2/auswahl/8330F797-B600-4CE4-81E8-FB445EC311E9_1_105_c.jpeg
+            - article [ref=e531]:
+              - link [ref=e532] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F9F948478-8AC9-480A-837E-EF4A40C3067D_1_105_c.jpeg
+                - img "9F948478-8AC9-480A-837E-EF4A40C3067D_1_105_c.jpeg" [ref=e533]
+              - generic [ref=e534]: File
+              - strong [ref=e535]:
+                - link "9F948478-8AC9-480A-837E-EF4A40C3067D_1_105_c.jpeg" [ref=e536] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2F9F948478-8AC9-480A-837E-EF4A40C3067D_1_105_c.jpeg
+              - generic [ref=e537]: HRMueller-2/auswahl/9F948478-8AC9-480A-837E-EF4A40C3067D_1_105_c.jpeg
+            - article [ref=e538]:
+              - link [ref=e539] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FAFF34DCD-CBED-4475-9745-6F96B591B552_1_105_c.jpeg
+                - img "AFF34DCD-CBED-4475-9745-6F96B591B552_1_105_c.jpeg" [ref=e540]
+              - generic [ref=e541]: File
+              - strong [ref=e542]:
+                - link "AFF34DCD-CBED-4475-9745-6F96B591B552_1_105_c.jpeg" [ref=e543] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FAFF34DCD-CBED-4475-9745-6F96B591B552_1_105_c.jpeg
+              - generic [ref=e544]: HRMueller-2/auswahl/AFF34DCD-CBED-4475-9745-6F96B591B552_1_105_c.jpeg
+            - article [ref=e545]:
+              - link [ref=e546] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FF365F468-E2EA-45A6-9FE6-578BCC09F69B_1_105_c.jpeg
+                - img "F365F468-E2EA-45A6-9FE6-578BCC09F69B_1_105_c.jpeg" [ref=e547]
+              - generic [ref=e548]: File
+              - strong [ref=e549]:
+                - link "F365F468-E2EA-45A6-9FE6-578BCC09F69B_1_105_c.jpeg" [ref=e550] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FF365F468-E2EA-45A6-9FE6-578BCC09F69B_1_105_c.jpeg
+              - generic [ref=e551]: HRMueller-2/auswahl/F365F468-E2EA-45A6-9FE6-578BCC09F69B_1_105_c.jpeg
+            - article [ref=e552]:
+              - link [ref=e553] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FF41C2237-BFFD-44D7-B08F-71B2A74E8E62_1_105_c.jpeg
+                - img "F41C2237-BFFD-44D7-B08F-71B2A74E8E62_1_105_c.jpeg" [ref=e554]
+              - generic [ref=e555]: File
+              - strong [ref=e556]:
+                - link "F41C2237-BFFD-44D7-B08F-71B2A74E8E62_1_105_c.jpeg" [ref=e557] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FF41C2237-BFFD-44D7-B08F-71B2A74E8E62_1_105_c.jpeg
+              - generic [ref=e558]: HRMueller-2/auswahl/F41C2237-BFFD-44D7-B08F-71B2A74E8E62_1_105_c.jpeg
+            - article [ref=e559]:
+              - link [ref=e560] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FIMG_0086-Kopie.jpeg
+                - img "IMG_0086-Kopie.jpeg" [ref=e561]
+              - generic [ref=e562]: File
+              - strong [ref=e563]:
+                - link "IMG_0086-Kopie.jpeg" [ref=e564] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=HRMueller-2%2Fauswahl%2FIMG_0086-Kopie.jpeg
+              - generic [ref=e565]: HRMueller-2/auswahl/IMG_0086-Kopie.jpeg
+      - contentinfo [ref=e566]:
+        - generic [ref=e567]: Copyright eggman

@@ -293,6 +293,9 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
     if (typeof payload.linkUrl === "string") {
       formData.set("linkUrl", payload.linkUrl);
     }
+    if (payload.submissionIntent === "external-link") {
+      formData.set("submissionIntent", "external-link");
+    }
     if (typeof payload.contents === "string") {
       formData.set("contents", payload.contents);
     }
@@ -1543,7 +1546,7 @@ window.POFF_CONTEXT = { currentPoffConfig, currentPathForIframe };
           preset = "custom";
         }
       }
-      const sourceLabel = mode === "none" ? "No outer layout" : preset === "shared" || storage === "shared" || state.source === "shared" ? `Collection: ${state.sharedName || state.name || "shared"}` : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in poff-layout" : "Current resolved layout";
+      const sourceLabel = mode === "none" ? "No outer layout" : preset === "shared" || storage === "shared" || state.source === "shared" ? `Collection: ${state.sharedName || state.name || "shared"}` : storage === "filesystem" ? `Filesystem: ${directory || ".layout"}` : storage === "default" ? "Built-in default" : "Current resolved layout";
       const displayMode = preset === "shared" || storage === "shared" || state.source === "shared" ? "collection-layout" : mode;
       return {
         ...state,
@@ -1862,7 +1865,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/work-fields.js
-  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType", "categories", "category", "templateMap"]);
+  var RESERVED_WORK_FIELD_NAMES = /* @__PURE__ */ new Set(["fields", "layout", "type", "model", "engine", "syntax", "mimeType", "categories", "category", "templateMap", "presentationSource"]);
   var SUPPORTED_WORK_FIELD_TYPES = /* @__PURE__ */ new Set(["text", "textarea", "number", "checkbox", "select", "color", "date", "url", "email"]);
   var SCHEMA_NUMBER_KEYS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "step"];
   var WORK_FIELD_SCHEMA_PROFILES = {
@@ -4181,9 +4184,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       originalTemplate = layoutState.phpTemplate || "";
     }
     const resolvedDirectory = layoutState.directory || localLayoutDirectory;
-    const wrapperSourceLabel = layoutState.mode === "none" || layoutState.storage === "none" ? "No outer layout" : layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout";
+    const wrapperSourceLabel = layoutState.mode === "none" || layoutState.storage === "none" ? "No outer layout" : layoutState.storage === "filesystem" ? isFile && resolvedDirectory !== localLayoutDirectory ? `Folder layout: ${resolvedDirectory}` : `${isFile ? "File layout" : "Folder layout"}: ${resolvedDirectory}` : layoutState.storage === "shared" ? layoutState.sourceLabel || `Collection: ${layoutState.sharedName || layoutState.name || "shared"}` : "Built-in default";
     const inheritedLayoutLabel = hasInheritedLayout ? layoutState.inheritedDirectory : "No parent .layout found";
-    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "PHP built-in poff-layout is read-only until a parent .layout exists";
+    const originalLabel = originalEditable ? `Editable source: ${originalTarget}` : layoutState.storage === "shared" ? `Collection layout source: ${layoutState.directory || layoutState.sharedName || layoutState.name || "shared"}` : "Built-in default is read-only until a local .layout exists";
     const displayMode = layoutState.mode === "filesystem-layout" ? layoutState.directory === localLayoutDirectory ? "custom-layout" : "inherit-layout" : layoutState.mode;
     return {
       layoutState,
@@ -4298,8 +4301,9 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const type = escapeHtml(item.type || "item");
       const approvalStatus = String((item == null ? void 0 : item.approvalStatus) || "").trim();
       const pendingApproval = approvalStatus === "pending";
-      const approvedExternal = !!(item == null ? void 0 : item.externalSubmission) && approvalStatus === "approved";
-      const badge = pendingApproval ? '<span class="edit-tree-badge edit-tree-badge-pending">new approval</span>' : approvedExternal ? '<span class="edit-tree-badge edit-tree-badge-approved">approved external</span>' : "";
+      const liveExternal = !!(item == null ? void 0 : item.externalWork);
+      const approvedExternal = liveExternal || !!(item == null ? void 0 : item.externalSubmission) && approvalStatus === "approved";
+      const badge = pendingApproval ? '<span class="edit-tree-badge edit-tree-badge-pending">new approval</span>' : approvedExternal ? `<span class="edit-tree-badge edit-tree-badge-approved">${liveExternal ? "external work \xB7 live" : "approved external"}</span>` : "";
       return `
                 <label class="edit-tree-item${pendingApproval ? " edit-tree-item-pending" : ""}${approvedExternal ? " edit-tree-item-approved" : ""}" data-tree-item-path="${key}">
                     <input type="checkbox" name="tree_visible" value="${key}" ${visible}>
@@ -4921,7 +4925,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <option value="upload" selected>Upload</option>
                             <option value="blank">Blank file</option>
                             <option value="folder">Folder</option>
-                            <option value="poff">Poff work</option>
+                            <option value="poff">External Poff work</option>
                             <option value="url">Web link</option>
                         </select>
                     </div>
@@ -4974,8 +4978,12 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                         <input class="form-input" id="edit-link-url" type="url" name="link_url" placeholder="https://other.example/?view=1&path=folder">
                     </div>
                     <div class="edit-poff-takeover" id="editPoffTakeoverWrap" hidden>
+                        <div class="edit-poff-social-note">
+                            <strong>Add work from another Pageoff page</strong>
+                            <span>Paste its public work or collection URL. It appears here as an <b>External work</b>, while source creator keeps files and layout.</span>
+                        </div>
                         <div>
-                            <label class="edit-label" for="edit-poff-url">Poff work URL</label>
+                            <label class="edit-label" for="edit-poff-url">Remote Poff work URL</label>
                             <div class="edit-poff-url-row">
                                 <input class="form-input" id="edit-poff-url" type="url" name="poff_url" placeholder="https://pageoff.de/?path=collection">
                                 <span class="edit-poff-node" id="editPoffNode"><i></i>Poff node</span>
@@ -4985,17 +4993,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                             <legend class="edit-label">Use mode</legend>
                             <div class="edit-poff-primary-modes">
                                 <label class="edit-poff-mode">
-                                    <input type="radio" name="poff_takeover_mode" value="copy" checked>
-                                    <span><strong>Local copy</strong><small>Own files. Video collections become looping players.</small></span>
+                                    <input type="radio" name="poff_takeover_mode" value="follow" checked>
+                                    <span><strong>External work \xB7 live</strong><small>Show it on this page. Source files and template stay remote; source changes appear here.</small></span>
                                     <em>Recommended</em>
                                 </label>
                                 <label class="edit-poff-mode">
-                                    <input type="radio" name="poff_takeover_mode" value="follow">
-                                    <span><strong>Live connection</strong><small>No file copy. Changes stay on source node.</small></span>
+                                    <input type="radio" name="poff_takeover_mode" value="copy">
+                                    <span><strong>Local copy \xB7 fork</strong><small>Copy files here for independent editing. Later source changes do not sync.</small></span>
                                 </label>
                             </div>
                         </fieldset>
-                        <div class="edit-poff-copy-options" id="editPoffCopyOptions">
+                        <div class="edit-poff-copy-options" id="editPoffCopyOptions" hidden>
                             <div>
                                 <label class="edit-label" for="edit-poff-destination">Folder name <span class="edit-label-optional">optional</span></label>
                                 <input class="form-input" id="edit-poff-destination" type="text" name="poff_destination" placeholder="Use remote work title">
@@ -5100,7 +5108,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         const sourceUrl = ((_d = poffUrlEl == null ? void 0 : poffUrlEl.value) == null ? void 0 : _d.trim()) || "";
         const takeoverMode = ((_e = poffModeEls.find((input) => input.checked)) == null ? void 0 : _e.value) || "copy";
         const destination = ((_f = poffDestinationEl == null ? void 0 : poffDestinationEl.value) == null ? void 0 : _f.trim()) || "new local folder";
-        uploadSummaryEl.textContent = sourceUrl ? takeoverMode === "copy" ? `${poffNodeLabel()} \u2192 ${destination} \u2192 player or converter when needed.` : `Live connection: ${poffNodeLabel()}.` : "Paste a public Poff work URL.";
+        uploadSummaryEl.textContent = sourceUrl ? takeoverMode === "copy" ? `${poffNodeLabel()} \u2192 ${destination} \u2192 player or converter when needed.` : `External work: ${poffNodeLabel()} \u2192 shown on this page. Source stays remote and updates live.` : "Paste a public Poff work URL.";
         return;
       }
       const validationError = uploadValidationError(files, uploadLimits);
@@ -5156,7 +5164,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       const takeoverMode = ((_a = poffModeEls.find((input) => input.checked)) == null ? void 0 : _a.value) || "copy";
       if (uploadSubmitButton) {
-        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? externalOnly ? "Submit for review" : "Add link" : mode === "poff" ? takeoverMode === "copy" ? "Copy work" : "Connect work" : "Upload";
+        uploadSubmitButton.textContent = mode === "blank" ? "Create blank file" : mode === "folder" ? "Create folder" : mode === "url" ? externalOnly ? "Submit for review" : "Add link" : mode === "poff" ? takeoverMode === "copy" ? "Create local copy" : "Add external work" : "Upload";
       }
       if (poffCopyOptionsEl) {
         poffCopyOptionsEl.hidden = mode !== "poff" || takeoverMode !== "copy";
@@ -5296,6 +5304,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
               source,
               linkName,
               linkUrl,
+              submissionIntent: externalOnly ? "external-link" : "",
               saveTarget: readSaveTarget(),
               statusEl,
               closeDialog: closeUploadDialog
@@ -5419,7 +5428,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const isVirtual = primaryMode === "virtual";
       const localWrapperDirectory = wrapperTarget.replace(/\/template\.hbs$/, "");
       const sharedLayoutName = getSharedLayoutLabel();
-      const sourcePreview = isVirtual ? preset === "shared" ? `Collection: ${sharedLayoutName || "shared"}` : originalEditable ? `Filesystem: ${originalTarget}` : "PHP built-in poff-layout" : `Filesystem: ${localWrapperDirectory}`;
+      const sourcePreview = isVirtual ? preset === "shared" ? `Collection: ${sharedLayoutName || "shared"}` : originalEditable ? `Filesystem: ${originalTarget}` : "Built-in default" : `Filesystem: ${localWrapperDirectory}`;
       const sectionSourcePreview = preset === "shared" ? `Collection: ${sharedLayoutName || "shared"} (${sectionName}.hbs)` : sectionSourceLabel;
       if (modePreviewEl) {
         modePreviewEl.textContent = nextMode;
@@ -5431,13 +5440,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         sectionSourcePreviewEl.textContent = sectionSourcePreview;
       }
       if (primaryTitleEl) {
-        primaryTitleEl.textContent = preset === "shared" ? "Collection layout" : isVirtual ? "Virtual layout" : "Custom layout";
+        primaryTitleEl.textContent = preset === "shared" ? "Collection layout" : isVirtual ? "Inherited layout" : "Custom layout";
       }
       if (primaryHintEl) {
         if (preset === "shared") {
           primaryHintEl.innerHTML = `Editing collection layout <code>${escapeHtml(sharedLayoutName || "shared")}</code>. Changes save inline unless you switch to <code>Custom</code>.`;
         } else if (isVirtual) {
-          primaryHintEl.innerHTML = originalEditable ? originalTarget === localWrapperDirectory ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.` : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing the bundled poff-layout. It stays read-only until a parent .layout exists.";
+          primaryHintEl.innerHTML = originalEditable ? originalTarget === localWrapperDirectory ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.` : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.` : "Showing built-in default. Create a local .layout to customize it.";
         } else {
           primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
         }
@@ -5718,14 +5727,13 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         <div class="edit-layout-launch edit-layout-summary">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
-                <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
-                <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
-                <div class="edit-layout-summary-line">Inner preview content source: <code id="edit-layout-section-source-preview">${escapeHtml(sectionSourceLabel)}</code></div>
-                <div class="edit-layout-summary-line">Prompt context separates <code>root.title</code> for the layout shell from <code>work.title</code> for the nested item.</div>
+                <div class="edit-layout-summary-line">Source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
+                <div class="edit-layout-summary-line">Mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
+                <div class="edit-layout-summary-line">Content template: <code id="edit-layout-section-source-preview">${escapeHtml(sectionSourceLabel)}</code></div>
             </div>
             <div class="edit-inline-actions edit-layout-header-actions">
                 <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
-                <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
+                <button class="btn btn-secondary" type="button" id="editLayoutMore">Advanced</button>
             </div>
         </div>
     `;
@@ -5775,7 +5783,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
   function renderLayoutPresetSelect(layoutState, sharedLayouts, sharedLayoutName) {
     return `
-        <label class="edit-label" for="edit-layout-preset">Layout select</label>
+        <label class="edit-label" for="edit-layout-preset">Layout source</label>
         <select class="form-select" id="edit-layout-preset" name="layout_preset">
             ${LAYOUT_PRESET_OPTIONS.map((option) => `
                 <option value="${option.value}" ${layoutState.preset === option.value ? "selected" : ""}>${option.label}</option>
@@ -5846,7 +5854,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     });
     return `
         <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
-        <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
+        <div class="small-note">Choose where this ${escapeHtml(subjectLabel)} gets its visual wrapper. Preview stays on the current work.</div>
         <div class="edit-status" id="editLayoutStatus"></div>
         <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
             ${renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionSourceLabel })}
@@ -5858,7 +5866,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
                     <div class="small-note" id="edit-layout-primary-hint"></div>
                     <div class="edit-inline-actions edit-layout-select-actions">
-                        <button class="btn" type="submit">Save layout</button>
+                        <button class="btn" type="submit">Save changes</button>
                     </div>
                 </div>
             </div>
@@ -5871,16 +5879,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       sectionTarget
     })}
         <details class="edit-layout-advanced edit-layout-manual" id="editLayoutManual" ${sectionWasLocal ? "open" : ""}>
-            <summary class="edit-layout-advanced-summary">More layout files</summary>
+            <summary class="edit-layout-advanced-summary">Template files (advanced)</summary>
             <div class="edit-layout-overlay-grid">
                 <div class="edit-layout-meta-card">
                     <div class="edit-layout-meta-title">Sources</div>
                     <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
-                    <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
+                    <div class="small-note">Built-in default: <code>poff-layout.hbs</code></div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
                     <div class="small-note">Inner content source: <code>${escapeHtml(sectionSourceLabel)}</code></div>
-                    <div class="small-note">Advanced local override target: <code>${escapeHtml(sectionTarget)}</code></div>
+                    <div class="small-note">Content override: <code>${escapeHtml(sectionTarget)}</code></div>
                 </div>
             </div>
             ${renderLayoutEditorFields({
@@ -6020,7 +6028,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
   }
 
   // src/assets/js/edit/panel/inline-sections.js
-  var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind", "converter"]);
+  var RESERVED_WORK_CONFIG_KEYS = /* @__PURE__ */ new Set(["type", "template", "templateMap", "layout", "fields", "categories", "category", "kind", "converter", "presentationSource"]);
   var PASSWORD_DETAILS_STORAGE_KEY = "password-details";
   function renderMediaTypeOptions(selectedValue = "", catalog = null) {
     const normalizedSelected = String(selectedValue || "").trim();
@@ -6200,6 +6208,57 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 `).join("")}
             </div>
             ` : ""}
+        </div>
+    `;
+  }
+  function renderRemoteWorkPresentationSection(config = {}) {
+    const work = (config == null ? void 0 : config.work) && typeof config.work === "object" ? config.work : {};
+    const layout = (work == null ? void 0 : work.layout) && typeof work.layout === "object" ? work.layout : {};
+    const source = (work == null ? void 0 : work.presentationSource) && typeof work.presentationSource === "object" ? work.presentationSource : {};
+    const localLayoutDirectory = `.works/${String((config == null ? void 0 : config.name) || (config == null ? void 0 : config.path) || "item").split("/").pop()}.layout`;
+    const hasLocalPresentation = String(layout.sectionDirectory || "").trim() === localLayoutDirectory || Boolean(source.url);
+    const sourceUrl = String(source.url || "").trim();
+    const sourceTitle = String(source.title || "").trim();
+    return `
+        <div class="edit-work-fields edit-remote-presentation">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Reuse complete work presentation</div>
+                    <div class="small-note">Copy <code>work.hbs</code>, <code>style.css</code>, and <code>script.js</code> from another file work. Your local media stays unchanged.</div>
+                </div>
+            </div>
+            ${sourceUrl ? `
+            <div class="edit-remote-presentation-current">
+                <span>Current presentation source:</span>
+                <a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceTitle || sourceUrl)}</a>
+            </div>
+            ` : ""}
+            <div class="edit-remote-presentation-check">
+                <div>
+                    <label class="edit-label" for="edit-remote-presentation-url">Remote file-work URL</label>
+                    <input class="form-input" id="edit-remote-presentation-url" type="url" value="${escapeHtml(sourceUrl)}" placeholder="https://pageoff.de/?view=1&file=works%2Fimage.jpg">
+                    <div class="small-note">Poff checks file type and all three presentation files. Existing local presentation files are backed up, then replaced together.</div>
+                </div>
+                <button class="btn btn-secondary" type="button" id="editCheckRemotePresentation">Check presentation</button>
+            </div>
+            <div class="edit-status" id="editRemotePresentationStatus"></div>
+            <div class="edit-remote-presentation-offer" id="editRemotePresentationOffer" role="status" hidden>
+                <div class="edit-remote-presentation-offer-head">
+                    <span class="edit-remote-presentation-offer-dot" aria-hidden="true"></span>
+                    <div>
+                        <strong id="editRemotePresentationOfferTitle">Remote presentation</strong>
+                        <small id="editRemotePresentationOfferMeta"></small>
+                    </div>
+                </div>
+                <a id="editRemotePresentationSource" target="_blank" rel="noopener noreferrer">View source work</a>
+                <div class="edit-remote-presentation-conflict" id="editRemotePresentationConflict" hidden></div>
+                <div class="edit-remote-presentation-files">
+                    <details><summary id="editRemotePresentationHbsMeta">work.hbs</summary><pre><code id="editRemotePresentationHbs"></code></pre></details>
+                    <details><summary id="editRemotePresentationCssMeta">style.css</summary><pre><code id="editRemotePresentationCss"></code></pre></details>
+                    <details><summary id="editRemotePresentationJsMeta">script.js</summary><pre><code id="editRemotePresentationJs"></code></pre></details>
+                </div>
+                <button class="btn" type="button" id="editApplyRemotePresentation" disabled>${hasLocalPresentation ? "Replace complete presentation" : "Copy complete presentation"}</button>
+            </div>
         </div>
     `;
   }
@@ -6718,6 +6777,40 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         </div>
     `;
   }
+  function renderExternalSubmissionsSection(config, isFileTarget) {
+    if (isFileTarget) {
+      return "";
+    }
+    const settings = (config == null ? void 0 : config.externalSubmissions) && typeof config.externalSubmissions === "object" ? config.externalSubmissions : {};
+    const enabled = settings.enabled === true;
+    const whitelistEnabled = settings.whitelistEnabled !== false;
+    const whitelist = Array.isArray(settings.whitelist) ? settings.whitelist.join("\n") : "";
+    const maxPending = Math.min(20, Math.max(1, Number(settings.maxPending || 5)));
+    return `
+        <fieldset class="edit-external-submissions">
+            <legend class="edit-work-fields-title">External work submissions</legend>
+            <label class="edit-inline-toggle" for="edit-external-submissions-enabled">
+                <input id="edit-external-submissions-enabled" type="checkbox" name="external_submissions_enabled"${enabled ? " checked" : ""}>
+                <span><strong>Allow external work</strong><small>Visitors may submit a Pageoff work URL. It stays hidden until you approve it in Settings.</small></span>
+            </label>
+            <div class="edit-external-submissions-options"${enabled ? "" : " hidden"}>
+                <label class="edit-inline-toggle" for="edit-external-submissions-whitelist-enabled">
+                    <input id="edit-external-submissions-whitelist-enabled" type="checkbox" name="external_submissions_whitelist_enabled"${whitelistEnabled ? " checked" : ""}>
+                    <span><strong>Use host whitelist</strong><small>Only accept URLs from listed Pageoff hosts.</small></span>
+                </label>
+                <div id="editExternalWhitelistWrap"${whitelistEnabled ? "" : " hidden"}>
+                    <label class="edit-label" for="edit-external-submissions-whitelist">Allowed hosts</label>
+                    <textarea class="form-textarea" id="edit-external-submissions-whitelist" name="external_submissions_whitelist" rows="3" placeholder="pageoff.de&#10;artist.example">${escapeHtml(whitelist)}</textarea>
+                    <div class="small-note">One hostname per line. No path needed.</div>
+                </div>
+                <div>
+                    <label class="edit-label" for="edit-external-submissions-max">Maximum pending submissions</label>
+                    <input class="form-input" id="edit-external-submissions-max" type="number" name="external_submissions_max" min="1" max="20" value="${maxPending}">
+                </div>
+            </div>
+        </fieldset>
+    `;
+  }
   function renderEditPanel({
     editPanel,
     editRequested: editRequested2,
@@ -6745,9 +6838,11 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     onChangePassword,
     onConvertWork,
     onCreateConverter,
-    onLoadConverterNode
+    onLoadConverterNode,
+    onInspectRemotePresentation,
+    onApplyRemotePresentation
   }) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g;
     if (!editPanel) {
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
@@ -6757,8 +6852,38 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       syncPromptDock();
       return { statusEl: null, promptRoot: null };
     }
+    const canRenderPublicExternalSubmission = !((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit) && ((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.editModeAllowed) !== false && (status == null ? void 0 : status.target) !== "file" && ((_c = config == null ? void 0 : config.externalSubmissions) == null ? void 0 : _c.enabled) === true;
     editPanel.hidden = false;
-    if (!((_a = status == null ? void 0 : status.auth) == null ? void 0 : _a.canEdit) && ((_b = status == null ? void 0 : status.auth) == null ? void 0 : _b.editModeAllowed) !== false && (status == null ? void 0 : status.target) !== "file") {
+    if (canRenderPublicExternalSubmission) {
+      const treeItems2 = Array.isArray(config == null ? void 0 : config.tree) ? config.tree : [];
+      const uploadSectionHtml2 = renderUploadSectionHtml({
+        isFileTarget: false,
+        isEmptyFolder: treeItems2.length === 0,
+        externalOnly: true,
+        showLauncher: true,
+        activeWorkName
+      });
+      editPanel.innerHTML = `
+            <h3 class="edit-panel-title">Submit external work</h3>
+            <div class="edit-status" id="editInlineStatus">This host reviews every submission before publishing it.</div>
+            ${uploadSectionHtml2}
+        `;
+      const statusEl2 = editPanel.querySelector("#editInlineStatus");
+      bindUploadDialog({
+        editPanel,
+        statusEl: statusEl2,
+        uploadLimits: (status == null ? void 0 : status.uploadLimits) || null,
+        externalOnly: true,
+        onUploadFiles,
+        onCreateBlankFile,
+        onCreateFolder,
+        onCreateLink,
+        onImportRemote
+      });
+      syncPromptDock();
+      return { statusEl: statusEl2, promptRoot: null };
+    }
+    if (!((_d = status == null ? void 0 : status.auth) == null ? void 0 : _d.canEdit) && ((_e = status == null ? void 0 : status.auth) == null ? void 0 : _e.editModeAllowed) !== false && (status == null ? void 0 : status.target) !== "file") {
       editPanel.innerHTML = `
             <h3 class="edit-panel-title">Edit mode</h3>
             <div class="edit-status" id="editInlineStatus">${escapeHtml((status == null ? void 0 : status.error) || "")}</div>
@@ -6841,6 +6966,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
                 <textarea class="form-textarea" id="edit-description" name="description">${escapeHtml(config.description || "")}</textarea>
             </div>
             ${(status == null ? void 0 : status.target) === "file" || (status == null ? void 0 : status.target) === "folder" || (config == null ? void 0 : config.work) && typeof config.work === "object" && Object.keys(config.work).some((key) => !RESERVED_WORK_CONFIG_KEYS.has(key) || key === "type") ? renderWorkConfigFieldsSection(config) : ""}
+            ${renderExternalSubmissionsSection(config, isFileTarget)}
             <div class="edit-work-fields">
                 <div class="edit-work-fields-header">
                     <div>
@@ -6873,6 +6999,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         ${renderPoffRegistrationSection(config, isFileTarget)}
         <div class="edit-panel-stack">
             ${uploadSectionHtml}
+            ${(status == null ? void 0 : status.target) === "file" ? renderRemoteWorkPresentationSection(config) : ""}
             ${(status == null ? void 0 : status.target) === "file" ? renderConverterSection(config) : ""}
             ${renderPromptWindow(settings, { mode: isFileTarget ? "file" : "folder" })}
         </div>
@@ -6892,8 +7019,28 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     const convertButton = editPanel.querySelector("#editConvertWork");
     const createConverterButton = editPanel.querySelector("#editCreateConverter");
     const converterNodeUrlInput = editPanel.querySelector("#edit-converter-node-url");
+    const remotePresentationUrlInput = editPanel.querySelector("#edit-remote-presentation-url");
+    const remotePresentationCheckButton = editPanel.querySelector("#editCheckRemotePresentation");
+    const remotePresentationApplyButton = editPanel.querySelector("#editApplyRemotePresentation");
+    const remotePresentationStatus = editPanel.querySelector("#editRemotePresentationStatus");
+    const remotePresentationOffer = editPanel.querySelector("#editRemotePresentationOffer");
+    const remotePresentationOfferTitle = editPanel.querySelector("#editRemotePresentationOfferTitle");
+    const remotePresentationOfferMeta = editPanel.querySelector("#editRemotePresentationOfferMeta");
+    const remotePresentationSource = editPanel.querySelector("#editRemotePresentationSource");
+    const remotePresentationConflict = editPanel.querySelector("#editRemotePresentationConflict");
+    const remotePresentationHbs = editPanel.querySelector("#editRemotePresentationHbs");
+    const remotePresentationCss = editPanel.querySelector("#editRemotePresentationCss");
+    const remotePresentationJs = editPanel.querySelector("#editRemotePresentationJs");
+    const remotePresentationHbsMeta = editPanel.querySelector("#editRemotePresentationHbsMeta");
+    const remotePresentationCssMeta = editPanel.querySelector("#editRemotePresentationCssMeta");
+    const remotePresentationJsMeta = editPanel.querySelector("#editRemotePresentationJsMeta");
+    const externalSubmissionsEnabled = editPanel.querySelector("#edit-external-submissions-enabled");
+    const externalWhitelistEnabled = editPanel.querySelector("#edit-external-submissions-whitelist-enabled");
+    const externalSubmissionsOptions = editPanel.querySelector(".edit-external-submissions-options");
+    const externalWhitelistWrap = editPanel.querySelector("#editExternalWhitelistWrap");
     const promptRoot = editPanel.querySelector("#promptLayer");
     syncPromptDock(promptRoot);
+    let inspectedRemotePresentation = null;
     if (passwordDetailsEl) {
       bindStoredDetailsState(passwordDetailsEl, PASSWORD_DETAILS_STORAGE_KEY);
     }
@@ -6904,7 +7051,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       onMediaInput(readMediaConfigFromForm(form, (config == null ? void 0 : config.work) || {}));
     };
     const syncConverterDependentOptions = ({ preserveCurrentValues = false } = {}) => {
-      var _a2, _b2, _c2, _d2, _e, _f, _g, _h, _i, _j;
+      var _a2, _b2, _c2, _d2, _e2, _f2, _g2, _h, _i, _j;
       const converterSelect = (_a2 = form == null ? void 0 : form.elements) == null ? void 0 : _a2.converter_id;
       const formatSelect = (_b2 = form == null ? void 0 : form.elements) == null ? void 0 : _b2.converter_format;
       const qualitySelect = (_c2 = form == null ? void 0 : form.elements) == null ? void 0 : _c2.converter_quality;
@@ -6916,16 +7063,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       let ui = {};
       let defaults = {};
       try {
-        ui = JSON.parse(((_e = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e.converterUi) || "{}");
+        ui = JSON.parse(((_e2 = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _e2.converterUi) || "{}");
       } catch (e) {
         ui = {};
       }
       try {
-        defaults = JSON.parse(((_f = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f.converterDefaults) || "{}");
+        defaults = JSON.parse(((_f2 = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _f2.converterDefaults) || "{}");
       } catch (e) {
         defaults = {};
       }
-      const formats = Array.isArray((_g = ui == null ? void 0 : ui.format) == null ? void 0 : _g.options) && ui.format.options.length ? ui.format.options : String(((_h = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _h.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean);
+      const formats = Array.isArray((_g2 = ui == null ? void 0 : ui.format) == null ? void 0 : _g2.options) && ui.format.options.length ? ui.format.options : String(((_h = selectedOption == null ? void 0 : selectedOption.dataset) == null ? void 0 : _h.converterFormats) || "").split(",").map((item) => item.trim()).filter(Boolean);
       const qualityOptions = Array.isArray((_i = ui == null ? void 0 : ui.quality) == null ? void 0 : _i.options) && ui.quality.options.length ? ui.quality.options : ["preview", "default", "archival", "small-web"];
       const saveModeOptions = Array.isArray((_j = ui == null ? void 0 : ui.saveMode) == null ? void 0 : _j.options) && ui.saveMode.options.length ? ui.saveMode.options : ["new-hidden-work", "replace-generated-work", "temporary-preview-only"];
       const syncSelectOptions = (select, options, preferredValue, labeler = null) => {
@@ -6982,6 +7129,17 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         workFieldEditor.addWorkField();
       });
     }
+    const syncExternalSubmissionOptions = () => {
+      if (externalSubmissionsOptions) {
+        externalSubmissionsOptions.hidden = !(externalSubmissionsEnabled == null ? void 0 : externalSubmissionsEnabled.checked);
+      }
+      if (externalWhitelistWrap) {
+        externalWhitelistWrap.hidden = !(externalSubmissionsEnabled == null ? void 0 : externalSubmissionsEnabled.checked) || !(externalWhitelistEnabled == null ? void 0 : externalWhitelistEnabled.checked);
+      }
+    };
+    externalSubmissionsEnabled == null ? void 0 : externalSubmissionsEnabled.addEventListener("change", syncExternalSubmissionOptions);
+    externalWhitelistEnabled == null ? void 0 : externalWhitelistEnabled.addEventListener("change", syncExternalSubmissionOptions);
+    syncExternalSubmissionOptions();
     editPanel.querySelectorAll("[data-work-config-field], #edit-work-type, #edit-converter-id, #edit-converter-quality, #edit-converter-format, #edit-converter-save-mode").forEach((input) => {
       if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || input instanceof HTMLTextAreaElement)) {
         return;
@@ -7057,11 +7215,98 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         });
       };
       converterNodeUrlInput.addEventListener("change", loadConverterNode);
-      const available = Array.isArray((_c = config == null ? void 0 : config.converterCatalog) == null ? void 0 : _c.available) ? config.converterCatalog.available : [];
+      const available = Array.isArray((_f = config == null ? void 0 : config.converterCatalog) == null ? void 0 : _f.available) ? config.converterCatalog.available : [];
       const hasRemote = available.some((item) => (item == null ? void 0 : item.engine) === "remote-node");
-      if (((_d = config == null ? void 0 : config.converterCatalog) == null ? void 0 : _d.autoLoadRemote) === true && !hasRemote) {
+      if (((_g = config == null ? void 0 : config.converterCatalog) == null ? void 0 : _g.autoLoadRemote) === true && !hasRemote) {
         Promise.resolve().then(loadConverterNode);
       }
+    }
+    if (remotePresentationUrlInput && remotePresentationCheckButton && typeof onInspectRemotePresentation === "function") {
+      remotePresentationCheckButton.addEventListener("click", async () => {
+        const sourceUrl = String(remotePresentationUrlInput.value || "").trim();
+        inspectedRemotePresentation = null;
+        remotePresentationCheckButton.disabled = true;
+        remotePresentationCheckButton.textContent = "Checking...";
+        if (remotePresentationOffer) {
+          remotePresentationOffer.hidden = true;
+          remotePresentationOffer.classList.remove("is-compatible", "is-incompatible");
+        }
+        if (remotePresentationApplyButton) {
+          remotePresentationApplyButton.disabled = true;
+        }
+        try {
+          const offer = await onInspectRemotePresentation({ sourceUrl, statusEl: remotePresentationStatus });
+          inspectedRemotePresentation = offer;
+          const compatible = (offer == null ? void 0 : offer.compatible) === true;
+          const remote = (offer == null ? void 0 : offer.remote) && typeof offer.remote === "object" ? offer.remote : {};
+          const presentation = (offer == null ? void 0 : offer.presentation) && typeof offer.presentation === "object" ? offer.presentation : {};
+          const bytes = (offer == null ? void 0 : offer.presentationBytes) && typeof offer.presentationBytes === "object" ? offer.presentationBytes : {};
+          const localPresentation = (offer == null ? void 0 : offer.localPresentation) && typeof offer.localPresentation === "object" ? offer.localPresentation : {};
+          const matches = Array.isArray(offer == null ? void 0 : offer.matches) ? offer.matches.join(" \xB7 ") : "";
+          const safetyIssues = Array.isArray(offer == null ? void 0 : offer.safetyIssues) ? offer.safetyIssues : [];
+          if (remotePresentationOffer) {
+            remotePresentationOffer.hidden = false;
+            remotePresentationOffer.classList.add(compatible ? "is-compatible" : "is-incompatible");
+          }
+          if (remotePresentationOfferTitle) {
+            remotePresentationOfferTitle.textContent = remote.title || remote.path || "Remote work presentation";
+          }
+          if (remotePresentationOfferMeta) {
+            remotePresentationOfferMeta.textContent = compatible ? `Compatible: ${matches || "matching work type"}` : safetyIssues.join(" ") || `Not compatible with this local work (${remote.mimeType || remote.kind || remote.extension || "unknown type"}).`;
+          }
+          if (remotePresentationSource) {
+            remotePresentationSource.href = remote.url || sourceUrl;
+          }
+          if (remotePresentationHbs) remotePresentationHbs.textContent = String(presentation.workHbs || "");
+          if (remotePresentationCss) remotePresentationCss.textContent = String(presentation.styleCss || "");
+          if (remotePresentationJs) remotePresentationJs.textContent = String(presentation.scriptJs || "");
+          if (remotePresentationHbsMeta) remotePresentationHbsMeta.textContent = `work.hbs \xB7 ${Number(bytes["work.hbs"] || 0)} bytes`;
+          if (remotePresentationCssMeta) remotePresentationCssMeta.textContent = `style.css \xB7 ${Number(bytes["style.css"] || 0)} bytes`;
+          if (remotePresentationJsMeta) remotePresentationJsMeta.textContent = `script.js \xB7 ${Number(bytes["script.js"] || 0)} bytes`;
+          if (remotePresentationConflict) {
+            const existingFiles = Object.entries(localPresentation.files || {}).filter(([, state]) => (state == null ? void 0 : state.exists) === true).map(([name]) => name);
+            remotePresentationConflict.hidden = existingFiles.length === 0;
+            remotePresentationConflict.textContent = existingFiles.length ? `Conflict: ${existingFiles.join(", ")} will be backed up, then all three presentation files will be replaced together.` : "";
+          }
+          if (remotePresentationApplyButton) {
+            remotePresentationApplyButton.disabled = !compatible;
+            remotePresentationApplyButton.textContent = localPresentation.hasPresentation ? "Replace complete presentation" : "Copy complete presentation";
+          }
+          setStatusMessage(
+            remotePresentationStatus,
+            compatible ? "Complete presentation ready: HBS + CSS + JS." : "Presentation cannot be copied.",
+            compatible
+          );
+        } catch (error) {
+          setStatusMessage(remotePresentationStatus, (error == null ? void 0 : error.message) || "Remote work presentation unavailable.");
+        } finally {
+          remotePresentationCheckButton.disabled = false;
+          remotePresentationCheckButton.textContent = "Check presentation";
+        }
+      });
+    }
+    if (remotePresentationApplyButton && typeof onApplyRemotePresentation === "function") {
+      remotePresentationApplyButton.addEventListener("click", async () => {
+        var _a2;
+        if (!(inspectedRemotePresentation == null ? void 0 : inspectedRemotePresentation.compatible)) {
+          return;
+        }
+        remotePresentationApplyButton.disabled = true;
+        remotePresentationApplyButton.textContent = "Copying complete presentation...";
+        try {
+          const result = await onApplyRemotePresentation({ offer: inspectedRemotePresentation, statusEl: remotePresentationStatus });
+          remotePresentationApplyButton.textContent = "Presentation copied";
+          setStatusMessage(
+            remotePresentationStatus,
+            (result == null ? void 0 : result.backupPath) ? `Presentation replaced. Backup: ${result.backupPath}` : "Complete presentation copied.",
+            true
+          );
+        } catch (error) {
+          remotePresentationApplyButton.disabled = false;
+          remotePresentationApplyButton.textContent = ((_a2 = inspectedRemotePresentation == null ? void 0 : inspectedRemotePresentation.localPresentation) == null ? void 0 : _a2.hasPresentation) ? "Replace complete presentation" : "Copy complete presentation";
+          setStatusMessage(remotePresentationStatus, (error == null ? void 0 : error.message) || "Presentation copy failed.");
+        }
+      });
     }
     if (resetFolderWorkButton && typeof onResetFolderWork === "function") {
       resetFolderWorkButton.addEventListener("click", async () => {
@@ -7523,7 +7768,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setEditConfig(editConfig);
       },
       onSubmit: async ({ elements: elements2, statusEl }) => {
-        var _a, _b;
+        var _a, _b, _c, _d, _e;
         const selection2 = getSelection();
         const editConfig = getEditConfig();
         const currentWork = (editConfig == null ? void 0 : editConfig.work) && typeof editConfig.work === "object" ? editConfig.work : {};
@@ -7534,6 +7779,14 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           title: (((_a = elements2.title) == null ? void 0 : _a.value) || "").trim(),
           description: (((_b = elements2.description) == null ? void 0 : _b.value) || "").trim()
         };
+        if (elements2.external_submissions_enabled) {
+          payload.externalSubmissions = {
+            enabled: !!elements2.external_submissions_enabled.checked,
+            whitelistEnabled: !!((_c = elements2.external_submissions_whitelist_enabled) == null ? void 0 : _c.checked),
+            whitelist: String(((_d = elements2.external_submissions_whitelist) == null ? void 0 : _d.value) || "").split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean),
+            maxPending: Number(((_e = elements2.external_submissions_max) == null ? void 0 : _e.value) || 5)
+          };
+        }
         if (mediaWork && typeof mediaWork === "object" && Object.keys(mediaWork).length > 0) {
           payload.work = materializeWorkFields(mediaWork);
         }
@@ -7552,6 +7805,42 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         setDrawerOpen(false);
         syncDrawerVisibility();
         window.location.hash = `#/${nextPath}`;
+      },
+      onInspectRemotePresentation: async ({ sourceUrl }) => {
+        const selection2 = getSelection();
+        const targetPath = getEditTargetPath2(selection2);
+        if (!targetPath || !sourceUrl) {
+          throw new Error("Enter a remote file-work URL.");
+        }
+        const data = await requestMcpRoute("remote-work-presentation", {
+          path: targetPath,
+          url: sourceUrl,
+          action: "inspect"
+        });
+        if (!data || data.ok === false || data.error) {
+          throw new Error((data == null ? void 0 : data.error) || "Remote work presentation unavailable.");
+        }
+        return data;
+      },
+      onApplyRemotePresentation: async ({ offer }) => {
+        var _a, _b;
+        const selection2 = getSelection();
+        const targetPath = getEditTargetPath2(selection2);
+        const sourceUrl = String(((_a = offer == null ? void 0 : offer.remote) == null ? void 0 : _a.url) || "").trim();
+        if (!targetPath || (offer == null ? void 0 : offer.compatible) !== true || !sourceUrl) {
+          throw new Error("Compatible remote work presentation required.");
+        }
+        const result = await requestMcpRoute("remote-work-presentation", {
+          path: targetPath,
+          url: sourceUrl,
+          action: "copy",
+          confirmReplace: ((_b = offer == null ? void 0 : offer.localPresentation) == null ? void 0 : _b.hasPresentation) === true
+        });
+        if (!result || result.ok === false || result.error) {
+          throw new Error((result == null ? void 0 : result.error) || "Copying complete work presentation failed.");
+        }
+        await refreshCurrentEditState(selection2, { forcePreviewRefresh: true });
+        return result;
       },
       onConvertWork: async ({
         statusEl,
@@ -7851,7 +8140,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }
         window.dispatchEvent(new CustomEvent("poff:content-updated"));
       },
-      onCreateLink: async ({ source, linkName, linkUrl, saveTarget, closeDialog }) => {
+      onCreateLink: async ({ source, linkName, linkUrl, submissionIntent, saveTarget, closeDialog }) => {
         var _a;
         const selection2 = getSelection();
         const data = await requestEditUpload(buildAddWorkRequestPayload(selection2, {
@@ -7859,6 +8148,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
           linkName,
           fileName: linkName,
           linkUrl,
+          submissionIntent,
           saveTarget,
           files: []
         }));
@@ -7903,7 +8193,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         closeDialog == null ? void 0 : closeDialog();
         const inlineStatus = document.getElementById("editInlineStatus");
         if (inlineStatus) {
-          const message = takeoverMode === "copy" ? `Copied ${data.copiedCount || 0} files into ${data.destinationPath || data.destinationName || "a local folder"}${data.playerCreated ? " and created a looping player" : ""}.` : `Following ${data.importedCount || 0} entries from the remote Poff node.`;
+          const message = takeoverMode === "copy" ? `Copied ${data.copiedCount || 0} files into ${data.destinationPath || data.destinationName || "a local folder"}${data.playerCreated ? " and created a looping player" : ""}.` : `Added ${data.importedCount || 0} external ${data.importedCount === 1 ? "work" : "works"}. Source files and layout stay remote; updates remain live.`;
           setStatusMessage2(inlineStatus, message, true);
         }
         if (takeoverMode === "copy" && data.destinationPath) {
@@ -8174,12 +8464,21 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return;
       }
       editAddWork.addEventListener("click", () => {
+        var _a;
         const openUploadDialogButton = document.getElementById("editOpenUploadDialog");
         if (openUploadDialogButton instanceof HTMLButtonElement) {
           openUploadDialogButton.click();
           return;
         }
         if (editRequested2) {
+          const externalSubmissionsEnabled = ((_a = currentPoffConfig == null ? void 0 : currentPoffConfig.externalSubmissions) == null ? void 0 : _a.enabled) === true;
+          if (!authState.canEdit && !externalSubmissionsEnabled) {
+            if (editAuthDetails) {
+              editAuthDetails.open = true;
+            }
+            setStatusMessage2(editAuthStatus, "This node is not accepting external work submissions.");
+            return;
+          }
           let attempts = 0;
           const maxAttempts = 24;
           const openWhenReady = () => {
@@ -8590,6 +8889,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             true
           );
         },
+        onInspectRemotePresentation: panelActions.onInspectRemotePresentation,
+        onApplyRemotePresentation: panelActions.onApplyRemotePresentation,
         onResetFolderWork: panelActions.onResetFolderWork,
         onReturnToWork: panelActions.onReturnToWork,
         onSubmitLayout: panelActions.onSubmitLayout,
@@ -8932,6 +9233,30 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     let lastPreviewKey = "";
     let previewMountRoot = null;
     let previewAbortController = null;
+    const previewResponseCache = /* @__PURE__ */ new Map();
+    function previewCacheKey(url) {
+      try {
+        const parsed = new URL(url, window.location.href);
+        parsed.searchParams.delete("_refresh");
+        return `${parsed.pathname}${parsed.search}`;
+      } catch (err) {
+        return String(url || "");
+      }
+    }
+    function isForcedPreviewRefresh(url) {
+      try {
+        return new URL(url, window.location.href).searchParams.has("_refresh");
+      } catch (err) {
+        return false;
+      }
+    }
+    function rememberPreviewResponse(key, value) {
+      previewResponseCache.delete(key);
+      previewResponseCache.set(key, value);
+      if (previewResponseCache.size > 24) {
+        previewResponseCache.delete(previewResponseCache.keys().next().value);
+      }
+    }
     function stripPreviewChrome(root) {
       if (!root || typeof root.querySelectorAll !== "function") {
         return root;
@@ -9293,18 +9618,28 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       const preservedScrollLeft = shouldPreserveScroll ? contentFrame.scrollLeft : 0;
       try {
         previewMountRoot = null;
-        const response = await fetch(url, {
-          credentials: "same-origin",
-          headers: {
-            "Accept": "text/html,application/xhtml+xml",
-            "X-Requested-With": "fetch-preview"
-          },
-          ...requestController ? { signal: requestController.signal } : {}
-        });
-        if (!response.ok) {
-          throw new Error(`Preview request failed: ${response.status}`);
+        const cacheKey = previewCacheKey(url);
+        const forceRefresh = isForcedPreviewRefresh(url);
+        let previewResponse = forceRefresh ? null : previewResponseCache.get(cacheKey);
+        if (!previewResponse) {
+          const response = await fetch(url, {
+            credentials: "same-origin",
+            headers: {
+              "Accept": "text/html,application/xhtml+xml",
+              "X-Requested-With": "fetch-preview"
+            },
+            ...requestController ? { signal: requestController.signal } : {}
+          });
+          if (!response.ok) {
+            throw new Error(`Preview request failed: ${response.status}`);
+          }
+          previewResponse = {
+            html: await response.text(),
+            url: response.url
+          };
+          rememberPreviewResponse(cacheKey, previewResponse);
         }
-        const html = await response.text();
+        const { html, url: responseUrl } = previewResponse;
         const parser = new DOMParser();
         const previewDocument = parser.parseFromString(html, "text/html");
         const previewRoot = previewDocument.querySelector("#contentFrame > .viewer") || previewDocument.querySelector(".viewer") || previewDocument.body;
@@ -9324,7 +9659,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
             return "";
           }
           try {
-            link.href = new URL(href, response.url).href;
+            link.href = new URL(href, responseUrl).href;
           } catch (err) {
             return "";
           }
@@ -9332,16 +9667,16 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         }).filter(Boolean).join("");
         const previewMarkup = rewritePreviewMarkupUrls(
           extractPreferredPreviewMarkup(previewDocument, previewRoot, { converterPreview }),
-          response.url
+          responseUrl
         );
         let previewScripts = [];
         try {
-          const localPreview = !isExternalPreviewUrl(response.url);
-          previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview || localPreview);
+          const localPreview = !isExternalPreviewUrl(responseUrl);
+          previewScripts = collectPreviewScripts(previewDocument, responseUrl, converterPreview || localPreview);
         } catch (err) {
           previewScripts = [];
         }
-        const fallbackMarkup = previewMarkup || (isExternalPreviewUrl(response.url) ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>` : '<div class="viewer-error">Preview unavailable.</div>');
+        const fallbackMarkup = previewMarkup || (isExternalPreviewUrl(responseUrl) ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(responseUrl)}" target="_blank" rel="noopener">Open original</a></div>` : '<div class="viewer-error">Preview unavailable.</div>');
         previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
         executePreviewScripts(previewContainer, previewScripts);
         syncPreviewDisabledState(previewDisabled);
@@ -9914,7 +10249,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     currentPathForIframe: currentPathForIframe2,
     renderFolderMeta,
     initEditMode,
-    getPreviewParams
+    getPreviewParams,
+    isSidebarOpen = () => true
   }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements2;
     let ignoreNextHashSync = false;
@@ -9973,7 +10309,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       }
       return "";
     }
-    const sidebarController2 = createSidebarController({
+    const sidebarController = createSidebarController({
       navList,
       sidebarLoading,
       editQuery: editQuery2,
@@ -10025,27 +10361,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       if (updateHash) {
         writeHashPath(selection2.path || "");
       }
-      if (navList && !skipSidebarReload) {
-        const currentSidebarSyncId = ++sidebarSyncId;
-        sidebarController2.loadNav(folderPath, {
-          loadingLabel: `Loading navigation for ${targetLabel}...`
-        }).then(() => {
-          if (currentSidebarSyncId !== sidebarSyncId) {
-            return;
-          }
-          sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          setLoadingVisible(sidebarLoading, false);
-        }).catch(() => {
-          if (currentSidebarSyncId !== sidebarSyncId) {
-            return;
-          }
-          sidebarController2.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
-          setLoadingVisible(sidebarLoading, false);
-        });
+      if (navList && !skipSidebarReload && isSidebarOpen()) {
+        refreshSidebarForSelection(selection2, targetLabel);
       }
       if (initEditMode && !skipEditInit) {
         initEditMode();
       }
+    }
+    function refreshSidebarForSelection(selectionInput = getCurrentSelection(), targetLabel = "") {
+      if (!navList || !isSidebarOpen()) {
+        return Promise.resolve();
+      }
+      const selection2 = selectionInput && typeof selectionInput === "object" && Object.prototype.hasOwnProperty.call(selectionInput, "path") ? selectionInput : getSelectionFromPath(selectionInput || "");
+      const previewPath = selection2.previewPath || "";
+      const previewIsFile = !!selection2.previewIsFile;
+      const folderPath = previewIsFile ? previewPath.split("/").slice(0, -1).join("/") : previewPath;
+      const label = targetLabel || String(selection2.path || previewPath || "home").split("/").filter(Boolean).pop() || "home";
+      const currentSidebarSyncId = ++sidebarSyncId;
+      return sidebarController.loadNav(folderPath, {
+        loadingLabel: `Loading navigation for ${label}...`
+      }).catch(() => "").then(() => {
+        if (currentSidebarSyncId !== sidebarSyncId) {
+          return;
+        }
+        sidebarController.syncSidebarSelection(selection2.path || previewPath, previewIsFile, !!selection2.isLayout);
+        setLoadingVisible(sidebarLoading, false);
+      });
     }
     function loadCurrentFolderInIframe() {
       var _a;
@@ -10095,7 +10436,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       });
     }
     if (navList) {
-      sidebarController2.bindNavClick();
+      sidebarController.bindNavClick();
     }
     if (contentFrame) {
       previewController.bindPreviewNavigation();
@@ -10111,6 +10452,7 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
       },
       loadCurrentFolderInIframe,
       refreshCurrentLocation,
+      refreshCurrentSidebar: () => refreshSidebarForSelection(),
       refreshCurrentPreviewLocation,
       rememberSlugPathAlias: routeResolver.rememberSlugPathAlias,
       syncFromLocation,
@@ -10172,18 +10514,27 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     }
     previewEl.scrollIntoView({ block: "start" });
   }
-  function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
+  function bindSidebarToggle({
+    appShell,
+    appSidebar,
+    sidebarToggle,
+    initiallyOpen = true,
+    onStateChange = null
+  }) {
     if (!appShell || !appSidebar || !sidebarToggle) {
       return null;
     }
     let unregisterEscapeClose = null;
-    const syncSidebarState = (isOpen) => {
+    const syncSidebarState = (isOpen, { notify = true } = {}) => {
       appShell.classList.toggle("sidebar-collapsed", !isOpen);
       appSidebar.hidden = !isOpen;
       appSidebar.setAttribute("aria-hidden", isOpen ? "false" : "true");
       sidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
       sidebarToggle.setAttribute("aria-label", isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
       sidebarToggle.setAttribute("title", isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
+      if (notify && typeof onStateChange === "function") {
+        onStateChange(isOpen);
+      }
     };
     const bindEscapeClose = () => {
       if (typeof unregisterEscapeClose === "function") {
@@ -10197,7 +10548,8 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
         return true;
       }, { label: "sidebar-toggle" });
     };
-    syncSidebarState(true);
+    const isNarrowViewport = typeof globalThis.matchMedia === "function" && globalThis.matchMedia("(max-width: 45rem)").matches;
+    syncSidebarState(initiallyOpen && !isNarrowViewport, { notify: false });
     bindEscapeClose();
     const onToggleClick = () => {
       const isOpen = !appShell.classList.contains("sidebar-collapsed");
@@ -10238,22 +10590,32 @@ ${lines.join("\n\n")}` : lines.join("\n\n");
     context: poffContext,
     editRequested
   });
-  var navigation = initNavigation({
+  var navigation = null;
+  bindSidebarToggle({
+    ...elements,
+    initiallyOpen: editRequested,
+    onStateChange(isOpen) {
+      if (isOpen) {
+        navigation == null ? void 0 : navigation.refreshCurrentSidebar();
+      }
+    }
+  });
+  navigation = initNavigation({
     elements,
     editQuery,
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode,
-    getPreviewParams: editController.getPreviewParams
+    getPreviewParams: editController.getPreviewParams,
+    isSidebarOpen: () => {
+      var _a;
+      return !((_a = elements.appShell) == null ? void 0 : _a.classList.contains("sidebar-collapsed"));
+    }
   });
   editController.setPreviewRefreshHandler(() => {
     navigation.refreshCurrentPreviewLocation();
   });
-  var sidebarController = bindSidebarToggle(elements);
   document.addEventListener("DOMContentLoaded", async () => {
-    if (sidebarController) {
-      sidebarController.syncSidebarState(true);
-    }
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();

@@ -21,11 +21,20 @@
 - Converted all 16 live HEIC files to PNG; originals remain preserved and hidden.
 - Captured a Playwright proof screenshot containing all 16 converted images.
 - Verified 166 MCP tests, 16 related UI tests, PHP lint, and diff whitespace.
+- Diagnosed production root: duplicated sidebar/tree and folder grid, with a separate 1.65s navigation request on route changes.
+- Added a collapsed public navigation, lazy navigation loading, preview response cache, owner-story entry, and regression coverage.
+- Rebuilt generated entrypoints after explicit user continuation.
+- Fixed a builder-specific literal-PHP rendering defect in the static layout markup, then rebuilt successfully.
+- Verified locally: closed public start, Explore work opens navigation, and HRMueller-2 resolves with its `auswahl` folder.
+- Verified 18 focused navigation tests, 173 MCP tests, PHP lint, and diff whitespace.
+- Corrected the production host guard and placed the owner story inside the layout main retained by the preview loader.
+- Deployed the rebuilt index to eggman1 with a matching remote checksum.
+- Verified in the public browser: owner story, Explore work, HRMueller-2, and its 11-image `auswahl` folder.
 ## In Progress
-- None.
+- Navigation renewal is complete locally and on production.
 ## Next
-- Rebuild generated entrypoints only when explicitly requested.
-- Commit only when explicitly requested.
+- Gather owner feedback on the story copy and navigation labels.
+- Optionally repair the legacy `npm run deploy` target mapping before the next release.
 
 ## Three-Node Pageoff Study
 - Loop 1 started with independent targets: `pageoff-artist`, `pageoff-writer`, and `pageoff-curator`.

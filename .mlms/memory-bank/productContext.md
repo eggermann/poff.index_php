@@ -7,6 +7,11 @@ Editors managing site content and nested work folders.
 Fast creation and organization of works without manual filesystem work.
 ## Current Scope
 Editing, uploading, folder creation, link creation, viewer rendering, federated conversion, and person-to-person exchange across independent single-file nodes.
+
+## Navigation Renewal Scope
+- Visitors should see one primary work surface, not a sidebar and matching folder grid competing at once.
+- A named entry story should explain the archive and point to selected work.
+- Editor navigation stays immediately available in edit mode.
 ## Non-Goals
 - Rewriting the generated site output by hand.
 - Broad editor redesign work unrelated to the bug.

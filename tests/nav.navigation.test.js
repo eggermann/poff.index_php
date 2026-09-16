@@ -148,8 +148,8 @@ describe('navigation', () => {
     const secondNavigation = navigation.syncFromLocation();
     await Promise.resolve();
     await Promise.resolve();
-    expect(iframeLabel.textContent).toBe('Loading home...');
-    expect(sidebarLabel.textContent).toBe('Loading navigation for home...');
+    expect(iframeLabel.textContent).toBe('Opening the studio archive…');
+    expect(sidebarLabel.textContent).toBe('Loading work menu…');
     pending[0]();
     await Promise.resolve();
     expect(syncSidebarSelection).not.toHaveBeenCalled();
@@ -197,6 +197,29 @@ describe('navigation', () => {
     expect(previewCalls).toHaveLength(1);
     expect(previewCalls[0]).toContain('viewer:docs/example.txt:file:refresh');
     expect(sidebarCalls).toHaveLength(0);
+  });
+
+  test('does not fetch sidebar navigation while the public explorer is collapsed', async () => {
+    const { initNavigation, sidebarCalls } = loadNavigation();
+    const navigation = initNavigation({
+      elements: {
+        navList: {},
+        contentFrame: { classList: { toggle() {} } },
+        iframeLoading: { classList: { toggle() {} } },
+        sidebarLoading: { classList: { toggle() {} } },
+      },
+      editQuery: '',
+      currentPathForIframe: 'works/first.jpg',
+      renderFolderMeta() {},
+      initEditMode() {},
+      isSidebarOpen() {
+        return false;
+      },
+    });
+
+    await navigation.syncFromLocation();
+
+    expect(sidebarCalls).toEqual([]);
   });
 
   test('refreshCurrentPreviewLocation resolves slug hashes before refreshing preview', async () => {

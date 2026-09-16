@@ -30,19 +30,28 @@ export function scrollToPreview() {
     previewEl.scrollIntoView({ block: 'start' });
 }
 
-export function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
+export function bindSidebarToggle({
+    appShell,
+    appSidebar,
+    sidebarToggle,
+    initiallyOpen = true,
+    onStateChange = null,
+}) {
     if (!appShell || !appSidebar || !sidebarToggle) {
         return null;
     }
     let unregisterEscapeClose = null;
 
-    const syncSidebarState = (isOpen) => {
+    const syncSidebarState = (isOpen, { notify = true } = {}) => {
         appShell.classList.toggle('sidebar-collapsed', !isOpen);
         appSidebar.hidden = !isOpen;
         appSidebar.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
         sidebarToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         sidebarToggle.setAttribute('aria-label', isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
         sidebarToggle.setAttribute('title', isOpen ? APP_LABELS.closeNavigation : APP_LABELS.openNavigation);
+        if (notify && typeof onStateChange === 'function') {
+            onStateChange(isOpen);
+        }
     };
 
     const bindEscapeClose = () => {
@@ -60,7 +69,7 @@ export function bindSidebarToggle({ appShell, appSidebar, sidebarToggle }) {
 
     const isNarrowViewport = typeof globalThis.matchMedia === 'function'
         && globalThis.matchMedia('(max-width: 45rem)').matches;
-    syncSidebarState(!isNarrowViewport);
+    syncSidebarState(initiallyOpen && !isNarrowViewport, { notify: false });
     bindEscapeClose();
 
     const onToggleClick = () => {

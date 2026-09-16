@@ -1,0 +1,924 @@
+[     472ms] [DIR] 
+ start-settings.php __globals: 
+ {isMobile: computer, engines: Object, embeded: false, embededQuery: word=1984&lang=en, engineName: engineWikText} @ https://mybrother.tv/versions/after-kruemmel-1/s/exp-player-test-opacity.php?word=1984&lang=en:34
+[     738ms] [ERROR] Mixed Content: The page at 'https://mybrother.tv/versions/after-kruemmel-1/s/exp-player-test-opacity.php?word=1984&lang=en' was loaded over HTTPS, but requested an insecure EventSource endpoint 'http://mybrother.tv:35731/events'. This request has been blocked; the content must be served over HTTPS. @ https://mybrother.tv/versions/after-kruemmel-1/s/exp-player-test-opacity.php?word=1984&lang=en:3268
+[    1105ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8888/dominikeggermann-project/page/index.php#/hrmueller-2-mybrother-tv-1-webloc:0
+[    1435ms] [DIR] 
+ start-settings.php __globals: 
+ {isMobile: computer, engines: Object, embeded: false, embededQuery: word=1984&lang=en, engineName: engineWikText} @ https://mybrother.tv/versions/after-kruemmel-1/s/exp-player-test-opacity.php?word=1984&lang=en:34
+[    1832ms] [ERROR] Mixed Content: The page at 'https://mybrother.tv/versions/after-kruemmel-1/s/exp-player-test-opacity.php?word=1984&lang=en' was loaded over HTTPS, but requested an insecure EventSource endpoint 'http://mybrother.tv:35731/events'. This request has been blocked; the content must be served over HTTPS. @ https://mybrother.tv/versions/after-kruemmel-1/s/exp-player-test-opacity.php?word=1984&lang=en:3268
+[    2237ms] [LOG] *playerType exp playersCnt:  3 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/frame-player.js?cb=ms8wmzdy-aytndrirx0p:49
+[    2239ms] [LOG] startProtocol: ?engineName=engineWikText&engineAssoNSign=engineAssoNPlus&lang=en&word=1984&category=&filmLen=900000000&fresh=true&writeDatas=false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/frame-player.js?cb=ms8wmzdy-aytndrirx0p:157
+[    2655ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[    3006ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[    3007ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[    3008ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[    3183ms] [WARNING] Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://mybrother.tv'). @ https://www.youtube.com/s/player/bed7a914/www-widgetapi.vflset/www-widgetapi.js:162
+[    3301ms] [LOG] players from window 1 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:768
+[    3304ms] [LOG] players from window 2 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:768
+[    3304ms] [LOG] players gealden @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:771
+[    3550ms] [WARNING] Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://mybrother.tv'). @ https://www.youtube.com/s/player/bed7a914/www-widgetapi.vflset/www-widgetapi.js:162
+[    3663ms] [LOG] players from window 1 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:768
+[    3711ms] [LOG] players from window 2 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:768
+[    3711ms] [LOG] players gealden @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:771
+[    3781ms] [LOG] players from window 1 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:768
+[    3818ms] [LOG] players from window 2 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:768
+[    3818ms] [LOG] players gealden @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/fade-player.js?cb=ms8wmzdy-aytndrirx0p:771
+[    4338ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    4340ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    4358ms] [LOG] posInSeconds 1 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/variations/helpers.js?cb=ms8wmzdy-aytndrirx0p:16
+[    4732ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    4735ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    4740ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[    4761ms] [LOG] posInSeconds 1 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/variations/helpers.js?cb=ms8wmzdy-aytndrirx0p:16
+[    4834ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    4836ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    4862ms] [LOG] posInSeconds 1 @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/player/variations/helpers.js?cb=ms8wmzdy-aytndrirx0p:16
+[    4946ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    7052ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    7061ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[    7238ms] [LOG] _playlist.length:  12 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[    9740ms] [LOG] _playlist.length:  12 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   12239ms] [LOG] _playlist.length:  12 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   14738ms] [LOG] _playlist.length:  12 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   15284ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   15579ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   17239ms] [LOG] _playlist.length:  12 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   19142ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   19145ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   19686ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   19739ms] [LOG] _playlist.length:  11 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   20947ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   20963ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   20968ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   20971ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   21780ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   22239ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   22400ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   22400ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   22669ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   22703ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   24737ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   27239ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   29739ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   32238ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   34739ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   37238ms] [LOG] _playlist.length:  10 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   37565ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   37567ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   37574ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   37577ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   38005ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   38015ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   39738ms] [LOG] _playlist.length:  8 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   41309ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   41580ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   42238ms] [LOG] _playlist.length:  8 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   44738ms] [LOG] _playlist.length:  8 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   47238ms] [LOG] _playlist.length:  8 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   47685ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   47955ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   48208ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   48211ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   48215ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   48995ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   49738ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   52237ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   54737ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   57239ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   59739ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   62239ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   64737ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   67238ms] [LOG] _playlist.length:  7 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   68492ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   68499ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   68502ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   68504ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   68504ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   68507ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   69039ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   69333ms] [ERROR] Access to fetch at 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=-V6odR7HzLCuqjYeowPjLA&label=followon_view&ptype=no_rmkt&random=690276887&cv_attributed=0' (redirected from 'https://www.youtube.com/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=-V6odR7HzLCuqjYeowPjLA&label=followon_view&ptype=no_rmkt&random=690276887') from origin 'https://www.youtube.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://www.youtube.com/embed/?origin=https%3A%2F%2Fmybrother.tv&autoplay=1&mute=1&controls=0&showinfo=0&quality=auto&iv_load_policy=3&modestbranding=1&html5=1&playsinline=1&rel=0&fs=0&disablekb=1&widget_referrer=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fjs%2Fmodules%2Fplayer%2Fyt-player%2Findex.html%3FytUi%3D2%26cover%3D1&aoriginsup=1&aorigins=https%3A%2F%2Fmybrother.tv%2Chttp%3A%2F%2Flocalhost%3A8888&gporigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&vf=6:0
+[   69333ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=-V6odR7HzLCuqjYeowPjLA&label=followon_view&ptype=no_rmkt&random=690276887&cv_attributed=0:0
+[   69464ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   69738ms] [LOG] _playlist.length:  5 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   70729ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   70738ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   72238ms] [LOG] _playlist.length:  5 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   74738ms] [LOG] _playlist.length:  5 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   77238ms] [LOG] _playlist.length:  5 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   79480ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   79483ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   79737ms] [LOG] _playlist.length:  4 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   80465ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   80844ms] [ERROR] Access to fetch at 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=-V6odR7HzLCuqjYeowPjLA&label=followon_view&ptype=no_rmkt&random=315826121&cv_attributed=0' (redirected from 'https://www.youtube.com/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=-V6odR7HzLCuqjYeowPjLA&label=followon_view&ptype=no_rmkt&random=315826121') from origin 'https://www.youtube.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://www.youtube.com/embed/?origin=https%3A%2F%2Fmybrother.tv&autoplay=1&mute=1&controls=0&showinfo=0&quality=auto&iv_load_policy=3&modestbranding=1&html5=1&playsinline=1&rel=0&fs=0&disablekb=1&widget_referrer=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fjs%2Fmodules%2Fplayer%2Fyt-player%2Findex.html%3FytUi%3D2%26cover%3D1&aoriginsup=1&aorigins=https%3A%2F%2Fmybrother.tv%2Chttp%3A%2F%2Flocalhost%3A8888&gporigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&vf=6:0
+[   80844ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=-V6odR7HzLCuqjYeowPjLA&label=followon_view&ptype=no_rmkt&random=315826121&cv_attributed=0:0
+[   82237ms] [LOG] _playlist.length:  4 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   83619ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   83889ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   84738ms] [LOG] _playlist.length:  4 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   87238ms] [LOG] _playlist.length:  4 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   89738ms] [LOG] _playlist.length:  4 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   92238ms] [LOG] _playlist.length:  4 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   92944ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   93219ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   93459ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   93460ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   93462ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   94095ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   94737ms] [LOG] _playlist.length:  3 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   97238ms] [LOG] _playlist.length:  3 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   99524ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   99525ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   99528ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   99738ms] [LOG] _playlist.length:  2 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[   99947ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   99947ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   99951ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[   99957ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  100630ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  100884ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  101010ms] [ERROR] Access to fetch at 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=FbRdRGijPR4oBjQ0fVCSmw&label=followon_view&ptype=no_rmkt&random=746571738&cv_attributed=0' (redirected from 'https://www.youtube.com/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=FbRdRGijPR4oBjQ0fVCSmw&label=followon_view&ptype=no_rmkt&random=746571738') from origin 'https://www.youtube.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://www.youtube.com/embed/?origin=https%3A%2F%2Fmybrother.tv&autoplay=1&mute=1&controls=0&showinfo=0&quality=auto&iv_load_policy=3&modestbranding=1&html5=1&playsinline=1&rel=0&fs=0&disablekb=1&widget_referrer=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fjs%2Fmodules%2Fplayer%2Fyt-player%2Findex.html%3FytUi%3D2%26cover%3D1&aoriginsup=1&aorigins=https%3A%2F%2Fmybrother.tv%2Chttp%3A%2F%2Flocalhost%3A8888&gporigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&vf=6:0
+[  101010ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=FbRdRGijPR4oBjQ0fVCSmw&label=followon_view&ptype=no_rmkt&random=746571738&cv_attributed=0:0
+[  101068ms] [ERROR] Access to fetch at 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=Gp4u0WHLsK8OAxnvwiTyhA&label=followon_view&ptype=no_rmkt&random=193077227&cv_attributed=0' (redirected from 'https://www.youtube.com/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=Gp4u0WHLsK8OAxnvwiTyhA&label=followon_view&ptype=no_rmkt&random=193077227') from origin 'https://www.youtube.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://www.youtube.com/embed/?origin=https%3A%2F%2Fmybrother.tv&autoplay=1&mute=1&controls=0&showinfo=0&quality=auto&iv_load_policy=3&modestbranding=1&html5=1&playsinline=1&rel=0&fs=0&disablekb=1&widget_referrer=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fjs%2Fmodules%2Fplayer%2Fyt-player%2Findex.html%3FytUi%3D2%26cover%3D1&aoriginsup=1&aorigins=https%3A%2F%2Fmybrother.tv%2Chttp%3A%2F%2Flocalhost%3A8888&gporigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&vf=6:0
+[  101068ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=Gp4u0WHLsK8OAxnvwiTyhA&label=followon_view&ptype=no_rmkt&random=193077227&cv_attributed=0:0
+[  102238ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  104738ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  107238ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  109738ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  112238ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  114738ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  117238ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  119738ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  122238ms] [LOG] _playlist.length:  1 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  124577ms] [LOG] yt-event: 2 pause @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  124580ms] [LOG] yt-event: -1 unstarted @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  124584ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  124738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  125018ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  125264ms] [ERROR] Access to fetch at 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=ZvysOTYDHMewYyIX_at8mw&label=followon_view&ptype=no_rmkt&random=136274529&cv_attributed=0' (redirected from 'https://www.youtube.com/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=ZvysOTYDHMewYyIX_at8mw&label=followon_view&ptype=no_rmkt&random=136274529') from origin 'https://www.youtube.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://www.youtube.com/embed/?origin=https%3A%2F%2Fmybrother.tv&autoplay=1&mute=1&controls=0&showinfo=0&quality=auto&iv_load_policy=3&modestbranding=1&html5=1&playsinline=1&rel=0&fs=0&disablekb=1&widget_referrer=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fjs%2Fmodules%2Fplayer%2Fyt-player%2Findex.html%3FytUi%3D2%26cover%3D1&aoriginsup=1&aorigins=https%3A%2F%2Fmybrother.tv%2Chttp%3A%2F%2Flocalhost%3A8888&gporigin=https%3A%2F%2Fmybrother.tv%2Fversions%2Fafter-kruemmel-1%2Fs%2Fexp-player-test-opacity.php%3Fword%3D1984%26lang%3Den&vf=6:0
+[  125264ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://googleads.g.doubleclick.net/pagead/viewthroughconversion/962985656/?backend=innertube&cname=56&cver=2_20260730&foc_id=ZvysOTYDHMewYyIX_at8mw&label=followon_view&ptype=no_rmkt&random=136274529&cv_attributed=0:0
+[  127238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  129738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  131186ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  131468ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  132238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  134737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  137238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  139737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  142237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  144160ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  144468ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  144737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  147238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  149739ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  151271ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  151272ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  151542ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  151543ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  152238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  154738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  157237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  159737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  162238ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  162292ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  164738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  167238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  169738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  170181ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  170484ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  172238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  174737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  176554ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  176844ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  177236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  179738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  182238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  184738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  187238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  189737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  192238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  194737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  197237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  199596ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  199737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  199857ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  200329ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  202238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  204737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  207237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  209738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  211796ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  212093ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  212238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  214736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  217237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  219738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  221122ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  221403ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  222237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  224737ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  224796ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  227237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  229737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  229770ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  230063ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  232237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  234737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  237236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  239737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  242237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  243830ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  244107ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  244736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  247237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  249737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  252238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  253679ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  253681ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  253955ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  253956ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  254737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  257237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  259737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  262238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  263691ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  263966ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  264737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  267237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  269737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  272237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  273978ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  274262ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  274738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  277237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  279738ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  281915ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  281917ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  282188ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  282190ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  282237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  284736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  287237ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  287474ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  289737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  292237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  294736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  297237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  299691ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  299736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  299982ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  302237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  304737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  306063ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  306327ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  307236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  309737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  312237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  314736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  317238ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  319737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  322237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  324736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  327237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  329116ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  329417ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  329736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  332237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  334105ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  334737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  337237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  339737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  341305ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  341579ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  342236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  344737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  347236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  349736ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  349798ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  352236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  353294ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  354217ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  354481ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  354736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  357237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  359737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  362237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  364736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  367237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  369736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  371492ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  371493ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  371811ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  372236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  374736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  376803ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  377236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  379737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  379798ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  380093ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  382237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  384737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  385131ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  387236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  389654ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  389657ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  389660ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  389736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  389938ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  389967ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  392237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  394737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  394978ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  397237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  399674ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  399674ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  399735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  399983ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  402236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  404238ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  404736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  407237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  409736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  409960ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  409961ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  410262ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  412236ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  412458ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  414736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  415247ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  417236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  417895ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  417898ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  417899ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  418168ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  418203ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  419736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  422237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  423431ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  424736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  427236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  429737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  432236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  434736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  437236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  439736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  440654ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  440655ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  440951ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  442236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  444736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  446143ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  446459ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  447026ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  447027ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  447236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  447325ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  449736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  452235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  452582ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  454735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  457237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  459736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  462235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  464736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  467236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  469736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  470077ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  470079ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  470388ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  472236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  474128ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  474735ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  474791ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  477235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  479735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  482237ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  482269ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  482270ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  482560ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  484736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  487235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  488149ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  489737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  492236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  494737ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  495171ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  495172ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  495467ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  497236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  499736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  500727ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  502236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  504736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  507235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  509736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  512236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  512461ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  512462ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  512761ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  514736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  517236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  517464ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  519735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  520761ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  520763ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  521060ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  522236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  524736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  526387ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  527236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  529735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  530618ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  530619ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  530622ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  530623ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  530935ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  530936ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  532236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  534736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  535784ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  536140ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  537235ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  537340ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  539735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  540631ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  540633ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  540950ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  542236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  544736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  545700ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  547236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  549735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  550913ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  550914ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  551216ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  552236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  554736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  556217ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  557236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  558850ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  558851ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  558853ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  558854ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  559152ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  559166ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  559736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  562235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  564238ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  564690ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  564736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  567235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  569734ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  572236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  574735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  577236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  579735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  582235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  583448ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  583448ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  583775ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  584735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  587235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  589423ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  589736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  592235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  594734ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  597235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  599736ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  599799ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  602235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  604735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  607235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  609735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  611036ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  611038ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  611341ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  612234ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  614736ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  616024ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  617235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  619735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  622234ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  623232ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  623233ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  623559ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  624735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  627236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  629317ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  629735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  632236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  634735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  636134ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  636134ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  636435ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  637235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  639735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  641447ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  642235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  644735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  647236ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  649735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  652235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  653420ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  653421ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  653729ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  654735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  657235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  657385ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  659735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  661719ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  661721ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  662024ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  662234ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  662881ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  664735ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  667030ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  667235ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  669734ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  672232ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  674730ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  677228ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  678134ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  678136ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  678458ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  679728ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  682227ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  683456ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  684725ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  686228ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  686230ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  686231ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  686234ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  686550ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  686552ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  687224ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  689724ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  690518ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  691382ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  692223ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  694722ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  697221ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  699722ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  700830ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  700832ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  701121ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  702222ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  704721ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  706096ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  707220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  708766ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  708767ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  709078ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  709720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  711068ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  711070ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  711372ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  712220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  714719ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  714720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  716365ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  717221ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  719721ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  722220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  724720ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  724814ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  727220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  729720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  732220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  733363ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  733364ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  733670ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  734719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  737220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  739100ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  739720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  740136ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  740138ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  740434ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  742220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  744720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  745441ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  747220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  749720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  751664ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  751668ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  751975ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  752220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  754720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  756484ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  757219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  759720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  762220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  764005ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  764006ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  764312ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  764720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  767220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  769719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  770232ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  772220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  774720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  776908ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  776910ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  776911ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  776913ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  777220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  777226ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  777230ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  779720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  782179ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  782217ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  782219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  784719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  787220ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  787282ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  789719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  792219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  794195ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  794198ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  794202ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  794204ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  794512ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  794524ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  794719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  797219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  799227ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  799516ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  799719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  802218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  802492ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  802493ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  802795ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  804719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  807220ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  807793ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  809719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  812218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  814720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  817219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  818923ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  818925ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  819226ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  819719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  822218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  824545ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  824719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  827020ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  827024ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  827028ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  827029ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  827218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  827349ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  827350ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  829720ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  832116ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  832219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  832250ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  834719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  837219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  839719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  842218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  844719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  845209ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  845210ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  845495ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  847219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  849719ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  849854ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  850256ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  852219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  853145ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  853146ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  853448ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  854718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  857219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  858768ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  859719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  862219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  864718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  867219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  869718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  872218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  874718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  877219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  877728ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  877729ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  878024ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  879718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  882219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  883395ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  884506ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  884508ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  884718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  884808ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  887219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  889719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  889815ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  892219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  894719ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  896027ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  896028ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  896324ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  897218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  899718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  899996ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  902218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  904718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  907218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  909163ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  909165ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  909465ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  909717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  912218ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  912271ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  914718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  915405ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  917217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  919718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  920703ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  920705ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  920993ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  922217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  924718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  925992ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  927218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  929718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  932218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  934718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  937219ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  939080ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  939082ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  939383ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  939718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  942218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  944151ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  944718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  947218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  947381ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  947383ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  947684ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  949717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  952218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  952692ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  954717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  957218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  959718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  962218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  963802ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  963803ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  964099ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  964718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  967218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  969120ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  969717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  971905ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  971907ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  972215ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  972217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  974717ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  975511ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[  977217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  977220ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  979717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  982218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  984718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  987218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  989718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  990086ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  990087ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  990384ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  992217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  994717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  995592ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[  997217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[  999717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1002217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1002683ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1002685ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1002992ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1004717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1007217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1008565ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1009717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1012218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1014718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1017217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1019717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1022217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1024718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1027217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1027272ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1027275ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1027573ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1029716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1032216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1032972ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1034055ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1034057ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1034348ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1034717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1037217ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1037600ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[ 1039359ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1039717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1042216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1044717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1045583ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1045587ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1045916ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1047217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1049717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1050590ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1052217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1054717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1057217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1058713ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1058714ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1059009ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1059718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1062217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1064718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1064741ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1067218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1069128ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1069129ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1069433ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1069718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1072218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1074205ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1074718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1077217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1079718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1082217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1084646ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1084648ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1084716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1084947ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1087218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1089717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1089963ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1092216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1094717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1097216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1099718ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1099836ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[ 1102216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1104717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1107218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1109168ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1109170ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1109462ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1109716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1112217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1114485ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1114718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1117216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1119716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1122216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1124716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1127216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1127354ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1127355ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1127667ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1129717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1132218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1132661ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1134716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1137218ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1139716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1139948ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1139950ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1140258ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1142216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1142252ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1142253ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1142558ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1144717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1145410ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1147215ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1147568ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1149718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1152216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1154718ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1157216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1159717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1162217ms] [LOG] _playlist.length:  0 loadprod:  false @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1162427ms] [LOG] in globalFkt  engineWikText @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/globalFunctions.js?cb=ms8wmzdy-aytndrirx0p:69
+[ 1164717ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1167216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1169715ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1172216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1174715ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1174980ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1174982ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1175272ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1177217ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1179715ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1181186ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1181752ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1181754ms] [LOG] yt-event: 3 buffering @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1182055ms] [LOG] yt-event: 1 playing @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1182215ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1184716ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27
+[ 1187030ms] [LOG] yt-event: 0 ended @ https://mybrother.tv/versions/after-kruemmel-1/s/js/modules/player/yt-player/index.html?ytUi=2&cover=1:466
+[ 1187216ms] [LOG] _playlist.length:  0 loadprod:  true @ https://mybrother.tv/versions/after-kruemmel-1/js/modules/c-protocol.js?cb=ms8wmzdy-aytndrirx0p:27

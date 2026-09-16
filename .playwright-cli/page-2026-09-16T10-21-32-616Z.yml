@@ -1,0 +1,249 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [active] [ref=e154] [cursor=pointer]
+  - complementary "Navigation" [ref=e155]:
+    - group [ref=e157]:
+      - generic "Toggle editor tools" [ref=e158] [cursor=pointer]: Editor tools
+    - list [ref=e165]:
+      - listitem [ref=e166]:
+        - link "./ dominikeggermann.com" [ref=e167] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e168]:
+        - link "1er" [ref=e169] [cursor=pointer]:
+          - /url: "?path=1er"
+      - listitem [ref=e173]:
+        - link "AAA" [ref=e174] [cursor=pointer]:
+          - /url: "?path=AAA"
+      - listitem [ref=e178]:
+        - link "ai-movs" [ref=e179] [cursor=pointer]:
+          - /url: "?path=ai-movs"
+      - listitem [ref=e183]:
+        - link "asasdasdadasd" [ref=e184] [cursor=pointer]:
+          - /url: "?path=asasdasdadasd"
+      - listitem [ref=e188]:
+        - link "coporate" [ref=e189] [cursor=pointer]:
+          - /url: "?path=coporate"
+      - listitem [ref=e193]:
+        - link "deploy" [ref=e194] [cursor=pointer]:
+          - /url: "?path=deploy"
+      - listitem [ref=e198]:
+        - link "for_Fx_hash" [ref=e199] [cursor=pointer]:
+          - /url: "?path=for_Fx_hash"
+      - listitem [ref=e203]:
+        - link "HrMueller" [ref=e204] [cursor=pointer]:
+          - /url: "?path=HrMueller"
+      - listitem [ref=e208]:
+        - link "HRMueller-2" [ref=e209] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=e213]:
+        - link "HrMueller-maerz" [ref=e214] [cursor=pointer]:
+          - /url: "?path=HrMueller-maerz"
+      - listitem [ref=e218]:
+        - link "html" [ref=e219] [cursor=pointer]:
+          - /url: "?path=html"
+      - listitem [ref=e223]:
+        - link "malerei-video" [ref=e224] [cursor=pointer]:
+          - /url: "?path=malerei-video"
+      - listitem [ref=e228]:
+        - link "mybrother-tv" [ref=e229] [cursor=pointer]:
+          - /url: "?path=mybrother-tv"
+      - listitem [ref=e233]:
+        - link "tests" [ref=e234] [cursor=pointer]:
+          - /url: "?path=tests"
+      - listitem [ref=e238]:
+        - link "the7" [ref=e239] [cursor=pointer]:
+          - /url: "?path=the7"
+      - listitem [ref=e243]:
+        - link "worktypes" [ref=e244] [cursor=pointer]:
+          - /url: "?path=worktypes"
+      - listitem [ref=e248]:
+        - link ".htaccess" [ref=e249] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e253]:
+        - link "DailyDoase.webloc" [ref=e254] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e258]:
+        - link "dominikeggermann.com external" [ref=e259] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e262]: dominikeggermann.com
+          - generic [ref=e263]: external
+      - listitem [ref=e264]:
+        - link "DominikEggermann_export.pdf" [ref=e265] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e269]:
+        - link "f-body - YouTube.webloc" [ref=e270] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e274]:
+        - link "localhost_3000_scenetimeline_1.png" [ref=e275] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e279]:
+        - link "NULL.jpg" [ref=e280] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e11]:
+    - generic [ref=e12]:
+      - banner [ref=e13]:
+        - img "Poff profile" [ref=e15]
+        - generic [ref=e16]:
+          - heading "dominikeggermann.com" [level=1] [ref=e17]
+          - generic "Categories" [ref=e18]:
+            - generic [ref=e19]: folder
+            - generic [ref=e20]: collection
+      - main [ref=e21]:
+        - region [ref=e22]:
+          - paragraph [ref=e23]: Dominik Eggermann
+          - heading "Work moving between image, film, and the in-between." [level=2] [ref=e24]
+          - paragraph [ref=e25]: "This is a living studio archive: selections, experiments, and projects that keep changing shape. Start with a selection, then follow what catches you."
+          - link "Open selected work" [ref=e26] [cursor=pointer]:
+            - /url: https://dominikeggermann.com/?view=1&path=HRMueller-2
+            - text: Open selected work
+            - generic [aria-hidden] [ref=e27]: →
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]: .
+            - generic [ref=e31]: 23 entries
+          - generic [ref=e32]:
+            - article [ref=e33]:
+              - generic [ref=e34]: File
+              - strong [ref=e35]:
+                - link ".htaccess" [ref=e36] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=.htaccess
+              - generic [ref=e37]: .htaccess
+            - article [ref=e38]:
+              - generic [ref=e39]: Folder
+              - strong [ref=e40]:
+                - link "1er" [ref=e41] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=1er
+              - generic [ref=e42]: 1er
+            - article [ref=e43]:
+              - generic [ref=e44]: Folder
+              - strong [ref=e45]:
+                - link "AAA" [ref=e46] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=AAA
+              - generic [ref=e47]: AAA
+            - article [ref=e48]:
+              - generic [ref=e49]: Folder
+              - strong [ref=e50]:
+                - link "ai-movs" [ref=e51] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=ai-movs
+              - generic [ref=e52]: ai-movs
+            - article [ref=e53]:
+              - generic [ref=e54]: Folder
+              - strong [ref=e55]:
+                - link "asasdasdadasd" [ref=e56] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=asasdasdadasd
+              - generic [ref=e57]: asasdasdadasd
+            - article [ref=e58]:
+              - generic [ref=e59]: Folder
+              - strong [ref=e60]:
+                - link "coporate" [ref=e61] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=coporate
+              - generic [ref=e62]: coporate
+            - article [ref=e63]:
+              - generic [ref=e64]: File
+              - strong [ref=e65]:
+                - link "DailyDoase.webloc" [ref=e66] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=DailyDoase.webloc
+              - generic [ref=e67]: DailyDoase.webloc
+            - article [ref=e68]:
+              - generic [ref=e69]: Folder
+              - strong [ref=e70]:
+                - link "deploy" [ref=e71] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=deploy
+              - generic [ref=e72]: deploy
+            - article [ref=e73]:
+              - generic [ref=e74]: File
+              - strong [ref=e75]:
+                - link "DominikEggermann_export.pdf" [ref=e76] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=DominikEggermann_export.pdf
+              - generic [ref=e77]: DominikEggermann_export.pdf
+            - article [ref=e78]:
+              - generic [ref=e79]: File
+              - strong [ref=e80]:
+                - link "dominikeggermann.com" [ref=e81] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=dominikeggermann.com
+              - generic [ref=e82]: dominikeggermann.com
+            - article [ref=e83]:
+              - generic [ref=e84]: File
+              - strong [ref=e85]:
+                - link "f-body - YouTube.webloc" [ref=e86] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=f-body%20-%20YouTube.webloc
+              - generic [ref=e87]: f-body - YouTube.webloc
+            - article [ref=e88]:
+              - generic [ref=e89]: Folder
+              - strong [ref=e90]:
+                - link "for_Fx_hash" [ref=e91] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=for_Fx_hash
+              - generic [ref=e92]: for_Fx_hash
+            - article [ref=e93]:
+              - generic [ref=e94]: Folder
+              - strong [ref=e95]:
+                - link "HrMueller" [ref=e96] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=HrMueller
+              - generic [ref=e97]: HrMueller
+            - article [ref=e98]:
+              - generic [ref=e99]: Folder
+              - strong [ref=e100]:
+                - link "HRMueller-2" [ref=e101] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=HRMueller-2
+              - generic [ref=e102]: HRMueller-2
+            - article [ref=e103]:
+              - generic [ref=e104]: Folder
+              - strong [ref=e105]:
+                - link "HrMueller-maerz" [ref=e106] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=HrMueller-maerz
+              - generic [ref=e107]: HrMueller-maerz
+            - article [ref=e108]:
+              - generic [ref=e109]: Folder
+              - strong [ref=e110]:
+                - link "html" [ref=e111] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=html
+              - generic [ref=e112]: html
+            - article [ref=e113]:
+              - link [ref=e114] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=localhost_3000_scenetimeline_1.png
+                - img "localhost_3000_scenetimeline_1.png" [ref=e115]
+              - generic [ref=e116]: File
+              - strong [ref=e117]:
+                - link "localhost_3000_scenetimeline_1.png" [ref=e118] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=localhost_3000_scenetimeline_1.png
+              - generic [ref=e119]: localhost_3000_scenetimeline_1.png
+            - article [ref=e120]:
+              - generic [ref=e121]: Folder
+              - strong [ref=e122]:
+                - link "malerei-video" [ref=e123] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=malerei-video
+              - generic [ref=e124]: malerei-video
+            - article [ref=e125]:
+              - generic [ref=e126]: Folder
+              - strong [ref=e127]:
+                - link "mybrother-tv" [ref=e128] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=mybrother-tv
+              - generic [ref=e129]: mybrother-tv
+            - article [ref=e130]:
+              - link [ref=e131] [cursor=pointer]:
+                - /url: https://dominikeggermann.com/?view=1&file=NULL.jpg
+                - img "NULL.jpg" [ref=e132]
+              - generic [ref=e133]: File
+              - strong [ref=e134]:
+                - link "NULL.jpg" [ref=e135] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&file=NULL.jpg
+              - generic [ref=e136]: NULL.jpg
+            - article [ref=e137]:
+              - generic [ref=e138]: Folder
+              - strong [ref=e139]:
+                - link "tests" [ref=e140] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=tests
+              - generic [ref=e141]: tests
+            - article [ref=e142]:
+              - generic [ref=e143]: Folder
+              - strong [ref=e144]:
+                - link "the7" [ref=e145] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=the7
+              - generic [ref=e146]: the7
+            - article [ref=e147]:
+              - generic [ref=e148]: Folder
+              - strong [ref=e149]:
+                - link "worktypes" [ref=e150] [cursor=pointer]:
+                  - /url: https://dominikeggermann.com/?view=1&path=worktypes
+              - generic [ref=e151]: worktypes
+      - contentinfo [ref=e152]:
+        - generic [ref=e153]: Copyright eggman

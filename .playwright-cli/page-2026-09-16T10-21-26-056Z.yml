@@ -1,0 +1,4 @@
+- generic [ref=e2]:
+  - button "Open navigation" [ref=e3] [cursor=pointer]:
+    - generic [ref=e8]: Explore work
+  - document [ref=e11]

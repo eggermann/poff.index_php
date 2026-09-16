@@ -1,0 +1,34 @@
+- generic [ref=f1e2]:
+  - button "Close navigation" [expanded] [ref=f1e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f1e8]:
+    - group [ref=f1e10]:
+      - generic "Toggle editor tools" [ref=f1e11] [cursor=pointer]: Editor tools
+    - list [ref=f1e18]:
+      - listitem [ref=f1e19]:
+        - link "page" [ref=f1e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f1e23]:
+        - link "Go Up" [ref=f1e24] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f1e27]:
+        - link "./ Player" [ref=f1e28] [cursor=pointer]:
+          - /url: "?path=player"
+      - listitem [ref=f1e29]:
+        - link "35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f1e30] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e34]:
+        - link "46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f1e35] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e39]:
+        - link "64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f1e40] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e44]:
+        - link "83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f1e45] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e49]:
+        - link "85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f1e50] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f1e54]:
+        - link "87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4" [ref=f1e55] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f1e61]

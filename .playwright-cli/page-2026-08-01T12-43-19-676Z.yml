@@ -1,0 +1,31 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "./ pageoff-artist" [ref=e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e21]:
+        - link "artist-manifesto.txt" [ref=e22] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e26]:
+        - link "curator-neighbour.webloc" [ref=e27] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e31]:
+        - link "field-study-blue.jpg" [ref=e32] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e36]:
+        - link "field-study-red.jpg" [ref=e37] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e41]:
+        - link "field-study-twelve.jpg" [ref=e42] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e46]:
+        - link "orbit-three.jpg" [ref=e47] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e51]:
+        - link "writer-neighbour.webloc" [ref=e52] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e58]

@@ -16,3 +16,6 @@ Every loop should include:
 - review notes
 - retrospective notes
 - next step
+
+## Public Navigation Pattern
+Public browsing should prefer one primary surface. Secondary navigation is explicit, on demand, and must not duplicate the visible work list.

@@ -1,0 +1,64 @@
+- generic [ref=e2]:
+  - button "Close navigation" [expanded] [ref=e3] [cursor=pointer]
+  - complementary "Navigation" [ref=e8]:
+    - group [ref=e10]:
+      - generic "Toggle editor tools" [ref=e11] [cursor=pointer]: Editor tools
+    - list [ref=e18]:
+      - listitem [ref=e19]:
+        - link "page" [ref=e20] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e23]:
+        - link "Go Up" [ref=e24] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=e27]:
+        - link "./ apres" [ref=e28] [cursor=pointer]:
+          - /url: "?path=apres"
+      - listitem [ref=e29]:
+        - link "IMG_1191" [ref=e30] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e34]:
+        - link "IMG_1192" [ref=e35] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e39]:
+        - link "IMG_1193" [ref=e40] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e44]:
+        - link "IMG_1194" [ref=e45] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e49]:
+        - link "IMG_1195" [ref=e50] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e54]:
+        - link "IMG_1196" [ref=e55] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e59]:
+        - link "IMG_1197" [ref=e60] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e64]:
+        - link "IMG_1198" [ref=e65] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e69]:
+        - link "IMG_1199" [ref=e70] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e74]:
+        - link "IMG_1200" [ref=e75] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e79]:
+        - link "IMG_1201" [ref=e80] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e84]:
+        - link "IMG_1202" [ref=e85] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e89]:
+        - link "IMG_1203" [ref=e90] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e94]:
+        - link "IMG_1204" [ref=e95] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e99]:
+        - link "IMG_1205" [ref=e100] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=e104]:
+        - link "IMG_1206" [ref=e105] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=e111]

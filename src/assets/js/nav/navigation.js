@@ -10,12 +10,17 @@ export function initNavigation({
     renderFolderMeta,
     initEditMode,
     getPreviewParams,
+    isSidebarOpen = () => true,
 }) {
     const { navList, contentFrame, iframeLoading, sidebarLoading } = elements;
     let ignoreNextHashSync = false;
     let sidebarSyncId = 0;
     const initialQueryPath = new URLSearchParams(window.location.search).get('path') || '';
     const routeResolver = createRouteResolver({ navList });
+
+    function describeLoadTarget(targetLabel = '') {
+        return targetLabel && targetLabel !== 'home' ? targetLabel : 'the studio archive';
+    }
 
     function setLoadingVisible(element, visible, label = '') {
         if (!element) {
@@ -24,9 +29,17 @@ export function initNavigation({
         element.classList.toggle('flex', visible);
         element.classList.toggle('items-center', visible);
         element.setAttribute?.('aria-busy', visible ? 'true' : 'false');
+        element.setAttribute?.('aria-hidden', visible ? 'false' : 'true');
         const labelElement = element.querySelector?.('.loader-label');
         if (visible && labelElement && label) {
             labelElement.textContent = label;
+        }
+        if (element === iframeLoading && contentFrame) {
+            contentFrame.classList?.toggle('content-frame-loading', visible);
+            contentFrame.setAttribute?.('aria-busy', visible ? 'true' : 'false');
+        }
+        if (element === sidebarLoading && navList) {
+            navList.setAttribute?.('aria-busy', visible ? 'true' : 'false');
         }
     }
 
@@ -122,7 +135,7 @@ export function initNavigation({
         const previewUrl = resolveSelectionPreviewUrl(selection, options?.previewUrl);
         const targetLabel = String(selection.path || previewPath || 'home').split('/').filter(Boolean).pop() || 'home';
 
-        setLoadingVisible(iframeLoading, true, `Loading ${targetLabel}...`);
+        setLoadingVisible(iframeLoading, true, `Opening ${describeLoadTarget(targetLabel)}…`);
         if (contentFrame) {
             contentFrame.classList.toggle('content-frame-layout-target', !!selection.isLayout);
             previewController.syncPreviewDisabledState(!!selection.isLayout);
@@ -131,29 +144,39 @@ export function initNavigation({
         if (updateHash) {
             writeHashPath(selection.path || '');
         }
-        if (navList && !skipSidebarReload) {
-            const currentSidebarSyncId = ++sidebarSyncId;
-            sidebarController.loadNav(folderPath, {
-                loadingLabel: `Loading navigation for ${targetLabel}...`,
-            })
-                .then(() => {
-                    if (currentSidebarSyncId !== sidebarSyncId) {
-                        return;
-                    }
-                    sidebarController.syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
-                    setLoadingVisible(sidebarLoading, false);
-                })
-                .catch(() => {
-                    if (currentSidebarSyncId !== sidebarSyncId) {
-                        return;
-                    }
-                    sidebarController.syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
-                    setLoadingVisible(sidebarLoading, false);
-                });
+        if (navList && !skipSidebarReload && isSidebarOpen()) {
+            refreshSidebarForSelection(selection, targetLabel);
         }
         if (initEditMode && !skipEditInit) {
             initEditMode();
         }
+    }
+
+    function refreshSidebarForSelection(selectionInput = getCurrentSelection(), targetLabel = '') {
+        if (!navList || !isSidebarOpen()) {
+            return Promise.resolve();
+        }
+        const selection = selectionInput && typeof selectionInput === 'object' && Object.prototype.hasOwnProperty.call(selectionInput, 'path')
+            ? selectionInput
+            : getSelectionFromPath(selectionInput || '');
+        const previewPath = selection.previewPath || '';
+        const previewIsFile = !!selection.previewIsFile;
+        const folderPath = previewIsFile ? previewPath.split('/').slice(0, -1).join('/') : previewPath;
+        const label = targetLabel || String(selection.path || previewPath || 'home').split('/').filter(Boolean).pop() || 'home';
+        const currentSidebarSyncId = ++sidebarSyncId;
+        return sidebarController.loadNav(folderPath, {
+            loadingLabel: label === 'home'
+                ? 'Loading work menu…'
+                : `Updating work menu for ${describeLoadTarget(label)}…`,
+        })
+            .catch(() => '')
+            .then(() => {
+                if (currentSidebarSyncId !== sidebarSyncId) {
+                    return;
+                }
+                sidebarController.syncSidebarSelection(selection.path || previewPath, previewIsFile, !!selection.isLayout);
+                setLoadingVisible(sidebarLoading, false);
+            });
     }
 
     function loadCurrentFolderInIframe() {
@@ -225,6 +248,7 @@ export function initNavigation({
         },
         loadCurrentFolderInIframe,
         refreshCurrentLocation,
+        refreshCurrentSidebar: () => refreshSidebarForSelection(),
         refreshCurrentPreviewLocation,
         rememberSlugPathAlias: routeResolver.rememberSlugPathAlias,
         syncFromLocation,

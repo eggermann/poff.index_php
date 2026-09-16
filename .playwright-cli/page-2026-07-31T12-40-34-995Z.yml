@@ -1,0 +1,93 @@
+- generic [ref=f29e2]:
+  - button "Close navigation" [expanded] [ref=f29e3] [cursor=pointer]
+  - complementary "Navigation" [ref=f29e8]:
+    - group [ref=f29e10]:
+      - generic "Toggle editor tools" [ref=f29e11] [cursor=pointer]: Editor tools
+    - list [ref=f29e18]:
+      - listitem [ref=f29e123]:
+        - link "dominikeggermann.com" [ref=f29e124] [cursor=pointer]:
+          - /url: "?path="
+      - listitem [ref=f29e127]:
+        - link "Go Up" [ref=f29e128] [cursor=pointer]:
+          - /url: "?path=HRMueller-2"
+      - listitem [ref=f29e131]:
+        - link "./ Player" [ref=f29e132] [cursor=pointer]:
+          - /url: "?path=HRMueller-2%2Fplayer"
+      - listitem [ref=f29e133]:
+        - link "35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e134] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f29e138]:
+        - link "46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e139] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f29e143]:
+        - link "64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e144] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f29e148]:
+        - link "83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e149] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f29e153]:
+        - link "85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e154] [cursor=pointer]:
+          - /url: "#"
+      - listitem [ref=f29e158]:
+        - link "87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4" [ref=f29e159] [cursor=pointer]:
+          - /url: "#"
+  - document [ref=f29e61]:
+    - main [ref=f29e62]:
+      - generic [ref=f29e63]:
+        - generic [ref=f29e64]:
+          - generic [ref=f29e65]:
+            - paragraph [ref=f29e66]: LOCAL COLLECTION · CONTINUOUS PLAY
+            - heading "Player" [level=1] [ref=f29e67]
+            - paragraph [ref=f29e68]: Six films copied locally from Prothagonia. The playlist advances automatically and loops continuously.
+          - button "Turn playlist loop on" [active] [ref=f29e163] [cursor=pointer]:
+            - generic [ref=f29e70]: ↻
+            - generic [ref=f29e71]: Loop off
+        - generic [ref=f29e72]:
+          - generic [ref=f29e75]:
+            - generic [ref=f29e76]:
+              - generic [ref=f29e77]: 02 / 06
+              - strong [ref=f29e78]: freshweb prompt fast wan strict 4 3 test merged web
+            - generic "Playlist controls" [ref=f29e79]:
+              - button "Previous film" [ref=f29e80] [cursor=pointer]: ←
+              - button "Next film" [ref=f29e81] [cursor=pointer]: →
+          - complementary [ref=f29e82]:
+            - generic [ref=f29e83]:
+              - generic [ref=f29e84]: Up next
+              - generic [ref=f29e85]: 6 films
+            - list [ref=f29e86]:
+              - listitem [ref=f29e87]:
+                - button "35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e88] [cursor=pointer]:
+                  - generic [ref=f29e89]:
+                    - strong [ref=f29e90]: 35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f29e91]: HRMueller-2/player/35-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f29e92]: ▶
+              - listitem [ref=f29e93]:
+                - button "46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e94] [cursor=pointer]:
+                  - generic [ref=f29e95]:
+                    - strong [ref=f29e96]: 46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f29e97]: HRMueller-2/player/46-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f29e98]: ▶
+              - listitem [ref=f29e99]:
+                - button "64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e100] [cursor=pointer]:
+                  - generic [ref=f29e101]:
+                    - strong [ref=f29e102]: 64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f29e103]: HRMueller-2/player/64-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f29e104]: ▶
+              - listitem [ref=f29e105]:
+                - button "83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e106] [cursor=pointer]:
+                  - generic [ref=f29e107]:
+                    - strong [ref=f29e108]: 83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f29e109]: HRMueller-2/player/83-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f29e110]: ▶
+              - listitem [ref=f29e111]:
+                - button "85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4 HRMueller-2/player/85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4" [ref=f29e112] [cursor=pointer]:
+                  - generic [ref=f29e113]:
+                    - strong [ref=f29e114]: 85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                    - generic [ref=f29e115]: HRMueller-2/player/85-freshweb-prompt-fast-wan-strict-4-3-test-merged-web.mp4
+                  - generic [ref=f29e116]: ▶
+              - listitem [ref=f29e117]:
+                - button "87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4 HRMueller-2/player/87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4" [ref=f29e118] [cursor=pointer]:
+                  - generic [ref=f29e119]:
+                    - strong [ref=f29e120]: 87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4
+                    - generic [ref=f29e121]: HRMueller-2/player/87-freshweb-prompt-fast-wan-strict-4-3-merged-web.mp4
+                  - generic [ref=f29e122]: ▶

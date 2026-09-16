@@ -20,6 +20,33 @@ export function createPreviewController({
     let lastPreviewKey = '';
     let previewMountRoot = null;
     let previewAbortController = null;
+    const previewResponseCache = new Map();
+
+    function previewCacheKey(url) {
+        try {
+            const parsed = new URL(url, window.location.href);
+            parsed.searchParams.delete('_refresh');
+            return `${parsed.pathname}${parsed.search}`;
+        } catch (err) {
+            return String(url || '');
+        }
+    }
+
+    function isForcedPreviewRefresh(url) {
+        try {
+            return new URL(url, window.location.href).searchParams.has('_refresh');
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function rememberPreviewResponse(key, value) {
+        previewResponseCache.delete(key);
+        previewResponseCache.set(key, value);
+        if (previewResponseCache.size > 24) {
+            previewResponseCache.delete(previewResponseCache.keys().next().value);
+        }
+    }
 
     function stripPreviewChrome(root) {
         if (!root || typeof root.querySelectorAll !== 'function') {
@@ -435,18 +462,28 @@ export function createPreviewController({
         const preservedScrollLeft = shouldPreserveScroll ? contentFrame.scrollLeft : 0;
         try {
             previewMountRoot = null;
-            const response = await fetch(url, {
-                credentials: 'same-origin',
-                headers: {
-                    'Accept': 'text/html,application/xhtml+xml',
-                    'X-Requested-With': 'fetch-preview',
-                },
-                ...(requestController ? { signal: requestController.signal } : {}),
-            });
-            if (!response.ok) {
-                throw new Error(`Preview request failed: ${response.status}`);
+            const cacheKey = previewCacheKey(url);
+            const forceRefresh = isForcedPreviewRefresh(url);
+            let previewResponse = forceRefresh ? null : previewResponseCache.get(cacheKey);
+            if (!previewResponse) {
+                const response = await fetch(url, {
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'text/html,application/xhtml+xml',
+                        'X-Requested-With': 'fetch-preview',
+                    },
+                    ...(requestController ? { signal: requestController.signal } : {}),
+                });
+                if (!response.ok) {
+                    throw new Error(`Preview request failed: ${response.status}`);
+                }
+                previewResponse = {
+                    html: await response.text(),
+                    url: response.url,
+                };
+                rememberPreviewResponse(cacheKey, previewResponse);
             }
-            const html = await response.text();
+            const { html, url: responseUrl } = previewResponse;
             const parser = new DOMParser();
             const previewDocument = parser.parseFromString(html, 'text/html');
             const previewRoot = previewDocument.querySelector('#contentFrame > .viewer') || previewDocument.querySelector('.viewer') || previewDocument.body;
@@ -468,7 +505,7 @@ export function createPreviewController({
                         return '';
                     }
                     try {
-                        link.href = new URL(href, response.url).href;
+                        link.href = new URL(href, responseUrl).href;
                     } catch (err) {
                         return '';
                     }
@@ -478,18 +515,18 @@ export function createPreviewController({
                 .join('');
             const previewMarkup = rewritePreviewMarkupUrls(
                 extractPreferredPreviewMarkup(previewDocument, previewRoot, { converterPreview }),
-                response.url
+                responseUrl
             );
             let previewScripts = [];
             try {
-                const localPreview = !isExternalPreviewUrl(response.url);
-                previewScripts = collectPreviewScripts(previewDocument, response.url, converterPreview || localPreview);
+                const localPreview = !isExternalPreviewUrl(responseUrl);
+                previewScripts = collectPreviewScripts(previewDocument, responseUrl, converterPreview || localPreview);
             } catch (err) {
                 previewScripts = [];
             }
             const fallbackMarkup = previewMarkup || (
-                isExternalPreviewUrl(response.url)
-                    ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(response.url)}" target="_blank" rel="noopener">Open original</a></div>`
+                isExternalPreviewUrl(responseUrl)
+                    ? `<div class="viewer-error"><div>Remote snapshot unavailable.</div><a href="${escapePreviewMarkup(responseUrl)}" target="_blank" rel="noopener">Open original</a></div>`
                     : '<div class="viewer-error">Preview unavailable.</div>'
             );
             previewContainer.innerHTML = `${previewStyles}${fallbackMarkup}`;
