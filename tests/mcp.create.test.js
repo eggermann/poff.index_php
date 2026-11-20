@@ -2516,6 +2516,44 @@ describe('Poff converters', () => {
     }
   });
 
+  test('converter discovery uses folder precedence and keeps disabled matches out of remote offers', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-precedence-${Date.now()}`);
+    const writeDefinition = (folder, definition) => {
+      const absoluteFolder = path.join(tempRoot, folder);
+      fs.mkdirSync(absoluteFolder, { recursive: true });
+      fs.writeFileSync(path.join(absoluteFolder, 'converter.json'), JSON.stringify({
+        type: 'converter',
+        accepts: ['text/plain'],
+        outputs: ['text/plain'],
+        engine: 'text-copy',
+        ...definition,
+      }));
+    };
+    writeDefinition('poff/converters/collision', { label: 'Poff converter' });
+    writeDefinition('converters/collision', { label: 'Visible converter' });
+    writeDefinition('.converters/collision', { label: 'Hidden converter' });
+    writeDefinition('poff/converters/disabled', { label: 'Disabled converter', enabled: false });
+
+    try {
+      const discovered = await runConverterRoute('discover', tempRoot);
+      expect(discovered['converter/collision']).toEqual(expect.objectContaining({
+        label: 'Hidden converter',
+        folder: '.converters/collision',
+      }));
+
+      const matched = await runConverterRoute('available', tempRoot, { mimeType: 'text/plain' });
+      expect(matched).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'converter/disabled', enabled: false }),
+      ]));
+
+      const offers = await runConverterRoute('offers', tempRoot, { mimeType: 'text/plain' });
+      expect(offers.converters.map(({ id }) => id)).toContain('converter/collision');
+      expect(offers.converters.map(({ id }) => id)).not.toContain('converter/disabled');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('legacy fallback returns folder-backed converter IDs for image/tiff', async () => {
     const result = await runConverterRoute('available', POFF_DIR, {
       mimeType: 'image/tiff',
