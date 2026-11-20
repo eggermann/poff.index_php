@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -2263,7 +2264,7 @@ describe('MCP create route helper (CLI)', () => {
   });
 });
 
-function runConverterRoute(mode, rootDir, payload = {}) {
+function runConverterRoute(mode, rootDir, payload = {}, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const args = [
       path.join(ROOT, 'tests/php_converter_routes.php'),
@@ -2273,7 +2274,7 @@ function runConverterRoute(mode, rootDir, payload = {}) {
     ];
     const proc = spawn('php', args, {
       cwd: ROOT,
-      env: withTestEnv(),
+      env: withTestEnv(extraEnv),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -3944,6 +3945,86 @@ describe('Poff converters', () => {
       expect(fileConfig.work.template).toBe('external');
       expect(fileConfig.external.sourceWork.path).toBe('scan-001.tiff');
     } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test.each(['new-hidden-work', 'replace-generated-work'])(
+    'save mode %s overwrites a same-name target',
+    async (mode) => {
+      const tempDir = path.join(POFF_DIR, `converter-save-mode-${Date.now()}`);
+      fs.mkdirSync(tempDir, { recursive: true });
+      fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+      fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
+      fs.writeFileSync(path.join(tempDir, 'converted.png'), 'existing content');
+
+      try {
+        const result = await runConverterRoute('save', tempDir, {
+          sourcePath: 'source.txt',
+          conversion: {
+            ok: true,
+            source: { path: 'source.txt', mimeType: 'text/plain' },
+            output: {
+              name: 'converted.png',
+              mimeType: 'image/png',
+              kind: 'image',
+              bodyBase64: Buffer.from('new conversion').toString('base64'),
+            },
+            target: { mode },
+          },
+        });
+
+        expect(result.ok).toBe(true);
+        expect(fs.readFileSync(path.join(tempDir, 'converted.png'), 'utf8')).toBe('new conversion');
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  test('downloadUrl rejects HTTP redirects without requesting the destination', async () => {
+    const tempDir = path.join(POFF_DIR, `converter-download-redirect-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
+    const requests = [];
+    const server = http.createServer((request, response) => {
+      requests.push(request.url);
+      if (request.url === '/redirect') {
+        response.writeHead(302, { Location: '/payload' });
+        response.end();
+        return;
+      }
+      response.writeHead(200, { 'Content-Type': 'text/plain' });
+      response.end('redirected conversion');
+    });
+
+    try {
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const { port } = server.address();
+      const result = await runConverterRoute('save', tempDir, {
+        sourcePath: 'source.txt',
+        conversion: {
+          ok: true,
+          source: { path: 'source.txt', mimeType: 'text/plain' },
+          output: {
+            name: 'redirected.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            downloadUrl: `http://127.0.0.1:${port}/redirect`,
+          },
+          target: { mode: 'new-hidden-work' },
+        },
+      }, { POFF_ALLOW_PRIVATE_CONVERTER_HOSTS: '1' });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Converted download failed.',
+      }));
+      expect(requests).toEqual(['/redirect']);
+      expect(fs.existsSync(path.join(tempDir, 'redirected.txt'))).toBe(false);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });

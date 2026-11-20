@@ -1838,6 +1838,8 @@ HTML;
                 'method' => 'GET',
                 'timeout' => 30,
                 'ignore_errors' => true,
+                'follow_location' => 0,
+                'max_redirects' => 0,
             ],
         ]));
         $status = self::statusFromHeaders($http_response_header ?? []);
