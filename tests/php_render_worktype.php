@@ -24,6 +24,25 @@ if ($action === 'catalog') {
     exit(0);
 }
 
+if ($action === 'select') {
+    echo json_encode(Worktype::resolveTemplateSelection(
+        $kind,
+        isset($payload['mime']) ? (string) $payload['mime'] : null,
+        isset($payload['fileName']) ? (string) $payload['fileName'] : null,
+        $payload['templateMap'] ?? null
+    ), JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($action === 'detect') {
+    $fileName = (string) ($payload['fileName'] ?? '');
+    echo json_encode([
+        'kind' => MediaType::classifyExtension($fileName),
+        'mime' => MediaType::detectMimeType((string) ($payload['fullPath'] ?? $fileName), $fileName),
+    ], JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($action === 'render') {
     $context = is_array($payload['ctx'] ?? null) ? $payload['ctx'] : [];
     echo Worktype::render($kind, $context);

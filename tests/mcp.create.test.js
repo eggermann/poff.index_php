@@ -2475,6 +2475,47 @@ describe('Poff converters', () => {
     }
   });
 
+  test('converter matching prefers supplied MIME and falls back through kind then extension', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-matching-${Date.now()}`);
+    const definitions = [
+      ['mime-wildcard', ['image/*']],
+      ['kind-only', ['image']],
+      ['extension-only', ['zzx']],
+    ];
+    for (const [name, accepts] of definitions) {
+      const folder = path.join(tempRoot, 'poff', 'converters', name);
+      fs.mkdirSync(folder, { recursive: true });
+      fs.writeFileSync(path.join(folder, 'converter.json'), JSON.stringify({
+        type: 'converter',
+        accepts,
+        outputs: ['image/png'],
+        engine: 'text-copy',
+      }));
+    }
+
+    try {
+      const byMime = await runConverterRoute('available', tempRoot, {
+        mimeType: 'image/tiff', kind: 'other', extension: 'txt',
+      });
+      const testConverters = (items) => items
+        .map(({ name }) => name)
+        .filter((name) => definitions.some(([definedName]) => definedName === name));
+      expect(testConverters(byMime)).toEqual(['mime-wildcard']);
+
+      const byKind = await runConverterRoute('available', tempRoot, {
+        mimeType: '', kind: 'image', extension: '',
+      });
+      expect(testConverters(byKind).sort()).toEqual(['kind-only', 'mime-wildcard']);
+
+      const byExtension = await runConverterRoute('available', tempRoot, {
+        mimeType: '', kind: '', extension: 'zzx',
+      });
+      expect(testConverters(byExtension)).toEqual(['extension-only']);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('legacy fallback returns folder-backed converter IDs for image/tiff', async () => {
     const result = await runConverterRoute('available', POFF_DIR, {
       mimeType: 'image/tiff',
@@ -3794,6 +3835,77 @@ describe('Poff converters', () => {
 });
 
 describe('Worktype HBS renderer', () => {
+  test('keeps extensibility definitions and assets wired into the single-file builder', () => {
+    const builder = fs.readFileSync(path.join(ROOT, 'build/build.php'), 'utf8');
+
+    for (const sourcePart of [
+      '/includes/MediaType.php',
+      '/includes/Converter.php',
+      '/includes/Worktype/Definitions.php',
+      '/includes/Worktype/Render.php',
+      '/includes/worktypes/worktypes.php',
+      '/includes/worktypes/*.worktype.php',
+      '/includes/worktypes/templates/*.hbs',
+    ]) {
+      expect(builder).toContain(sourcePart);
+    }
+    expect(builder).toContain('Worktype::setEmbedded(');
+    expect(builder).toContain('Worktype::setEmbeddedTemplates(');
+    expect(builder).toContain('Worktype::setEmbeddedLayoutAssets(');
+    expect(builder).toContain("'/includes/worktypes/templates/converter'");
+    expect(builder).toContain("'style.css', 'script.js'");
+  });
+
+  test('detects resource MIME and kind without selecting renderer or converter', async () => {
+    const detected = JSON.parse(await runWorktype('detect', '', { fileName: 'photo.jpg' }));
+    expect(detected).toEqual({ kind: 'image', mime: 'image/jpeg' });
+  });
+
+  test('selects templateMap entries by exact MIME, wildcard, kind, then extension', async () => {
+    const cases = [
+      [{ 'image/jpeg': 'video', 'image/*': 'audio', image: 'text', jpg: 'pdf' }, 'video'],
+      [{ 'image/*': 'audio', 'image/.*': 'video', image: 'text', jpg: 'pdf' }, 'audio'],
+      [{ 'image/.*': 'video', image: 'text', jpg: 'pdf' }, 'video'],
+      [{ image: 'text', jpg: 'pdf' }, 'text'],
+      [{ jpg: 'pdf' }, 'pdf'],
+    ];
+
+    for (const [templateMap, expected] of cases) {
+      const result = JSON.parse(await runWorktype('select', 'image', {
+        mime: 'image/jpeg', fileName: 'photo.jpg', templateMap,
+      }));
+      expect(result.template).toBe(expected);
+      expect(result.source).toBe('templateMap');
+    }
+  });
+
+  test('explicit work template overrides inherited and local templateMap selection', async () => {
+    const tempRoot = path.join(POFF_DIR, `worktype-inheritance-${Date.now()}`);
+    const childDir = path.join(tempRoot, 'section');
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      work: { templateMap: { 'image/*': 'audio', jpg: 'pdf' } },
+    }));
+    fs.writeFileSync(path.join(childDir, 'poff.config.json'), JSON.stringify({
+      work: { templateMap: { 'image/jpeg': 'video' } },
+    }));
+
+    try {
+      const inherited = JSON.parse(await runLayoutFilesystem('resolve-work-template', childDir, '', {
+        work: {}, kind: 'image', mime: 'image/jpeg', fileName: 'photo.jpg',
+      }));
+      expect(inherited.template).toBe('video');
+      expect(inherited.templateMap).toEqual({ 'image/*': 'audio', 'image/jpeg': 'video', jpg: 'pdf' });
+
+      const explicit = JSON.parse(await runLayoutFilesystem('resolve-work-template', childDir, '', {
+        work: { template: 'text' }, kind: 'image', mime: 'image/jpeg', fileName: 'photo.jpg',
+      }));
+      expect(explicit).toEqual(expect.objectContaining({ template: 'text', source: 'explicit' }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('reads the current unsaved editor draft for layout and work prompt targets', () => {
     const { readPromptEditorDraft } = loadPromptDraftHelpers();
     const fields = {

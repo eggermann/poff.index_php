@@ -266,30 +266,7 @@ function mcpRemoteExportSourceId(string $url, array $payload): string
 
 function mcpRemoteUniqueImportedName(string $preferred, string $sourceId, array &$usedNames): string
 {
-    $base = trim($preferred);
-    if ($base === '') {
-        $base = $sourceId;
-    }
-
-    if (!isset($usedNames[$base])) {
-        $usedNames[$base] = true;
-        return $base;
-    }
-
-    $candidate = $base . ' (' . $sourceId . ')';
-    if (!isset($usedNames[$candidate])) {
-        $usedNames[$candidate] = true;
-        return $candidate;
-    }
-
-    $index = 2;
-    while (isset($usedNames[$candidate . ' ' . $index])) {
-        $index++;
-    }
-
-    $final = $candidate . ' ' . $index;
-    $usedNames[$final] = true;
-    return $final;
+    return PoffConfig::uniqueImportedName($preferred, $sourceId, $usedNames);
 }
 
 function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $sourceId, array $existingTree): array
