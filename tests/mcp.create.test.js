@@ -128,6 +128,24 @@ function runPhpLint(filePath) {
   });
 }
 
+function runConverterGrainMirror(targetDir) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_converter_grain_mirror.php'), targetDir], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`converter grain mirror failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runWorktype(action, kind, payload = null) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_render_worktype.php'), action, kind];
@@ -4165,6 +4183,24 @@ describe('Worktype HBS renderer', () => {
       }
     } finally {
       fs.rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  test('copies converter definition and template sidecars into an isolated runtime folder', async () => {
+    const targetDir = path.join(ROOT, 'tests', `.tmp-converter-grains-${process.pid}-${Date.now()}`);
+
+    try {
+      expect(await runConverterGrainMirror(targetDir)).toBe('ok');
+      for (const relativePath of [
+        'default/converter.json',
+        'default/template.hbs',
+        'convert-pageoff-remote-image/converter.php',
+        'convert-pageoff-remote-image/style.css',
+      ]) {
+        expect(fs.existsSync(path.join(targetDir, relativePath))).toBe(true);
+      }
+    } finally {
+      fs.rmSync(targetDir, { recursive: true, force: true });
     }
   });
 
