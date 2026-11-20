@@ -43,6 +43,12 @@ if ($action === 'detect') {
     exit(0);
 }
 
+if ($action === 'bundle-metadata') {
+    $bundle = include __DIR__ . '/../src/includes/worktypes/worktypes.php';
+    echo json_encode($bundle['metadata'] ?? [], JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($action === 'render') {
     $context = is_array($payload['ctx'] ?? null) ? $payload['ctx'] : [];
     echo Worktype::render($kind, $context);

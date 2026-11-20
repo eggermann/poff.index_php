@@ -5,6 +5,7 @@
  */
 
  $definitions = [];
+ $metadata = [];
  $templates = [];
 
  foreach ((glob(__DIR__ . '/*.worktype.php') ?: []) as $worktypePath) {
@@ -25,6 +26,9 @@
      } else {
          $definitions[$type] = $entry;
      }
+
+     $metadataKeys = ['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description'];
+     $metadata[$type] = array_intersect_key($entry, array_flip($metadataKeys));
  }
 
 foreach ((glob(__DIR__ . '/templates/*.hbs') ?: []) as $tplPath) {
@@ -48,5 +52,6 @@ if ($templates === []) {
 
 return [
     'definitions' => $definitions,
+    'metadata' => $metadata,
     'templates' => $templates,
 ];

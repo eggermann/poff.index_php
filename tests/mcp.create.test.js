@@ -3835,6 +3835,43 @@ describe('Poff converters', () => {
 });
 
 describe('Worktype HBS renderer', () => {
+  test('keeps worktype catalog metadata from per-kind definitions', async () => {
+    const image = JSON.parse(await runWorktype('definition', 'image'));
+    expect(image.mimes).toEqual(['image/*', 'image/.*']);
+
+    const pdf = JSON.parse(await runWorktype('definition', 'pdf'));
+    expect(pdf.mimes).toEqual(['application/pdf', 'application/x-pdf']);
+    expect(pdf.viewer).toBe('embed');
+
+    const htaccess = JSON.parse(await runWorktype('definition', 'htaccess'));
+    expect(htaccess).toEqual(expect.objectContaining({
+      suffixes: ['.htaccess'],
+      label: '.htaccess',
+      preferred: true,
+      description: 'Apache access policy and iframe embedding rules.',
+    }));
+
+    const bundledMetadata = JSON.parse(await runWorktype('bundle-metadata', ''));
+    expect(bundledMetadata.image).toEqual({ mimes: ['image/*', 'image/.*'] });
+    expect(bundledMetadata.htaccess).toEqual(expect.objectContaining({
+      suffixes: ['.htaccess'],
+      label: '.htaccess',
+      preferred: true,
+    }));
+
+    const imageCatalog = JSON.parse(await runWorktype('catalog', 'image', {
+      mime: 'image/jpeg', fileName: 'photo.unknown', subjectType: 'file',
+    }));
+    const imageChoice = imageCatalog.choices.find(({ value }) => value === 'image');
+    expect(imageChoice.mimes).toEqual(['image/*', 'image/.*']);
+    expect(imageCatalog.selected).toBe('image');
+
+    const htaccessCatalog = JSON.parse(await runWorktype('catalog', 'htaccess', {
+      mime: 'text/plain', fileName: '.htaccess', subjectType: 'file',
+    }));
+    expect(htaccessCatalog.choices.find(({ value }) => value === 'htaccess').extensions).toEqual(['.htaccess']);
+  });
+
   test('keeps extensibility definitions and assets wired into the single-file builder', () => {
     const builder = fs.readFileSync(path.join(ROOT, 'build/build.php'), 'utf8');
 
@@ -3854,6 +3891,8 @@ describe('Worktype HBS renderer', () => {
     expect(builder).toContain('Worktype::setEmbeddedLayoutAssets(');
     expect(builder).toContain("'/includes/worktypes/templates/converter'");
     expect(builder).toContain("'style.css', 'script.js'");
+    expect(builder).toContain("$bundle['metadata']");
+    expect(builder).toContain("['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description']");
   });
 
   test('detects resource MIME and kind without selecting renderer or converter', async () => {

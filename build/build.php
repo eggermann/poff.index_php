@@ -146,6 +146,14 @@ PHP
             if (isset($bundle['definitions']) && is_array($bundle['definitions'])) {
                 $embeddedWorktypes = $bundle['definitions'];
             }
+            if (isset($bundle['metadata']) && is_array($bundle['metadata'])) {
+                foreach ($bundle['metadata'] as $kind => $metadata) {
+                    if (!is_string($kind) || !is_array($metadata) || !isset($embeddedWorktypes[$kind])) {
+                        continue;
+                    }
+                    $embeddedWorktypes[$kind] = array_replace($metadata, $embeddedWorktypes[$kind]);
+                }
+            }
             if (isset($bundle['templates']) && is_array($bundle['templates'])) {
                 $embeddedTemplates = $bundle['templates'];
             }
@@ -173,6 +181,11 @@ PHP
             $data = include $wtFile;
             if (is_array($data)) {
                 $embeddedWorktypes[$key] = $data['model'] ?? $data['definition'] ?? $data;
+                if (is_array($embeddedWorktypes[$key])) {
+                    $metadataKeys = ['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description'];
+                    $metadata = array_intersect_key($data, array_flip($metadataKeys));
+                    $embeddedWorktypes[$key] = array_replace($metadata, $embeddedWorktypes[$key]);
+                }
             }
         }
     }

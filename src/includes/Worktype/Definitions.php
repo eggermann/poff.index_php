@@ -408,6 +408,17 @@ trait WorktypeDefinitionsTrait
         return (string) ($catalog['selected'] ?? $kind);
     }
 
+    private static function mergeDefinitionMetadata(array $definition, array $metadata): array
+    {
+        foreach (['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description'] as $key) {
+            if (!array_key_exists($key, $definition) && array_key_exists($key, $metadata)) {
+                $definition[$key] = $metadata[$key];
+            }
+        }
+
+        return $definition;
+    }
+
     /**
      * Build a selector catalog for work templates.
      *
@@ -432,6 +443,17 @@ trait WorktypeDefinitionsTrait
             $choiceLabel = self::worktypeLabel($key, $definition);
             $choiceMimes = self::normalizeChoiceList($definition['mimes'] ?? $definition['mimeTypes'] ?? null);
             $choiceExtensions = self::normalizeChoiceList($definition['extensions'] ?? $definition['suffixes'] ?? null);
+            $mimeMatches = false;
+            foreach ($choiceMimes as $mimePattern) {
+                if (self::mimeMatchesPattern($mime, $mimePattern)) {
+                    $mimeMatches = true;
+                    break;
+                }
+            }
+            $extensionMatches = $extension !== '' && (
+                in_array($extension, $choiceExtensions, true)
+                || in_array('.' . $extension, $choiceExtensions, true)
+            );
 
             if ($subjectType === 'folder' && $choiceKind !== 'folder') {
                 continue;
@@ -447,10 +469,10 @@ trait WorktypeDefinitionsTrait
             if ($choiceKind !== '' && $detectedKind !== '' && $choiceKind === $detectedKind) {
                 $score += 300;
             }
-            if ($mime !== '' && in_array($mime, $choiceMimes, true)) {
+            if ($mime !== '' && $mimeMatches) {
                 $score += 600;
             }
-            if ($extension !== '' && in_array($extension, $choiceExtensions, true)) {
+            if ($extensionMatches) {
                 $score += 500;
             }
             if (($definition['preferred'] ?? false) === true) {
@@ -578,9 +600,9 @@ trait WorktypeDefinitionsTrait
             $data = include $path;
             if (is_array($data)) {
                 if (isset($data['model'])) {
-                    self::$fileDefinitions[$kind] = $data['model'];
+                    self::$fileDefinitions[$kind] = self::mergeDefinitionMetadata($data['model'], $data);
                 } elseif (isset($data['definition'])) {
-                    self::$fileDefinitions[$kind] = $data['definition'];
+                    self::$fileDefinitions[$kind] = self::mergeDefinitionMetadata($data['definition'], $data);
                 } else {
                     self::$fileDefinitions[$kind] = $data;
                 }
@@ -605,6 +627,16 @@ trait WorktypeDefinitionsTrait
                     if (isset($data['definitions']) && is_array($data['definitions'])) {
                         self::$bundleDefinitions = $data['definitions'];
                     }
+                    if (isset($data['metadata']) && is_array($data['metadata'])) {
+                        foreach ($data['metadata'] as $kind => $metadata) {
+                            if (is_string($kind) && is_array($metadata) && isset(self::$bundleDefinitions[$kind])) {
+                                self::$bundleDefinitions[$kind] = self::mergeDefinitionMetadata(
+                                    self::$bundleDefinitions[$kind],
+                                    $metadata
+                                );
+                            }
+                        }
+                    }
                     if (isset($data['templates']) && is_array($data['templates'])) {
                         self::$bundleTemplates = $data['templates'];
                     }
@@ -614,9 +646,9 @@ trait WorktypeDefinitionsTrait
                             continue;
                         }
                         if (isset($value['model'])) {
-                            self::$bundleDefinitions[$key] = $value['model'];
+                            self::$bundleDefinitions[$key] = self::mergeDefinitionMetadata($value['model'], $value);
                         } elseif (isset($value['definition'])) {
-                            self::$bundleDefinitions[$key] = $value['definition'];
+                            self::$bundleDefinitions[$key] = self::mergeDefinitionMetadata($value['definition'], $value);
                         }
                         if (isset($value['template'])) {
                             self::$bundleTemplates[$key] = $value['template'];

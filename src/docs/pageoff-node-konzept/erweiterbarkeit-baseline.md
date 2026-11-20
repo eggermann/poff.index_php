@@ -31,7 +31,7 @@ Template selection contract:
 
 `templateMap` entries merge ancestor folder configs from root to child; local entries replace the same normalized key. Lookup candidate order is exact MIME, `major/*`, `major/.*`, detected kind, then filename extension. If none match exactly, remaining MIME patterns are scanned in normalized key order. `image/*` and `image/.*` both act as MIME wildcards. The final selected Worktype may enable the QuickTime/MOV autoplay default.
 
-**Audit gap:** `*.worktype.php` files can declare top-level `mimes`, `extensions`, `label` and `preferred`, but current loaders keep only `model`/`definition` for the model. Catalog scoring reads such metadata from the resulting definition. Verify/fix this only with an explicit compatibility test; do not silently change existing definitions during the architecture split.
+Worktype files can declare top-level `mimes`, `mimeTypes`, `extensions`, `suffixes`, `label`, `preferred` and `description`. These are now retained alongside model fields by the per-kind loader and additive `metadata` map in the bundle; explicit model fields win if duplicated. The Builder merges bundle metadata into embedded definitions and applies the same merge in its per-file fallback. The catalog matches exact MIME plus `/*` and `/.*` patterns; extensions match bare values and dotted suffixes. Characterization tests cover image MIME patterns, PDF metadata, `.htaccess` label/preference/suffix and bundle metadata serialization.
 
 ## Template and layout resolution
 
@@ -73,18 +73,18 @@ Local converter definitions and packages execute on their own node. Remote disco
 
 At build time, `build/build.php` orders and concatenates `MediaType.php`, `Converter.php`, Worktype traits and class, and `PoffConfig`/viewer pieces. It prefers `src/includes/worktypes/worktypes.php`, with a `*.worktype.php` fallback if no embedded definitions were read. Worktype definitions, `.hbs` templates and layout CSS/JS are exported into `Worktype::setEmbedded*()` maps. LightnCandy source is embedded. Default/file-system layout profile assets are also embedded/copied. Converter grain files are copied as sidecars under `worktypes/templates/converter` in build output and standalone copies.
 
-Build-time inputs: Worktype PHP definitions and template bundle, direct template files used by fallback, built-in layout wrapper/assets, LightnCandy source, converter JSON/grain files, and ordered PHP source pieces. Runtime filesystem inputs: node-local `.layout`, `.works/<file>.layout`, shared layout collections, and node-local converter definitions/packages. A single PHP artifact cannot discover arbitrary development source folders unless those assets are deployed beside it. Runtime package discovery must not be described as bundled discovery.
+Build-time inputs: Worktype PHP definitions and template/metadata bundle, direct template files used by fallback, built-in layout wrapper/assets, LightnCandy source, converter JSON/grain files, and ordered PHP source pieces. Runtime filesystem inputs: node-local `.layout`, `.works/<file>.layout`, shared layout collections, and node-local converter definitions/packages. A single PHP artifact cannot discover arbitrary development source folders unless those assets are deployed beside it. Runtime package discovery must not be described as bundled discovery.
 
 No build was run in this audit. Current source/bundle parity is not proven. Any extraction needs explicit builder wiring and isolated artifact checks; normal build remains governed by repository instructions.
 
 ## Regression coverage and next safe slices
 
-Existing `tests/mcp.create.test.js` covers Worktype catalog choices, QuickTime behavior, inherited/wildcard maps, custom file/folder layouts, shared package hydration, converter discovery, MIME acceptance, preview, local/remote mocks, generated Work metadata and endpoint rejection. New tests in this slice pin resource MIME/kind detection (`photo.jpg`), exact Worktype `templateMap` candidate priority, inherited/local map merging, explicit-template override, Converter MIME/kind/extension matching, and required source inputs in the single-file Builder recipe. This is static recipe coverage, not generated-artifact parity.
+Existing `tests/mcp.create.test.js` covers Worktype catalog choices, QuickTime behavior, inherited/wildcard maps, custom file/folder layouts, shared package hydration, converter discovery, MIME acceptance, preview, local/remote mocks, generated Work metadata and endpoint rejection. New tests in this slice pin Worktype metadata retention through source and bundle loaders, wildcard MIME/dotted suffix catalog behavior, resource MIME/kind detection (`photo.jpg`), exact Worktype `templateMap` candidate priority, inherited/local map merging, explicit-template override, Converter MIME/kind/extension matching, and required source inputs in the single-file Builder recipe. This is static recipe coverage, not generated-artifact parity.
 
 Prioritized follow-up:
 
 1. Add source/build parity checks for Worktype definitions/templates, layout assets and converter sidecars without writing to `pages/`.
-2. Characterize Worktype metadata loading; pin intended `mimes`, `extensions`, `label` and `preferred` behavior before fixing any loss.
+2. Add isolated source/build output parity checks for metadata, custom Worktype definitions, templates, layout assets and converter sidecars.
 3. Add converter discovery collision/disabled-engine tests and remote `poff-converter/1` offer/execute contract tests.
 4. Review execution size, overwrite and redirect boundaries in isolated tests before moving Converter business logic out of MCP transport.
 5. Only then define capability-specific Core contracts and extract one operation at a time. Preserve current folder formats and builder input paths as adapters.
