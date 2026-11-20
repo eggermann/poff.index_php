@@ -84,5 +84,5 @@ Existing `tests/mcp.create.test.js` covers Worktype catalog choices, QuickTime b
 Prioritized follow-up:
 
 1. Add isolated source/build output parity checks for metadata, custom Worktype definitions, templates, layout assets and converter sidecars. Do not write generated output into `pages/`.
-2. Review source-size enforcement, output overwrite behavior and redirect handling in isolated tests before moving Converter business logic out of MCP transport. Current code trusts caller-provided source size when set, writes generated output directly to its target path, disables redirects for POST, and leaves default redirect behavior enabled for GET downloads.
+2. Review output overwrite behavior and redirect handling in isolated tests before moving Converter business logic out of MCP transport. `Converter::convert()` now replaces caller-provided source size with `filesize()` from the resolved in-root source path before enforcing the 100 MiB limit; inline offered sources also have a decoded-byte limit. Generated output is still written directly to the target; HTTP POST disables redirects, while GET download keeps the default redirect behavior.
 3. Define capability-specific Core contracts and extract one operation at a time. Preserve current folder formats and builder input paths as adapters.

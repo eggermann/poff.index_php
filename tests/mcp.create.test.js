@@ -2914,6 +2914,38 @@ describe('Poff converters', () => {
     }
   });
 
+  test('uses the actual source file size instead of the supplied size', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-source-size-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    const sourcePath = path.join(tempRoot, 'oversized.tiff');
+    fs.closeSync(fs.openSync(sourcePath, 'w'));
+    fs.truncateSync(sourcePath, 104857601);
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'oversized.tiff',
+          path: 'oversized.tiff',
+          mimeType: 'image/tiff',
+          extension: 'tiff',
+          size: 1,
+        },
+        converter: {
+          id: 'converter/convert-image',
+          format: 'png',
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Source file is too large.',
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('bulk converts eligible folder images and applies converted-only visibility', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-bulk-${Date.now()}`);
     const albumDir = path.join(tempRoot, 'album');
