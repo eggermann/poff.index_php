@@ -1559,6 +1559,16 @@ describe('MCP create route helper (CLI)', () => {
     }
   });
 
+  test('folder and file Work IDs survive repeated config ensure', async () => {
+    const result = await runPhpJson('php_work_id_stability.php');
+
+    expect(result.folder[0]).toMatch(/^poff_[a-f0-9]{16}$/);
+    expect(result.file[0]).toMatch(/^poff_[a-f0-9]{16}$/);
+    expect(result.folder[1]).toBe(result.folder[0]);
+    expect(result.file[1]).toBe(result.file[0]);
+    expect(result.file[0]).not.toBe(result.folder[0]);
+  });
+
   test('formats prompt provider failures with status and redacted detail', async () => {
     const result = await runPhpJson('php_prompt_error_helpers.php');
 

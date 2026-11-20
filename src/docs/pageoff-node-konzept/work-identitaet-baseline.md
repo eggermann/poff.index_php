@@ -11,7 +11,7 @@ Codebefund 20. November 2026; Folgeänderung 21. November 2026. Das ist ein Code
 - Kein verwalteter Rename- oder Move-Endpunkt wurde im untersuchten Code gefunden. Die Edit-Aktionen schreiben Datei- und Config-Änderungen, aber kein identifiziertes Move-Protokoll.
 - Der MCP-Copy-Pfad für Verzeichnisse kopiert deren Konfigurationen mit den Dateien. Seit 21. November 2026 erhalten kopierte Folder- und Datei-Metadaten anschließend neue IDs; die Quell-IDs bleiben erhalten. Der Codebefund oben beschreibt den vorherigen Stand.
 - Der Copy-Pfad für einzelne Dateien kopiert die Quelldatei; kein fokussierter Test belegt, wie eine vorhandene `.works/`-ID behandelt wird.
-- Es gibt weiterhin keine ID-Stabilitätstests für Rename/Move; ein Regressionstest deckt jetzt neue IDs bei rekursiver Folder-Kopie ab.
+- Tests decken jetzt stabile IDs bei wiederholtem `ensure()`/`ensureFileConfig()` und neue IDs bei rekursiver Folder-Kopie ab. Rename/Move bleibt mangels verwalteter Operation ungeprüft.
 
 ## Konsequenz für das Zielmodell
 
@@ -33,4 +33,4 @@ Branch-lokale Regel: Eine Folder-Kopie erzeugt für jeden mitkopierten `poff.con
 
 `PoffConfig::reassignWorkIdForCopy()` hält die ID-Erzeugung im Core. Der MCP-Copy-Pfad nutzt die Methode nur für kopierte Work-Metadaten. Die bestehenden Route-Parameter bleiben gleich. Provenienz (`copiedFrom`), Konfliktmigration bereits duplizierter IDs und öffentliche Node-ID-Auflösung bleiben offen.
 
-Regressionstest kopiert isolierte Root- und Nested-Folder- sowie Datei-Metadaten, bestätigt vier neue IDs und prüft, dass Quell-Metadaten unverändert bleiben. Der temporäre Single-File-Build bestätigt, dass die Core-Methode in der gebündelten `PoffConfig`-Klasse enthalten ist.
+Regressionstest kopiert isolierte Root- und Nested-Folder- sowie Datei-Metadaten, bestätigt vier neue IDs und prüft, dass Quell-Metadaten unverändert bleiben. Ein weiterer Test bestätigt, dass wiederholte `PoffConfig::ensure()`- und `ensureFileConfig()`-Aufrufe Folder- und File-IDs erhalten. Der temporäre Single-File-Build bestätigt, dass die Core-Methode in der gebündelten `PoffConfig`-Klasse enthalten ist.
