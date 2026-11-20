@@ -5,7 +5,6 @@ const { spawn, spawnSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
-const bundledLayoutAsset = path.join(rootDir, 'src', 'includes', 'worktypes', 'templates', 'layout', 'default', 'poff.profile.jpg');
 
 function logBrowseUrl(linkName) {
   if (!linkName) return;
@@ -77,107 +76,6 @@ function ensureSymlink(outputDir, config) {
   return linkName;
 }
 
-function ensureStandaloneCopies(outputDir, outputFile, config) {
-  if (!config.mampHtdocs) {
-    console.warn('[watch] MAMP htdocs is not configured, skipping standalone copies.');
-    return;
-  }
-  const resolvedHtdocs = path.resolve(config.mampHtdocs);
-  const standaloneCopyTargets = Array.isArray(config.standaloneCopyTargets) ? config.standaloneCopyTargets : [];
-  const additionalIndexCopyTargets = Array.isArray(config.additionalIndexCopyTargets) ? config.additionalIndexCopyTargets : [];
-  if (!fs.existsSync(resolvedHtdocs)) {
-    console.warn(`[watch] MAMP htdocs not found at ${resolvedHtdocs}, skipping standalone copies.`);
-    return;
-  }
-
-  const sourceFile = path.join(path.resolve(outputDir), outputFile);
-  if (!fs.existsSync(sourceFile)) {
-    console.warn(`[watch] Built file not found at ${sourceFile}, skipping standalone copies.`);
-    return;
-  }
-
-  standaloneCopyTargets.forEach((targetName) => {
-    const targetDir = path.join(resolvedHtdocs, targetName);
-    const targetFile = path.join(targetDir, outputFile);
-    fs.mkdirSync(targetDir, { recursive: true });
-    fs.copyFileSync(sourceFile, targetFile);
-    removeGeneratedEntrypointsFromSubdirectories(targetDir, outputFile);
-    if (fs.existsSync(bundledLayoutAsset)) {
-      copyFileToLayoutDirectories(bundledLayoutAsset, targetDir);
-    }
-    console.log(`[watch] Copied standalone build ${sourceFile} -> ${targetFile}.`);
-    logBrowseUrl(targetName);
-  });
-
-  additionalIndexCopyTargets.forEach(({ name: targetName, cleanSubdirectories }) => {
-    const targetDir = path.join(resolvedHtdocs, targetName);
-    const targetFile = path.join(targetDir, outputFile);
-    fs.mkdirSync(targetDir, { recursive: true });
-    fs.copyFileSync(sourceFile, targetFile);
-    if (cleanSubdirectories) {
-      removeGeneratedEntrypointsFromSubdirectories(targetDir, outputFile);
-    }
-    console.log(`[watch] Copied additional index build ${sourceFile} -> ${targetFile}.`);
-    logBrowseUrl(targetName);
-  });
-}
-
-function findAllDirectories(rootDir) {
-  const dirs = [];
-  const stack = [rootDir];
-
-  while (stack.length > 0) {
-    const currentDir = stack.pop();
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-
-    entries.forEach((entry) => {
-      if (!entry.isDirectory()) {
-        return;
-      }
-
-      const fullPath = path.join(currentDir, entry.name);
-      if (
-        entry.name.startsWith('.')
-        || entry.name === 'build'
-        || entry.name === 'vendor'
-        || entry.name === 'node_modules'
-      ) {
-        return;
-      }
-
-      dirs.push(fullPath);
-      stack.push(fullPath);
-    });
-  }
-
-  return dirs;
-}
-
-function copyFileToLayoutDirectories(sourceFile, targetRoot, layoutDirName = '.layout') {
-  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
-    const destinationDir = path.join(dir, layoutDirName);
-    fs.mkdirSync(destinationDir, { recursive: true });
-    fs.copyFileSync(sourceFile, path.join(destinationDir, path.basename(sourceFile)));
-  });
-}
-
-function removeGeneratedEntrypointsFromSubdirectories(targetRoot, fileName = 'index.php') {
-  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
-    const candidate = path.join(dir, fileName);
-    if (dir === targetRoot || !fs.existsSync(candidate)) {
-      return;
-    }
-
-    const stat = fs.statSync(candidate);
-    if (!stat.isFile()) {
-      return;
-    }
-
-    fs.unlinkSync(candidate);
-    console.log(`[watch] Removed subdirectory entrypoint: ${candidate}`);
-  });
-}
-
 function refreshBrowser() {
   const scripts = [
     'tell application "Google Chrome" to if exists window 1 then tell the active tab of window 1 to reload',
@@ -232,7 +130,6 @@ function startWatcher() {
         try {
           const freshConfig = readBuildConfig();
           ensureSymlink(freshConfig.outputDir, freshConfig);
-          ensureStandaloneCopies(freshConfig.outputDir, freshConfig.outputFile, freshConfig);
           refreshBrowser();
         } catch (err) {
           console.error(`[watch] Post-build step failed: ${err.message}`);

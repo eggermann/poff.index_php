@@ -6,8 +6,6 @@ const { pathToFileURL } = require('url');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const BUILD_SHARED_CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, 'build', 'BuildConfig.shared.json'), 'utf8'));
-const RUNTIME_ROOT = path.join(ROOT, BUILD_SHARED_CONFIG.pagesDir, BUILD_SHARED_CONFIG.siteHost);
 const POFF_DIR = path.join(ROOT, 'tests/poff-tests');
 const TEST_NAME = 'jest-create-route';
 const TEST_DEST = path.join(POFF_DIR, TEST_NAME);

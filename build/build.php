@@ -182,9 +182,6 @@ PHP
             'poff-layout' => $sourceDir . '/includes/worktypes/templates/layout/default/template.hbs',
             'filesystem-layout' => $sourceDir . '/includes/worktypes/templates/layout/file-system/template.hbs',
         ]);
-        if (!$templateFiles) {
-            $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.tpl') ?: [];
-        }
         foreach ($templateFiles as $key => $tplFile) {
             if (!is_file($tplFile)) {
                 continue;
@@ -325,9 +322,12 @@ PHP
         '/mcp/helpers.php',
         '/mcp/routes/workprompt.php',
         '/mcp/routes/create.php',
+        '/mcp/routes/edit-config/payload.php',
+        '/mcp/routes/edit-config/apply.php',
         '/mcp/routes/edit-config.php',
         '/mcp/routes/prompt-template.php',
         '/mcp/routes/remote-content.php',
+        '/mcp/routes/remote-presentation.php',
         '/mcp/routes/converters.php',
         '/mcp/routes/convert.php',
         '/mcp/routes/converter-network.php',
@@ -434,6 +434,11 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'mode' => (string) ($remoteInput['mode'] ?? 'follow'),
                     'destinationName' => (string) ($remoteInput['destinationName'] ?? ''),
                     'createPlayer' => (bool) ($remoteInput['createPlayer'] ?? false),
+                ]));
+            case 'remote-work-presentation':
+                mcpJsonResponse(handleRemoteWorkPresentation([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
                 ]));
             case 'converters':
                 mcpJsonResponse(handleConverters([
@@ -662,10 +667,6 @@ PHP;
     }
 
     echo "Build completed successfully ($buildMode): $outputFile\n";
-
-    // Trigger SSH upload using SSHUploader
-    require_once __DIR__ . '/SSHUploader.php';
-    //--> SSHUploader::upload();
 
 } catch (Exception $e) {
     echo "Build failed: " . $e->getMessage() . "\n";
