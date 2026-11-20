@@ -79,12 +79,10 @@ No build was run in this audit. Current source/bundle parity is not proven. Any 
 
 ## Regression coverage and next safe slices
 
-Existing `tests/mcp.create.test.js` covers Worktype catalog choices, QuickTime behavior, inherited/wildcard maps, custom file/folder layouts, shared package hydration, converter discovery, MIME acceptance, preview, local/remote mocks, generated Work metadata and endpoint rejection. New tests in this slice pin Worktype metadata retention through source and bundle loaders, wildcard MIME/dotted suffix catalog behavior, resource MIME/kind detection (`photo.jpg`), exact Worktype `templateMap` candidate priority, inherited/local map merging, explicit-template override, Converter MIME/kind/extension matching, folder discovery collision precedence, disabled converter offer filtering, and required source inputs in the single-file Builder recipe. This is static recipe coverage, not generated-artifact parity.
+Existing `tests/mcp.create.test.js` covers Worktype catalog choices, QuickTime behavior, inherited/wildcard maps, custom file/folder layouts, shared package hydration, converter discovery, MIME acceptance, preview, local/remote mocks, generated Work metadata and endpoint rejection. New tests in this slice pin Worktype metadata retention through source and bundle loaders, wildcard MIME/dotted suffix catalog behavior, resource MIME/kind detection (`photo.jpg`), exact Worktype `templateMap` candidate priority, inherited/local map merging, explicit-template override, Converter MIME/kind/extension matching, folder discovery collision precedence, disabled converter offer filtering, required source inputs in the single-file Builder recipe, and rejection of remote conversion results whose MIME type was not offered. This is static recipe coverage, not generated-artifact parity.
 
 Prioritized follow-up:
 
-1. Add source/build parity checks for Worktype definitions/templates, layout assets and converter sidecars without writing to `pages/`.
-2. Add isolated source/build output parity checks for metadata, custom Worktype definitions, templates, layout assets and converter sidecars.
-3. Add remote `poff-converter/1` offer/execute contract tests.
-4. Review execution size, overwrite and redirect boundaries in isolated tests before moving Converter business logic out of MCP transport.
-5. Only then define capability-specific Core contracts and extract one operation at a time. Preserve current folder formats and builder input paths as adapters.
+1. Add isolated source/build output parity checks for metadata, custom Worktype definitions, templates, layout assets and converter sidecars. Do not write generated output into `pages/`.
+2. Review source-size enforcement, output overwrite behavior and redirect handling in isolated tests before moving Converter business logic out of MCP transport. Current code trusts caller-provided source size when set, writes generated output directly to its target path, disables redirects for POST, and leaves default redirect behavior enabled for GET downloads.
+3. Define capability-specific Core contracts and extract one operation at a time. Preserve current folder formats and builder input paths as adapters.

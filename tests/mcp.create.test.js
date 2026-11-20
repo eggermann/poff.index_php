@@ -2861,6 +2861,59 @@ describe('Poff converters', () => {
     }
   });
 
+  test('rejects a remote converter result with an unoffered output MIME type', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-invalid-output-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'scan-001.tiff',
+          path: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          extension: 'tiff',
+        },
+        converter: {
+          id: 'converter/remote-provider-example-convert-image',
+          name: 'remote-provider-example-convert-image',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          formats: ['png'],
+          engine: 'remote-node',
+          format: 'png',
+          node: {
+            id: 'provider-example',
+            baseUrl: 'https://provider.example/index.php',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+        target: { saveAs: 'scan-001.png' },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'scan-001.svg',
+              mimeType: 'image/svg+xml',
+              bodyBase64: Buffer.from('<svg/>').toString('base64'),
+            },
+          },
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Remote output MIME type is not allowed.',
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('bulk converts eligible folder images and applies converted-only visibility', async () => {
     const tempRoot = path.join(POFF_DIR, `converter-bulk-${Date.now()}`);
     const albumDir = path.join(tempRoot, 'album');
