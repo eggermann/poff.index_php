@@ -87,6 +87,47 @@ function runFileCopierCleanup(rootDir) {
   });
 }
 
+function runIsolatedPhpBuild(outputDir) {
+  return new Promise((resolve, reject) => {
+    const relativeOutputDir = path.relative(ROOT, outputDir);
+    const proc = spawn('php', [path.join(ROOT, 'build/build.php')], {
+      cwd: ROOT,
+      env: withTestEnv({
+        POFF_BUILD_MODE: 'development',
+        POFF_OUTPUT_DIR: relativeOutputDir,
+        POFF_SKIP_DISTRIBUTION_COPIES: '1',
+      }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`isolated PHP build failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runPhpLint(filePath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', ['-l', filePath], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`PHP lint failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runWorktype(action, kind, payload = null) {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_render_worktype.php'), action, kind];
@@ -4097,6 +4138,34 @@ describe('Worktype HBS renderer', () => {
     expect(builder).toContain("'style.css', 'script.js'");
     expect(builder).toContain("$bundle['metadata']");
     expect(builder).toContain("['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description']");
+  });
+
+  test('builds a syntax-valid isolated bundle with Worktype templates and layout assets embedded', async () => {
+    const outputDir = path.join(ROOT, 'tests', `.tmp-build-parity-${process.pid}-${Date.now()}`);
+
+    try {
+      const buildResult = await runIsolatedPhpBuild(outputDir);
+      const bundlePath = path.join(outputDir, 'index.php');
+      expect(buildResult).toContain('Build completed successfully (development)');
+      expect(fs.existsSync(bundlePath)).toBe(true);
+      expect(await runPhpLint(bundlePath)).toContain('No syntax errors detected');
+
+      const bundle = fs.readFileSync(bundlePath, 'utf8');
+      for (const embeddedContent of [
+        'Worktype::setEmbedded(',
+        'Worktype::setEmbeddedTemplates(',
+        'Worktype::setEmbeddedLayoutAssets(',
+        'image/*',
+        'max-h-screen max-w-full object-contain',
+        '--poff-shell-bg',
+      ]) {
+        if (!bundle.includes(embeddedContent)) {
+          throw new Error(`isolated bundle is missing embedded content: ${embeddedContent}`);
+        }
+      }
+    } finally {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 
   test('detects resource MIME and kind without selecting renderer or converter', async () => {
