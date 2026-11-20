@@ -60,10 +60,19 @@ function runCreate(args) {
       env: withTestEnv({ POFF_BASE: POFF_DIR }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    let stdout = '';
     let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
     proc.stderr.on('data', (d) => (stderr += d.toString()));
     proc.on('exit', (code) => {
-      if (code === 0) return resolve();
+      if (code === 0) {
+        try {
+          resolve(JSON.parse(stdout.trim()));
+        } catch (error) {
+          reject(new Error(`create helper returned invalid JSON: ${error.message}`));
+        }
+        return;
+      }
       reject(new Error(`create helper failed: ${code} ${stderr}`));
     });
   });
@@ -1485,6 +1494,69 @@ describe('MCP create route helper (CLI)', () => {
     const copiedFile = path.join(POFF_DIR, destFolder, 'data.md');
     expect(fs.existsSync(copiedFile)).toBe(true);
     expect(fs.readFileSync(copiedFile, 'utf8')).toBe('nested data');
+  });
+
+  test('folder copy assigns new Work IDs to copied folders and file metadata', async () => {
+    const tempRoot = path.join(POFF_DIR, `identity-copy-${Date.now()}`);
+    const sourceDir = path.join(tempRoot, 'poff', 'source');
+    const worksDir = path.join(sourceDir, '.works');
+    const nestedDir = path.join(sourceDir, 'nested');
+    const nestedWorksDir = path.join(nestedDir, '.works');
+    fs.mkdirSync(worksDir, { recursive: true });
+    fs.mkdirSync(nestedWorksDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'note.txt'), 'copy identity fixture');
+    fs.writeFileSync(path.join(nestedDir, 'nested.txt'), 'nested copy identity fixture');
+    fs.writeFileSync(path.join(sourceDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_source_folder',
+      title: 'Source folder',
+      tree: [{ name: 'note.txt', type: 'file' }],
+    }));
+    fs.writeFileSync(path.join(worksDir, 'note.txt.config.json'), JSON.stringify({
+      id: 'poff_source_file',
+      name: 'note.txt',
+      path: 'note.txt',
+      type: 'file',
+      work: { type: 'text' },
+    }));
+    fs.writeFileSync(path.join(nestedDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_source_nested_folder',
+      title: 'Nested source folder',
+      tree: [{ name: 'nested.txt', type: 'file' }],
+    }));
+    fs.writeFileSync(path.join(nestedWorksDir, 'nested.txt.config.json'), JSON.stringify({
+      id: 'poff_source_nested_file',
+      name: 'nested.txt',
+      path: 'nested.txt',
+      type: 'file',
+      work: { type: 'text' },
+    }));
+
+    try {
+      const sourceRelativePath = path.relative(POFF_DIR, sourceDir);
+      const destinationRelativePath = path.relative(POFF_DIR, path.join(tempRoot, 'poff', 'copy'));
+      const result = await runCreate([
+        `--dest=${destinationRelativePath}`,
+        `--path=${sourceRelativePath}`,
+      ]);
+      const copiedDir = path.join(POFF_DIR, destinationRelativePath);
+      const copiedFolderConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, 'poff.config.json'), 'utf8'));
+      const copiedFileConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, '.works', 'note.txt.config.json'), 'utf8'));
+      const copiedNestedFolderConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, 'nested', 'poff.config.json'), 'utf8'));
+      const copiedNestedFileConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, 'nested', '.works', 'nested.txt.config.json'), 'utf8'));
+
+      expect(result.copied).toBe(true);
+      expect(result.details.reidentifiedWorks).toBe(4);
+      expect(copiedFolderConfig.id).not.toBe('poff_source_folder');
+      expect(copiedFileConfig.id).not.toBe('poff_source_file');
+      expect(copiedNestedFolderConfig.id).not.toBe('poff_source_nested_folder');
+      expect(copiedNestedFileConfig.id).not.toBe('poff_source_nested_file');
+      expect(fs.readFileSync(path.join(sourceDir, 'poff.config.json'), 'utf8')).toContain('poff_source_folder');
+      expect(fs.readFileSync(path.join(worksDir, 'note.txt.config.json'), 'utf8')).toContain('poff_source_file');
+      expect(fs.readFileSync(path.join(nestedDir, 'poff.config.json'), 'utf8')).toContain('poff_source_nested_folder');
+      expect(fs.readFileSync(path.join(nestedWorksDir, 'nested.txt.config.json'), 'utf8')).toContain('poff_source_nested_file');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('formats prompt provider failures with status and redacted detail', async () => {
@@ -4173,6 +4245,7 @@ describe('Worktype HBS renderer', () => {
         'Worktype::setEmbedded(',
         'Worktype::setEmbeddedTemplates(',
         'Worktype::setEmbeddedLayoutAssets(',
+        'reassignWorkIdForCopy',
         'image/*',
         'max-h-screen max-w-full object-contain',
         '--poff-shell-bg',

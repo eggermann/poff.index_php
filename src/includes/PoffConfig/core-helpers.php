@@ -39,6 +39,12 @@ trait PoffConfigCoreHelpers
         }
     }
 
+    public static function reassignWorkIdForCopy(array $workMetadata): array
+    {
+        $workMetadata['id'] = self::generateId();
+        return $workMetadata;
+    }
+
     private static function normalizeTemplateMap(mixed $value): array
     {
         return class_exists('Worktype') ? Worktype::normalizeTemplateMap($value) : [];

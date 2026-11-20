@@ -14,9 +14,11 @@ Arbeitsstand: 20. November 2026. Grundlage ist [die oberste Architektur](archite
 
 Die Bereiche überlappen im heutigen Code teilweise. Die Zuordnung beschreibt Zuständigkeiten, keine Behauptung, dass sie bereits vollständig getrennt sind. Graph und Identität gehören fachlich zum Core; das Host-Modul verwaltet seine eigenen Verbindungen. Die Ressource bleibt beim Ursprung, ihr Verbindungseintrag beim Host. Das Frontend entscheidet über die Darstellung der vom Protokoll bereitgestellten Daten.
 
-## Erster abgeschlossener Core-Schritt
+## Bisherige Core-Schritte
 
 Die Namensvergabe bei Remote-Import-Kollisionen liegt jetzt als `PoffConfig::uniqueImportedName()` im Core. `mcpRemoteUniqueImportedName()` bleibt als Kompatibilitätsadapter in der MCP-Route. Der PHP-Builder flacht die Core-Methode mit den bestehenden `PoffConfig`-Traits in `index.php` ein. Geprüft sind normale und wiederholte Namenskollisionen sowie leere Namen. Das ist ein kleiner transportfreier Baustein; die übrige Remote-Import-Logik bleibt vorerst in der Route.
+
+Folder-Kopien vergeben neue IDs für kopierte Folder- und Datei-Metadaten über `PoffConfig::reassignWorkIdForCopy()`; die MCP-Route bleibt Adapter. Quell-IDs bleiben bestehen. Das ist eine branch-lokale Kopierregel, noch kein öffentlich beschlossenes Identitätsformat. Move/Rename und Node-Adresse bleiben offen.
 
 ## Reihenfolge für die Ausarbeitung
 
