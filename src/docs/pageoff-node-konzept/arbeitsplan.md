@@ -18,7 +18,7 @@ Die Bereiche überlappen im heutigen Code teilweise. Die Zuordnung beschreibt Zu
 
 Die Namensvergabe bei Remote-Import-Kollisionen liegt jetzt als `PoffConfig::uniqueImportedName()` im Core. `mcpRemoteUniqueImportedName()` bleibt als Kompatibilitätsadapter in der MCP-Route. Der PHP-Builder flacht die Core-Methode mit den bestehenden `PoffConfig`-Traits in `index.php` ein. Geprüft sind normale und wiederholte Namenskollisionen sowie leere Namen. Das ist ein kleiner transportfreier Baustein; die übrige Remote-Import-Logik bleibt vorerst in der Route.
 
-`PoffConfig::newWorkId()` hält die ID-Vergabe im Core. Folder-Kopien vergeben neue IDs für kopierte Folder- und Datei-Metadaten über `PoffConfig::reassignWorkIdForCopy()`; Remote-Import nutzt ebenfalls den Core. MCP-Routen bleiben Adapter. Quell-IDs bleiben bestehen. Das ist eine branch-lokale Kopierregel, noch kein öffentlich beschlossenes Identitätsformat. Move/Rename und Node-Adresse bleiben offen.
+`PoffConfig::newWorkId()` hält die Work-ID-Vergabe im Core. Folder-Kopien vergeben neue IDs für kopierte Folder- und Datei-Metadaten über `PoffConfig::reassignWorkIdForCopy()`. `PoffNodeIdentity` hält die Node-ID separat in `poff.node.json`; Export ergänzt `source.nodeId` und `workId` pro lokaler Work, ohne `source.id` zu entfernen. Feed-Import speichert Quell-IDs getrennt von lokalen IDs und nutzt eine gültige Node-ID als stabilen Feed-Schlüssel. Pfade und Domains bleiben Adressen, keine Identitäten. Kopieren/Move-Entscheidungen sind bestätigt; Kollisionen und Clone-Rotation bleiben offen.
 
 ## Reihenfolge für die Ausarbeitung
 

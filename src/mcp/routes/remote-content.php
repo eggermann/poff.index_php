@@ -187,7 +187,35 @@ function mcpRemoteExportPathIsPublic(string $path): bool
     return true;
 }
 
-function mcpRemoteNormalizeExportItem(array $item, string $baseUrl): array
+function mcpRemoteWorkIdentityForExport(array $item, string $nodeRootDir): array
+{
+    if (!empty($item['isVirtual'])) {
+        $remoteNodeId = trim((string) ($item['remoteNodeId'] ?? ''));
+        $remoteWorkId = trim((string) ($item['remoteWorkId'] ?? ''));
+        return $remoteNodeId !== '' && $remoteWorkId !== ''
+            ? ['reference' => ['nodeId' => $remoteNodeId, 'workId' => $remoteWorkId]]
+            : [];
+    }
+
+    $relativePath = trim((string) ($item['relativePath'] ?? $item['path'] ?? ''), "/\\");
+    $absolutePath = mcpResolvePathInsideRoot($nodeRootDir, $relativePath);
+    if ($absolutePath === null) {
+        return [];
+    }
+
+    if (is_dir($absolutePath)) {
+        $config = PoffConfig::ensure($absolutePath);
+    } elseif (is_file($absolutePath)) {
+        $config = PoffConfig::ensureFileConfig(dirname($absolutePath), basename($absolutePath));
+    } else {
+        return [];
+    }
+
+    $workId = trim((string) ($config['id'] ?? ''));
+    return $workId !== '' ? ['workId' => $workId] : [];
+}
+
+function mcpRemoteNormalizeExportItem(array $item, string $baseUrl, string $nodeRootDir): array
 {
     $result = [];
     $routePath = trim((string) ($item['routePath'] ?? ($item['relativePath'] ?? ($item['path'] ?? ''))));
@@ -228,6 +256,7 @@ function mcpRemoteNormalizeExportItem(array $item, string $baseUrl): array
     if ($routeSlug !== '') {
         $result['routeSlug'] = $routeSlug;
     }
+    $result = array_merge($result, mcpRemoteWorkIdentityForExport($item, $nodeRootDir));
 
     $pageLink = trim((string) ($item['pageLink'] ?? $item['viewerHref'] ?? ''));
     $srcUrl = trim((string) ($item['srcUrl'] ?? $item['assetUrl'] ?? $item['rawHref'] ?? ''));
@@ -241,7 +270,7 @@ function mcpRemoteNormalizeExportItem(array $item, string $baseUrl): array
 
     if (!empty($item['children']) && is_array($item['children'])) {
         $result['children'] = array_map(
-            static fn(array $child): array => mcpRemoteNormalizeExportItem($child, $baseUrl),
+            static fn(array $child): array => mcpRemoteNormalizeExportItem($child, $baseUrl, $nodeRootDir),
             array_values(array_filter($item['children'], 'is_array'))
         );
     }
@@ -249,11 +278,22 @@ function mcpRemoteNormalizeExportItem(array $item, string $baseUrl): array
     return $result;
 }
 
+function mcpRemoteStableNodeId(mixed $value): string
+{
+    $nodeId = trim(is_string($value) ? $value : '');
+    return preg_match('/^poff_node_[a-f0-9]{32}$/', $nodeId) === 1 ? $nodeId : '';
+}
+
 function mcpRemoteExportSourceId(string $url, array $payload): string
 {
     $declared = trim((string) (($payload['source']['id'] ?? $payload['origin']['host'] ?? '')));
     if ($declared !== '') {
         return preg_replace('/[^a-z0-9._-]+/i', '-', strtolower($declared)) ?: 'remote';
+    }
+
+    $nodeId = mcpRemoteStableNodeId($payload['source']['nodeId'] ?? '');
+    if ($nodeId !== '') {
+        return $nodeId;
     }
 
     $host = trim((string) (parse_url($url, PHP_URL_HOST) ?? ''));
@@ -330,6 +370,19 @@ function mcpRemoteImportTreeEntries(array $payload, string $sourceUrl, string $s
             'externalWork' => true,
             'importedAt' => date('c'),
         ];
+        $reference = is_array($item['reference'] ?? null) ? $item['reference'] : [];
+        $remoteNodeId = mcpRemoteStableNodeId($reference['nodeId'] ?? ($payload['source']['nodeId'] ?? ''));
+        $remoteWorkId = trim((string) ($reference['workId'] ?? ($item['workId'] ?? '')));
+        $remoteFeedNodeId = mcpRemoteStableNodeId($payload['source']['nodeId'] ?? '');
+        if ($remoteNodeId !== '') {
+            $entry['remoteNodeId'] = $remoteNodeId;
+        }
+        if ($remoteWorkId !== '') {
+            $entry['remoteWorkId'] = $remoteWorkId;
+        }
+        if ($remoteFeedNodeId !== '') {
+            $entry['remoteFeedNodeId'] = $remoteFeedNodeId;
+        }
         $entries[] = $entry;
     }
 
@@ -683,7 +736,7 @@ function handleExportContent(array $opts): array
         ], mcpRemoteContentError('Invalid folder path.'));
     }
 
-    $config = PoffConfig::read($targetDir);
+    $config = PoffConfig::ensure($targetDir);
     $folderName = (string) ($config['folderName'] ?? basename($targetDir));
     $title = (string) ($config['title'] ?? $folderName);
     $slug = trim((string) ($config['slug'] ?? ''));
@@ -710,6 +763,7 @@ function handleExportContent(array $opts): array
             'path' => $path,
         ],
         'root' => [
+            'workId' => (string) ($config['id'] ?? ''),
             'name' => $folderName,
             'title' => $title,
             'slug' => $slug,
@@ -717,7 +771,7 @@ function handleExportContent(array $opts): array
             'pageLink' => mcpRemoteAbsoluteUrl($baseUrl, '?view=1&path=' . rawurlencode($path)),
         ],
         'items' => array_map(
-            static fn(array $item): array => mcpRemoteNormalizeExportItem($item, $baseUrl),
+            static fn(array $item): array => mcpRemoteNormalizeExportItem($item, $baseUrl, $rootDir),
             $viewerData['tree']
         ),
         'counts' => [
@@ -808,21 +862,42 @@ function handleImportRemote(array $opts): array
     $config = PoffConfig::ensure($targetDir);
     $existingTree = isset($config['tree']) && is_array($config['tree']) ? $config['tree'] : [];
     $resolvedSourceId = $sourceId !== '' ? $sourceId : mcpRemoteExportSourceId($url, $payload);
-    $importedEntries = mcpRemoteImportTreeEntries($payload, $url, $resolvedSourceId, $existingTree);
+    $sourceNodeId = mcpRemoteStableNodeId($payload['source']['nodeId'] ?? '');
 
     if ($replace) {
-        $existingTree = array_values(array_filter($existingTree, static function ($item) use ($resolvedSourceId): bool {
-            return !is_array($item) || (string) ($item['remoteSource'] ?? '') !== $resolvedSourceId;
+        $existingTree = array_values(array_filter($existingTree, static function ($item) use ($resolvedSourceId, $sourceNodeId): bool {
+            if (!is_array($item)) {
+                return true;
+            }
+            $sameLegacySource = (string) ($item['remoteSource'] ?? '') === $resolvedSourceId;
+            $sameStableNode = $sourceNodeId !== '' && (string) ($item['remoteFeedNodeId'] ?? '') === $sourceNodeId;
+            return !$sameLegacySource && !$sameStableNode;
         }));
     }
+
+    $importedEntries = mcpRemoteImportTreeEntries($payload, $url, $resolvedSourceId, $existingTree);
 
     $config['tree'] = array_merge($existingTree, $importedEntries);
     $config['treeHash'] = hash('sha256', json_encode($config['tree']));
     $config['updatedAt'] = date('c');
+    $existingRemoteSources = isset($config['remoteSources']) && is_array($config['remoteSources'])
+        ? $config['remoteSources']
+        : [];
+    if ($replace) {
+        $existingRemoteSources = array_values(array_filter($existingRemoteSources, static function ($source) use ($resolvedSourceId, $sourceNodeId): bool {
+            if (!is_array($source)) {
+                return false;
+            }
+            $sameLegacySource = (string) ($source['id'] ?? '') === $resolvedSourceId;
+            $sameStableNode = $sourceNodeId !== '' && (string) ($source['nodeId'] ?? '') === $sourceNodeId;
+            return !$sameLegacySource && !$sameStableNode;
+        }));
+    }
     $config['remoteSources'] = array_values(array_filter(array_merge(
-        isset($config['remoteSources']) && is_array($config['remoteSources']) ? $config['remoteSources'] : [],
+        $existingRemoteSources,
         [[
             'id' => $resolvedSourceId,
+            'nodeId' => mcpRemoteStableNodeId($payload['source']['nodeId'] ?? ''),
             'url' => $url,
             'path' => $payload['source']['path'] ?? '',
             'importedAt' => $config['updatedAt'],

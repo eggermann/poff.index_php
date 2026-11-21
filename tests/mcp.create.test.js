@@ -6101,6 +6101,10 @@ describe('Worktype HBS renderer', () => {
         path: 'viewer-folder',
       }));
       expect(repeatedResult.source.nodeId).toBe(result.source.nodeId);
+      expect(repeatedResult.root.workId).toBe(result.root.workId);
+      expect(repeatedResult.items.find((item) => item.name === 'child.txt').workId)
+        .toBe(result.items.find((item) => item.name === 'child.txt').workId);
+      expect(result.root.workId).toMatch(/^poff_[a-f0-9]{16}$/);
       expect(repeatedResult.items).not.toEqual(expect.arrayContaining([
         expect.objectContaining({ name: 'poff.node.json' }),
       ]));
@@ -6108,6 +6112,7 @@ describe('Worktype HBS renderer', () => {
       expect(result.items).toEqual(expect.arrayContaining([
         expect.objectContaining({
           name: 'child.txt',
+          workId: expect.stringMatching(/^poff_[a-f0-9]{16}$/),
           pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
           srcUrl: 'https://origin.example/viewer-folder/child.txt',
           routeSlug: 'child-txt',
@@ -6116,6 +6121,7 @@ describe('Worktype HBS renderer', () => {
         expect.objectContaining({
           name: 'nested-child',
           isFolder: true,
+          workId: expect.stringMatching(/^poff_[a-f0-9]{16}$/),
           pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
           routeSlug: 'nested-child',
           routePath: 'viewer-folder/nested-child',
@@ -6249,6 +6255,7 @@ describe('Worktype HBS renderer', () => {
       route: 'export-content',
       source: {
         id: 'origin-example',
+        nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         path: 'viewer-folder',
       },
       items: [
@@ -6263,6 +6270,10 @@ describe('Worktype HBS renderer', () => {
         srcUrl: 'https://origin.example/index.php?path=viewer-folder%2Fnested-child',
         routeSlug: 'nested-child',
         routePath: 'viewer-folder/nested-child',
+        reference: {
+          nodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          workId: 'poff_bbbbbbbbbbbbbbbb',
+        },
         renderedHtml: '<article class="remote-snapshot remote-snapshot--folder">Portfolio snapshot</article>',
         visible: true,
         isFolder: true,
@@ -6272,7 +6283,7 @@ describe('Worktype HBS renderer', () => {
           name: 'Leaf Note',
           title: 'Leaf Note',
           type: 'file',
-        id: 'poff_upstream-leaf-001',
+        workId: 'poff_0123456789abcdef',
         kind: 'text',
         path: 'viewer-folder/child.txt',
         relativePath: 'viewer-folder/child.txt',
@@ -6290,7 +6301,6 @@ describe('Worktype HBS renderer', () => {
 
     const result = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
       url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
-      sourceId: 'origin-example',
       mockResponse: {
         status: 200,
         body: remoteFeed,
@@ -6305,6 +6315,7 @@ describe('Worktype HBS renderer', () => {
     expect(storedConfig.remoteSources).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'origin-example',
+        nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
       }),
     ]));
@@ -6314,6 +6325,8 @@ describe('Worktype HBS renderer', () => {
         type: 'folder',
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
         remoteSource: 'origin-example',
+        remoteNodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        remoteFeedNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         externalWork: true,
         routeSlug: 'nested-child',
         routePath: 'viewer-folder/nested-child',
@@ -6323,6 +6336,9 @@ describe('Worktype HBS renderer', () => {
         type: 'file',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
         remoteSource: 'origin-example',
+        remoteNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
+        remoteWorkId: 'poff_0123456789abcdef',
+        remoteFeedNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         externalWork: true,
         routeSlug: 'child-txt',
         routePath: 'viewer-folder/child.txt',
@@ -6332,11 +6348,48 @@ describe('Worktype HBS renderer', () => {
     const leafEntry = storedConfig.tree.find((item) => item.name === 'Leaf Note');
     expect(leafEntry).toBeTruthy();
     expect(leafEntry.id).toBeUndefined();
-    expect(leafEntry.remoteWorkId).toBeUndefined();
+    expect(leafEntry.remoteNodeId).toBe('poff_node_0123456789abcdef0123456789abcdef');
+    expect(leafEntry.remoteWorkId).toBe('poff_0123456789abcdef');
+    expect(leafEntry.remoteFeedNodeId).toBe('poff_node_0123456789abcdef0123456789abcdef');
     expect(leafEntry.remoteSource).toBe('origin-example');
     expect(leafEntry.routePath).toBe('viewer-folder/child.txt');
     expect(leafEntry.renderedHtml).toBeUndefined();
     expect(leafEntry.template).toBeUndefined();
+
+    const relocatedFeed = JSON.parse(JSON.stringify(remoteFeed));
+    relocatedFeed.source.id = 'new-origin.example';
+    const replaced = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
+      url: 'https://new-origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
+      replace: true,
+      mockResponse: {
+        status: 200,
+        body: relocatedFeed,
+      },
+    });
+    expect(replaced.saved).toBe(true);
+    expect(replaced.importedCount).toBe(2);
+
+    const replacedConfig = JSON.parse(fs.readFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), 'utf8'));
+    expect(replacedConfig.tree.map((item) => item.name).sort()).toEqual(['Leaf Note', 'Portfolio']);
+    expect(replacedConfig.remoteSources.filter((source) => source.nodeId === remoteFeed.source.nodeId)).toHaveLength(1);
+
+    const relayRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-relay-'));
+    try {
+      copyDirSync(REMOTE_IMPORT_DIR, path.join(relayRoot, 'remote-import-links'));
+      const relayFeed = await runRemoteContent('export', relayRoot, 'remote-import-links', {
+        baseUrl: 'https://relay.example/index.php',
+      });
+      expect(relayFeed.items.find((item) => item.name === 'Portfolio').reference).toEqual({
+        nodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        workId: 'poff_bbbbbbbbbbbbbbbb',
+      });
+      expect(relayFeed.items.find((item) => item.name === 'Leaf Note').reference).toEqual({
+        nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
+        workId: 'poff_0123456789abcdef',
+      });
+    } finally {
+      fs.rmSync(relayRoot, { recursive: true, force: true });
+    }
   });
 
   test('copies remote export files into a new local folder and creates a looping player', async () => {

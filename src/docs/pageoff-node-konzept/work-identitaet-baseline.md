@@ -6,7 +6,7 @@ Codebefund 20. November 2026; Folgeänderungen 21. November 2026. Die beobachtet
 
 Die dauerhafte Referenz soll aus stabiler Node-ID und stabiler Work-ID bestehen. Domain und URL sind erreichbare Adressen eines Nodes und dürfen wechseln, ohne die Identität zu ändern. Verschieben erhält die Work-ID; Kopieren erzeugt eine neue Work-ID. Remote-Referenzen speichern künftig die Quell-Node-ID und Quell-Work-ID. Ein Pfadindex bleibt abgeleitet und neu aufbaubar.
 
-Die erste Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Das Schreiben der Node-ID braucht Schreibrecht im Node-Root; vollständige Serverkopien übernehmen die Node-ID zunächst mit und benötigen vor dem Betrieb eine explizite Identitätsrotation.
+Die Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Exportierte Folder und physische Files erhalten `workId`; Remote-Works werden als `reference: { nodeId, workId }` weitergereicht. Beim Import werden IDs als `remoteNodeId`/`remoteWorkId` abgelegt, nicht als lokale Work-ID. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Identitätserzeugung beim Export braucht Schreibrecht im Node-Root; vollständige Serverkopien übernehmen die Node-ID zunächst mit und benötigen vor dem Betrieb eine explizite Identitätsrotation.
 
 ## Vorhandenes Verhalten
 
@@ -16,7 +16,7 @@ Die erste Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root un
 - Die Dateibaum-Einträge führen aktuell Namen und Pfade; die untersuchten Tree-Projektionen sind keine unabhängige Work-ID-Auflösung.
 - Kein verwalteter Rename- oder Move-Endpunkt wurde im untersuchten Code gefunden. Die Edit-Aktionen schreiben Datei- und Config-Änderungen, aber kein identifiziertes Move-Protokoll.
 - Der MCP-Copy-Pfad für Verzeichnisse kopiert deren Konfigurationen mit den Dateien. Seit 21. November 2026 erhalten kopierte Folder- und Datei-Metadaten anschließend neue IDs; die Quell-IDs bleiben erhalten. Der Codebefund oben beschreibt den vorherigen Stand.
-- Der Remote-Feed-Import legt virtuelle Einträge im `tree` ohne lokale Work-ID an. Er übernimmt auch keine eventuell im Feed gelieferte Quell-Work-ID. Die Einträge enthalten stattdessen `remoteSource`, `remotePath`, `routePath`/`routeSlug` und Remote-URLs. Das ist ein Remote-Verweis, keine lokale dauerhafte Work-Identität; eine stabile Bindung an die Quell-Work-ID geht derzeit verloren. Der separate Remote-Folder-Copy erzeugt eine neue lokale Folder-ID.
+- Der Remote-Feed-Import legt virtuelle Einträge im `tree` ohne lokale Work-ID an. Er bewahrt die Quell-Identität als `remoteNodeId` + `remoteWorkId` und notiert den direkten Feed-Node getrennt als `remoteFeedNodeId`. Ältere Feeds ohne `nodeId`/`workId` bleiben gültig und erzeugen diese Felder nicht. Der separate Remote-Folder-Copy erzeugt eine neue lokale Folder-ID.
 - Der Copy-Pfad für einzelne Dateien kopiert die Quelldatei; kein fokussierter Test belegt, wie eine vorhandene `.works/`-ID behandelt wird.
 - Tests decken jetzt stabile IDs bei wiederholtem `ensure()`/`ensureFileConfig()` und neue IDs bei rekursiver Folder-Kopie ab. Rename/Move bleibt mangels verwalteter Operation ungeprüft.
 
