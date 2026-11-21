@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../../includes/PoffConfig.php';
 
 function mcpSanitizeRelPath(string $path): string
 {
@@ -60,6 +61,60 @@ function mcp_copy_recursive(string $src, string $dst): void
 {
     // Internal compatibility wrapper for older MCP helper callers.
     mcpCopyRecursive($src, $dst);
+}
+
+function mcpRegenerateCopiedWorkIds(string $sourceDir, string $destinationDir): array
+{
+    $sourceRoot = realpath($sourceDir);
+    if (!is_string($sourceRoot) || !is_dir($sourceRoot)) {
+        return ['count' => 0, 'errors' => ['Copied source folder could not be resolved.']];
+    }
+
+    $count = 0;
+    $errors = [];
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($sourceRoot, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::LEAVES_ONLY
+    );
+
+    foreach ($iterator as $sourceFile) {
+        if (!$sourceFile->isFile()) {
+            continue;
+        }
+
+        $metadataPath = $sourceFile->getPathname();
+        $metadataName = $sourceFile->getFilename();
+        $isFolderMetadata = $metadataName === 'poff.config.json';
+        $isFileMetadata = $metadataName !== ''
+            && str_ends_with($metadataName, '.config.json')
+            && basename(dirname($metadataPath)) === '.works';
+        if (!$isFolderMetadata && !$isFileMetadata) {
+            continue;
+        }
+
+        $relativePath = substr($metadataPath, strlen(rtrim($sourceRoot, DIRECTORY_SEPARATOR)) + 1);
+        $copiedMetadataPath = rtrim($destinationDir, '/\\')
+            . DIRECTORY_SEPARATOR
+            . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+        if (!is_file($copiedMetadataPath)) {
+            continue;
+        }
+
+        $metadata = json_decode((string) file_get_contents($copiedMetadataPath), true);
+        if (!is_array($metadata)) {
+            continue;
+        }
+
+        $metadata = PoffConfig::reassignWorkIdForCopy($metadata);
+        $encoded = json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (!is_string($encoded) || file_put_contents($copiedMetadataPath, $encoded) === false) {
+            $errors[] = 'Failed to assign a new identity to copied Work metadata.';
+            continue;
+        }
+        $count++;
+    }
+
+    return ['count' => $count, 'errors' => $errors];
 }
 
 function mcpUrlHostIsPrivate(string $host): bool
@@ -151,6 +206,11 @@ function handleCreate(array $opts): array
             mcpCopyRecursive($absSrc, $destDir);
             $copied = true;
             $details['copiedFrom'] = $absSrc;
+            if (is_dir($absSrc)) {
+                $identityResult = mcpRegenerateCopiedWorkIds($absSrc, $destDir);
+                $details['reidentifiedWorks'] = $identityResult['count'];
+                $errors = array_merge($errors, $identityResult['errors']);
+            }
         }
     } elseif ($url) {
         $scheme = strtolower((string) (parse_url((string) $url, PHP_URL_SCHEME) ?? ''));

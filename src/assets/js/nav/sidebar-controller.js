@@ -1,4 +1,4 @@
-import { requestEditConfig, requestEditDelete } from '../api/edit.js';
+import { requestEditConfig, requestEditDelete, requestMcpRoute } from '../api/edit.js';
 import { extractNavHtml } from '../core/utils.js';
 
 export function createSidebarController({
@@ -254,6 +254,49 @@ export function createSidebarController({
         await loadNav(currentFolderPath);
     }
 
+    async function moveNavEntry(link) {
+        if (!link) {
+            return;
+        }
+        const sourcePath = link.getAttribute('data-path') || link.getAttribute('data-src') || '';
+        if (!sourcePath) {
+            return;
+        }
+
+        const destination = window.prompt(
+            'Destination folder path, relative to this PageOff node. Leave blank for the root folder:',
+            currentFolderPath
+        );
+        if (destination === null) {
+            return;
+        }
+
+        const sourceName = sourcePath.split('/').filter(Boolean).pop() || sourcePath;
+        const name = window.prompt('New name. Leave blank to keep the current name:', sourceName);
+        if (name === null) {
+            return;
+        }
+
+        const response = await requestEditConfig('move', {
+            path: sourcePath,
+            destination: destination.trim(),
+            name: name.trim(),
+        });
+        if (!response || response.error || response.allowed === false) {
+            window.alert(response?.error || 'Move failed.');
+            return;
+        }
+
+        if (typeof navigateToPath === 'function') {
+            navigateToPath(destination.trim(), {
+                isFile: false,
+                forceRefresh: true,
+            });
+            return;
+        }
+        await loadNav(destination.trim());
+    }
+
     function syncSidebarSelection(path = '', isFile = false, isLayout = false) {
         if (isLayout) {
             setActiveLayoutLink(path);
@@ -268,6 +311,26 @@ export function createSidebarController({
 
     function handleNavClick(event) {
         if (!navList) {
+            return;
+        }
+        const reconnectAction = event.target.closest?.('[data-nav-action="reconnect-node"]');
+        if (reconnectAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const url = window.prompt('New HTTPS address of the source PageOff node');
+            if (!url?.trim()) {
+                return;
+            }
+            reconnectAction.disabled = true;
+            requestMcpRoute('reconnect-node', { nodeId: reconnectAction.dataset.nodeId, url: url.trim() })
+                .then((response) => {
+                    if (response?.ok) {
+                        navigateToPath(currentFolderPath, { isFile: false, forceRefresh: true, updateHash: false });
+                    } else {
+                        window.alert(response?.error || 'Could not update the node address.');
+                    }
+                })
+                .finally(() => { reconnectAction.disabled = false; });
             return;
         }
         const reviewAction = event.target.closest?.('[data-nav-action="review-external"]');
@@ -297,6 +360,14 @@ export function createSidebarController({
             event.stopPropagation();
             const rowLink = deleteAction.closest('li')?.querySelector('a[data-tree-item="1"]');
             deleteNavEntry(rowLink).catch(() => {});
+            return;
+        }
+        const moveAction = event.target.closest?.('[data-nav-action="move-target"]');
+        if (moveAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const rowLink = moveAction.closest('li')?.querySelector('a[data-tree-item="1"]');
+            moveNavEntry(rowLink).catch(() => {});
             return;
         }
         let target = event.target;

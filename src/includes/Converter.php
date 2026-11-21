@@ -578,6 +578,14 @@ class Converter
         return false;
     }
 
+    public static function offerableFor(string $mimeType, string $kind, string $extension, string $rootDir = ''): array
+    {
+        return array_values(array_filter(
+            self::availableFor($mimeType, $kind, $extension, $rootDir),
+            [self::class, 'canOffer']
+        ));
+    }
+
     public static function canOffer(array $definition): bool
     {
         $engine = strtolower(trim((string) ($definition['engine'] ?? '')));
@@ -791,6 +799,23 @@ class Converter
         $mime = strtolower(trim((string) ($source['mimeType'] ?? '')));
         if (!self::mimeAccepted($mime, $definition['accepts'] ?? [])) {
             return self::error('Source MIME type is not accepted.');
+        }
+
+        $root = realpath($rootDir);
+        $sourcePath = str_replace('\\', '/', trim((string) ($source['path'] ?? ''), '/'));
+        if (is_string($root) && $root !== '' && $sourcePath !== '') {
+            $fullPath = realpath($root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $sourcePath));
+            if (is_string($fullPath)
+                && is_file($fullPath)
+                && str_starts_with($fullPath, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)
+            ) {
+                $actualSize = @filesize($fullPath);
+                if (!is_int($actualSize)) {
+                    return self::error('Could not determine source file size.');
+                }
+                $source['size'] = $actualSize;
+                $payload['source'] = $source;
+            }
         }
         if ((int) ($source['size'] ?? 0) > self::MAX_SOURCE_BYTES) {
             return self::error('Source file is too large.');
@@ -1821,6 +1846,8 @@ HTML;
                 'method' => 'GET',
                 'timeout' => 30,
                 'ignore_errors' => true,
+                'follow_location' => 0,
+                'max_redirects' => 0,
             ],
         ]));
         $status = self::statusFromHeaders($http_response_header ?? []);

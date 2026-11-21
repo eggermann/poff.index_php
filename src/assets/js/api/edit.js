@@ -180,10 +180,22 @@ export async function requestEditConfig(action, payload) {
                     })()
                     : JSON.stringify(payload),
         });
-        if (!res.ok) {
-            return { allowed: false, error: 'Edit endpoint unavailable.' };
+        const responseText = await res.text();
+        let data = null;
+        try {
+            data = responseText ? JSON.parse(responseText) : null;
+        } catch (err) {
+            data = null;
         }
-        return await res.json();
+        if (!res.ok) {
+            return {
+                allowed: false,
+                error: (data && typeof data.error === 'string' ? data.error : '')
+                    || responseText.trim()
+                    || `Edit request failed (HTTP ${res.status}).`,
+            };
+        }
+        return data || { allowed: false, error: 'Edit endpoint returned invalid JSON.' };
     } catch (err) {
         return { allowed: false, error: 'Edit endpoint unavailable.' };
     }

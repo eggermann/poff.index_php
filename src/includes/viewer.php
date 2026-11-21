@@ -9,6 +9,18 @@ require_once __DIR__ . '/nav-render.php';
 require_once __DIR__ . '/viewer/edit.php';
 require_once __DIR__ . '/viewer/render.php';
 
+if (($_GET['ajax'] ?? '') === 'node-identity') {
+    cmsHandleNodeIdentityRoute(cmsProjectRootDir());
+}
+
+if ((string) ($_GET['ajax'] ?? '') === 'resolve') {
+    @require_once __DIR__ . '/MediaType.php';
+    @require_once __DIR__ . '/Worktype.php';
+    @require_once __DIR__ . '/PoffConfig.php';
+    require_once __DIR__ . '/NodeIdentity.php';
+    cmsHandleResolveRoute(cmsProjectRootDir());
+}
+
 if ((string) ($_GET['mcp'] ?? '') === '1') {
     require_once __DIR__ . '/../mcp/helpers.php';
     @require_once __DIR__ . '/MediaType.php';
@@ -20,6 +32,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
     require_once __DIR__ . '/../mcp/routes/edit-config.php';
     require_once __DIR__ . '/../mcp/routes/prompt-template.php';
     require_once __DIR__ . '/../mcp/routes/remote-content.php';
+    require_once __DIR__ . '/../mcp/routes/reconnect-node.php';
     require_once __DIR__ . '/../mcp/routes/remote-presentation.php';
     require_once __DIR__ . '/../mcp/routes/converters.php';
     require_once __DIR__ . '/../mcp/routes/convert.php';
@@ -84,6 +97,8 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $rootDir,
                     'path' => mcpRoutePath(),
                 ]));
+            case 'reconnect-node':
+                mcpJsonResponse(handleReconnectNode($rootDir, mcpReadRequestData(), $_SERVER['REQUEST_METHOD'] ?? 'GET'));
             case 'import-remote':
                 $remoteInput = mcpReadRequestData();
                 mcpJsonResponse(handleImportRemote([
@@ -203,7 +218,7 @@ if (($_GET['ajax'] ?? '') === 'nav') {
 
 // Handle edit/prompt requests if present.
 $viewerEditAction = $_GET['edit'] ?? '';
-if (in_array($viewerEditAction, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
+if (in_array($viewerEditAction, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'move', 'reset', 'models'], true)) {
     register_shutdown_function(static function (): void {
         $error = error_get_last();
         if (!is_array($error)) {

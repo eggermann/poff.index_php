@@ -39,6 +39,7 @@ echo json_encode([
     'containsHydrateConfigLayout' => str_contains($builtClass, 'public static function hydrateConfigLayout'),
     'containsPersistLayoutFiles' => str_contains($builtClass, 'public static function persistLayoutFiles'),
     'containsLayoutCollectionPackage' => str_contains($builtClass, 'private static function layoutCollectionPackage'),
+    'containsUniqueImportedName' => str_contains($builtClass, 'public static function uniqueImportedName'),
     'lintExitCode' => $exitCode,
     'lintOutput' => implode("\n", $output),
 ], JSON_UNESCAPED_SLASHES);

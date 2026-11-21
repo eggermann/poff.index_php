@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -59,10 +60,19 @@ function runCreate(args) {
       env: withTestEnv({ POFF_BASE: POFF_DIR }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    let stdout = '';
     let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
     proc.stderr.on('data', (d) => (stderr += d.toString()));
     proc.on('exit', (code) => {
-      if (code === 0) return resolve();
+      if (code === 0) {
+        try {
+          resolve(JSON.parse(stdout.trim()));
+        } catch (error) {
+          reject(new Error(`create helper returned invalid JSON: ${error.message}`));
+        }
+        return;
+      }
       reject(new Error(`create helper failed: ${code} ${stderr}`));
     });
   });
@@ -82,6 +92,65 @@ function runFileCopierCleanup(rootDir) {
     proc.on('exit', (code) => {
       if (code === 0) return resolve(stdout.trim());
       reject(new Error(`file copier cleanup failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runIsolatedPhpBuild(outputDir) {
+  return new Promise((resolve, reject) => {
+    const relativeOutputDir = path.relative(ROOT, outputDir);
+    const proc = spawn('php', [path.join(ROOT, 'build/build.php')], {
+      cwd: ROOT,
+      env: withTestEnv({
+        POFF_BUILD_MODE: 'development',
+        POFF_OUTPUT_DIR: relativeOutputDir,
+        POFF_SKIP_DISTRIBUTION_COPIES: '1',
+      }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`isolated PHP build failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runPhpLint(filePath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', ['-l', filePath], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`PHP lint failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runConverterGrainMirror(targetDir) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_converter_grain_mirror.php'), targetDir], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(stdout.trim());
+      reject(new Error(`converter grain mirror failed: ${code} ${stderr}`));
     });
   });
 }
@@ -372,6 +441,63 @@ function runRemoteContent(mode, baseDir, relativePath = '', payload = {}) {
         return;
       }
       reject(new Error(`remote content helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runWorkIdResolve(rootDir, nodeId, workId, edit = false) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_resolve_work_id.php'), rootDir, nodeId, workId];
+    if (edit) args.push('edit');
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => (stdout += data.toString()));
+    proc.stderr.on('data', (data) => (stderr += data.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`Work ID resolve helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runRemoteImportEntries(input) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_remote_import_entries.php'), JSON.stringify(input)], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => (stdout += data.toString()));
+    proc.stderr.on('data', (data) => (stderr += data.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`remote import entries helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
+function runMoveWork(rootDir, source, destination, name = '') {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_move_work.php'), rootDir, source, destination, name];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => (stdout += data.toString()));
+    proc.stderr.on('data', (data) => (stderr += data.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`Work move helper failed: ${code} ${stderr}`));
     });
   });
 }
@@ -1427,6 +1553,346 @@ describe('MCP create route helper (CLI)', () => {
     expect(fs.readFileSync(copiedFile, 'utf8')).toBe('nested data');
   });
 
+  test('folder copy assigns new Work IDs to copied folders and file metadata', async () => {
+    const tempRoot = path.join(POFF_DIR, `identity-copy-${Date.now()}`);
+    const sourceDir = path.join(tempRoot, 'poff', 'source');
+    const worksDir = path.join(sourceDir, '.works');
+    const nestedDir = path.join(sourceDir, 'nested');
+    const nestedWorksDir = path.join(nestedDir, '.works');
+    fs.mkdirSync(worksDir, { recursive: true });
+    fs.mkdirSync(nestedWorksDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'note.txt'), 'copy identity fixture');
+    fs.writeFileSync(path.join(nestedDir, 'nested.txt'), 'nested copy identity fixture');
+    fs.writeFileSync(path.join(sourceDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_source_folder',
+      title: 'Source folder',
+      tree: [{ name: 'note.txt', type: 'file' }],
+    }));
+    fs.writeFileSync(path.join(worksDir, 'note.txt.config.json'), JSON.stringify({
+      id: 'poff_source_file',
+      name: 'note.txt',
+      path: 'note.txt',
+      type: 'file',
+      work: { type: 'text' },
+    }));
+    fs.writeFileSync(path.join(nestedDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_source_nested_folder',
+      title: 'Nested source folder',
+      tree: [{ name: 'nested.txt', type: 'file' }],
+    }));
+    fs.writeFileSync(path.join(nestedWorksDir, 'nested.txt.config.json'), JSON.stringify({
+      id: 'poff_source_nested_file',
+      name: 'nested.txt',
+      path: 'nested.txt',
+      type: 'file',
+      work: { type: 'text' },
+    }));
+
+    try {
+      const sourceRelativePath = path.relative(POFF_DIR, sourceDir);
+      const destinationRelativePath = path.relative(POFF_DIR, path.join(tempRoot, 'poff', 'copy'));
+      const result = await runCreate([
+        `--dest=${destinationRelativePath}`,
+        `--path=${sourceRelativePath}`,
+      ]);
+      const copiedDir = path.join(POFF_DIR, destinationRelativePath);
+      const copiedFolderConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, 'poff.config.json'), 'utf8'));
+      const copiedFileConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, '.works', 'note.txt.config.json'), 'utf8'));
+      const copiedNestedFolderConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, 'nested', 'poff.config.json'), 'utf8'));
+      const copiedNestedFileConfig = JSON.parse(fs.readFileSync(path.join(copiedDir, 'nested', '.works', 'nested.txt.config.json'), 'utf8'));
+
+      expect(result.copied).toBe(true);
+      expect(result.details.reidentifiedWorks).toBe(4);
+      expect(copiedFolderConfig.id).not.toBe('poff_source_folder');
+      expect(copiedFileConfig.id).not.toBe('poff_source_file');
+      expect(copiedNestedFolderConfig.id).not.toBe('poff_source_nested_folder');
+      expect(copiedNestedFileConfig.id).not.toBe('poff_source_nested_file');
+      expect(fs.readFileSync(path.join(sourceDir, 'poff.config.json'), 'utf8')).toContain('poff_source_folder');
+      expect(fs.readFileSync(path.join(worksDir, 'note.txt.config.json'), 'utf8')).toContain('poff_source_file');
+      expect(fs.readFileSync(path.join(nestedDir, 'poff.config.json'), 'utf8')).toContain('poff_source_nested_folder');
+      expect(fs.readFileSync(path.join(nestedWorksDir, 'nested.txt.config.json'), 'utf8')).toContain('poff_source_nested_file');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('folder and file Work IDs survive repeated config ensure', async () => {
+    const result = await runPhpJson('php_work_id_stability.php');
+
+    expect(result.folder[0]).toMatch(/^poff_[a-f0-9]{16}$/);
+    expect(result.file[0]).toMatch(/^poff_[a-f0-9]{16}$/);
+    expect(result.folder[1]).toBe(result.folder[0]);
+    expect(result.file[1]).toBe(result.file[0]);
+    expect(result.file[0]).not.toBe(result.folder[0]);
+    expect(result.newIds[0]).toMatch(/^poff_[a-f0-9]{16}$/);
+    expect(result.newIds[1]).not.toBe(result.newIds[0]);
+    expect(result.nodeIds[0]).toMatch(/^poff_node_[a-f0-9]{32}$/);
+    expect(result.nodeIds[1]).toBe(result.nodeIds[0]);
+  });
+
+  test('rotates a cloned Node identity without changing its Work IDs', async () => {
+    const result = await runPhpJson('php_node_identity_rotation.php');
+
+    expect(result.rotated.previousId).toBe(result.sourceId);
+    expect(result.rotated.id).toMatch(/^poff_node_[a-f0-9]{32}$/);
+    expect(result.rotated.id).not.toBe(result.sourceId);
+    expect(result.sourceRead).toBe(result.sourceId);
+    expect(result.cloneRead).toBe(result.rotated.id);
+    expect(result.cloneRotatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.cloneWorkId).toBe('poff_existing_work_id');
+    expect(result.sourceWorkId).toBe('poff_existing_work_id');
+  });
+
+  test('file move keeps Work ID and custom layout while refreshing both parent trees', async () => {
+    const tempRoot = path.join(POFF_DIR, `identity-move-file-${Date.now()}`);
+    const sourceDir = path.join(tempRoot, 'source');
+    const destinationDir = path.join(tempRoot, 'destination');
+    const worksDir = path.join(sourceDir, '.works');
+    fs.mkdirSync(path.join(worksDir, 'note.txt.layout'), { recursive: true });
+    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'note.txt'), 'move identity fixture');
+    fs.writeFileSync(path.join(sourceDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_move_source_parent',
+      tree: [{ name: 'note.txt', type: 'file', path: 'note.txt', slug: 'hand-picked-note', title: 'Tree title', description: 'Tree description', visible: false }],
+    }));
+    fs.writeFileSync(path.join(destinationDir, 'poff.config.json'), JSON.stringify({ id: 'poff_move_destination_parent' }));
+    fs.writeFileSync(path.join(worksDir, 'note.txt.config.json'), JSON.stringify({ id: 'poff_move_file', work: { type: 'text' } }));
+    fs.writeFileSync(path.join(worksDir, 'note.txt.layout', 'template.hbs'), '<article>{{title}}</article>');
+
+    try {
+      const result = await runMoveWork(tempRoot, 'source/note.txt', 'destination', 'renamed.txt');
+      const movedConfigPath = path.join(destinationDir, '.works', 'renamed.txt.config.json');
+      expect(result.errors).toEqual([]);
+      expect(result.moved[0]).toEqual(expect.objectContaining({ id: 'poff_move_file', type: 'file', from: 'source/note.txt', to: 'destination/renamed.txt' }));
+      expect(fs.readFileSync(path.join(destinationDir, 'renamed.txt'), 'utf8')).toBe('move identity fixture');
+      expect(JSON.parse(fs.readFileSync(movedConfigPath, 'utf8')).id).toBe('poff_move_file');
+      expect(JSON.parse(fs.readFileSync(movedConfigPath, 'utf8'))).toEqual(expect.objectContaining({ name: 'renamed.txt', slug: 'renamed-txt', path: 'renamed.txt' }));
+      expect(fs.readFileSync(path.join(destinationDir, '.works', 'renamed.txt.layout', 'template.hbs'), 'utf8')).toBe('<article>{{title}}</article>');
+      expect(fs.existsSync(path.join(sourceDir, 'note.txt'))).toBe(false);
+      expect(result.sourceTreeNames).not.toContain('note.txt');
+      expect(result.destinationTreeNames).toContain('renamed.txt');
+      const destinationConfig = JSON.parse(fs.readFileSync(path.join(destinationDir, 'poff.config.json'), 'utf8'));
+      expect(destinationConfig.tree.find((item) => item.name === 'renamed.txt')).toEqual(expect.objectContaining({
+        slug: 'hand-picked-note',
+        title: 'Tree title',
+        description: 'Tree description',
+        visible: false,
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('folder move preserves its Work ID and rejects existing destinations', async () => {
+    const tempRoot = path.join(POFF_DIR, `identity-move-folder-${Date.now()}`);
+    const sourceDir = path.join(tempRoot, 'source');
+    const nestedDir = path.join(sourceDir, 'nested');
+    const destinationDir = path.join(tempRoot, 'destination');
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.writeFileSync(path.join(nestedDir, 'poff.config.json'), JSON.stringify({ id: 'poff_move_folder', tree: [] }));
+    fs.writeFileSync(path.join(sourceDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_move_source_parent',
+      tree: [{ name: 'nested', type: 'folder', path: 'nested', slug: 'custom-nested', title: 'Nested tree title' }],
+    }));
+    fs.writeFileSync(path.join(destinationDir, 'poff.config.json'), JSON.stringify({ id: 'poff_move_destination_parent' }));
+    fs.mkdirSync(path.join(destinationDir, 'taken'));
+
+    try {
+      const conflict = await runMoveWork(tempRoot, 'source/nested', 'destination', 'taken');
+      expect(conflict.errors).toContain('Move destination already exists.');
+      expect(fs.existsSync(nestedDir)).toBe(true);
+
+      const result = await runMoveWork(tempRoot, 'source/nested', 'destination', 'renamed');
+      expect(result.errors).toEqual([]);
+      expect(result.moved[0]).toEqual(expect.objectContaining({ id: 'poff_move_folder', type: 'folder', from: 'source/nested', to: 'destination/renamed' }));
+      expect(JSON.parse(fs.readFileSync(path.join(destinationDir, 'renamed', 'poff.config.json'), 'utf8'))).toEqual(expect.objectContaining({ id: 'poff_move_folder', folderName: 'renamed', slug: 'renamed' }));
+      expect(result.sourceTreeNames).not.toContain('nested');
+      expect(result.destinationTreeNames).toContain('renamed');
+      const destinationConfig = JSON.parse(fs.readFileSync(path.join(destinationDir, 'poff.config.json'), 'utf8'));
+      expect(destinationConfig.tree.find((item) => item.name === 'renamed')).toEqual(expect.objectContaining({ slug: 'custom-nested', title: 'Nested tree title' }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('resolves local Work IDs and reports duplicate matches as ambiguous', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-work-resolve-'));
+    const nodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    const rootWorkId = 'poff_1111111111111111';
+    const publicFolderWorkId = 'poff_2222222222222222';
+    const fileWorkId = 'poff_3333333333333333';
+    const hiddenFolderWorkId = 'poff_4444444444444444';
+    const hiddenDir = path.join(tempRoot, 'hidden');
+    const publicDir = path.join(tempRoot, 'public');
+    const duplicateDir = path.join(tempRoot, 'duplicate');
+    fs.mkdirSync(hiddenDir);
+    fs.mkdirSync(publicDir);
+    fs.mkdirSync(duplicateDir);
+    fs.mkdirSync(path.join(tempRoot, '.layout'));
+    fs.mkdirSync(path.join(tempRoot, '.works'));
+    fs.writeFileSync(path.join(tempRoot, 'note.txt'), 'identity lookup fixture');
+    const writeJson = (filePath, value) => fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+    writeJson(path.join(tempRoot, 'poff.node.json'), { schemaVersion: 1, id: nodeId });
+    writeJson(path.join(tempRoot, 'poff.config.json'), {
+      id: rootWorkId,
+      title: 'Root',
+      tree: [
+        { name: 'hidden', path: 'hidden', type: 'folder', visible: false },
+        { name: 'public', path: 'public', type: 'folder', visible: true },
+        { name: 'duplicate', path: 'duplicate', type: 'folder', visible: true },
+        { name: 'note.txt', path: 'note.txt', type: 'file', visible: true },
+      ],
+    });
+    writeJson(path.join(publicDir, 'poff.config.json'), { id: publicFolderWorkId, title: 'Public' });
+    writeJson(path.join(duplicateDir, 'poff.config.json'), { id: publicFolderWorkId, title: 'Duplicate' });
+    writeJson(path.join(hiddenDir, 'poff.config.json'), { id: hiddenFolderWorkId, title: 'Hidden' });
+    writeJson(path.join(tempRoot, '.works', 'note.txt.config.json'), { id: fileWorkId, title: 'Note' });
+    writeJson(path.join(tempRoot, '.layout', 'poff.config.json'), { id: rootWorkId, title: 'Layout metadata' });
+
+    try {
+      const root = await runWorkIdResolve(tempRoot, nodeId, rootWorkId);
+      expect(root).toEqual(expect.objectContaining({ resolved: true, nodeId, workId: rootWorkId, path: '', type: 'folder' }));
+
+      const file = await runWorkIdResolve(tempRoot, nodeId, fileWorkId);
+      expect(file).toEqual(expect.objectContaining({ resolved: true, path: 'note.txt', type: 'file' }));
+
+      const hidden = await runWorkIdResolve(tempRoot, nodeId, hiddenFolderWorkId);
+      expect(hidden.resolved).toBe(false);
+
+      const ambiguous = await runWorkIdResolve(tempRoot, nodeId, publicFolderWorkId);
+      expect(ambiguous).toEqual(expect.objectContaining({ resolved: false, ambiguous: true, workId: publicFolderWorkId }));
+      expect(ambiguous.matches.map((match) => match.path)).toEqual(['duplicate', 'public']);
+
+      const wrongNode = await runWorkIdResolve(tempRoot, 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', fileWorkId);
+      expect(wrongNode.resolved).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('Core remote import normalization preserves legacy fields and source identity', async () => {
+    const feedNodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    const remoteNodeId = 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const entries = await runRemoteImportEntries({
+      sourceUrl: 'https://origin.example/index.php?mcp=1&route=export-content',
+      sourceId: 'origin-example',
+      existingTree: [
+        { name: 'Portfolio' },
+        { name: 'Plan' },
+        { name: 'Plan (origin-example)' },
+      ],
+      payload: {
+        source: { nodeId: feedNodeId },
+        items: [
+          {
+            title: 'Portfolio',
+            type: 'file',
+            kind: 'image',
+            path: 'photos/photo.jpg',
+            routePath: 'photos/photo.jpg',
+            routeSlug: 'photo',
+            pageLink: 'https://origin.example/view/photo',
+            reference: { nodeId: remoteNodeId, workId: 'poff_bbbbbbbbbbbbbbbb' },
+            visible: false,
+          },
+          {
+            title: 'Plan',
+            type: 'folder',
+            path: 'notes/plan',
+            pageLink: 'https://origin.example/view/plan',
+          },
+          { name: 'No link', type: 'file' },
+        ],
+      },
+    });
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual(expect.objectContaining({
+      name: 'Portfolio (origin-example)',
+      type: 'file',
+      slug: 'photo',
+      routeSlug: 'photo',
+      routePath: 'photos/photo.jpg',
+      remoteNodeId,
+      remoteWorkId: 'poff_bbbbbbbbbbbbbbbb',
+      remoteFeedNodeId: feedNodeId,
+      remoteSource: 'origin-example',
+      remoteFeedUrl: 'https://origin.example/index.php?mcp=1&route=export-content',
+      visible: false,
+      externalWork: true,
+    }));
+    expect(entries[1]).toEqual(expect.objectContaining({
+      name: 'Plan (origin-example) 2',
+      type: 'folder',
+      slug: 'plan',
+      routePath: 'notes/plan',
+      remoteSource: 'origin-example',
+    }));
+    expect(entries[1].remoteNodeId).toBe(feedNodeId);
+    expect(entries[1].remoteFeedNodeId).toBe(feedNodeId);
+    expect(entries[1].importedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const malformedIdentityEntries = await runRemoteImportEntries({
+      sourceUrl: 'https://malformed.example/export',
+      sourceId: 'malformed-example',
+      existingTree: [],
+      payload: {
+        source: { nodeId: 'poff_node_invalid' },
+        items: [{
+          title: 'Untrusted identity',
+          type: 'file',
+          pageLink: 'https://malformed.example/work',
+          reference: { nodeId: 'poff_node_invalid', workId: 'poff_aaaaaaaaaaaaaaaa' },
+        }],
+      },
+    });
+    expect(malformedIdentityEntries[0]).not.toHaveProperty('remoteNodeId');
+    expect(malformedIdentityEntries[0]).not.toHaveProperty('remoteFeedNodeId');
+    expect(malformedIdentityEntries[0].remoteWorkId).toBe('poff_aaaaaaaaaaaaaaaa');
+
+    const legacyEntries = await runRemoteImportEntries({
+      sourceUrl: 'https://legacy.example/export',
+      sourceId: 'legacy-example',
+      existingTree: [],
+      payload: {
+        tree: [{ name: 'Legacy note', type: 'file', path: 'notes/legacy.txt', pageLink: 'https://legacy.example/notes/legacy.txt' }],
+      },
+    });
+    expect(legacyEntries[0]).toEqual(expect.objectContaining({
+      name: 'Legacy note',
+      slug: 'legacy-txt',
+      routePath: 'notes/legacy.txt',
+      remoteSource: 'legacy-example',
+      remoteFeedUrl: 'https://legacy.example/export',
+    }));
+    expect(legacyEntries[0]).not.toHaveProperty('remoteNodeId');
+    expect(legacyEntries[0]).not.toHaveProperty('remoteWorkId');
+  });
+
+  test('Core remote copy preparation flattens assets and allocates safe unique names', async () => {
+    const result = await runRemoteImportEntries({
+      operation: 'copyItems',
+      items: [
+        { type: 'folder', srcUrl: 'https://origin.example/folder', children: [
+          { type: 'file', srcUrl: 'https://origin.example/photo.jpg', name: 'photo.jpg' },
+          { type: 'file', srcUrl: '', name: 'no asset' },
+        ] },
+        { type: 'file', srcUrl: 'https://origin.example/nested/unsafe?.jpg', name: 'unsafe?.jpg' },
+        null,
+      ],
+      names: [
+        { name: 'photo.jpg' },
+        { name: 'photo.jpg' },
+        { name: '../unsafe?.jpg' },
+        { srcUrl: 'https://origin.example/', extension: '.png' },
+      ],
+    });
+
+    expect(result.items.map((item) => item.name)).toEqual(['photo.jpg', 'unsafe?.jpg']);
+    expect(result.names).toEqual(['photo.jpg', 'photo-2.jpg', 'unsafe-.jpg', 'remote-file-4.png']);
+  });
+
   test('formats prompt provider failures with status and redacted detail', async () => {
     const result = await runPhpJson('php_prompt_error_helpers.php');
 
@@ -2263,7 +2729,7 @@ describe('MCP create route helper (CLI)', () => {
   });
 });
 
-function runConverterRoute(mode, rootDir, payload = {}) {
+function runConverterRoute(mode, rootDir, payload = {}, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const args = [
       path.join(ROOT, 'tests/php_converter_routes.php'),
@@ -2273,7 +2739,7 @@ function runConverterRoute(mode, rootDir, payload = {}) {
     ];
     const proc = spawn('php', args, {
       cwd: ROOT,
-      env: withTestEnv(),
+      env: withTestEnv(extraEnv),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -2470,6 +2936,85 @@ describe('Poff converters', () => {
         'imagemagick-image-jpeg',
         'imagemagick-image-png',
       ]));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('converter matching prefers supplied MIME and falls back through kind then extension', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-matching-${Date.now()}`);
+    const definitions = [
+      ['mime-wildcard', ['image/*']],
+      ['kind-only', ['image']],
+      ['extension-only', ['zzx']],
+    ];
+    for (const [name, accepts] of definitions) {
+      const folder = path.join(tempRoot, 'poff', 'converters', name);
+      fs.mkdirSync(folder, { recursive: true });
+      fs.writeFileSync(path.join(folder, 'converter.json'), JSON.stringify({
+        type: 'converter',
+        accepts,
+        outputs: ['image/png'],
+        engine: 'text-copy',
+      }));
+    }
+
+    try {
+      const byMime = await runConverterRoute('available', tempRoot, {
+        mimeType: 'image/tiff', kind: 'other', extension: 'txt',
+      });
+      const testConverters = (items) => items
+        .map(({ name }) => name)
+        .filter((name) => definitions.some(([definedName]) => definedName === name));
+      expect(testConverters(byMime)).toEqual(['mime-wildcard']);
+
+      const byKind = await runConverterRoute('available', tempRoot, {
+        mimeType: '', kind: 'image', extension: '',
+      });
+      expect(testConverters(byKind).sort()).toEqual(['kind-only', 'mime-wildcard']);
+
+      const byExtension = await runConverterRoute('available', tempRoot, {
+        mimeType: '', kind: '', extension: 'zzx',
+      });
+      expect(testConverters(byExtension)).toEqual(['extension-only']);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('converter discovery uses folder precedence and keeps disabled matches out of remote offers', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-precedence-${Date.now()}`);
+    const writeDefinition = (folder, definition) => {
+      const absoluteFolder = path.join(tempRoot, folder);
+      fs.mkdirSync(absoluteFolder, { recursive: true });
+      fs.writeFileSync(path.join(absoluteFolder, 'converter.json'), JSON.stringify({
+        type: 'converter',
+        accepts: ['text/plain'],
+        outputs: ['text/plain'],
+        engine: 'text-copy',
+        ...definition,
+      }));
+    };
+    writeDefinition('poff/converters/collision', { label: 'Poff converter' });
+    writeDefinition('converters/collision', { label: 'Visible converter' });
+    writeDefinition('.converters/collision', { label: 'Hidden converter' });
+    writeDefinition('poff/converters/disabled', { label: 'Disabled converter', enabled: false });
+
+    try {
+      const discovered = await runConverterRoute('discover', tempRoot);
+      expect(discovered['converter/collision']).toEqual(expect.objectContaining({
+        label: 'Hidden converter',
+        folder: '.converters/collision',
+      }));
+
+      const matched = await runConverterRoute('available', tempRoot, { mimeType: 'text/plain' });
+      expect(matched).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'converter/disabled', enabled: false }),
+      ]));
+
+      const offers = await runConverterRoute('offers', tempRoot, { mimeType: 'text/plain' });
+      expect(offers.converters.map(({ id }) => id)).toContain('converter/collision');
+      expect(offers.converters.map(({ id }) => id)).not.toContain('converter/disabled');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -2777,6 +3322,91 @@ describe('Poff converters', () => {
       expect(result._capturedRemotePayload.converter.id).toBe('converter/convert-image');
       expect(result._capturedRemotePayload.converter.node).toBe('provider');
       expect(result.generatedBy.node).toBe('provider-example');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects a remote converter result with an unoffered output MIME type', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-invalid-output-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'scan-001.tiff',
+          path: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          extension: 'tiff',
+        },
+        converter: {
+          id: 'converter/remote-provider-example-convert-image',
+          name: 'remote-provider-example-convert-image',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          formats: ['png'],
+          engine: 'remote-node',
+          format: 'png',
+          node: {
+            id: 'provider-example',
+            baseUrl: 'https://provider.example/index.php',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+        target: { saveAs: 'scan-001.png' },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'scan-001.svg',
+              mimeType: 'image/svg+xml',
+              bodyBase64: Buffer.from('<svg/>').toString('base64'),
+            },
+          },
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Remote output MIME type is not allowed.',
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('uses the actual source file size instead of the supplied size', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-source-size-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    const sourcePath = path.join(tempRoot, 'oversized.tiff');
+    fs.closeSync(fs.openSync(sourcePath, 'w'));
+    fs.truncateSync(sourcePath, 104857601);
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'oversized.tiff',
+          path: 'oversized.tiff',
+          mimeType: 'image/tiff',
+          extension: 'tiff',
+          size: 1,
+        },
+        converter: {
+          id: 'converter/convert-image',
+          format: 'png',
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Source file is too large.',
+      }));
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -3784,6 +4414,86 @@ describe('Poff converters', () => {
     }
   });
 
+  test.each(['new-hidden-work', 'replace-generated-work'])(
+    'save mode %s overwrites a same-name target',
+    async (mode) => {
+      const tempDir = path.join(POFF_DIR, `converter-save-mode-${Date.now()}`);
+      fs.mkdirSync(tempDir, { recursive: true });
+      fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+      fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
+      fs.writeFileSync(path.join(tempDir, 'converted.png'), 'existing content');
+
+      try {
+        const result = await runConverterRoute('save', tempDir, {
+          sourcePath: 'source.txt',
+          conversion: {
+            ok: true,
+            source: { path: 'source.txt', mimeType: 'text/plain' },
+            output: {
+              name: 'converted.png',
+              mimeType: 'image/png',
+              kind: 'image',
+              bodyBase64: Buffer.from('new conversion').toString('base64'),
+            },
+            target: { mode },
+          },
+        });
+
+        expect(result.ok).toBe(true);
+        expect(fs.readFileSync(path.join(tempDir, 'converted.png'), 'utf8')).toBe('new conversion');
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  test('downloadUrl rejects HTTP redirects without requesting the destination', async () => {
+    const tempDir = path.join(POFF_DIR, `converter-download-redirect-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
+    const requests = [];
+    const server = http.createServer((request, response) => {
+      requests.push(request.url);
+      if (request.url === '/redirect') {
+        response.writeHead(302, { Location: '/payload' });
+        response.end();
+        return;
+      }
+      response.writeHead(200, { 'Content-Type': 'text/plain' });
+      response.end('redirected conversion');
+    });
+
+    try {
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const { port } = server.address();
+      const result = await runConverterRoute('save', tempDir, {
+        sourcePath: 'source.txt',
+        conversion: {
+          ok: true,
+          source: { path: 'source.txt', mimeType: 'text/plain' },
+          output: {
+            name: 'redirected.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            downloadUrl: `http://127.0.0.1:${port}/redirect`,
+          },
+          target: { mode: 'new-hidden-work' },
+        },
+      }, { POFF_ALLOW_PRIVATE_CONVERTER_HOSTS: '1' });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Converted download failed.',
+      }));
+      expect(requests).toEqual(['/redirect']);
+      expect(fs.existsSync(path.join(tempDir, 'redirected.txt'))).toBe(false);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('remote converter rejects private hosts', async () => {
     const result = await runConverterRoute('remote-security', POFF_DIR, {
       url: 'http://127.0.0.1/index.php?mcp=1&route=convert',
@@ -3794,6 +4504,170 @@ describe('Poff converters', () => {
 });
 
 describe('Worktype HBS renderer', () => {
+  test('keeps worktype catalog metadata from per-kind definitions', async () => {
+    const image = JSON.parse(await runWorktype('definition', 'image'));
+    expect(image.mimes).toEqual(['image/*', 'image/.*']);
+
+    const pdf = JSON.parse(await runWorktype('definition', 'pdf'));
+    expect(pdf.mimes).toEqual(['application/pdf', 'application/x-pdf']);
+    expect(pdf.viewer).toBe('embed');
+
+    const htaccess = JSON.parse(await runWorktype('definition', 'htaccess'));
+    expect(htaccess).toEqual(expect.objectContaining({
+      suffixes: ['.htaccess'],
+      label: '.htaccess',
+      preferred: true,
+      description: 'Apache access policy and iframe embedding rules.',
+    }));
+
+    const bundledMetadata = JSON.parse(await runWorktype('bundle-metadata', ''));
+    expect(bundledMetadata.image).toEqual({ mimes: ['image/*', 'image/.*'] });
+    expect(bundledMetadata.htaccess).toEqual(expect.objectContaining({
+      suffixes: ['.htaccess'],
+      label: '.htaccess',
+      preferred: true,
+    }));
+
+    const imageCatalog = JSON.parse(await runWorktype('catalog', 'image', {
+      mime: 'image/jpeg', fileName: 'photo.unknown', subjectType: 'file',
+    }));
+    const imageChoice = imageCatalog.choices.find(({ value }) => value === 'image');
+    expect(imageChoice.mimes).toEqual(['image/*', 'image/.*']);
+    expect(imageCatalog.selected).toBe('image');
+
+    const htaccessCatalog = JSON.parse(await runWorktype('catalog', 'htaccess', {
+      mime: 'text/plain', fileName: '.htaccess', subjectType: 'file',
+    }));
+    expect(htaccessCatalog.choices.find(({ value }) => value === 'htaccess').extensions).toEqual(['.htaccess']);
+  });
+
+  test('keeps extensibility definitions and assets wired into the single-file builder', () => {
+    const builder = fs.readFileSync(path.join(ROOT, 'build/build.php'), 'utf8');
+
+    for (const sourcePart of [
+      '/includes/MediaType.php',
+      '/includes/Converter.php',
+      '/includes/Worktype/Definitions.php',
+      '/includes/Worktype/Render.php',
+      '/includes/worktypes/worktypes.php',
+      '/includes/worktypes/*.worktype.php',
+      '/includes/worktypes/templates/*.hbs',
+    ]) {
+      expect(builder).toContain(sourcePart);
+    }
+    expect(builder).toContain('Worktype::setEmbedded(');
+    expect(builder).toContain('Worktype::setEmbeddedTemplates(');
+    expect(builder).toContain('Worktype::setEmbeddedLayoutAssets(');
+    expect(builder).toContain("'/includes/worktypes/templates/converter'");
+    expect(builder).toContain("'style.css', 'script.js'");
+    expect(builder).toContain("$bundle['metadata']");
+    expect(builder).toContain("['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description']");
+  });
+
+  test('builds a syntax-valid isolated bundle with Worktype templates and layout assets embedded', async () => {
+    const outputDir = path.join(ROOT, 'tests', `.tmp-build-parity-${process.pid}-${Date.now()}`);
+
+    try {
+      const buildResult = await runIsolatedPhpBuild(outputDir);
+      const bundlePath = path.join(outputDir, 'index.php');
+      expect(buildResult).toContain('Build completed successfully (development)');
+      expect(fs.existsSync(bundlePath)).toBe(true);
+      expect(await runPhpLint(bundlePath)).toContain('No syntax errors detected');
+
+      const bundle = fs.readFileSync(bundlePath, 'utf8');
+      for (const embeddedContent of [
+        'Worktype::setEmbedded(',
+        'Worktype::setEmbeddedTemplates(',
+        'Worktype::setEmbeddedLayoutAssets(',
+        'newWorkId',
+        'reassignWorkIdForCopy',
+        'PoffRemoteFeedImport',
+        'class PoffRemoteNodeAddresses',
+        'function handleReconnectNode',
+        'findWorkLocationsById',
+        'cmsMoveTarget',
+        'class PoffNodeIdentity',
+        'image/*',
+        'max-h-screen max-w-full object-contain',
+        '--poff-shell-bg',
+      ]) {
+        if (!bundle.includes(embeddedContent)) {
+          throw new Error(`isolated bundle is missing embedded content: ${embeddedContent}`);
+        }
+      }
+    } finally {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  test('copies converter definition and template sidecars into an isolated runtime folder', async () => {
+    const targetDir = path.join(ROOT, 'tests', `.tmp-converter-grains-${process.pid}-${Date.now()}`);
+
+    try {
+      expect(await runConverterGrainMirror(targetDir)).toBe('ok');
+      for (const relativePath of [
+        'default/converter.json',
+        'default/template.hbs',
+        'convert-pageoff-remote-image/converter.php',
+        'convert-pageoff-remote-image/style.css',
+      ]) {
+        expect(fs.existsSync(path.join(targetDir, relativePath))).toBe(true);
+      }
+    } finally {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
+  test('detects resource MIME and kind without selecting renderer or converter', async () => {
+    const detected = JSON.parse(await runWorktype('detect', '', { fileName: 'photo.jpg' }));
+    expect(detected).toEqual({ kind: 'image', mime: 'image/jpeg' });
+  });
+
+  test('selects templateMap entries by exact MIME, wildcard, kind, then extension', async () => {
+    const cases = [
+      [{ 'image/jpeg': 'video', 'image/*': 'audio', image: 'text', jpg: 'pdf' }, 'video'],
+      [{ 'image/*': 'audio', 'image/.*': 'video', image: 'text', jpg: 'pdf' }, 'audio'],
+      [{ 'image/.*': 'video', image: 'text', jpg: 'pdf' }, 'video'],
+      [{ image: 'text', jpg: 'pdf' }, 'text'],
+      [{ jpg: 'pdf' }, 'pdf'],
+    ];
+
+    for (const [templateMap, expected] of cases) {
+      const result = JSON.parse(await runWorktype('select', 'image', {
+        mime: 'image/jpeg', fileName: 'photo.jpg', templateMap,
+      }));
+      expect(result.template).toBe(expected);
+      expect(result.source).toBe('templateMap');
+    }
+  });
+
+  test('explicit work template overrides inherited and local templateMap selection', async () => {
+    const tempRoot = path.join(POFF_DIR, `worktype-inheritance-${Date.now()}`);
+    const childDir = path.join(tempRoot, 'section');
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+      work: { templateMap: { 'image/*': 'audio', jpg: 'pdf' } },
+    }));
+    fs.writeFileSync(path.join(childDir, 'poff.config.json'), JSON.stringify({
+      work: { templateMap: { 'image/jpeg': 'video' } },
+    }));
+
+    try {
+      const inherited = JSON.parse(await runLayoutFilesystem('resolve-work-template', childDir, '', {
+        work: {}, kind: 'image', mime: 'image/jpeg', fileName: 'photo.jpg',
+      }));
+      expect(inherited.template).toBe('video');
+      expect(inherited.templateMap).toEqual({ 'image/*': 'audio', 'image/jpeg': 'video', jpg: 'pdf' });
+
+      const explicit = JSON.parse(await runLayoutFilesystem('resolve-work-template', childDir, '', {
+        work: { template: 'text' }, kind: 'image', mime: 'image/jpeg', fileName: 'photo.jpg',
+      }));
+      expect(explicit).toEqual(expect.objectContaining({ template: 'text', source: 'explicit' }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('reads the current unsaved editor draft for layout and work prompt targets', () => {
     const { readPromptEditorDraft } = loadPromptDraftHelpers();
     const fields = {
@@ -5020,6 +5894,56 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('reconnects existing remote works to their confirmed origin after a domain change', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-node-address-'));
+    const origin = 'poff_node_1234567890abcdef1234567890abcdef';
+    const relay = 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const workId = 'poff_1111111111111111';
+    const oldUrl = 'https://old.example/index.php';
+    const newUrl = 'https://new.example/studio/index.php';
+    const folder = path.join(root, 'collection');
+    const configPath = path.join(folder, 'poff.config.json');
+    try {
+      fs.mkdirSync(folder);
+      fs.writeFileSync(configPath, JSON.stringify({
+        tree: [{
+          name: 'Photo',
+          path: 'photo',
+          type: 'file',
+          pageLink: oldUrl + '?view=1&file=photo',
+          remoteNodeId: origin,
+          remoteWorkId: workId,
+          remoteFeedNodeId: relay,
+          externalWork: true,
+        }],
+      }));
+
+      const update = (url, probeNodeId, overrides = {}) => runRemoteContent('reconnect', root, '', {
+        nodeId: origin, url, probeNodeId, ...overrides,
+      });
+      const originalConfig = fs.readFileSync(configPath, 'utf8');
+      expect(await update(oldUrl, origin, { method: 'GET' })).toMatchObject({ ok: false, error: expect.stringMatching(/POST/) });
+      expect(await update(oldUrl, origin, { authenticated: false })).toMatchObject({ ok: false, allowed: false });
+      expect(await update(oldUrl, origin)).toMatchObject({ ok: true });
+      expect(await update(newUrl, relay)).toMatchObject({ ok: false, error: expect.stringMatching(/expected node ID/) });
+      const addressPath = path.join(root, '.poff-node-addresses.json');
+      expect(JSON.parse(fs.readFileSync(addressPath, 'utf8'))).toEqual({ [origin]: oldUrl });
+      expect(await update(newUrl, origin)).toMatchObject({ ok: true, nodeId: origin, url: newUrl });
+      expect(JSON.parse(fs.readFileSync(addressPath, 'utf8'))).toEqual({ [origin]: newUrl });
+      expect(fs.readFileSync(configPath, 'utf8')).toBe(originalConfig);
+
+      const html = await runViewer('collection/photo', root);
+      expect(html).toContain(newUrl + '?ajax&#x3D;resolve');
+      expect(html).toContain('nodeId&#x3D;' + origin);
+      expect(html).toContain('workId&#x3D;' + workId);
+      expect(html).toContain('open&#x3D;1');
+      expect(html).not.toContain(oldUrl);
+      expect(await runViewer('collection', root)).toContain('?view&#x3D;1&amp;file&#x3D;collection%2Fphoto');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('renders virtual remote link items through the local host viewer wrapper', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-virtual-link-viewer-'));
     try {
@@ -5529,34 +6453,58 @@ describe('Worktype HBS renderer', () => {
   });
 
   test('exports normalized remote content with absolute viewer and asset links', async () => {
-    const result = await runRemoteContent('export', POFF_DIR, 'viewer-folder', {
-      baseUrl: 'https://origin.example/index.php',
-      sourceId: 'origin-example',
-    });
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-export-'));
+    const exportFolder = path.join(tempRoot, 'viewer-folder');
+    fs.mkdirSync(path.join(exportFolder, 'nested-child'), { recursive: true });
+    fs.writeFileSync(path.join(exportFolder, 'child.txt'), 'export identity fixture');
 
-    expect(result.route).toBe('export-content');
-    expect(result.source).toEqual(expect.objectContaining({
-      id: 'origin-example',
-      baseUrl: 'https://origin.example/index.php',
-      path: 'viewer-folder',
-    }));
-    expect(result.root.pageLink).toBe('https://origin.example/index.php?view=1&path=viewer-folder');
-    expect(result.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        name: 'child.txt',
-        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
-        srcUrl: 'https://origin.example/viewer-folder/child.txt',
-        routeSlug: 'child-txt',
-        routePath: 'viewer-folder/child.txt',
-      }),
-      expect.objectContaining({
-        name: 'nested-child',
-        isFolder: true,
-        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
-        routeSlug: 'nested-child',
-        routePath: 'viewer-folder/nested-child',
-      }),
-    ]));
+    try {
+      const result = await runRemoteContent('export', tempRoot, 'viewer-folder', {
+        baseUrl: 'https://origin.example/index.php',
+        sourceId: 'origin-example',
+      });
+      const repeatedResult = await runRemoteContent('export', tempRoot, 'viewer-folder', {
+        baseUrl: 'https://origin.example/index.php',
+        sourceId: 'origin-example',
+      });
+
+      expect(result.route).toBe('export-content');
+      expect(result.source).toEqual(expect.objectContaining({
+        id: 'origin-example',
+        nodeId: expect.stringMatching(/^poff_node_[a-f0-9]{32}$/),
+        baseUrl: 'https://origin.example/index.php',
+        path: 'viewer-folder',
+      }));
+      expect(repeatedResult.source.nodeId).toBe(result.source.nodeId);
+      expect(repeatedResult.root.workId).toBe(result.root.workId);
+      expect(repeatedResult.items.find((item) => item.name === 'child.txt').workId)
+        .toBe(result.items.find((item) => item.name === 'child.txt').workId);
+      expect(result.root.workId).toMatch(/^poff_[a-f0-9]{16}$/);
+      expect(repeatedResult.items).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'poff.node.json' }),
+      ]));
+      expect(result.root.pageLink).toBe('https://origin.example/index.php?view=1&path=viewer-folder');
+      expect(result.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'child.txt',
+          workId: expect.stringMatching(/^poff_[a-f0-9]{16}$/),
+          pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+          srcUrl: 'https://origin.example/viewer-folder/child.txt',
+          routeSlug: 'child-txt',
+          routePath: 'viewer-folder/child.txt',
+        }),
+        expect.objectContaining({
+          name: 'nested-child',
+          isFolder: true,
+          workId: expect.stringMatching(/^poff_[a-f0-9]{16}$/),
+          pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+          routeSlug: 'nested-child',
+          routePath: 'viewer-folder/nested-child',
+        }),
+      ]));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('inspects and atomically replaces a compatible remote work presentation', async () => {
@@ -5682,6 +6630,7 @@ describe('Worktype HBS renderer', () => {
       route: 'export-content',
       source: {
         id: 'origin-example',
+        nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         path: 'viewer-folder',
       },
       items: [
@@ -5696,6 +6645,10 @@ describe('Worktype HBS renderer', () => {
         srcUrl: 'https://origin.example/index.php?path=viewer-folder%2Fnested-child',
         routeSlug: 'nested-child',
         routePath: 'viewer-folder/nested-child',
+        reference: {
+          nodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          workId: 'poff_bbbbbbbbbbbbbbbb',
+        },
         renderedHtml: '<article class="remote-snapshot remote-snapshot--folder">Portfolio snapshot</article>',
         visible: true,
         isFolder: true,
@@ -5705,6 +6658,7 @@ describe('Worktype HBS renderer', () => {
           name: 'Leaf Note',
           title: 'Leaf Note',
           type: 'file',
+        workId: 'poff_0123456789abcdef',
         kind: 'text',
         path: 'viewer-folder/child.txt',
         relativePath: 'viewer-folder/child.txt',
@@ -5722,7 +6676,6 @@ describe('Worktype HBS renderer', () => {
 
     const result = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
       url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
-      sourceId: 'origin-example',
       mockResponse: {
         status: 200,
         body: remoteFeed,
@@ -5737,6 +6690,7 @@ describe('Worktype HBS renderer', () => {
     expect(storedConfig.remoteSources).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'origin-example',
+        nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
       }),
     ]));
@@ -5746,6 +6700,8 @@ describe('Worktype HBS renderer', () => {
         type: 'folder',
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
         remoteSource: 'origin-example',
+        remoteNodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        remoteFeedNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         externalWork: true,
         routeSlug: 'nested-child',
         routePath: 'viewer-folder/nested-child',
@@ -5755,6 +6711,9 @@ describe('Worktype HBS renderer', () => {
         type: 'file',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
         remoteSource: 'origin-example',
+        remoteNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
+        remoteWorkId: 'poff_0123456789abcdef',
+        remoteFeedNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         externalWork: true,
         routeSlug: 'child-txt',
         routePath: 'viewer-folder/child.txt',
@@ -5763,8 +6722,49 @@ describe('Worktype HBS renderer', () => {
 
     const leafEntry = storedConfig.tree.find((item) => item.name === 'Leaf Note');
     expect(leafEntry).toBeTruthy();
+    expect(leafEntry.id).toBeUndefined();
+    expect(leafEntry.remoteNodeId).toBe('poff_node_0123456789abcdef0123456789abcdef');
+    expect(leafEntry.remoteWorkId).toBe('poff_0123456789abcdef');
+    expect(leafEntry.remoteFeedNodeId).toBe('poff_node_0123456789abcdef0123456789abcdef');
+    expect(leafEntry.remoteSource).toBe('origin-example');
+    expect(leafEntry.routePath).toBe('viewer-folder/child.txt');
     expect(leafEntry.renderedHtml).toBeUndefined();
     expect(leafEntry.template).toBeUndefined();
+
+    const relocatedFeed = JSON.parse(JSON.stringify(remoteFeed));
+    relocatedFeed.source.id = 'new-origin.example';
+    const replaced = await runRemoteContent('import', POFF_DIR, 'remote-import-links', {
+      url: 'https://new-origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
+      replace: true,
+      mockResponse: {
+        status: 200,
+        body: relocatedFeed,
+      },
+    });
+    expect(replaced.saved).toBe(true);
+    expect(replaced.importedCount).toBe(2);
+
+    const replacedConfig = JSON.parse(fs.readFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), 'utf8'));
+    expect(replacedConfig.tree.map((item) => item.name).sort()).toEqual(['Leaf Note', 'Portfolio']);
+    expect(replacedConfig.remoteSources.filter((source) => source.nodeId === remoteFeed.source.nodeId)).toHaveLength(1);
+
+    const relayRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-relay-'));
+    try {
+      copyDirSync(REMOTE_IMPORT_DIR, path.join(relayRoot, 'remote-import-links'));
+      const relayFeed = await runRemoteContent('export', relayRoot, 'remote-import-links', {
+        baseUrl: 'https://relay.example/index.php',
+      });
+      expect(relayFeed.items.find((item) => item.name === 'Portfolio').reference).toEqual({
+        nodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        workId: 'poff_bbbbbbbbbbbbbbbb',
+      });
+      expect(relayFeed.items.find((item) => item.name === 'Leaf Note').reference).toEqual({
+        nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
+        workId: 'poff_0123456789abcdef',
+      });
+    } finally {
+      fs.rmSync(relayRoot, { recursive: true, force: true });
+    }
   });
 
   test('copies remote export files into a new local folder and creates a looping player', async () => {
@@ -5834,6 +6834,7 @@ describe('Worktype HBS renderer', () => {
       expect(playerScript).toContain("loopToggle?.addEventListener('click'");
       expect(playerScript).toContain("tracks.forEach((track, trackIndex) => track.addEventListener('click'");
       const copiedConfig = JSON.parse(fs.readFileSync(path.join(tempRoot, 'local-films', 'poff.config.json'), 'utf8'));
+      expect(copiedConfig.id).toMatch(/^poff_[a-f0-9]{16}$/);
       expect(copiedConfig.tree).toEqual([
         expect.objectContaining({
           name: 'clip.mp4',

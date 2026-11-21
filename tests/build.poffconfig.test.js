@@ -32,7 +32,23 @@ test('build flattens PoffConfig helper traits into a syntax-valid class', () => 
   expect(payload.containsHydrateConfigLayout).toBe(true);
   expect(payload.containsPersistLayoutFiles).toBe(true);
   expect(payload.containsLayoutCollectionPackage).toBe(true);
+  expect(payload.containsUniqueImportedName).toBe(true);
   expect(payload.lintExitCode).toBe(0);
+});
+
+test('Core imported-name allocation preserves the remote-import collision rules', () => {
+  const result = spawnSync('php', [path.join(__dirname, 'php_poffconfig_unique_imported_name.php')], {
+    cwd: path.join(__dirname, '..'),
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual([
+    'Photo',
+    'Photo (origin)',
+    'Photo (origin) 2',
+    'remote-node',
+  ]);
 });
 
 test('build owns distribution copies while watcher only links the build output', () => {

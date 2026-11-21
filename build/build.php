@@ -146,6 +146,14 @@ PHP
             if (isset($bundle['definitions']) && is_array($bundle['definitions'])) {
                 $embeddedWorktypes = $bundle['definitions'];
             }
+            if (isset($bundle['metadata']) && is_array($bundle['metadata'])) {
+                foreach ($bundle['metadata'] as $kind => $metadata) {
+                    if (!is_string($kind) || !is_array($metadata) || !isset($embeddedWorktypes[$kind])) {
+                        continue;
+                    }
+                    $embeddedWorktypes[$kind] = array_replace($metadata, $embeddedWorktypes[$kind]);
+                }
+            }
             if (isset($bundle['templates']) && is_array($bundle['templates'])) {
                 $embeddedTemplates = $bundle['templates'];
             }
@@ -173,6 +181,11 @@ PHP
             $data = include $wtFile;
             if (is_array($data)) {
                 $embeddedWorktypes[$key] = $data['model'] ?? $data['definition'] ?? $data;
+                if (is_array($embeddedWorktypes[$key])) {
+                    $metadataKeys = ['mimes', 'mimeTypes', 'extensions', 'suffixes', 'label', 'preferred', 'description'];
+                    $metadata = array_intersect_key($data, array_flip($metadataKeys));
+                    $embeddedWorktypes[$key] = array_replace($metadata, $embeddedWorktypes[$key]);
+                }
             }
         }
     }
@@ -242,6 +255,7 @@ PHP
         $poffConfigPromptHelpers,
     ]);
     $poffConfigContent = $stripPhp($poffConfigContent);
+    $nodeIdentityContent = $stripPhp($readSourceFile('/includes/NodeIdentity.php'));
     $authHelpers = $stripPhp($readSourceFile('/includes/auth.php'));
     $navRenderHelpers = $stripPhp($readSourceFile('/includes/nav-render.php'));
     foreach ([
@@ -251,6 +265,7 @@ PHP
         $promptTemplateSanitize,
         $viewerLinkTargets,
         $poffConfigContent,
+        $nodeIdentityContent,
         $navRenderHelpers,
     ] as $phpBlock) {
         $appendPhpBlock($buildContent, $phpBlock);
@@ -258,6 +273,7 @@ PHP
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
     $viewerSharedParts = [
+        '/includes/Core/RemoteNodeAddresses.php',
         '/includes/viewer/utils/core.php',
         '/includes/viewer/utils/targets.php',
         '/includes/viewer/utils/remote-html.php',
@@ -292,12 +308,14 @@ PHP
         '/includes/viewer/edit/upload/work-folder.php',
         '/includes/viewer/edit/upload/links.php',
         '/includes/viewer/edit/delete.php',
+        '/includes/viewer/edit/move.php',
         '/includes/viewer/edit/reset.php',
         '/includes/viewer/edit/action/context.php',
         '/includes/viewer/edit/action/auth-action.php',
         '/includes/viewer/edit/action/config.php',
         '/includes/viewer/edit/action/upload-action.php',
         '/includes/viewer/edit/action/delete-action.php',
+        '/includes/viewer/edit/action/move-action.php',
         '/includes/viewer/edit/action/reset-action.php',
         '/includes/viewer/edit/action/save/meta.php',
         '/includes/viewer/edit/action/save/work.php',
@@ -326,7 +344,9 @@ PHP
         '/mcp/routes/edit-config/apply.php',
         '/mcp/routes/edit-config.php',
         '/mcp/routes/prompt-template.php',
+        '/includes/Core/RemoteFeedImport.php',
         '/mcp/routes/remote-content.php',
+        '/mcp/routes/reconnect-node.php',
         '/mcp/routes/remote-presentation.php',
         '/mcp/routes/converters.php',
         '/mcp/routes/convert.php',
@@ -423,6 +443,8 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $baseDir,
                     'path' => mcpRoutePath(),
                 ]));
+            case 'reconnect-node':
+                mcpJsonResponse(handleReconnectNode($baseDir, mcpReadRequestData(), $_SERVER['REQUEST_METHOD'] ?? 'GET'));
             case 'import-remote':
                 $remoteInput = mcpReadRequestData();
                 mcpJsonResponse(handleImportRemote([
@@ -533,6 +555,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'nav') {
 
 // Route mapper for hash-only slugs. Browser hashes are not sent on refresh,
 // so the client asks this endpoint to map #slug back to the filesystem item.
+if (($_GET['ajax'] ?? '') === 'node-identity') {
+    cmsHandleNodeIdentityRoute($baseDir);
+}
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'resolve') {
     cmsHandleResolveRoute($baseDir);
 }

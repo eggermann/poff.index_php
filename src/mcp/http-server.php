@@ -5,10 +5,19 @@ declare(strict_types=1);
 chdir(dirname(__DIR__, 2)); // project root
 
 require __DIR__ . '/../../vendor/autoload.php';
+$mcpAutoload = __DIR__ . '/vendor/autoload.php';
+if (is_file($mcpAutoload)) {
+    require_once $mcpAutoload;
+}
+if (!class_exists(\PhpMcp\Server\Server::class)) {
+    fwrite(STDERR, "MCP dependencies missing. Run composer install --working-dir=src/mcp.\n");
+    exit(1);
+}
 @require_once __DIR__ . '/../includes/MediaType.php';
 @require_once __DIR__ . '/../includes/Worktype.php';
 @require_once __DIR__ . '/../includes/Converter.php';
 @require_once __DIR__ . '/../includes/PoffConfig.php';
+@require_once __DIR__ . '/../includes/NodeIdentity.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/routes/workprompt.php';
 require_once __DIR__ . '/routes/create.php';

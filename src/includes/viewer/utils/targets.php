@@ -281,8 +281,83 @@ function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string 
     return null;
 }
 
+function cmsHandleNodeIdentityRoute(string $rootDir): void
+{
+    header('Cache-Control: no-store');
+    try {
+        $nodeId = PoffNodeIdentity::read($rootDir);
+    } catch (RuntimeException) {
+        cmsJsonResponse(['error' => 'Node identity is invalid.'], 500);
+    }
+    if ($nodeId === null) {
+        cmsJsonResponse(['error' => 'Node identity not found.'], 404);
+    }
+    cmsJsonResponse(['nodeId' => $nodeId]);
+}
+
 function cmsHandleResolveRoute(string $rootDir): void
 {
+    $workId = trim((string) ($_GET['workId'] ?? ''));
+    if ($workId !== '') {
+        $nodeId = trim((string) ($_GET['nodeId'] ?? ''));
+        if (
+            PoffNodeIdentity::normalizeId($nodeId) === ''
+            || preg_match('/^poff_[a-z0-9._-]{1,120}$/iD', $workId) !== 1
+        ) {
+            cmsJsonResponse(['resolved' => false, 'error' => 'Invalid Work reference.'], 400);
+        }
+
+        try {
+            $localNodeId = class_exists('PoffNodeIdentity') ? PoffNodeIdentity::read($rootDir) : null;
+        } catch (Throwable) {
+            cmsJsonResponse(['resolved' => false, 'error' => 'Node identity is invalid.'], 500);
+        }
+        if ($localNodeId === null || !hash_equals($localNodeId, $nodeId)) {
+            cmsJsonResponse(['resolved' => false, 'error' => 'Node or Work not found.'], 404);
+        }
+        if (!class_exists('PoffConfig')) {
+            cmsJsonResponse(['resolved' => false, 'error' => 'Work resolver unavailable.'], 503);
+        }
+
+        $includeHiddenWorks = (string) ($_GET['edit'] ?? '') === 'true'
+            && function_exists('cmsIsEditorAuthenticated')
+            && cmsIsEditorAuthenticated($rootDir);
+        $matches = PoffConfig::findWorkLocationsById($rootDir, $workId, $includeHiddenWorks);
+        if ($matches === []) {
+            cmsJsonResponse(['resolved' => false, 'error' => 'Node or Work not found.'], 404);
+        }
+        if (count($matches) > 1) {
+            cmsJsonResponse([
+                'resolved' => false,
+                'ambiguous' => true,
+                'error' => 'Work ID matches more than one visible Work.',
+                'nodeId' => $nodeId,
+                'workId' => $workId,
+                'matches' => $matches,
+            ], 409);
+        }
+
+        $match = $matches[0];
+        if (($_GET['open'] ?? '') === '1') {
+            $target = $match['type'] === 'folder' ? 'path' : 'file';
+            $url = '?view=1&' . $target . '=' . rawurlencode((string) $match['path']);
+            if ($includeHiddenWorks) {
+                $url .= '&edit=true';
+            }
+            header('Cache-Control: no-store');
+            header('Location: ' . $url, true, 302);
+            exit;
+        }
+        cmsJsonResponse([
+            'resolved' => true,
+            'nodeId' => $nodeId,
+            'workId' => $workId,
+            'path' => (string) $match['path'],
+            'type' => (string) $match['type'],
+            'isFile' => (string) $match['type'] !== 'folder',
+        ]);
+    }
+
     $slug = cmsNormalizeRouteSlug((string) ($_GET['slug'] ?? $_GET['route'] ?? ''));
     if ($slug === '' || str_contains($slug, '..')) {
         cmsJsonResponse(['resolved' => false, 'error' => 'Invalid route.'], 400);

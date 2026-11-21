@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__ . '/../project-root.php';
+require_once __DIR__ . '/../Core/RemoteNodeAddresses.php';
 require_once __DIR__ . '/../edit-mode.php';
 require_once __DIR__ . '/link-targets.php';
 require_once __DIR__ . '/utils/core.php';

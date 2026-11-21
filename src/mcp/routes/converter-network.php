@@ -56,16 +56,15 @@ function handleConverterOffers(array $opts): array
 {
     $rootDir = (string) ($opts['rootDir'] ?? '');
     $input = is_array($opts['input'] ?? null) ? $opts['input'] : mcpReadRequestData();
-    $mimeType = strtolower(trim((string) ($input['mimeType'] ?? '')));
-    $kind = strtolower(trim((string) ($input['kind'] ?? '')));
-    $extension = strtolower(trim((string) ($input['extension'] ?? ''), '. '));
     $nodeUrl = trim((string) ($opts['nodeUrl'] ?? mcpConverterCurrentNodeUrl()));
     $nodeId = trim((string) ($opts['nodeId'] ?? parse_url($nodeUrl, PHP_URL_HOST) ?? 'poff-node'));
 
-    $available = array_values(array_filter(
-        Converter::availableFor($mimeType, $kind, $extension, $rootDir),
-        static fn(array $definition): bool => Converter::canOffer($definition)
-    ));
+    $available = Converter::offerableFor(
+        (string) ($input['mimeType'] ?? ''),
+        (string) ($input['kind'] ?? ''),
+        (string) ($input['extension'] ?? ''),
+        $rootDir
+    );
 
     return [
         'ok' => true,
