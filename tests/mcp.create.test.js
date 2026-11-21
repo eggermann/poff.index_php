@@ -445,6 +445,26 @@ function runRemoteContent(mode, baseDir, relativePath = '', payload = {}) {
   });
 }
 
+function runWorkIdResolve(rootDir, nodeId, workId, edit = false) {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_resolve_work_id.php'), rootDir, nodeId, workId];
+    if (edit) args.push('edit');
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => (stdout += data.toString()));
+    proc.stderr.on('data', (data) => (stderr += data.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`Work ID resolve helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runBlankFile(targetDir, fileName, contents = '') {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_blank_file.php'), targetDir, fileName, contents];
@@ -1571,6 +1591,61 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.newIds[1]).not.toBe(result.newIds[0]);
     expect(result.nodeIds[0]).toMatch(/^poff_node_[a-f0-9]{32}$/);
     expect(result.nodeIds[1]).toBe(result.nodeIds[0]);
+  });
+
+  test('resolves local Work IDs and reports duplicate matches as ambiguous', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-work-resolve-'));
+    const nodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    const rootWorkId = 'poff_1111111111111111';
+    const publicFolderWorkId = 'poff_2222222222222222';
+    const fileWorkId = 'poff_3333333333333333';
+    const hiddenFolderWorkId = 'poff_4444444444444444';
+    const hiddenDir = path.join(tempRoot, 'hidden');
+    const publicDir = path.join(tempRoot, 'public');
+    const duplicateDir = path.join(tempRoot, 'duplicate');
+    fs.mkdirSync(hiddenDir);
+    fs.mkdirSync(publicDir);
+    fs.mkdirSync(duplicateDir);
+    fs.mkdirSync(path.join(tempRoot, '.layout'));
+    fs.mkdirSync(path.join(tempRoot, '.works'));
+    fs.writeFileSync(path.join(tempRoot, 'note.txt'), 'identity lookup fixture');
+    const writeJson = (filePath, value) => fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+    writeJson(path.join(tempRoot, 'poff.node.json'), { schemaVersion: 1, id: nodeId });
+    writeJson(path.join(tempRoot, 'poff.config.json'), {
+      id: rootWorkId,
+      title: 'Root',
+      tree: [
+        { name: 'hidden', path: 'hidden', type: 'folder', visible: false },
+        { name: 'public', path: 'public', type: 'folder', visible: true },
+        { name: 'duplicate', path: 'duplicate', type: 'folder', visible: true },
+        { name: 'note.txt', path: 'note.txt', type: 'file', visible: true },
+      ],
+    });
+    writeJson(path.join(publicDir, 'poff.config.json'), { id: publicFolderWorkId, title: 'Public' });
+    writeJson(path.join(duplicateDir, 'poff.config.json'), { id: publicFolderWorkId, title: 'Duplicate' });
+    writeJson(path.join(hiddenDir, 'poff.config.json'), { id: hiddenFolderWorkId, title: 'Hidden' });
+    writeJson(path.join(tempRoot, '.works', 'note.txt.config.json'), { id: fileWorkId, title: 'Note' });
+    writeJson(path.join(tempRoot, '.layout', 'poff.config.json'), { id: rootWorkId, title: 'Layout metadata' });
+
+    try {
+      const root = await runWorkIdResolve(tempRoot, nodeId, rootWorkId);
+      expect(root).toEqual(expect.objectContaining({ resolved: true, nodeId, workId: rootWorkId, path: '', type: 'folder' }));
+
+      const file = await runWorkIdResolve(tempRoot, nodeId, fileWorkId);
+      expect(file).toEqual(expect.objectContaining({ resolved: true, path: 'note.txt', type: 'file' }));
+
+      const hidden = await runWorkIdResolve(tempRoot, nodeId, hiddenFolderWorkId);
+      expect(hidden.resolved).toBe(false);
+
+      const ambiguous = await runWorkIdResolve(tempRoot, nodeId, publicFolderWorkId);
+      expect(ambiguous).toEqual(expect.objectContaining({ resolved: false, ambiguous: true, workId: publicFolderWorkId }));
+      expect(ambiguous.matches.map((match) => match.path)).toEqual(['duplicate', 'public']);
+
+      const wrongNode = await runWorkIdResolve(tempRoot, 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', fileWorkId);
+      expect(wrongNode.resolved).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('formats prompt provider failures with status and redacted detail', async () => {
@@ -4261,6 +4336,7 @@ describe('Worktype HBS renderer', () => {
         'Worktype::setEmbeddedLayoutAssets(',
         'newWorkId',
         'reassignWorkIdForCopy',
+        'findWorkLocationsById',
         'class PoffNodeIdentity',
         'image/*',
         'max-h-screen max-w-full object-contain',

@@ -50,6 +50,118 @@ trait PoffConfigCoreHelpers
         return $workMetadata;
     }
 
+    public static function findWorkLocationsById(string $rootDir, string $workId, bool $includeHidden = false): array
+    {
+        $resolvedRoot = realpath($rootDir);
+        $workId = trim($workId);
+        if (!is_string($resolvedRoot) || $resolvedRoot === '' || !is_dir($resolvedRoot) || $workId === '') {
+            return [];
+        }
+
+        $matches = [];
+        $visited = [];
+        $ignoredDirectories = ['build', 'node_modules', 'pages', 'poff', 'scripts', 'src', 'tests', 'vendor'];
+        $scanDirectory = null;
+        $scanDirectory = static function (string $directory, string $relativePath, int $depth) use (&$scanDirectory, &$matches, &$visited, $workId, $includeHidden, $ignoredDirectories, $resolvedRoot): void {
+            if ($depth > 48 || is_link($directory)) {
+                return;
+            }
+
+            $realDirectory = realpath($directory);
+            if (!is_string($realDirectory) || $realDirectory === '' || isset($visited[$realDirectory])) {
+                return;
+            }
+            $visited[$realDirectory] = true;
+
+            $folderConfig = self::readDecodedConfigFile(self::configPath($realDirectory));
+            if (($folderConfig['id'] ?? null) === $workId && ($includeHidden || self::workPathIsVisible($resolvedRoot, $relativePath, false))) {
+                $matches[] = [
+                    'id' => $workId,
+                    'type' => 'folder',
+                    'path' => $relativePath,
+                    'title' => (string) ($folderConfig['title'] ?? basename($realDirectory)),
+                ];
+            }
+
+            $worksDirectory = $realDirectory . DIRECTORY_SEPARATOR . '.works';
+            if (is_dir($worksDirectory) && !is_link($worksDirectory)) {
+                foreach (glob($worksDirectory . DIRECTORY_SEPARATOR . '*.config.json') ?: [] as $metadataPath) {
+                    $metadataName = basename($metadataPath);
+                    $fileName = substr($metadataName, 0, -strlen('.config.json'));
+                    $filePath = $realDirectory . DIRECTORY_SEPARATOR . $fileName;
+                    if ($fileName === '' || !is_file($filePath) || is_link($filePath)) {
+                        continue;
+                    }
+
+                    $fileConfig = self::readDecodedConfigFile($metadataPath);
+                    $fileRelativePath = trim($relativePath . '/' . $fileName, '/');
+                    if (($fileConfig['id'] ?? null) !== $workId || (!$includeHidden && !self::workPathIsVisible($resolvedRoot, $fileRelativePath, true))) {
+                        continue;
+                    }
+
+                    $matches[] = [
+                        'id' => $workId,
+                        'type' => 'file',
+                        'path' => $fileRelativePath,
+                        'title' => (string) ($fileConfig['title'] ?? $fileName),
+                    ];
+                }
+            }
+
+            foreach (@scandir($realDirectory) ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.') || in_array($entry, $ignoredDirectories, true)) {
+                    continue;
+                }
+                $childPath = $realDirectory . DIRECTORY_SEPARATOR . $entry;
+                if (!is_dir($childPath) || is_link($childPath)) {
+                    continue;
+                }
+                $childRelativePath = trim($relativePath . '/' . $entry, '/');
+                $scanDirectory($childPath, $childRelativePath, $depth + 1);
+            }
+        };
+
+        $scanDirectory($resolvedRoot, '', 0);
+        usort($matches, static fn(array $left, array $right): int => strcmp((string) $left['path'], (string) $right['path']));
+        return $matches;
+    }
+
+    private static function workPathIsVisible(string $rootDir, string $relativePath, bool $isFile): bool
+    {
+        $segments = array_values(array_filter(explode('/', trim(str_replace('\\', '/', $relativePath), '/')), static fn(string $segment): bool => $segment !== ''));
+        $directory = $rootDir;
+        foreach ($segments as $index => $segment) {
+            $parentConfig = self::readDecodedConfigFile(self::configPath($directory));
+            foreach (is_array($parentConfig['tree'] ?? null) ? $parentConfig['tree'] : [] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $itemName = trim((string) ($item['name'] ?? ''));
+                if ($itemName === $segment && (($item['visible'] ?? true) === false)) {
+                    return false;
+                }
+            }
+
+            $targetPath = $directory . DIRECTORY_SEPARATOR . $segment;
+            if ($index < count($segments) - 1 || !$isFile) {
+                $directory = $targetPath;
+            }
+        }
+
+        if ($isFile && $segments !== []) {
+            $fileName = $segments[count($segments) - 1];
+            $fileDirectory = count($segments) > 1
+                ? $rootDir . DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, array_slice($segments, 0, -1))
+                : $rootDir;
+            $fileConfig = self::readDecodedConfigFile(self::fileConfigPath($fileDirectory, $fileName));
+            if (($fileConfig['visible'] ?? true) === false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static function normalizeTemplateMap(mixed $value): array
     {
         return class_exists('Worktype') ? Worktype::normalizeTemplateMap($value) : [];

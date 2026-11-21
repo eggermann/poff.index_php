@@ -4,7 +4,7 @@ Codebefund 20. November 2026; Folgeänderungen 21. November 2026. Die beobachtet
 
 ## Bestätigte Zielrichtung — 21. November 2026
 
-Die dauerhafte Referenz soll aus stabiler Node-ID und stabiler Work-ID bestehen. Domain und URL sind erreichbare Adressen eines Nodes und dürfen wechseln, ohne die Identität zu ändern. Verschieben erhält die Work-ID; Kopieren erzeugt eine neue Work-ID. Remote-Referenzen speichern künftig die Quell-Node-ID und Quell-Work-ID. Ein Pfadindex bleibt abgeleitet und neu aufbaubar.
+Die dauerhafte Referenz besteht aus stabiler Node-ID und stabiler Work-ID. Domain und URL sind erreichbare Adressen eines Nodes und dürfen wechseln, ohne die Identität zu ändern. Verschieben erhält die Work-ID; Kopieren erzeugt eine neue Work-ID. Remote-Referenzen speichern die Quell-Node-ID und Quell-Work-ID. Ein Pfadindex bleibt abgeleitet und neu aufbaubar.
 
 Die Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Exportierte Folder und physische Files erhalten `workId`; Remote-Works werden als `reference: { nodeId, workId }` weitergereicht. Beim Import werden IDs als `remoteNodeId`/`remoteWorkId` abgelegt, nicht als lokale Work-ID. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Identitätserzeugung beim Export braucht Schreibrecht im Node-Root; vollständige Serverkopien übernehmen die Node-ID zunächst mit und benötigen vor dem Betrieb eine explizite Identitätsrotation.
 
@@ -26,14 +26,16 @@ Die zufällige Metadaten-ID ist ein nützlicher Ausgangspunkt, aber aktuell kein
 
 ## Resolver- und Kollisionsaudit (Workspace-Snapshot 21. November 2026)
 
-Statische Suche in `src/includes` und `src/mcp` fand keinen Work-ID-zu-Pfad-Resolver oder ID-Index. Vorhandene Viewer-Auflösung arbeitet über Pfade und Slugs. Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadatendateien unter dem lokalen `pages/`-Baum fand eine doppelt vergebene ID in zwei Konfigurationen: `.layout/poff.config.json` und `.layout copy/poff.config.json` unter `dominikeggermann.comX`. Das deutet auf eine kopierte lokale Layout-Konfiguration, beweist aber weder Herkunft noch Auswirkungen für andere Nodes. Keine Migration wurde ausgeführt; der Snapshot muss vor einer Migrationsplanung geprüft und gegen weitere Node-Bestände neu erhoben werden.
+Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadatendateien unter dem lokalen `pages/`-Baum fand eine doppelte ID in `.layout/poff.config.json` und `.layout copy/poff.config.json` unter `dominikeggermann.comX`. Beide liegen in versteckten Layout-Verzeichnissen, die keine sichtbaren Works sind; das war eine Metadaten-Kollision, kein Beleg für doppelte öffentliche Work-IDs. Keine Migration wurde ausgeführt. Der Befund gilt nur für diesen Workspace-Snapshot.
+
+`PoffConfig::findWorkLocationsById()` sucht lesend nach lokalen Folder- und File-IDs. `?ajax=resolve&nodeId=…&workId=…` prüft zuerst die lokale Node-ID. Ein Treffer liefert den relativen Pfad; kein Treffer liefert 404; mehrere sichtbare Treffer liefern 409 `ambiguous` mit allen Kandidaten. Versteckte Works bleiben ohne authentifizierten Edit-Modus unauflösbar. Der Resolver schreibt keine Konfiguration und baut keinen dauerhaften Index.
 
 ## Nächste Entscheidungen
 
 1. Wie bleibt die Work-ID beim Umbenennen erhalten, obwohl der Datei-Metadatensatz aktuell an den Dateinamen gekoppelt ist? Eine Rename-Operation muss Quelldaten atomar mitbewegen.
-2. Wie werden bestehende doppelte IDs migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
+2. Wie werden künftige echte ID-Kollisionen migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
 3. Wie wird eine vollständige Serverkopie vor dem Betrieb mit einer neuen Node-ID versehen?
-4. Ein ID-zu-Pfad-Index darf nur abgeleitet und neu aufbaubar sein; die Metadaten bleiben maßgeblicher Bestand.
+4. Bei größerem Bestand messen, ob der lesende Scan genügt oder ein abgeleiteter, neu aufbaubarer Index nötig wird.
 
 Quelle: `src/includes/PoffConfig/core-helpers.php`, `src/includes/PoffConfig/layout-helpers.php`, `src/mcp/routes/create.php`, `src/includes/nav-render.php`, `tests/mcp.create.test.js`.
 
@@ -41,6 +43,6 @@ Quelle: `src/includes/PoffConfig/core-helpers.php`, `src/includes/PoffConfig/lay
 
 Branch-lokale Regel: Eine Folder-Kopie erzeugt für jeden mitkopierten `poff.config.json`- und `.works/*.config.json`-Datensatz eine neue `poff_…` Work-ID. Quelldateien und Quell-IDs bleiben unverändert. Kopierte Einzeldateien enthalten keine Metadaten-Sidecars; bei einem neuen Ziel wird eine ID später wie bisher erzeugt. Wird eine bestehende Zieldatei ersetzt, bleiben ihre vorhandenen Metadaten und ID erhalten. Ein Move-Endpunkt existiert nicht und ist von dieser Regel nicht abgedeckt.
 
-`PoffConfig::newWorkId()` zentralisiert die ID-Vergabe im Core. `PoffConfig::reassignWorkIdForCopy()` nutzt dieselbe Vergabe für kopierte Metadaten. Der MCP-Folder-Copy und der Remote-Folder-Copy verwenden den gemeinsamen Core-Vertrag; der virtuelle Remote-Feed-Import erstellt keine lokalen Work-IDs. Bestehende Route-Parameter bleiben gleich. Provenienz (`copiedFrom`), Konfliktmigration bereits duplizierter IDs und öffentliche Node-ID-Auflösung bleiben offen.
+`PoffConfig::newWorkId()` zentralisiert die ID-Vergabe im Core. `PoffConfig::reassignWorkIdForCopy()` nutzt dieselbe Vergabe für kopierte Metadaten. Der MCP-Folder-Copy und der Remote-Folder-Copy verwenden den gemeinsamen Core-Vertrag; der virtuelle Remote-Feed-Import erstellt keine lokalen Work-IDs. Bestehende Route-Parameter bleiben gleich. Provenienz (`copiedFrom`), Reparatur echter ID-Kollisionen und Clone-Rotation bleiben offen.
 
 Regressionstest kopiert isolierte Root- und Nested-Folder- sowie Datei-Metadaten, bestätigt vier neue IDs und prüft, dass Quell-Metadaten unverändert bleiben. Ein weiterer Test bestätigt, dass wiederholte `PoffConfig::ensure()`- und `ensureFileConfig()`-Aufrufe Folder- und File-IDs erhalten. Der temporäre Single-File-Build bestätigt, dass die Core-Methode in der gebündelten `PoffConfig`-Klasse enthalten ist.

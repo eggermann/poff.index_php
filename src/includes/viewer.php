@@ -9,13 +9,20 @@ require_once __DIR__ . '/nav-render.php';
 require_once __DIR__ . '/viewer/edit.php';
 require_once __DIR__ . '/viewer/render.php';
 
+if ((string) ($_GET['ajax'] ?? '') === 'resolve') {
+    @require_once __DIR__ . '/MediaType.php';
+    @require_once __DIR__ . '/Worktype.php';
+    @require_once __DIR__ . '/PoffConfig.php';
+    require_once __DIR__ . '/NodeIdentity.php';
+    cmsHandleResolveRoute(cmsProjectRootDir());
+}
+
 if ((string) ($_GET['mcp'] ?? '') === '1') {
     require_once __DIR__ . '/../mcp/helpers.php';
     @require_once __DIR__ . '/MediaType.php';
     @require_once __DIR__ . '/Worktype.php';
     @require_once __DIR__ . '/Converter.php';
     @require_once __DIR__ . '/PoffConfig.php';
-    @require_once __DIR__ . '/NodeIdentity.php';
     require_once __DIR__ . '/../mcp/routes/workprompt.php';
     require_once __DIR__ . '/../mcp/routes/create.php';
     require_once __DIR__ . '/../mcp/routes/edit-config.php';

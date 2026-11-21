@@ -11,6 +11,24 @@ final class PoffNodeIdentity
         return rtrim($rootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . self::FILE_NAME;
     }
 
+    public static function read(string $rootDir): ?string
+    {
+        $resolvedRoot = realpath($rootDir);
+        if (!is_string($resolvedRoot) || $resolvedRoot === '' || !is_dir($resolvedRoot)) {
+            return null;
+        }
+
+        $identityPath = self::path($resolvedRoot);
+        if (!file_exists($identityPath) && !is_link($identityPath)) {
+            return null;
+        }
+        if (is_link($identityPath) || !is_file($identityPath)) {
+            throw new RuntimeException('PageOff node identity file is invalid.');
+        }
+
+        return self::readId($identityPath);
+    }
+
     public static function ensure(string $rootDir): string
     {
         $resolvedRoot = realpath($rootDir);
@@ -32,6 +50,9 @@ final class PoffNodeIdentity
             $identityPath = self::path($resolvedRoot);
             if (is_file($identityPath)) {
                 return self::readId($identityPath);
+            }
+            if (is_link($identityPath)) {
+                throw new RuntimeException('PageOff node identity file is invalid.');
             }
 
             $identity = [
