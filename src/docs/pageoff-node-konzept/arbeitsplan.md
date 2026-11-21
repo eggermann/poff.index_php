@@ -34,3 +34,13 @@ Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet me
 8. **Erweiterbarkeit erhalten:** Worktype-, Layout- und Converter-Verträge beibehalten; nur capability-spezifische Core-Grenzen extrahieren. [Audit-Baseline](erweiterbarkeit-baseline.md)
 
 Für jeden Schritt: erst Beispiele und Akzeptanzkriterien mit dem Nutzer durchgehen, dann Quellstand prüfen und eine kleine Änderung planen. Die Reihenfolge ist ein Vorschlag; sie verpflichtet noch nicht auf ein Datenformat oder eine öffentliche API.
+
+## Priorisierter Rest-Backlog
+
+1. **P0 — Streamable MCP wirklich optional installieren:** `php-mcp/server` aus der Root-Dependency in eine separat installierbare MCP-Abhängigkeit bewegen und den Startpfad darauf ausrichten. Dafür müssen `composer.json` und `composer.lock` geändert werden; diese Dateien liegen derzeit außerhalb der Edit-Allowlist in `AGENTS.md`. Bis dahin bleibt nur der HTTP-Einstieg aus dem Single-File-Artifact herausgelöst.
+2. **P1 — Adressfindung nach Relay/Domainwechsel rubberducken:** entscheiden, ob ein letzter Node-Adresshinweis pro Node-ID mitgeführt wird, ob mehrere Adressen zulässig sind und ob ein freiwilliges Verzeichnis angeboten wird. Die Identität bleibt in jedem Fall `(nodeId, workId)`; Adresswechsel ändern sie nicht.
+3. **P1 — Work-ID-Forkregel entscheiden:** Node-ID-Rotation eines Klons ist implementiert; klären, ob beim unabhängigen Fork zusätzlich sämtliche Work-IDs erneuert werden müssen und wie Rotation vor dem ersten Betrieb erzwungen wird.
+4. **P1 — Move-Rollback abdecken:** partielle Dateisystemfehler gezielt simulieren und prüfen, dass Ressourcen und Sidecars gemeinsam wiederhergestellt werden.
+5. **P2 — Remote-Referenz im Frontend-Kit:** nach Adressvertrag ID-basiertes Öffnen, Reconnect und Offline-Zustand ergänzen. Offline darf keinen gespeicherten Verweis löschen.
+6. **P2 — Host-Modell abstimmen:** Ordnergrenzen, Open/Curated, Rollen und vererbte Redaktionsrechte präzisieren. Implementierung bleibt ausdrücklich ausgesetzt, bis das Modell abgestimmt ist.
+7. **P3 — Physische Modulgrenzen:** nach den Verträgen Core, Node API, Frontend-Kit und optionale Adapter schrittweise organisatorisch trennen; `index.php`-Bundle-Kompatibilität bleibt bei jedem Schritt getestet.
