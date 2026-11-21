@@ -273,6 +273,7 @@ PHP
 
     // Inline viewer helpers so the built output stays single-file (no require_once).
     $viewerSharedParts = [
+        '/includes/Core/RemoteNodeAddresses.php',
         '/includes/viewer/utils/core.php',
         '/includes/viewer/utils/targets.php',
         '/includes/viewer/utils/remote-html.php',
@@ -345,6 +346,7 @@ PHP
         '/mcp/routes/prompt-template.php',
         '/includes/Core/RemoteFeedImport.php',
         '/mcp/routes/remote-content.php',
+        '/mcp/routes/reconnect-node.php',
         '/mcp/routes/remote-presentation.php',
         '/mcp/routes/converters.php',
         '/mcp/routes/convert.php',
@@ -441,6 +443,8 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $baseDir,
                     'path' => mcpRoutePath(),
                 ]));
+            case 'reconnect-node':
+                mcpJsonResponse(handleReconnectNode($baseDir, mcpReadRequestData(), $_SERVER['REQUEST_METHOD'] ?? 'GET'));
             case 'import-remote':
                 $remoteInput = mcpReadRequestData();
                 mcpJsonResponse(handleImportRemote([
@@ -551,6 +555,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'nav') {
 
 // Route mapper for hash-only slugs. Browser hashes are not sent on refresh,
 // so the client asks this endpoint to map #slug back to the filesystem item.
+if (($_GET['ajax'] ?? '') === 'node-identity') {
+    cmsHandleNodeIdentityRoute($baseDir);
+}
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'resolve') {
     cmsHandleResolveRoute($baseDir);
 }

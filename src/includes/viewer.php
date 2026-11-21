@@ -9,6 +9,10 @@ require_once __DIR__ . '/nav-render.php';
 require_once __DIR__ . '/viewer/edit.php';
 require_once __DIR__ . '/viewer/render.php';
 
+if (($_GET['ajax'] ?? '') === 'node-identity') {
+    cmsHandleNodeIdentityRoute(cmsProjectRootDir());
+}
+
 if ((string) ($_GET['ajax'] ?? '') === 'resolve') {
     @require_once __DIR__ . '/MediaType.php';
     @require_once __DIR__ . '/Worktype.php';
@@ -28,6 +32,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
     require_once __DIR__ . '/../mcp/routes/edit-config.php';
     require_once __DIR__ . '/../mcp/routes/prompt-template.php';
     require_once __DIR__ . '/../mcp/routes/remote-content.php';
+    require_once __DIR__ . '/../mcp/routes/reconnect-node.php';
     require_once __DIR__ . '/../mcp/routes/remote-presentation.php';
     require_once __DIR__ . '/../mcp/routes/converters.php';
     require_once __DIR__ . '/../mcp/routes/convert.php';
@@ -92,6 +97,8 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $rootDir,
                     'path' => mcpRoutePath(),
                 ]));
+            case 'reconnect-node':
+                mcpJsonResponse(handleReconnectNode($rootDir, mcpReadRequestData(), $_SERVER['REQUEST_METHOD'] ?? 'GET'));
             case 'import-remote':
                 $remoteInput = mcpReadRequestData();
                 mcpJsonResponse(handleImportRemote([

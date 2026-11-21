@@ -1,4 +1,4 @@
-import { requestEditConfig, requestEditDelete } from '../api/edit.js';
+import { requestEditConfig, requestEditDelete, requestMcpRoute } from '../api/edit.js';
 import { extractNavHtml } from '../core/utils.js';
 
 export function createSidebarController({
@@ -311,6 +311,26 @@ export function createSidebarController({
 
     function handleNavClick(event) {
         if (!navList) {
+            return;
+        }
+        const reconnectAction = event.target.closest?.('[data-nav-action="reconnect-node"]');
+        if (reconnectAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const url = window.prompt('New HTTPS address of the source PageOff node');
+            if (!url?.trim()) {
+                return;
+            }
+            reconnectAction.disabled = true;
+            requestMcpRoute('reconnect-node', { nodeId: reconnectAction.dataset.nodeId, url: url.trim() })
+                .then((response) => {
+                    if (response?.ok) {
+                        navigateToPath(currentFolderPath, { isFile: false, forceRefresh: true, updateHash: false });
+                    } else {
+                        window.alert(response?.error || 'Could not update the node address.');
+                    }
+                })
+                .finally(() => { reconnectAction.disabled = false; });
             return;
         }
         const reviewAction = event.target.closest?.('[data-nav-action="review-external"]');

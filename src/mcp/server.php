@@ -21,6 +21,7 @@ require_once __DIR__ . '/routes/create.php';
 require_once __DIR__ . '/routes/edit-config.php';
 require_once __DIR__ . '/routes/prompt-template.php';
 require_once __DIR__ . '/routes/remote-content.php';
+require_once __DIR__ . '/routes/reconnect-node.php';
 require_once __DIR__ . '/routes/remote-presentation.php';
 require_once __DIR__ . '/routes/converters.php';
 require_once __DIR__ . '/routes/convert.php';
@@ -38,6 +39,10 @@ $targetFile = mcpRouteFile();
 $stylePrompt = mcpRouteStyle();
 
 header('Content-Type: application/json');
+
+if ($route === 'reconnect-node') {
+    mcpJsonResponse(handleReconnectNode($rootDir, mcpReadRequestData(), $_SERVER['REQUEST_METHOD'] ?? 'GET'));
+}
 
 $tree = mcpBuildFileTree($rootDir, $rootDir);
 $configState = mcpEnsureConfig($configPath, $tree);

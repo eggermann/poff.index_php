@@ -13,6 +13,10 @@ Stand: 20. November 2026. Bestandsaufnahme aus dem Quellcode, kein Nachweis eine
 
 ## Begriffsregel: Node API und MCP
 
+Für einen Domainwechsel sendet der Editor einen JSON-POST an `?mcp=1&route=reconnect-node` mit `nodeId` und `url`. Die URL bezeichnet den öffentlichen HTTPS-Einstieg des Ursprungs-Nodes, zum Beispiel `https://beispiel.de/studio/index.php`. Die Gegenstelle meldet ihre gespeicherte Node-ID über `?ajax=node-identity`. Die Prüfung benötigt PHP ab 8.2 und cURL. Nur bei Übereinstimmung speichert PageOff die Adresse. Diese Bestätigung beruht auf HTTPS und der vom Ziel gemeldeten ID. Es gibt dafür keine Signatur mit einem Node-Schlüssel.
+
+Beim Öffnen eines Works nutzt der Viewer die bestätigte Adresse mit `?ajax=resolve&open=1&nodeId=…&workId=…`. Der Ziel-Node leitet bei einem eindeutigen sichtbaren Treffer zur aktuellen Work-Ansicht weiter. Die bestehende JSON-Auflösung bleibt ohne `open=1` verfügbar.
+
 `?mcp=1&route=…` in `viewer.php` und den Einzeldateien ist die bestehende PageOff JSON Node API; der Parametername ist historisch. `src/mcp/server.php` ist ein separater JSON-Router mit eigenem Dispatch. Das eigentliche Streamable-MCP-Tool-Protokoll ist `src/mcp/http-server.php`. Diese Flächen unterscheiden sich in Routen, Requestschemas, Initialisierung und Seiteneffekten.
 
 Für die Zielarchitektur bleibt die bestehende JSON-Node-API als Kompatibilitätsadapter in `index.php`. Das Streamable-MCP-Protokoll ist optional und darf nur auf die transportfreien Core-Operationen zugreifen. Ein Build-Schalter darf nicht versehentlich die JSON-API entfernen, die vorhandene Viewer-/Editor-Clients verwenden.

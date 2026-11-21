@@ -69,7 +69,27 @@ function cmsCompactFolderRenderContext(array $context): array
     return $context;
 }
 
-function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullPath): array
+function cmsUseConfirmedWorkLinks(array $items, array $addresses): array
+{
+    foreach ($items as &$item) {
+        if (!empty($item['isVirtual'])) {
+            $url = PoffRemoteNodeAddresses::workUrl($addresses, $item);
+            if ($url !== '') {
+                $viewerHref = cmsBuildViewerHrefFromRelativePath($item['relativePath'], $item['isFile']);
+                foreach (['viewerHref', 'viewUrl', 'workUrl', 'pageLink', 'pageUrl'] as $field) {
+                    $item[$field] = $viewerHref;
+                }
+                $item['linkUrl'] = $url;
+            }
+        }
+        if (!empty($item['children'])) {
+            $item['children'] = cmsUseConfirmedWorkLinks($item['children'], $addresses);
+        }
+    }
+    return $items;
+}
+
+function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullPath, ?string $rootDir = null): array
 {
     $folderConfig = null;
     if (class_exists('PoffConfig')) {
@@ -107,6 +127,15 @@ function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullP
         'title' => $folderConfig['title'] ?? $rawName,
         'slug' => $rawSlug === '' ? 'item' : $rawSlug,
     ], trim($relativePath, '/\\') === '' ? ['maxDepth' => 0] : []);
+    $addresses = $rootDir === null ? [] : PoffRemoteNodeAddresses::load($rootDir);
+    if ($addresses !== []) {
+        foreach ($folderViewData as $key => $items) {
+            if ($key === 'tree' || str_starts_with($key, 'all')) {
+                $folderViewData[$key] = cmsUseConfirmedWorkLinks($items, $addresses);
+            }
+        }
+        $folderViewData['workTree']['children'] = $folderViewData['tree'];
+    }
     $tree = $folderViewData['tree'];
     $descriptionHtml = '';
     if (!empty($folderConfig['description'])) {
@@ -206,9 +235,9 @@ function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullP
     ];
 }
 
-function renderFolderViewer(string $relativePath, string $fullPath): void
+function renderFolderViewer(string $relativePath, string $fullPath, ?string $rootDir = null): void
 {
-    $payload = cmsBuildFolderViewerSnapshotPayload($relativePath, $fullPath);
+    $payload = cmsBuildFolderViewerSnapshotPayload($relativePath, $fullPath, $rootDir);
     renderViewerShell([
         'type' => $payload['type'],
         'name' => $payload['name'],

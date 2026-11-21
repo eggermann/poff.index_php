@@ -32,6 +32,8 @@ function cmsIsHiddenSystemEntry(string $entry): bool
         'poff.config.json',
         'poff.node.json',
         '.poff-node-identity.lock',
+        '.poff-node-addresses.json',
+        '.poff-node-addresses.lock',
         '.poff-auth.php',
         'auth.config.php',
         '.works',

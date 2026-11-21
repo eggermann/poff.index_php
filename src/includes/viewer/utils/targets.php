@@ -281,6 +281,20 @@ function cmsResolveSlugRouteInTree(string $rootDir, string $relativeDir, string 
     return null;
 }
 
+function cmsHandleNodeIdentityRoute(string $rootDir): void
+{
+    header('Cache-Control: no-store');
+    try {
+        $nodeId = PoffNodeIdentity::read($rootDir);
+    } catch (RuntimeException) {
+        cmsJsonResponse(['error' => 'Node identity is invalid.'], 500);
+    }
+    if ($nodeId === null) {
+        cmsJsonResponse(['error' => 'Node identity not found.'], 404);
+    }
+    cmsJsonResponse(['nodeId' => $nodeId]);
+}
+
 function cmsHandleResolveRoute(string $rootDir): void
 {
     $workId = trim((string) ($_GET['workId'] ?? ''));
@@ -288,7 +302,7 @@ function cmsHandleResolveRoute(string $rootDir): void
         $nodeId = trim((string) ($_GET['nodeId'] ?? ''));
         if (
             PoffNodeIdentity::normalizeId($nodeId) === ''
-            || preg_match('/^poff_[a-z0-9._-]{1,120}$/i', $workId) !== 1
+            || preg_match('/^poff_[a-z0-9._-]{1,120}$/iD', $workId) !== 1
         ) {
             cmsJsonResponse(['resolved' => false, 'error' => 'Invalid Work reference.'], 400);
         }
@@ -324,6 +338,16 @@ function cmsHandleResolveRoute(string $rootDir): void
         }
 
         $match = $matches[0];
+        if (($_GET['open'] ?? '') === '1') {
+            $target = $match['type'] === 'folder' ? 'path' : 'file';
+            $url = '?view=1&' . $target . '=' . rawurlencode((string) $match['path']);
+            if ($includeHiddenWorks) {
+                $url .= '&edit=true';
+            }
+            header('Cache-Control: no-store');
+            header('Location: ' . $url, true, 302);
+            exit;
+        }
         cmsJsonResponse([
             'resolved' => true,
             'nodeId' => $nodeId,

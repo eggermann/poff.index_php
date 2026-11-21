@@ -10,6 +10,7 @@ require_once __DIR__ . '/../src/includes/NodeIdentity.php';
 require_once __DIR__ . '/../src/includes/viewer/render.php';
 require_once __DIR__ . '/../src/mcp/helpers.php';
 require_once __DIR__ . '/../src/mcp/routes/remote-content.php';
+require_once __DIR__ . '/../src/mcp/routes/reconnect-node.php';
 require_once __DIR__ . '/../src/mcp/routes/remote-presentation.php';
 
 $mode = $argv[1] ?? '';
@@ -25,6 +26,17 @@ if ($rootDir === '') {
 $payload = $payloadRaw !== '' ? json_decode($payloadRaw, true) : [];
 if (!is_array($payload)) {
     $payload = [];
+}
+
+if ($mode === 'reconnect') {
+    if (($payload['authenticated'] ?? true) === false) {
+        putenv('POFF_TEST_AUTH_BYPASS=0');
+    }
+    $probe = array_key_exists('probeNodeId', $payload)
+        ? static fn(string $url): ?string => $url === $payload['url'] . '?ajax=node-identity' ? $payload['probeNodeId'] : null
+        : null;
+    echo json_encode(handleReconnectNode($rootDir, $payload, $payload['method'] ?? 'POST', $probe));
+    exit(0);
 }
 
 if ($mode === 'export') {

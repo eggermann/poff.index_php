@@ -44,7 +44,7 @@ Das Frontend-Kit rendert Works, stellt Layouts und Gestaltung bereit, bietet Ord
 
 Ob ein fremder Node wie ein Ordner durchsuchbar ist oder als Einstiegspunkt erscheint, entscheidet das Frontend-Kit. Core stellt dafür die nötigen öffentlichen Informationen und Zugriffe bereit.
 
-**Code-Stand:** Viewer/Rendering und Navigation liegen derzeit in `src/includes/viewer/`, `src/includes/nav-render.php` und `src/assets/js/`; ein eigenständiges Frontend-Kit-Paket existiert nicht. Remote Einbettung nutzt überwiegend `linkUrl`/`pageLink`, Hash-Routen und Snapshot-/HTML-Fallbacks. Die UI verwendet noch keine dauerhafte Remote-Auflösung über `(nodeId, workId)` und hat keinen expliziten Offline-/Reconnect-Zustand. Der lokale Resolver ist vorhanden. Der authentifizierte `edit=move`-Endpunkt hat nun eine einfache Sidebar-Aktion für Zielordner und Umbenennung; eine ausgebaute Verschieben-/Drag-and-drop-Oberfläche ist nicht enthalten.
+**Code-Stand:** Viewer und Navigation liegen in `src/includes/viewer/`, `src/includes/nav-render.php` und `src/assets/js/`. Für einen bestätigten Ursprungs-Node öffnet der Viewer externe Works über `(nodeId, workId)`. Bei anderen Einträgen greifen die bestehenden Links und Vorschauen. Die Sidebar bietet **Reconnect** und die Move-Aktion. Eine eigene Erreichbarkeitsanzeige bleibt offen.
 
 **Frontend-Zielregel:** Ein lokales Layout darf die Präsentation einer Verbindung ändern, aber weder Quell-Work noch Identität verändern. Die UI folgt einer Verbindung über ihre stabile Referenz, zeigt Offline-Verfügbarkeit als Zustand der Verbindung und bewahrt sie bei Fehlern. Navigation in einen fremden Node bleibt eine bewusste Frontend-Entscheidung; direkte Graph-Kanten werden nicht stillschweigend zu rekursivem Crawling.
 
@@ -71,12 +71,12 @@ Für den Graphen gilt als Zielregel:
 - Eine Verbindung gehört dem lokalen Parentfolder und ist ein eigener lokaler Tree-Eintrag. Derselbe entfernte Work darf in mehreren Parentfoldern unabhängig präsentiert werden.
 - Wenn bekannt, bezeichnet `target = (nodeId, workId)` eindeutig den ursprünglichen Work. Node-Adresse, Domain, Pfad und `pageLink` sind änderbare Erreichbarkeitshinweise und ändern die Identität nicht. Die Adresse muss dem jeweiligen Node zugeordnet sein; `remoteFeedUrl` kann bei einem Relay nur den Vermittler erreichen und reicht nicht zwingend, um den ursprünglichen Node aufzulösen.
 - `remoteFeedNodeId` beschreibt bei weitergereichten Feeds den unmittelbaren Vermittler; `remoteNodeId` + `remoteWorkId` bleiben die Herkunft. Relay darf die Ursprungsreferenz nicht in eine neue Identität umschreiben.
-- Eine stabile Node-ID löst keine Adresse auf. Ohne zentrale Pflichtinstanz muss eine neue Adresse über eine bekannte Verbindung, einen direkten erneuten Austausch oder ein freiwilliges Verzeichnis gelernt werden. Es gibt noch keine beschlossene Address-Discovery-Regel.
+- Der Editor kann über **Reconnect** die zuletzt bestätigte Adresse einer Node-ID aktualisieren. PageOff prüft die ID an der neuen öffentlichen HTTPS-Adresse und speichert höchstens eine Adresse pro Node-ID in `.poff-node-addresses.json` am lokalen Node-Root. Vor der ersten Bestätigung dienen die bestehenden URLs als Einstieg.
 - Ein nicht erreichbarer Node löscht keine Verbindung. `offline` soll aus Erreichbarkeitsprüfung und Abrufzeit abgeleitet werden, nicht zur Identität gehören. Ein solches Status-/Cachemodell ist aktuell noch nicht implementiert.
 - Mounten soll nur eine lokale Parentfolder-Verbindung anlegen. Unmounten darf nur diesen Eintrag entfernen, niemals die Ressource am Ursprungs-Node. Transitive Verbindungen werden nicht automatisch importiert.
 - Links ohne stabile Node-/Work-Paarung bleiben normale URL-Verbindungen und dürfen nicht fälschlich als dauerhafte Work-Referenzen behandelt werden.
 
-Noch zu entscheiden sind das konkrete Add/Remove-API, Erreichbarkeitsspeicher und Cache-Frische, Umgang mit mehreren URLs für dieselbe Node-ID, Address-Discovery nach Domainwechseln, sowie wann ein Feed-Eintrag aus `remoteSources` entfernt werden darf, wenn weitere Works ihn noch referenzieren. Vor dieser Entscheidung werden keine neuen Graph-Felder eingeführt.
+Noch zu entscheiden sind das konkrete Add/Remove-API, die Erreichbarkeitsanzeige und die Bereinigung gemeinsam genutzter Feed-Abos. Der Editor kann eine bekannte neue Adresse bereits manuell bestätigen.
 
 Ein Host speichert nur direkte Verbindungen; indirekte Verbindungen fremder Nodes werden nicht automatisch übernommen. Mounten erstellt eine Verbindung. Unmounten entfernt diese Verbindung, nicht die Ursprungsressource. Bei Nichterreichbarkeit bleibt die Verbindung bestehen und kann offline angezeigt werden.
 

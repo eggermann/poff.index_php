@@ -4582,6 +4582,8 @@ describe('Worktype HBS renderer', () => {
         'newWorkId',
         'reassignWorkIdForCopy',
         'PoffRemoteFeedImport',
+        'class PoffRemoteNodeAddresses',
+        'function handleReconnectNode',
         'findWorkLocationsById',
         'cmsMoveTarget',
         'class PoffNodeIdentity',
@@ -5889,6 +5891,56 @@ describe('Worktype HBS renderer', () => {
       expect(rendered).not.toContain('href="https://remote.example/portfolio"');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('reconnects existing remote works to their confirmed origin after a domain change', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-node-address-'));
+    const origin = 'poff_node_1234567890abcdef1234567890abcdef';
+    const relay = 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const workId = 'poff_1111111111111111';
+    const oldUrl = 'https://old.example/index.php';
+    const newUrl = 'https://new.example/studio/index.php';
+    const folder = path.join(root, 'collection');
+    const configPath = path.join(folder, 'poff.config.json');
+    try {
+      fs.mkdirSync(folder);
+      fs.writeFileSync(configPath, JSON.stringify({
+        tree: [{
+          name: 'Photo',
+          path: 'photo',
+          type: 'file',
+          pageLink: oldUrl + '?view=1&file=photo',
+          remoteNodeId: origin,
+          remoteWorkId: workId,
+          remoteFeedNodeId: relay,
+          externalWork: true,
+        }],
+      }));
+
+      const update = (url, probeNodeId, overrides = {}) => runRemoteContent('reconnect', root, '', {
+        nodeId: origin, url, probeNodeId, ...overrides,
+      });
+      const originalConfig = fs.readFileSync(configPath, 'utf8');
+      expect(await update(oldUrl, origin, { method: 'GET' })).toMatchObject({ ok: false, error: expect.stringMatching(/POST/) });
+      expect(await update(oldUrl, origin, { authenticated: false })).toMatchObject({ ok: false, allowed: false });
+      expect(await update(oldUrl, origin)).toMatchObject({ ok: true });
+      expect(await update(newUrl, relay)).toMatchObject({ ok: false, error: expect.stringMatching(/expected node ID/) });
+      const addressPath = path.join(root, '.poff-node-addresses.json');
+      expect(JSON.parse(fs.readFileSync(addressPath, 'utf8'))).toEqual({ [origin]: oldUrl });
+      expect(await update(newUrl, origin)).toMatchObject({ ok: true, nodeId: origin, url: newUrl });
+      expect(JSON.parse(fs.readFileSync(addressPath, 'utf8'))).toEqual({ [origin]: newUrl });
+      expect(fs.readFileSync(configPath, 'utf8')).toBe(originalConfig);
+
+      const html = await runViewer('collection/photo', root);
+      expect(html).toContain(newUrl + '?ajax&#x3D;resolve');
+      expect(html).toContain('nodeId&#x3D;' + origin);
+      expect(html).toContain('workId&#x3D;' + workId);
+      expect(html).toContain('open&#x3D;1');
+      expect(html).not.toContain(oldUrl);
+      expect(await runViewer('collection', root)).toContain('?view&#x3D;1&amp;file&#x3D;collection%2Fphoto');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

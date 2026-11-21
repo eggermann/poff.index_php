@@ -168,6 +168,7 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $bas
     $isHidden = !empty($item['hidden']);
     $isPendingApproval = !empty($item['pendingApproval']);
     $isApprovedExternal = !empty($item['approvedExternal']);
+    $remoteNodeId = (string) ($item['remoteNodeId'] ?? '');
     $isConverter = cmsNavIsConverterItem($item, $isFile, $baseDir);
     $displayName = (string) ($item['title'] ?? $item['name']);
     $hiddenAttrs = $isHidden
@@ -193,6 +194,7 @@ function cmsNavRenderItem(array $item, bool $editMode, bool $isFile, string $bas
         . $item['icon'] . '<span class="nav-link__label">' . htmlspecialchars($displayName) . '</span>' . cmsNavBadgeForItem($isHidden, $isPendingApproval, $isApprovedExternal, $isConverter) . '</a>'
         . cmsNavActionGroup(
             $isPendingApproval ? cmsNavActionButton('Review', 'Review external link submission', 'nav-row-action-review', cmsNavIcon('pending'), ' data-nav-action="review-external" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '',
+            $editMode && !$isPendingApproval && $remoteNodeId !== '' ? cmsNavActionButton('Reconnect', 'Update the source node address', 'nav-row-action-reconnect', cmsNavIcon('move'), ' data-nav-action="reconnect-node" data-node-id="' . htmlspecialchars($remoteNodeId) . '"') : '',
             $editMode ? cmsNavActionButton('Copy', 'Copy + paste', 'nav-row-action-copy', cmsNavIcon('copy'), cmsNavCopyPasteAttr((string) ($item['copyText'] ?? $item['name']))) : '',
             $editMode && !$isPendingApproval ? cmsNavActionButton('Move', 'Move or rename this work', 'nav-row-action-move', cmsNavIcon('move'), ' data-nav-action="move-target" data-nav-path="' . htmlspecialchars($item['path']) . '"') : '',
             $editMode && !$isPendingApproval ? cmsNavActionButton($isHidden ? 'Unhide' : 'Hide', $isHidden ? 'Unhide in sidebar' : 'Hide from sidebar', 'nav-row-action-toggle', $isHidden ? cmsNavIcon('show') : cmsNavIcon('hide'), ' data-nav-action="toggle-visibility" data-nav-path="' . htmlspecialchars($item['path']) . '" data-nav-hidden="' . ($isHidden ? '1' : '0') . '"') : '',
@@ -271,6 +273,7 @@ function cmsRenderNavListMarkup(array $context): string
     $tree = $currentNavConfig['tree'] ?? null;
 
     if (is_array($tree)) {
+        $addresses = PoffRemoteNodeAddresses::load($baseDir);
         foreach ($tree as $item) {
             $isHidden = isset($item['visible']) && $item['visible'] === false;
             $approvalStatus = trim((string) ($item['approvalStatus'] ?? ''));
@@ -298,12 +301,17 @@ function cmsRenderNavListMarkup(array $context): string
                 'hidden' => $isHidden,
                 'pendingApproval' => $isPendingApproval,
                 'approvedExternal' => $isApprovedExternal,
+                'remoteNodeId' => $navEditorAuthenticated ? PoffNodeIdentity::normalizeId($item['remoteNodeId'] ?? null) : '',
             ];
 
             if ($itemType === 'folder') {
                 $directories[] = cmsNavEntry($itemName, $relativePath, 'folder', $folderIcon, $item, null, $editQuery) + $entry;
             } else {
-                $files[] = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $relativePath, $editQuery) + $entry;
+                $fileEntry = cmsNavEntry($itemName, $relativePath, 'file', $fileIcon, $item, $relativePath, $editQuery);
+                if (PoffRemoteNodeAddresses::workUrl($addresses, $item) !== '') {
+                    $fileEntry['view_url'] = '';
+                }
+                $files[] = $fileEntry + $entry;
             }
         }
     } else {
