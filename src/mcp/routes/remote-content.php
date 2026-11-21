@@ -733,6 +733,15 @@ function handleImportRemote(array $opts): array
         ? $config['remoteSources'] : [];
 
     if ($replace) {
+        foreach ($existingRemoteSources as $existingSource) {
+            if (!is_array($existingSource) || (string) ($existingSource['url'] ?? '') !== $url) {
+                continue;
+            }
+            $existingNodeId = mcpRemoteStableNodeId($existingSource['nodeId'] ?? '');
+            if ($existingNodeId !== '' && $existingNodeId !== $sourceNodeId) {
+                return array_merge(['route' => 'import-remote'], mcpRemoteContentError('Feed URL belongs to a different or unverifiable node.'));
+            }
+        }
         $matchedUrls = [$url => true];
         $existingRemoteSources = array_values(array_filter($existingRemoteSources, static function ($source) use ($sourceNodeId, $sourcePath, $url, &$matchedUrls): bool {
             if (!is_array($source)) {

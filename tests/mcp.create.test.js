@@ -7463,6 +7463,31 @@ describe('Worktype HBS renderer', () => {
     }
   });
 
+  test('rejects replacement when a feed URL is already bound to another node', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-feed-conflict-'));
+    const url = 'https://origin.example/feed';
+    const oldNode = 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const newNode = 'poff_node_0123456789abcdef0123456789abcdef';
+    fs.writeFileSync(path.join(root, '.edit.allow'), '');
+    fs.writeFileSync(path.join(root, 'poff.config.json'), JSON.stringify({
+      tree: [{ name: 'Original', type: 'file', pageLink: 'https://origin.example/work', remoteFeedUrl: url, remoteSource: oldNode }],
+      remoteSources: [{ id: oldNode, nodeId: oldNode, path: 'folder', url }],
+    }));
+    try {
+      const result = await runRemoteContent('import', root, '', {
+        url, sourceId: oldNode, replace: true,
+        mockResponse: { status: 200, body: { source: { nodeId: newNode, path: 'folder' }, items: [{ name: 'New', type: 'file', pageLink: 'https://origin.example/new' }] } },
+      });
+      expect(result.error).toBe('Feed URL belongs to a different or unverifiable node.');
+      const config = JSON.parse(fs.readFileSync(path.join(root, 'poff.config.json'), 'utf8'));
+      expect(config.tree.map((item) => item.name)).toContain('Original');
+      expect(config.tree.map((item) => item.name)).not.toContain('New');
+      expect(config.remoteSources).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId: oldNode, url })]));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('copies remote export files into a new local folder and creates a looping player', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-copy-'));
     const exportUrl = 'https://origin.example/?mcp=1&route=export-content&path=films';
