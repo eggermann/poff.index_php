@@ -24,6 +24,16 @@ Die Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und ver�
 
 Die zufällige Metadaten-ID ist ein nützlicher Ausgangspunkt, aber aktuell keine eindeutige dauerhafte Identität innerhalb eines Nodes, wie der lokale Snapshot zeigt. Vor einer öffentlichen Auflösung braucht es weiterhin eine Regel für bestehende ID-Konflikte. Verwaltetes Verschieben muss Metadaten samt Identität erhalten; jede Kopie wird als neues Work behandelt und erhält eine neue ID.
 
+## Rename und Move: vorhandene Dateisystem-Grenze
+
+Das bestätigte Identitätsziel ist noch keine vorhandene Move-Funktion. Der Edit-Dispatcher kennt `auth`, `config`, `save`, `prompt`, `upload`, `delete`, `reset` und `models`; einen Rename- oder Move-Aufruf gibt es derzeit nicht.
+
+- **Folder:** Die ID liegt in `poff.config.json` im Folder. Wird der ganze Folder innerhalb desselben Dateisystems verschoben oder umbenannt, wandert diese Datei samt ID mit. Verschieben aktualisiert aber nicht automatisch die Tree-Konfiguration des alten und neuen Parents; `PoffConfig::ensure()` projiziert den physischen Bestand und erhält nur passende bestehende Einträge bzw. konfigurierte virtuelle Links.
+- **File:** Die ID und File-Overrides liegen in `.works/<Dateiname>.config.json`; ein eigener Layout-Override kann in `.works/<Dateiname>.layout/` liegen. Nur die Ressource umzubenennen oder zu verschieben lässt diese Sidecars am alten Namen zurück. Beim neuen Namen kann später eine neue ID entstehen; der alte Layout-Override wird dem neuen Namen nicht zugeordnet.
+- **Sicherer Vertrag für eine spätere verwaltete Operation:** dieselbe Node, Rename oder Move ohne Überschreiben eines bestehenden Ziels; Folder-Metadaten bewegen sich mit dem ganzen Folder. Bei Files werden Ressource, Config-Sidecar und Layout-Sidecar zusammen bewegt, und die beiden Parent-Trees werden aktualisiert. Ein Fehler darf keinen halbfertigen Move hinterlassen. Eine Kopie bleibt eine neue Work-ID.
+
+Damit ist „Move behält Work-ID“ derzeit eine beschlossene Zielregel, keine durch UI oder API garantierte Funktion. Für direkte Dateisystemoperationen hängt das Ergebnis davon ab, ob die zugehörigen Sidecars mitbewegt werden.
+
 ## Resolver- und Kollisionsaudit (Workspace-Snapshot 21. November 2026)
 
 Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadatendateien unter dem lokalen `pages/`-Baum fand eine doppelte ID in `.layout/poff.config.json` und `.layout copy/poff.config.json` unter `dominikeggermann.comX`. Beide liegen in versteckten Layout-Verzeichnissen, die keine sichtbaren Works sind; das war eine Metadaten-Kollision, kein Beleg für doppelte öffentliche Work-IDs. Keine Migration wurde ausgeführt. Der Befund gilt nur für diesen Workspace-Snapshot.
@@ -32,7 +42,7 @@ Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadate
 
 ## Nächste Entscheidungen
 
-1. Wie bleibt die Work-ID beim Umbenennen erhalten, obwohl der Datei-Metadatensatz aktuell an den Dateinamen gekoppelt ist? Eine Rename-Operation muss Quelldaten atomar mitbewegen.
+1. Eine authentifizierte, atomar rückrollbare Rename-/Move-Operation für Folder und Files spezifizieren und testen. Bei Files müssen Ressource, Config-Sidecar und optionales Layout-Sidecar gemeinsam bewegt werden; anschließend beide Parent-Trees aktualisieren.
 2. Wie werden künftige echte ID-Kollisionen migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
 3. Wie wird eine vollständige Serverkopie vor dem Betrieb mit einer neuen Node-ID versehen?
 4. Bei größerem Bestand messen, ob der lesende Scan genügt oder ein abgeleiteter, neu aufbaubarer Index nötig wird.
