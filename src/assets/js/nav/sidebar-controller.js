@@ -254,6 +254,49 @@ export function createSidebarController({
         await loadNav(currentFolderPath);
     }
 
+    async function moveNavEntry(link) {
+        if (!link) {
+            return;
+        }
+        const sourcePath = link.getAttribute('data-path') || link.getAttribute('data-src') || '';
+        if (!sourcePath) {
+            return;
+        }
+
+        const destination = window.prompt(
+            'Destination folder path, relative to this PageOff node. Leave blank for the root folder:',
+            currentFolderPath
+        );
+        if (destination === null) {
+            return;
+        }
+
+        const sourceName = sourcePath.split('/').filter(Boolean).pop() || sourcePath;
+        const name = window.prompt('New name. Leave blank to keep the current name:', sourceName);
+        if (name === null) {
+            return;
+        }
+
+        const response = await requestEditConfig('move', {
+            path: sourcePath,
+            destination: destination.trim(),
+            name: name.trim(),
+        });
+        if (!response || response.error || response.allowed === false) {
+            window.alert(response?.error || 'Move failed.');
+            return;
+        }
+
+        if (typeof navigateToPath === 'function') {
+            navigateToPath(destination.trim(), {
+                isFile: false,
+                forceRefresh: true,
+            });
+            return;
+        }
+        await loadNav(destination.trim());
+    }
+
     function syncSidebarSelection(path = '', isFile = false, isLayout = false) {
         if (isLayout) {
             setActiveLayoutLink(path);
@@ -297,6 +340,14 @@ export function createSidebarController({
             event.stopPropagation();
             const rowLink = deleteAction.closest('li')?.querySelector('a[data-tree-item="1"]');
             deleteNavEntry(rowLink).catch(() => {});
+            return;
+        }
+        const moveAction = event.target.closest?.('[data-nav-action="move-target"]');
+        if (moveAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const rowLink = moveAction.closest('li')?.querySelector('a[data-tree-item="1"]');
+            moveNavEntry(rowLink).catch(() => {});
             return;
         }
         let target = event.target;

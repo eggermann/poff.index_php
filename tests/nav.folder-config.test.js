@@ -87,6 +87,7 @@ test('nav edit rendering includes fast hide actions for tree items', () => {
   expect(result.stderr).toBe('');
   expect(result.stdout).toContain('data-nav-action="toggle-visibility"');
   expect(result.stdout).toContain('data-nav-action="delete-target"');
+  expect(result.stdout).toContain('data-nav-action="move-target"');
   expect(result.stdout).toContain('nav-row-actions');
   expect(result.stdout).toContain('data-tree-item="1"');
   expect(result.stdout).toContain('nav-row-action__icon');

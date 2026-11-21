@@ -23,6 +23,7 @@ if ($baseDir === false || !is_dir($baseDir)) {
 if ($editMode) {
     $_GET['edit'] = 'true';
 }
+$_GET['ajax'] = 'nav';
 
 $currentRelativePath = trim($relativePath, "/\\");
 $currentAbsolutePath = $baseDir;

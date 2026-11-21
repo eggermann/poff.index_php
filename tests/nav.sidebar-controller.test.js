@@ -55,10 +55,12 @@ function loadSidebarController(overrides = {}) {
 
   const module = { exports: {} };
   const requestEditDeleteMock = jest.fn();
+  const requestEditConfigMock = jest.fn();
   const windowMock = {
     dispatchEvent: jest.fn(),
     confirm: jest.fn(() => true),
     alert: jest.fn(),
+    prompt: jest.fn(),
   };
   const context = vm.createContext({
     module,
@@ -70,6 +72,7 @@ function loadSidebarController(overrides = {}) {
     fetch: overrides.fetch || jest.fn(),
     extractNavHtml: overrides.extractNavHtml || ((html) => html),
     requestEditDelete: requestEditDeleteMock,
+    requestEditConfig: requestEditConfigMock,
     CustomEvent: class CustomEvent {
       constructor(type, init = {}) {
         this.type = type;
@@ -86,6 +89,7 @@ module.exports = {
 
   module.exports.createSidebarController.__windowMock = windowMock;
   module.exports.createSidebarController.__requestEditDeleteMock = requestEditDeleteMock;
+  module.exports.createSidebarController.__requestEditConfigMock = requestEditConfigMock;
   return module.exports.createSidebarController;
 }
 
@@ -338,6 +342,47 @@ describe('sidebar selection scroll', () => {
       path: 'album/second.mp4',
     });
     expect(navigateToPath).toHaveBeenCalledWith('album', {
+      isFile: false,
+      forceRefresh: true,
+    });
+  });
+
+  test('move actions preserve the source path, send destination and refresh its folder', async () => {
+    const createSidebarController = loadSidebarController();
+    const navigateToPath = jest.fn();
+    const requestEditConfigMock = createSidebarController.__requestEditConfigMock;
+    const windowMock = createSidebarController.__windowMock;
+    windowMock.prompt
+      .mockReturnValueOnce('archive/2026')
+      .mockReturnValueOnce('final.jpg');
+    requestEditConfigMock.mockResolvedValue({ allowed: true, moved: [{ to: 'archive/2026/final.jpg' }] });
+
+    const targetLink = createNavLink({ 'data-path': 'photos/draft.jpg', 'data-is-file': '1' });
+    const row = { querySelector: () => targetLink };
+    const moveButton = {
+      closest(selector) {
+        if (selector === '[data-nav-action="move-target"]') return this;
+        if (selector === 'li') return row;
+        return null;
+      },
+      getAttribute(name) {
+        return name === 'data-nav-path' ? 'photos/draft.jpg' : null;
+      },
+    };
+    const navList = { addEventListener(type, handler) { if (type === 'click') this.handler = handler; } };
+    const controller = createSidebarController({ navList, editQuery: '', navigateToPath, setLoadingVisible() {} });
+
+    controller.bindNavClick();
+    await navList.handler({ target: moveButton, preventDefault: jest.fn(), stopPropagation: jest.fn() });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(requestEditConfigMock).toHaveBeenCalledWith('move', {
+      path: 'photos/draft.jpg',
+      destination: 'archive/2026',
+      name: 'final.jpg',
+    });
+    expect(navigateToPath).toHaveBeenCalledWith('archive/2026', {
       isFile: false,
       forceRefresh: true,
     });
