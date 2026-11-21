@@ -10,6 +10,7 @@ Codebefund 20. November 2026; Folgeänderung 21. November 2026. Das ist ein Code
 - Die Dateibaum-Einträge führen aktuell Namen und Pfade; die untersuchten Tree-Projektionen sind keine unabhängige Work-ID-Auflösung.
 - Kein verwalteter Rename- oder Move-Endpunkt wurde im untersuchten Code gefunden. Die Edit-Aktionen schreiben Datei- und Config-Änderungen, aber kein identifiziertes Move-Protokoll.
 - Der MCP-Copy-Pfad für Verzeichnisse kopiert deren Konfigurationen mit den Dateien. Seit 21. November 2026 erhalten kopierte Folder- und Datei-Metadaten anschließend neue IDs; die Quell-IDs bleiben erhalten. Der Codebefund oben beschreibt den vorherigen Stand.
+- Der Remote-Feed-Import legt virtuelle Einträge im `tree` ohne lokale Work-ID an. Sie enthalten stattdessen `remoteSource`, `remotePath`, `routePath`/`routeSlug` und Remote-URLs. Das ist ein Remote-Verweis, keine lokale dauerhafte Work-Identität. Der separate Remote-Folder-Copy erzeugt eine neue lokale Folder-ID.
 - Der Copy-Pfad für einzelne Dateien kopiert die Quelldatei; kein fokussierter Test belegt, wie eine vorhandene `.works/`-ID behandelt wird.
 - Tests decken jetzt stabile IDs bei wiederholtem `ensure()`/`ensureFileConfig()` und neue IDs bei rekursiver Folder-Kopie ab. Rename/Move bleibt mangels verwalteter Operation ungeprüft.
 
@@ -31,6 +32,6 @@ Quelle: `src/includes/PoffConfig/core-helpers.php`, `src/includes/PoffConfig/lay
 
 Branch-lokale Regel: Eine Folder-Kopie erzeugt für jeden mitkopierten `poff.config.json`- und `.works/*.config.json`-Datensatz eine neue `poff_…` Work-ID. Quelldateien und Quell-IDs bleiben unverändert. Kopierte Einzeldateien enthalten keine Metadaten-Sidecars; bei einem neuen Ziel wird eine ID später wie bisher erzeugt. Wird eine bestehende Zieldatei ersetzt, bleiben ihre vorhandenen Metadaten und ID erhalten. Ein Move-Endpunkt existiert nicht und ist von dieser Regel nicht abgedeckt.
 
-`PoffConfig::newWorkId()` zentralisiert die ID-Vergabe im Core. `PoffConfig::reassignWorkIdForCopy()` nutzt dieselbe Vergabe für kopierte Metadaten. Der MCP-Copy-Pfad und der Remote-Import verwenden den gemeinsamen Core-Vertrag; bestehende Route-Parameter bleiben gleich. Provenienz (`copiedFrom`), Konfliktmigration bereits duplizierter IDs und öffentliche Node-ID-Auflösung bleiben offen.
+`PoffConfig::newWorkId()` zentralisiert die ID-Vergabe im Core. `PoffConfig::reassignWorkIdForCopy()` nutzt dieselbe Vergabe für kopierte Metadaten. Der MCP-Folder-Copy und der Remote-Folder-Copy verwenden den gemeinsamen Core-Vertrag; der virtuelle Remote-Feed-Import erstellt keine lokalen Work-IDs. Bestehende Route-Parameter bleiben gleich. Provenienz (`copiedFrom`), Konfliktmigration bereits duplizierter IDs und öffentliche Node-ID-Auflösung bleiben offen.
 
 Regressionstest kopiert isolierte Root- und Nested-Folder- sowie Datei-Metadaten, bestätigt vier neue IDs und prüft, dass Quell-Metadaten unverändert bleiben. Ein weiterer Test bestätigt, dass wiederholte `PoffConfig::ensure()`- und `ensureFileConfig()`-Aufrufe Folder- und File-IDs erhalten. Der temporäre Single-File-Build bestätigt, dass die Core-Methode in der gebündelten `PoffConfig`-Klasse enthalten ist.

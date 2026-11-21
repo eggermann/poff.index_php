@@ -6309,6 +6309,9 @@ describe('Worktype HBS renderer', () => {
 
     const leafEntry = storedConfig.tree.find((item) => item.name === 'Leaf Note');
     expect(leafEntry).toBeTruthy();
+    expect(leafEntry.id).toBeUndefined();
+    expect(leafEntry.remoteSource).toBe('origin-example');
+    expect(leafEntry.routePath).toBe('viewer-folder/child.txt');
     expect(leafEntry.renderedHtml).toBeUndefined();
     expect(leafEntry.template).toBeUndefined();
   });
