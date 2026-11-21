@@ -15,6 +15,25 @@ if (!is_array($input)) {
     exit(1);
 }
 
+if (($input['operation'] ?? '') === 'copyItems') {
+    $usedNames = [];
+    $names = [];
+    foreach (($input['names'] ?? []) as $index => $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $names[] = PoffRemoteFeedImport::uniqueCopyName(
+            PoffRemoteFeedImport::safeCopyName($item, (int) $index),
+            $usedNames
+        );
+    }
+    echo json_encode([
+        'items' => PoffRemoteFeedImport::flattenCopyItems(is_array($input['items'] ?? null) ? $input['items'] : []),
+        'names' => $names,
+    ], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $entries = PoffRemoteFeedImport::normalizeTreeEntries(
     is_array($input['payload'] ?? null) ? $input['payload'] : [],
     (string) ($input['sourceUrl'] ?? ''),

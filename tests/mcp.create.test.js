@@ -1870,6 +1870,29 @@ describe('MCP create route helper (CLI)', () => {
     expect(legacyEntries[0]).not.toHaveProperty('remoteWorkId');
   });
 
+  test('Core remote copy preparation flattens assets and allocates safe unique names', async () => {
+    const result = await runRemoteImportEntries({
+      operation: 'copyItems',
+      items: [
+        { type: 'folder', srcUrl: 'https://origin.example/folder', children: [
+          { type: 'file', srcUrl: 'https://origin.example/photo.jpg', name: 'photo.jpg' },
+          { type: 'file', srcUrl: '', name: 'no asset' },
+        ] },
+        { type: 'file', srcUrl: 'https://origin.example/nested/unsafe?.jpg', name: 'unsafe?.jpg' },
+        null,
+      ],
+      names: [
+        { name: 'photo.jpg' },
+        { name: 'photo.jpg' },
+        { name: '../unsafe?.jpg' },
+        { srcUrl: 'https://origin.example/', extension: '.png' },
+      ],
+    });
+
+    expect(result.items.map((item) => item.name)).toEqual(['photo.jpg', 'unsafe?.jpg']);
+    expect(result.names).toEqual(['photo.jpg', 'photo-2.jpg', 'unsafe-.jpg', 'remote-file-4.png']);
+  });
+
   test('formats prompt provider failures with status and redacted detail', async () => {
     const result = await runPhpJson('php_prompt_error_helpers.php');
 
