@@ -287,7 +287,7 @@ function cmsHandleResolveRoute(string $rootDir): void
     if ($workId !== '') {
         $nodeId = trim((string) ($_GET['nodeId'] ?? ''));
         if (
-            preg_match('/^poff_node_[a-f0-9]{32}$/', $nodeId) !== 1
+            PoffNodeIdentity::normalizeId($nodeId) === ''
             || preg_match('/^poff_[a-z0-9._-]{1,120}$/i', $workId) !== 1
         ) {
             cmsJsonResponse(['resolved' => false, 'error' => 'Invalid Work reference.'], 400);
