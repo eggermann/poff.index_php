@@ -6251,6 +6251,7 @@ describe('Worktype HBS renderer', () => {
           name: 'Leaf Note',
           title: 'Leaf Note',
           type: 'file',
+        id: 'poff_upstream-leaf-001',
         kind: 'text',
         path: 'viewer-folder/child.txt',
         relativePath: 'viewer-folder/child.txt',
@@ -6310,6 +6311,7 @@ describe('Worktype HBS renderer', () => {
     const leafEntry = storedConfig.tree.find((item) => item.name === 'Leaf Note');
     expect(leafEntry).toBeTruthy();
     expect(leafEntry.id).toBeUndefined();
+    expect(leafEntry.remoteWorkId).toBeUndefined();
     expect(leafEntry.remoteSource).toBe('origin-example');
     expect(leafEntry.routePath).toBe('viewer-folder/child.txt');
     expect(leafEntry.renderedHtml).toBeUndefined();

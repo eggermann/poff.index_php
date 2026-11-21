@@ -10,7 +10,7 @@ Codebefund 20. November 2026; Folgeänderung 21. November 2026. Das ist ein Code
 - Die Dateibaum-Einträge führen aktuell Namen und Pfade; die untersuchten Tree-Projektionen sind keine unabhängige Work-ID-Auflösung.
 - Kein verwalteter Rename- oder Move-Endpunkt wurde im untersuchten Code gefunden. Die Edit-Aktionen schreiben Datei- und Config-Änderungen, aber kein identifiziertes Move-Protokoll.
 - Der MCP-Copy-Pfad für Verzeichnisse kopiert deren Konfigurationen mit den Dateien. Seit 21. November 2026 erhalten kopierte Folder- und Datei-Metadaten anschließend neue IDs; die Quell-IDs bleiben erhalten. Der Codebefund oben beschreibt den vorherigen Stand.
-- Der Remote-Feed-Import legt virtuelle Einträge im `tree` ohne lokale Work-ID an. Sie enthalten stattdessen `remoteSource`, `remotePath`, `routePath`/`routeSlug` und Remote-URLs. Das ist ein Remote-Verweis, keine lokale dauerhafte Work-Identität. Der separate Remote-Folder-Copy erzeugt eine neue lokale Folder-ID.
+- Der Remote-Feed-Import legt virtuelle Einträge im `tree` ohne lokale Work-ID an. Er übernimmt auch keine eventuell im Feed gelieferte Quell-Work-ID. Die Einträge enthalten stattdessen `remoteSource`, `remotePath`, `routePath`/`routeSlug` und Remote-URLs. Das ist ein Remote-Verweis, keine lokale dauerhafte Work-Identität; eine stabile Bindung an die Quell-Work-ID geht derzeit verloren. Der separate Remote-Folder-Copy erzeugt eine neue lokale Folder-ID.
 - Der Copy-Pfad für einzelne Dateien kopiert die Quelldatei; kein fokussierter Test belegt, wie eine vorhandene `.works/`-ID behandelt wird.
 - Tests decken jetzt stabile IDs bei wiederholtem `ensure()`/`ensureFileConfig()` und neue IDs bei rekursiver Folder-Kopie ab. Rename/Move bleibt mangels verwalteter Operation ungeprüft.
 
