@@ -26,13 +26,13 @@ Die zufällige Metadaten-ID ist ein nützlicher Ausgangspunkt, aber aktuell kein
 
 ## Rename und Move: vorhandene Dateisystem-Grenze
 
-Das bestätigte Identitätsziel ist noch keine vorhandene Move-Funktion. Der Edit-Dispatcher kennt `auth`, `config`, `save`, `prompt`, `upload`, `delete`, `reset` und `models`; einen Rename- oder Move-Aufruf gibt es derzeit nicht.
+Der Edit-Dispatcher bietet jetzt `move` als authentifizierte POST-Aktion an. Der Request nimmt den bestehenden Quellpfad sowie `destination` (relativer Folder-Pfad, leer für Root) und optional `name` entgegen. Die Aktion bewegt nur physische Works, folgt keinen Symlinks, lehnt vorhandene Ziele ab und unterstützt keine virtuelle Layout-Targets.
 
 - **Folder:** Die ID liegt in `poff.config.json` im Folder. Wird der ganze Folder innerhalb desselben Dateisystems verschoben oder umbenannt, wandert diese Datei samt ID mit. Verschieben aktualisiert aber nicht automatisch die Tree-Konfiguration des alten und neuen Parents; `PoffConfig::ensure()` projiziert den physischen Bestand und erhält nur passende bestehende Einträge bzw. konfigurierte virtuelle Links.
 - **File:** Die ID und File-Overrides liegen in `.works/<Dateiname>.config.json`; ein eigener Layout-Override kann in `.works/<Dateiname>.layout/` liegen. Nur die Ressource umzubenennen oder zu verschieben lässt diese Sidecars am alten Namen zurück. Beim neuen Namen kann später eine neue ID entstehen; der alte Layout-Override wird dem neuen Namen nicht zugeordnet.
-- **Sicherer Vertrag für eine spätere verwaltete Operation:** dieselbe Node, Rename oder Move ohne Überschreiben eines bestehenden Ziels; Folder-Metadaten bewegen sich mit dem ganzen Folder. Bei Files werden Ressource, Config-Sidecar und Layout-Sidecar zusammen bewegt, und die beiden Parent-Trees werden aktualisiert. Ein Fehler darf keinen halbfertigen Move hinterlassen. Eine Kopie bleibt eine neue Work-ID.
+- **Move-Vertrag:** dieselbe Node, Rename oder Move ohne Überschreiben eines bestehenden Ziels; Folder-Metadaten bewegen sich mit dem ganzen Folder. Bei Files werden Ressource, Config-Sidecar und vorhandener Layout-Sidecar zusammen bewegt, danach werden beide Parent-Trees aktualisiert. Schlägt ein Teil-Rename fehl, werden bereits bewegte Teile zurückgesetzt. Eine Kopie bleibt eine neue Work-ID.
 
-Damit ist „Move behält Work-ID“ derzeit eine beschlossene Zielregel, keine durch UI oder API garantierte Funktion. Für direkte Dateisystemoperationen hängt das Ergebnis davon ab, ob die zugehörigen Sidecars mitbewegt werden.
+Damit ist die Identitätsregel für den verwalteten Move-Pfad umgesetzt. Es gibt noch keine Edit-UI für diese Aktion. Für direkte Dateisystemoperationen hängt die Identität weiterhin davon ab, ob alle zugehörigen Sidecars mitbewegt werden.
 
 ## Resolver- und Kollisionsaudit (Workspace-Snapshot 21. November 2026)
 
@@ -42,7 +42,7 @@ Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadate
 
 ## Nächste Entscheidungen
 
-1. Eine authentifizierte, atomar rückrollbare Rename-/Move-Operation für Folder und Files spezifizieren und testen. Bei Files müssen Ressource, Config-Sidecar und optionales Layout-Sidecar gemeinsam bewegt werden; anschließend beide Parent-Trees aktualisieren.
+1. Move-Regressionen für partielle Dateisystemfehler ergänzen und den Request in die Edit-UI integrieren.
 2. Wie werden künftige echte ID-Kollisionen migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
 3. Wie wird eine vollständige Serverkopie vor dem Betrieb mit einer neuen Node-ID versehen?
 4. Bei größerem Bestand messen, ob der lesende Scan genügt oder ein abgeleiteter, neu aufbaubarer Index nötig wird.

@@ -465,6 +465,25 @@ function runWorkIdResolve(rootDir, nodeId, workId, edit = false) {
   });
 }
 
+function runMoveWork(rootDir, source, destination, name = '') {
+  return new Promise((resolve, reject) => {
+    const args = [path.join(ROOT, 'tests/php_move_work.php'), rootDir, source, destination, name];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => (stdout += data.toString()));
+    proc.stderr.on('data', (data) => (stderr += data.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`Work move helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runBlankFile(targetDir, fileName, contents = '') {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_blank_file.php'), targetDir, fileName, contents];
@@ -1591,6 +1610,79 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.newIds[1]).not.toBe(result.newIds[0]);
     expect(result.nodeIds[0]).toMatch(/^poff_node_[a-f0-9]{32}$/);
     expect(result.nodeIds[1]).toBe(result.nodeIds[0]);
+  });
+
+  test('file move keeps Work ID and custom layout while refreshing both parent trees', async () => {
+    const tempRoot = path.join(POFF_DIR, `identity-move-file-${Date.now()}`);
+    const sourceDir = path.join(tempRoot, 'source');
+    const destinationDir = path.join(tempRoot, 'destination');
+    const worksDir = path.join(sourceDir, '.works');
+    fs.mkdirSync(path.join(worksDir, 'note.txt.layout'), { recursive: true });
+    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'note.txt'), 'move identity fixture');
+    fs.writeFileSync(path.join(sourceDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_move_source_parent',
+      tree: [{ name: 'note.txt', type: 'file', path: 'note.txt', slug: 'hand-picked-note', title: 'Tree title', description: 'Tree description', visible: false }],
+    }));
+    fs.writeFileSync(path.join(destinationDir, 'poff.config.json'), JSON.stringify({ id: 'poff_move_destination_parent' }));
+    fs.writeFileSync(path.join(worksDir, 'note.txt.config.json'), JSON.stringify({ id: 'poff_move_file', work: { type: 'text' } }));
+    fs.writeFileSync(path.join(worksDir, 'note.txt.layout', 'template.hbs'), '<article>{{title}}</article>');
+
+    try {
+      const result = await runMoveWork(tempRoot, 'source/note.txt', 'destination', 'renamed.txt');
+      const movedConfigPath = path.join(destinationDir, '.works', 'renamed.txt.config.json');
+      expect(result.errors).toEqual([]);
+      expect(result.moved[0]).toEqual(expect.objectContaining({ id: 'poff_move_file', type: 'file', from: 'source/note.txt', to: 'destination/renamed.txt' }));
+      expect(fs.readFileSync(path.join(destinationDir, 'renamed.txt'), 'utf8')).toBe('move identity fixture');
+      expect(JSON.parse(fs.readFileSync(movedConfigPath, 'utf8')).id).toBe('poff_move_file');
+      expect(JSON.parse(fs.readFileSync(movedConfigPath, 'utf8'))).toEqual(expect.objectContaining({ name: 'renamed.txt', slug: 'renamed-txt', path: 'renamed.txt' }));
+      expect(fs.readFileSync(path.join(destinationDir, '.works', 'renamed.txt.layout', 'template.hbs'), 'utf8')).toBe('<article>{{title}}</article>');
+      expect(fs.existsSync(path.join(sourceDir, 'note.txt'))).toBe(false);
+      expect(result.sourceTreeNames).not.toContain('note.txt');
+      expect(result.destinationTreeNames).toContain('renamed.txt');
+      const destinationConfig = JSON.parse(fs.readFileSync(path.join(destinationDir, 'poff.config.json'), 'utf8'));
+      expect(destinationConfig.tree.find((item) => item.name === 'renamed.txt')).toEqual(expect.objectContaining({
+        slug: 'hand-picked-note',
+        title: 'Tree title',
+        description: 'Tree description',
+        visible: false,
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('folder move preserves its Work ID and rejects existing destinations', async () => {
+    const tempRoot = path.join(POFF_DIR, `identity-move-folder-${Date.now()}`);
+    const sourceDir = path.join(tempRoot, 'source');
+    const nestedDir = path.join(sourceDir, 'nested');
+    const destinationDir = path.join(tempRoot, 'destination');
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.writeFileSync(path.join(nestedDir, 'poff.config.json'), JSON.stringify({ id: 'poff_move_folder', tree: [] }));
+    fs.writeFileSync(path.join(sourceDir, 'poff.config.json'), JSON.stringify({
+      id: 'poff_move_source_parent',
+      tree: [{ name: 'nested', type: 'folder', path: 'nested', slug: 'custom-nested', title: 'Nested tree title' }],
+    }));
+    fs.writeFileSync(path.join(destinationDir, 'poff.config.json'), JSON.stringify({ id: 'poff_move_destination_parent' }));
+    fs.mkdirSync(path.join(destinationDir, 'taken'));
+
+    try {
+      const conflict = await runMoveWork(tempRoot, 'source/nested', 'destination', 'taken');
+      expect(conflict.errors).toContain('Move destination already exists.');
+      expect(fs.existsSync(nestedDir)).toBe(true);
+
+      const result = await runMoveWork(tempRoot, 'source/nested', 'destination', 'renamed');
+      expect(result.errors).toEqual([]);
+      expect(result.moved[0]).toEqual(expect.objectContaining({ id: 'poff_move_folder', type: 'folder', from: 'source/nested', to: 'destination/renamed' }));
+      expect(JSON.parse(fs.readFileSync(path.join(destinationDir, 'renamed', 'poff.config.json'), 'utf8'))).toEqual(expect.objectContaining({ id: 'poff_move_folder', folderName: 'renamed', slug: 'renamed' }));
+      expect(result.sourceTreeNames).not.toContain('nested');
+      expect(result.destinationTreeNames).toContain('renamed');
+      const destinationConfig = JSON.parse(fs.readFileSync(path.join(destinationDir, 'poff.config.json'), 'utf8'));
+      expect(destinationConfig.tree.find((item) => item.name === 'renamed')).toEqual(expect.objectContaining({ slug: 'custom-nested', title: 'Nested tree title' }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('resolves local Work IDs and reports duplicate matches as ambiguous', async () => {
@@ -4337,6 +4429,7 @@ describe('Worktype HBS renderer', () => {
         'newWorkId',
         'reassignWorkIdForCopy',
         'findWorkLocationsById',
+        'cmsMoveTarget',
         'class PoffNodeIdentity',
         'image/*',
         'max-h-screen max-w-full object-contain',

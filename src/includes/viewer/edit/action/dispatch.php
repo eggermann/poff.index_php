@@ -18,7 +18,7 @@ function cmsEditRequirePost(string $actionLabel): void
 function cmsHandleEditAction(): void
 {
     $action = $_GET['edit'] ?? '';
-    if (!in_array($action, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
+    if (!in_array($action, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'move', 'reset', 'models'], true)) {
         return;
     }
 
@@ -35,6 +35,9 @@ function cmsHandleEditAction(): void
             return;
         case 'delete':
             cmsHandleEditDeleteAction($ctx);
+            return;
+        case 'move':
+            cmsHandleEditMoveAction($ctx);
             return;
         case 'reset':
             cmsHandleEditResetAction($ctx);

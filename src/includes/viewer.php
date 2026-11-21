@@ -211,7 +211,7 @@ if (($_GET['ajax'] ?? '') === 'nav') {
 
 // Handle edit/prompt requests if present.
 $viewerEditAction = $_GET['edit'] ?? '';
-if (in_array($viewerEditAction, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'reset', 'models'], true)) {
+if (in_array($viewerEditAction, ['auth', 'config', 'save', 'prompt', 'upload', 'delete', 'move', 'reset', 'models'], true)) {
     register_shutdown_function(static function (): void {
         $error = error_get_last();
         if (!is_array($error)) {
