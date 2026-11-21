@@ -343,6 +343,7 @@ PHP
         '/mcp/routes/edit-config/apply.php',
         '/mcp/routes/edit-config.php',
         '/mcp/routes/prompt-template.php',
+        '/includes/Core/RemoteFeedImport.php',
         '/mcp/routes/remote-content.php',
         '/mcp/routes/remote-presentation.php',
         '/mcp/routes/converters.php',

@@ -11,6 +11,12 @@ Stand: 20. November 2026. Bestandsaufnahme aus dem Quellcode, kein Nachweis eine
 | `build/build.php` | Erzeugt Dispatch in der Einzeldatei aus der Routerlogik des Viewers. Wurzel stammt aus `POFF_BASE_DIR`, `base` oder Verzeichnis des Einstiegspunkts. Fügt Fatal-Handler und `Throwable`-Behandlung hinzu. |
 | `src/mcp/http-server.php` | Streamable MCP über `127.0.0.1:8080/mcp`; registriert eine Teilmenge als Tools mit eigenen Namen und Schemas. |
 
+## Begriffsregel: Node API und MCP
+
+`?mcp=1&route=…` in `viewer.php` und den Einzeldateien ist die bestehende PageOff JSON Node API; der Parametername ist historisch. `src/mcp/server.php` ist ein separater JSON-Router mit eigenem Dispatch. Das eigentliche Streamable-MCP-Tool-Protokoll ist `src/mcp/http-server.php`. Diese Flächen unterscheiden sich in Routen, Requestschemas, Initialisierung und Seiteneffekten.
+
+Für die Zielarchitektur bleibt die bestehende JSON-Node-API als Kompatibilitätsadapter in `index.php`. Das Streamable-MCP-Protokoll ist optional und darf nur auf die transportfreien Core-Operationen zugreifen. Ein Build-Schalter darf nicht versehentlich die JSON-API entfernen, die vorhandene Viewer-/Editor-Clients verwenden.
+
 Der primäre Router in `viewer.php` und der Build-Dispatch haben denselben Routenumfang, unterscheiden sich aber im `create`-Default (`$runtime['poffDir']` gegenüber `mcpPoffDirOverride()`). Beide liefern `rootDir` bei `info`; der Build hat zusätzliche Pfadvalidierung und Fehlerbehandlung. Der separate `src/mcp/server.php` liefert eine andere `info`-Antwort (`configPath`, Erstellungs-/Updateflags, Config), synchronisiert die TOON-Datei vor allen Routen und hat einen anderen Routenumfang. Eine Zusammenlegung muss diese Verträge ausdrücklich berücksichtigen.
 
 ## JSON-Routen

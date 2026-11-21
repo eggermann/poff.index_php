@@ -21,7 +21,7 @@ Der Commit `4f42aef` und die frühere Node-Studie dokumentieren drei eigenständ
 
 Der verbindliche Konzeptstand ist [PageOff – Oberste Architektur](architektur.md). Er trennt Dateisystem und Metadaten, Core, optionales Host-Modul und Frontend-Kit. Hosts werden über `host` in `poff.config.json` aktiviert. `index.php` bleibt zunächst alleiniger ausgelieferter Einstieg; `server.php` ist nicht festgelegt.
 
-Die Umsetzung bleibt teilweise offen: dauerhafte Work-IDs und ihre Auflösung, Graph-Verbindungen, Host-Grenzen und hostbezogene Redaktionsrechte fehlen noch oder sind nicht durchgängig vereinheitlicht. Das Konzept beschreibt das Ziel, nicht den bereits implementierten Funktionsstand.
+Work-IDs, Node-IDs, eindeutige lokale Auflösung, ein authentifizierter Move-Pfad und ein Offline-Werkzeug zur Node-ID-Rotation von Klonen sind implementiert und getestet. Remote-Referenzen tragen Quell-Node- und Work-ID. Die JSON-Routen `?mcp=1&route=…` sind die bestehende Node API; nur das Streamable-MCP-Protokoll ist der optionale MCP-Adapter. Noch offen sind die saubere Transport/Core-Trennung, ein einheitliches Graph-Modell, eine verpflichtende Klon-Startprüfung sowie Host-Grenzen und hostbezogene Redaktionsrechte. Das optionale Host-Modul bleibt ausdrücklich Zukunftsarbeit.
 
 - [Umgebungen und Testordner](umgebungen-und-tests.md)
 - [Oberste Architektur](architektur.md)

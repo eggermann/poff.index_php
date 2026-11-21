@@ -24,11 +24,17 @@ Es gibt keine verpflichtende zentrale Instanz. `off.page` ist ein Host nach dens
 
 Der Core verwaltet Works, Ordner, Ressourcen, dauerhafte Work-IDs, ID-zu-Pfad-Auflösung, lokale Parentfolder-Beziehungen, Metadaten, Layout-Vererbung, öffentliche Bereitstellung und grundlegende Zugriffsprüfungen.
 
-Jedes Work hat eine dauerhafte ID, die Umbenennen und Verschieben übersteht. Eine Identität besteht zunächst aus Node-Adresse plus Work-ID. Eine Kopie auf einem anderen Node erhält eine neue ID; `copiedFrom` kann ihre Herkunft festhalten.
+Eine lokale Work-ID liegt bei Foldern in `poff.config.json`, bei Files in `.works/<Dateiname>.config.json`. Die stabile Referenz ist `nodeId + workId`; Domain und URL sind nur veränderliche Adressen. `poff.node.json` speichert die Node-ID. Der lesende Resolver akzeptiert eine eindeutige sichtbare Work-ID und meldet Mehrdeutigkeit ausdrücklich. Der authentifizierte `edit=move`-Pfad bewegt Folder-Metadaten beziehungsweise File und filename-bound Sidecars gemeinsam. Kopien erhalten neue Work-IDs. Ein Pfadindex wird derzeit nicht persistiert.
+
+### Node API und MCP-Adapter
+
+Die bestehenden JSON-Routen unter `?mcp=1&route=…` sind PageOffs rückwärtskompatible Node API mit historischem Namen. Der eigenständige `src/mcp/server.php` ist ein weiterer JSON-Einstieg. Das Streamable-MCP-Tool-Protokoll liegt separat in `src/mcp/http-server.php`. Diese drei Oberflächen haben verschiedene Routen, Initialisierung und Seiteneffekte; sie sind keine austauschbaren Dispatches.
+
+Zielrichtung: Core-Operationen bleiben ohne Netzwerk oder MCP verfügbar. Die Node API adaptiert Requests in die vorhandenen JSON-Routen; das Streamable-MCP-Protokoll ist ein optionaler Adapter. Der Einzeldatei-Builder behält die bestehende JSON-Node-API bei, damit vorhandene Clients weiter funktionieren.
 
 ### Optionales Host-Modul
 
-Das Host-Modul ist eine optionale Fähigkeit eines Nodes. Es aktiviert bestimmte Ordner als Hosts, nimmt externe Nodes und Works per URL auf, verwaltet direkte Graph-Verbindungen, offene oder kuratierte Einreichungen, Host-Ordnerrechte und öffentliche Informationen zu direkten Verbindungen.
+Das Host-Modul ist das Ziel für eine optionale Fähigkeit eines Nodes. Es soll bestimmte Ordner als Hosts aktivieren, direkte Graph-Verbindungen verwalten und offene oder kuratierte Einreichungen sowie Host-Ordnerrechte bereitstellen. Dieses Modul ist noch nicht implementiert. Die bestehenden `externalSubmissions`-Einstellungen und Link-Upload-Funktionen sind Vorläufer, aber kein vollständiges Host-Modell.
 
 Ein Host kann einen ganzen Node oder einzelne Works verknüpfen. Die Originalressource bleibt beim Ursprungs-Node. Eine Verbindung erstellt weder automatisch eine Dateikopie noch erfordert sie Synchronisation. Der lokale Host-Eintrag liegt im eigenen Parentfolder. Mehrere Hosts können dieselbe externe Ressource in unterschiedlichen Parentfoldern führen.
 
@@ -73,7 +79,7 @@ Redaktionsrechte gelten in Unterordnern weiter, bis eine neue Host-Grenze mit ei
 
 ## `index.php` und Host-Modul
 
-Logische Module und ausgelieferte PHP-Dateien sind getrennte Entscheidungen. `index.php` bleibt der zentrale Einstieg und stellt Viewer, Editor und Core-Funktionen bereit. Ein Node funktioniert ohne aktivierten Host und stellt öffentliche Works über stabile IDs bereit.
+Logische Module und ausgelieferte PHP-Dateien sind getrennte Entscheidungen. `index.php` bleibt der einzige ausgelieferte Einstieg. Ein Node funktioniert ohne aktivierten Host und stellt öffentliche Works über stabile IDs bereit. Der Builder bündelt heute Viewer, Editor und die historisch `mcp` genannten JSON-Node-API-Routen gemeinsam. Das Streamable-MCP-Tool-Protokoll läuft separat; es gibt noch keinen optionalen Build-Schalter für seine weitere Adapterassemblierung.
 
 Host-Funktionen werden im Quellcode eigenständig organisiert. Vorläufig bleibt es bei einer ausgelieferten `index.php`; ein zusätzliches `host.php` ist nur sinnvoll, wenn es Auslieferung, Wartung oder Funktionstrennung verbessert. `server.php` ist kein festgelegter Architekturbaustein.
 
@@ -83,11 +89,11 @@ Nodes nehmen einander auf, ohne ihre Unabhängigkeit aufzugeben. Jeder Host best
 
 ## Stand und offene Punkte
 
-**Bereits vorhanden:** dateibasiertes CMS, Viewer, Editor, Worktypes, Layout-Vererbung, externe Links, Remote-Exporte, lokale Kopien, Node-Anmeldungen sowie grundlegende Einreichungs- und Freigabefunktionen.
+**Bereits vorhanden:** dateibasiertes CMS, Viewer, Editor, Worktypes, Layout-Vererbung, externe Links, Remote-Exporte, lokale Kopien, Node-Anmeldungen, Einreichungs- und Freigabefunktionen, stabile Node- und lokale Work-IDs, additive Remote-Referenzen, eindeutige Work-ID-Auflösung und ein authentifizierter Move-Pfad. Diese Funktionen liegen noch teilweise in gemischten Schichten.
 
-**Beschlossen, aber noch nicht vollständig implementiert:** dauerhafte Work-ID-Auflösung, einheitliche Graph-Verbindungen, hostbezogene Redaktionsrechte, klare Host-Grenzen und optionales Host-Modul.
+**Beschlossen, aber noch nicht vollständig implementiert:** transportfreie Node-API-Services, MCP als optionaler Adapter, einheitliche Graph-Verbindungen, ein dokumentierter und getesteter Klon-Betriebsablauf, hostbezogene Redaktionsrechte, klare Host-Grenzen und optionales Host-Modul. Ein Offline-Rotationswerkzeug für Node-IDs besteht; der Dienststart eines geklonten Nodes wird dadurch nicht automatisch blockiert.
 
-**Noch offen:** Domainwechsel eines Nodes, mögliche dauerhafte Node-IDs, genaues Host-Konfigurationsschema, endgültiger PHP-Dateisplit und Schnittstelle für dynamische Netzwerknavigation.
+**Noch offen:** Migration echter Work-ID-Kollisionen, ob ein Node-Fork zusätzlich alle Work-IDs erneuert, wie ein Rotationsschritt in Klonabläufen verpflichtend wird, genaues Host-Konfigurationsschema, endgültiger PHP-Dateisplit und Schnittstelle für dynamische Netzwerknavigation. Domainwechsel ändern die Identität nicht; Node-ID-Rotation ist dagegen ein expliziter Identitätswechsel.
 
 ## Architekturprinzip
 

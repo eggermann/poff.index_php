@@ -465,6 +465,24 @@ function runWorkIdResolve(rootDir, nodeId, workId, edit = false) {
   });
 }
 
+function runRemoteImportEntries(input) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [path.join(ROOT, 'tests/php_remote_import_entries.php'), JSON.stringify(input)], {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => (stdout += data.toString()));
+    proc.stderr.on('data', (data) => (stderr += data.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) return resolve(JSON.parse(stdout.trim()));
+      reject(new Error(`remote import entries helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runMoveWork(rootDir, source, destination, name = '') {
   return new Promise((resolve, reject) => {
     const args = [path.join(ROOT, 'tests/php_move_work.php'), rootDir, source, destination, name];
@@ -1612,6 +1630,19 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.nodeIds[1]).toBe(result.nodeIds[0]);
   });
 
+  test('rotates a cloned Node identity without changing its Work IDs', async () => {
+    const result = await runPhpJson('php_node_identity_rotation.php');
+
+    expect(result.rotated.previousId).toBe(result.sourceId);
+    expect(result.rotated.id).toMatch(/^poff_node_[a-f0-9]{32}$/);
+    expect(result.rotated.id).not.toBe(result.sourceId);
+    expect(result.sourceRead).toBe(result.sourceId);
+    expect(result.cloneRead).toBe(result.rotated.id);
+    expect(result.cloneRotatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.cloneWorkId).toBe('poff_existing_work_id');
+    expect(result.sourceWorkId).toBe('poff_existing_work_id');
+  });
+
   test('file move keeps Work ID and custom layout while refreshing both parent trees', async () => {
     const tempRoot = path.join(POFF_DIR, `identity-move-file-${Date.now()}`);
     const sourceDir = path.join(tempRoot, 'source');
@@ -1738,6 +1769,87 @@ describe('MCP create route helper (CLI)', () => {
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  test('Core remote import normalization preserves legacy fields and source identity', async () => {
+    const feedNodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    const remoteNodeId = 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const entries = await runRemoteImportEntries({
+      sourceUrl: 'https://origin.example/index.php?mcp=1&route=export-content',
+      sourceId: 'origin-example',
+      existingTree: [
+        { name: 'Portfolio' },
+        { name: 'Plan' },
+        { name: 'Plan (origin-example)' },
+      ],
+      payload: {
+        source: { nodeId: feedNodeId },
+        items: [
+          {
+            title: 'Portfolio',
+            type: 'file',
+            kind: 'image',
+            path: 'photos/photo.jpg',
+            routePath: 'photos/photo.jpg',
+            routeSlug: 'photo',
+            pageLink: 'https://origin.example/view/photo',
+            reference: { nodeId: remoteNodeId, workId: 'poff_bbbbbbbbbbbbbbbb' },
+            visible: false,
+          },
+          {
+            title: 'Plan',
+            type: 'folder',
+            path: 'notes/plan',
+            pageLink: 'https://origin.example/view/plan',
+          },
+          { name: 'No link', type: 'file' },
+        ],
+      },
+    });
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual(expect.objectContaining({
+      name: 'Portfolio (origin-example)',
+      type: 'file',
+      slug: 'photo',
+      routeSlug: 'photo',
+      routePath: 'photos/photo.jpg',
+      remoteNodeId,
+      remoteWorkId: 'poff_bbbbbbbbbbbbbbbb',
+      remoteFeedNodeId: feedNodeId,
+      remoteSource: 'origin-example',
+      remoteFeedUrl: 'https://origin.example/index.php?mcp=1&route=export-content',
+      visible: false,
+      externalWork: true,
+    }));
+    expect(entries[1]).toEqual(expect.objectContaining({
+      name: 'Plan (origin-example) 2',
+      type: 'folder',
+      slug: 'plan',
+      routePath: 'notes/plan',
+      remoteSource: 'origin-example',
+    }));
+    expect(entries[1].remoteNodeId).toBe(feedNodeId);
+    expect(entries[1].remoteFeedNodeId).toBe(feedNodeId);
+    expect(entries[1].importedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const legacyEntries = await runRemoteImportEntries({
+      sourceUrl: 'https://legacy.example/export',
+      sourceId: 'legacy-example',
+      existingTree: [],
+      payload: {
+        tree: [{ name: 'Legacy note', type: 'file', path: 'notes/legacy.txt', pageLink: 'https://legacy.example/notes/legacy.txt' }],
+      },
+    });
+    expect(legacyEntries[0]).toEqual(expect.objectContaining({
+      name: 'Legacy note',
+      slug: 'legacy-txt',
+      routePath: 'notes/legacy.txt',
+      remoteSource: 'legacy-example',
+      remoteFeedUrl: 'https://legacy.example/export',
+    }));
+    expect(legacyEntries[0]).not.toHaveProperty('remoteNodeId');
+    expect(legacyEntries[0]).not.toHaveProperty('remoteWorkId');
   });
 
   test('formats prompt provider failures with status and redacted detail', async () => {
@@ -4428,6 +4540,7 @@ describe('Worktype HBS renderer', () => {
         'Worktype::setEmbeddedLayoutAssets(',
         'newWorkId',
         'reassignWorkIdForCopy',
+        'PoffRemoteFeedImport',
         'findWorkLocationsById',
         'cmsMoveTarget',
         'class PoffNodeIdentity',
