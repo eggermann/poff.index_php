@@ -58,6 +58,21 @@ Der heutige Code registriert Worktypes und Converter über Dateien, Bundles und 
 - **Parentfolder:** Ordner, der einen Work-Eintrag enthält und dessen lokalen Kontext bestimmt.
 - **Verbindung:** lokaler Eintrag, der auf einen externen Node oder ein externes Work verweist.
 
+### Graph-Vertrag: Ist-Stand und Zielregel
+
+Heute bestehen externe Einträge aus zwei kompatiblen Formen: frei konfigurierte Links wie `linkUrl`, sowie importierte Feed-Einträge im `tree`. Ein Feed-Eintrag kann den Ursprung als `remoteNodeId` + `remoteWorkId`, den direkt abfragbaren Feed getrennt als `remoteFeedNodeId` und die aktuelle Adresse als `remoteFeedUrl` speichern. Auf Folder-Ebene hält `remoteSources` die Feed-Adresse und – sofern bekannt – die Node-ID. Ältere Einträge ohne stabile IDs bleiben gültig. Das sind Speicherfelder für die bestehende Importfunktion, noch kein vollständiges Mount-/Unmount-Protokoll.
+
+Für den Graphen gilt als Zielregel:
+
+- Eine Verbindung gehört dem lokalen Parentfolder und ist ein eigener lokaler Tree-Eintrag. Derselbe entfernte Work darf in mehreren Parentfoldern unabhängig präsentiert werden.
+- Wenn bekannt, bezeichnet `target = (nodeId, workId)` eindeutig den ursprünglichen Work. Feed-Adresse, Domain, Pfad und `pageLink` sind änderbare Erreichbarkeitshinweise und ändern die Identität nicht.
+- `remoteFeedNodeId` beschreibt bei weitergereichten Feeds den unmittelbaren Vermittler; `remoteNodeId` + `remoteWorkId` bleiben die Herkunft. Relay darf die Ursprungsreferenz nicht in eine neue Identität umschreiben.
+- Ein nicht erreichbarer Node löscht keine Verbindung. `offline` soll aus Erreichbarkeitsprüfung und Abrufzeit abgeleitet werden, nicht zur Identität gehören. Ein solches Status-/Cachemodell ist aktuell noch nicht implementiert.
+- Mounten soll nur eine lokale Parentfolder-Verbindung anlegen. Unmounten darf nur diesen Eintrag entfernen, niemals die Ressource am Ursprungs-Node. Transitive Verbindungen werden nicht automatisch importiert.
+- Links ohne stabile Node-/Work-Paarung bleiben normale URL-Verbindungen und dürfen nicht fälschlich als dauerhafte Work-Referenzen behandelt werden.
+
+Noch zu entscheiden sind das konkrete Add/Remove-API, Erreichbarkeitsspeicher und Cache-Frische, Umgang mit mehreren URLs für dieselbe Node-ID, sowie wann ein Feed-Eintrag aus `remoteSources` entfernt werden darf, wenn weitere Works ihn noch referenzieren. Vor dieser Entscheidung werden keine neuen Graph-Felder eingeführt.
+
 Ein Host speichert nur direkte Verbindungen; indirekte Verbindungen fremder Nodes werden nicht automatisch übernommen. Mounten erstellt eine Verbindung. Unmounten entfernt diese Verbindung, nicht die Ursprungsressource. Bei Nichterreichbarkeit bleibt die Verbindung bestehen und kann offline angezeigt werden.
 
 ## Hosting und Redaktion
