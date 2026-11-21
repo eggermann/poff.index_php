@@ -27,7 +27,7 @@ Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet me
 1. **Transport/Core trennen:** weitere reine Konfiguration und Import-Operationen aus MCP-Routen in den Core verschieben; vorhandene Routennamen als Adapter erhalten.
 2. **Node API spezifizieren:** stabile ID-Auflösung, Export, Remote-Referenzen, Fehlerstatus, Auth und Dateisystemeffekte als unabhängige Verträge festhalten.
 3. **Graph-Verbindungen:** Speicher-Ist-Stand und Zielregeln für Parentfolder, direkte Node-/Work-Paare, Relay und Offline-Zustand sind jetzt dokumentiert. Offen vor Implementierung: Add/Remove-API, URL-/Cache-Frische und Bereinigung gemeinsam genutzter Feed-Abos.
-4. **MCP optional machen:** die Streamable-Laufzeit ist bereits separat und fehlt im Einzeldatei-Artifact; die Handler bleiben wegen der JSON-Node-API eingebettet. Offen ist die optionale Composer-Dependency und der Startpfad. Beide ändern, ohne den bisherigen Einzeldatei-Standard oder vorhandene API-Routen zu entfernen.
+4. **MCP optional machen:** Streamable-Transport und Composer-Abhängigkeit sind separat installierbar; die Handler bleiben wegen der JSON-Node-API eingebettet. Die weitere Entkopplung ihrer Geschäftslogik bleibt offen.
 5. **Frontend-Kit entkoppeln:** Move-API ist über eine Sidebar-Aktion erreichbar; stabile Remote-Work-Referenzen und Offline/Reconnect sind noch nicht in der UI. Rendering/Layout bleibt eine lokale Präsentationsentscheidung.
 6. **Host und Rechte ausarbeiten:** `host`-Konfiguration, Open/Curated, Rollen, Vererbung und Grenzen festlegen. Bestehende Eingänge anhand des Quellcodes abgleichen; Host bleibt bis zur abgestimmten Umsetzung unimplementiert.
 7. **Build und Einführung absichern:** jede Änderung in temporärer Einzeldatei prüfen; generierte Inhaltsausgaben und bestehende lokale Build-Dateien unangetastet lassen.
@@ -37,7 +37,7 @@ Für jeden Schritt: erst Beispiele und Akzeptanzkriterien mit dem Nutzer durchge
 
 ## Priorisierter Rest-Backlog
 
-1. **P0 — Streamable MCP wirklich optional installieren:** `php-mcp/server` aus der Root-Dependency in eine separat installierbare MCP-Abhängigkeit bewegen und den Startpfad darauf ausrichten. Dafür müssen `composer.json` und `composer.lock` geändert werden; diese Dateien liegen derzeit außerhalb der Edit-Allowlist in `AGENTS.md`. Bis dahin bleibt nur der HTTP-Einstieg aus dem Single-File-Artifact herausgelöst.
+1. **P0 — MCP-Adapter weiter entkoppeln:** die separate Composer-Installation ist umgesetzt; verbleibende fachliche Logik aus den gemeinsamen Route-Handlern schrittweise in Core-Dienste verschieben.
 2. **P1 — Adressfindung nach Relay/Domainwechsel rubberducken:** entscheiden, ob ein letzter Node-Adresshinweis pro Node-ID mitgeführt wird, ob mehrere Adressen zulässig sind und ob ein freiwilliges Verzeichnis angeboten wird. Die Identität bleibt in jedem Fall `(nodeId, workId)`; Adresswechsel ändern sie nicht.
 3. **P1 — Work-ID-Forkregel entscheiden:** Node-ID-Rotation eines Klons ist implementiert; klären, ob beim unabhängigen Fork zusätzlich sämtliche Work-IDs erneuert werden müssen und wie Rotation vor dem ersten Betrieb erzwungen wird.
 4. **P1 — Move-Rollback abdecken:** partielle Dateisystemfehler gezielt simulieren und prüfen, dass Ressourcen und Sidecars gemeinsam wiederhergestellt werden.
