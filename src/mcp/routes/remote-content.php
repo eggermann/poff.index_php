@@ -286,22 +286,7 @@ function mcpRemoteStableNodeId(mixed $value): string
 
 function mcpRemoteExportSourceId(string $url, array $payload): string
 {
-    $declared = trim((string) (($payload['source']['id'] ?? $payload['origin']['host'] ?? '')));
-    if ($declared !== '') {
-        return preg_replace('/[^a-z0-9._-]+/i', '-', strtolower($declared)) ?: 'remote';
-    }
-
-    $nodeId = mcpRemoteStableNodeId($payload['source']['nodeId'] ?? '');
-    if ($nodeId !== '') {
-        return $nodeId;
-    }
-
-    $host = trim((string) (parse_url($url, PHP_URL_HOST) ?? ''));
-    if ($host !== '') {
-        return preg_replace('/[^a-z0-9._-]+/i', '-', strtolower($host)) ?: 'remote';
-    }
-
-    return 'remote';
+    return PoffRemoteFeedImport::sourceId($url, $payload);
 }
 
 function mcpRemoteUniqueImportedName(string $preferred, string $sourceId, array &$usedNames): string
@@ -743,15 +728,43 @@ function handleImportRemote(array $opts): array
     $existingTree = isset($config['tree']) && is_array($config['tree']) ? $config['tree'] : [];
     $resolvedSourceId = $sourceId !== '' ? $sourceId : mcpRemoteExportSourceId($url, $payload);
     $sourceNodeId = mcpRemoteStableNodeId($payload['source']['nodeId'] ?? '');
+    $sourcePath = $payload['source']['path'] ?? null;
+    $existingRemoteSources = isset($config['remoteSources']) && is_array($config['remoteSources'])
+        ? $config['remoteSources'] : [];
 
     if ($replace) {
-        $existingTree = array_values(array_filter($existingTree, static function ($item) use ($resolvedSourceId, $sourceNodeId): bool {
+        $matchedUrls = [$url => true];
+        $existingRemoteSources = array_values(array_filter($existingRemoteSources, static function ($source) use ($sourceNodeId, $sourcePath, $url, &$matchedUrls): bool {
+            if (!is_array($source)) {
+                return true;
+            }
+            $previousNodeId = mcpRemoteStableNodeId($source['nodeId'] ?? '');
+            if ($previousNodeId !== '' && ($sourceNodeId === '' || $previousNodeId !== $sourceNodeId)) {
+                return true;
+            }
+            $previousUrl = (string) ($source['url'] ?? '');
+            $sameUrl = $previousUrl !== '' && $previousUrl === $url;
+            $sameNodeAndPath = $sourceNodeId !== '' && $previousNodeId === $sourceNodeId
+                && is_string($sourcePath) && array_key_exists('path', $source)
+                && is_string($source['path']) && $source['path'] === $sourcePath;
+            if ($sameUrl || $sameNodeAndPath) {
+                if ($previousUrl !== '') {
+                    $matchedUrls[$previousUrl] = true;
+                }
+                return false;
+            }
+            return true;
+        }));
+        $existingTree = array_values(array_filter($existingTree, static function ($item) use ($sourceNodeId, $matchedUrls): bool {
             if (!is_array($item)) {
                 return true;
             }
-            $sameLegacySource = (string) ($item['remoteSource'] ?? '') === $resolvedSourceId;
-            $sameStableNode = $sourceNodeId !== '' && (string) ($item['remoteFeedNodeId'] ?? '') === $sourceNodeId;
-            return !$sameLegacySource && !$sameStableNode;
+            $previousNodeId = mcpRemoteStableNodeId($item['remoteFeedNodeId'] ?? '');
+            if ($previousNodeId !== '' && ($sourceNodeId === '' || $previousNodeId !== $sourceNodeId)) {
+                return true;
+            }
+            $previousUrl = (string) ($item['remoteFeedUrl'] ?? '');
+            return $previousUrl === '' || !isset($matchedUrls[$previousUrl]);
         }));
     }
 
@@ -760,19 +773,6 @@ function handleImportRemote(array $opts): array
     $config['tree'] = array_merge($existingTree, $importedEntries);
     $config['treeHash'] = hash('sha256', json_encode($config['tree']));
     $config['updatedAt'] = date('c');
-    $existingRemoteSources = isset($config['remoteSources']) && is_array($config['remoteSources'])
-        ? $config['remoteSources']
-        : [];
-    if ($replace) {
-        $existingRemoteSources = array_values(array_filter($existingRemoteSources, static function ($source) use ($resolvedSourceId, $sourceNodeId): bool {
-            if (!is_array($source)) {
-                return false;
-            }
-            $sameLegacySource = (string) ($source['id'] ?? '') === $resolvedSourceId;
-            $sameStableNode = $sourceNodeId !== '' && (string) ($source['nodeId'] ?? '') === $sourceNodeId;
-            return !$sameLegacySource && !$sameStableNode;
-        }));
-    }
     $config['remoteSources'] = array_values(array_filter(array_merge(
         $existingRemoteSources,
         [[

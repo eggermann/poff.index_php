@@ -24,6 +24,10 @@ Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet me
 
 `Converter::offerableFor()` wählt passende Konverter nach der bestehenden Angebotsregel aus. `converter-offers` liest den Request, erzeugt die Anbieter-URL und gibt nur die öffentlichen Felder im Format `poff-converter/1` aus. Die Auswahl lässt sich im Core ohne HTTP-Request verwenden.
 
+Die automatische Feed-Quell-ID wird in `PoffRemoteFeedImport::sourceId()` bestimmt: gültige Node-ID zuerst, sonst Host der Feed-URL, sonst `remote`. Die frühere Ableitung aus `source.id` oder `origin.host` entfällt; eine explizit beim Import übergebene `sourceId` bleibt möglich. Beim erneuten Import mit `replace` werden Einträge ohne gespeicherte Node-ID anhand der exakt gleichen Feed-URL ersetzt. Ohne `replace` erfolgt keine automatische Migration. `PoffConfig::ensure()` erhält die gespeicherte `remoteSources`-Liste auch beim Neuaufbau der Ordnerkonfiguration.
+
+Bei bekannter Node-ID und gespeichertem Feed-Pfad kann `replace` denselben Feed auch nach einem Adresswechsel zuordnen. Verschiedene Ordnerfeeds desselben Nodes bleiben getrennt. Fehlen für einen alten Feed sowohl passende URL als auch Node-ID und Pfad, wird er nicht geraten oder automatisch entfernt.
+
 Die tatsächlichen Route-, Editor- und Speicherverträge sowie die offenen Sicherheitsgrenzen sind jetzt in [remote-converter-protocol.md](remote-converter-protocol.md) festgehalten. Die Routen existieren im Quellrouter, Standalone-JSON-Router und Builder; es ist keine Neuanlage der Routen erforderlich.
 
 ## Reihenfolge für die Ausarbeitung

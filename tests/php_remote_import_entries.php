@@ -15,6 +15,11 @@ if (!is_array($input)) {
     exit(1);
 }
 
+if (($input['operation'] ?? '') === 'sourceId') {
+    echo json_encode(['id' => PoffRemoteFeedImport::sourceId((string) ($input['url'] ?? ''), (array) ($input['payload'] ?? []))], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 if (($input['operation'] ?? '') === 'copyItems') {
     $usedNames = [];
     $names = [];

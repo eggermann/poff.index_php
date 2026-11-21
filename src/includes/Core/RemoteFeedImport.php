@@ -7,6 +7,19 @@ declare(strict_types=1);
  */
 final class PoffRemoteFeedImport
 {
+    public static function sourceId(string $url, array $payload): string
+    {
+        $nodeId = PoffNodeIdentity::normalizeId($payload['source']['nodeId'] ?? '');
+        if ($nodeId !== '') {
+            return $nodeId;
+        }
+        $host = trim((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+        if ($host !== '') {
+            return preg_replace('/[^a-z0-9._-]+/i', '-', strtolower($host)) ?: 'remote';
+        }
+        return 'remote';
+    }
+
     public static function flattenCopyItems(array $items): array
     {
         $result = [];

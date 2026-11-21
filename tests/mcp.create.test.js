@@ -1884,6 +1884,23 @@ describe('MCP create route helper (CLI)', () => {
     }
   });
 
+  test('Core feed source ID uses node identity and falls back to the URL host', async () => {
+    const nodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    const cases = [
+      [{ source: { id: 'Legacy Name!', nodeId } }, nodeId],
+      [{ origin: { host: 'Old.Example' }, source: { nodeId } }, nodeId],
+      [{ source: { nodeId } }, nodeId],
+      [{ source: { nodeId: 'invalid' } }, 'provider.example'],
+      [{ source: { id: 'old-name' }, origin: { host: 'old.example' } }, 'provider.example'],
+    ];
+    for (const [payload, id] of cases) {
+      const result = await runRemoteImportEntries({ operation: 'sourceId', url: 'https://provider.example/feed', payload });
+      expect(result.id).toBe(id);
+    }
+    const fallback = await runRemoteImportEntries({ operation: 'sourceId', url: '', payload: {} });
+    expect(fallback.id).toBe('remote');
+  });
+
   test('Core remote import normalization preserves legacy fields and source identity', async () => {
     const feedNodeId = 'poff_node_0123456789abcdef0123456789abcdef';
     const remoteNodeId = 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -7308,7 +7325,7 @@ describe('Worktype HBS renderer', () => {
     const storedConfig = JSON.parse(fs.readFileSync(path.join(REMOTE_IMPORT_DIR, 'poff.config.json'), 'utf8'));
     expect(storedConfig.remoteSources).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        id: 'origin-example',
+        id: 'poff_node_0123456789abcdef0123456789abcdef',
         nodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         url: 'https://origin.example/index.php?mcp=1&route=export-content&path=viewer-folder',
       }),
@@ -7318,7 +7335,7 @@ describe('Worktype HBS renderer', () => {
         name: 'Portfolio',
         type: 'folder',
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
-        remoteSource: 'origin-example',
+        remoteSource: 'poff_node_0123456789abcdef0123456789abcdef',
         remoteNodeId: 'poff_node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         remoteFeedNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         externalWork: true,
@@ -7329,7 +7346,7 @@ describe('Worktype HBS renderer', () => {
         name: 'Leaf Note',
         type: 'file',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
-        remoteSource: 'origin-example',
+        remoteSource: 'poff_node_0123456789abcdef0123456789abcdef',
         remoteNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
         remoteWorkId: 'poff_0123456789abcdef',
         remoteFeedNodeId: 'poff_node_0123456789abcdef0123456789abcdef',
@@ -7345,7 +7362,7 @@ describe('Worktype HBS renderer', () => {
     expect(leafEntry.remoteNodeId).toBe('poff_node_0123456789abcdef0123456789abcdef');
     expect(leafEntry.remoteWorkId).toBe('poff_0123456789abcdef');
     expect(leafEntry.remoteFeedNodeId).toBe('poff_node_0123456789abcdef0123456789abcdef');
-    expect(leafEntry.remoteSource).toBe('origin-example');
+    expect(leafEntry.remoteSource).toBe('poff_node_0123456789abcdef0123456789abcdef');
     expect(leafEntry.routePath).toBe('viewer-folder/child.txt');
     expect(leafEntry.renderedHtml).toBeUndefined();
     expect(leafEntry.template).toBeUndefined();
@@ -7383,6 +7400,66 @@ describe('Worktype HBS renderer', () => {
       });
     } finally {
       fs.rmSync(relayRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('replaces prior feed entries by matching URL when their old key lacks a node ID', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-feed-migration-'));
+    const url = 'https://origin.example/index.php?mcp=1&route=export-content&path=folder';
+    const otherUrl = 'https://other.example/feed';
+    const nodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    fs.writeFileSync(path.join(root, '.edit.allow'), '');
+    fs.writeFileSync(path.join(root, 'poff.config.json'), JSON.stringify({
+      tree: [
+        { name: 'Old item', type: 'file', pageLink: 'https://origin.example/old', remoteSource: 'old-key', remoteFeedUrl: url, externalWork: true },
+        { name: 'Other item', type: 'file', pageLink: 'https://other.example/item', remoteSource: 'other-key', remoteFeedUrl: otherUrl, externalWork: true },
+      ],
+      remoteSources: [{ id: 'old-key', url }, { id: 'other-key', url: otherUrl }],
+    }));
+    try {
+      const result = await runRemoteContent('import', root, '', {
+        url,
+        replace: true,
+        mockResponse: { status: 200, body: {
+          source: { nodeId, path: 'folder' },
+          items: [{ name: 'New item', title: 'New item', type: 'file', pageLink: 'https://origin.example/new' }],
+        } },
+      });
+      expect(result.saved).toBe(true);
+      const config = JSON.parse(fs.readFileSync(path.join(root, 'poff.config.json'), 'utf8'));
+      expect(config.tree.map((item) => item.name).sort()).toEqual(['New item', 'Other item']);
+      expect(config.tree.find((item) => item.name === 'New item').remoteSource).toBe(nodeId);
+      expect(config.remoteSources.map((source) => source.id).sort()).toEqual([nodeId, 'other-key'].sort());
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('replacing a relocated folder feed preserves other folders on the same node', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-feed-scoping-'));
+    const nodeId = 'poff_node_0123456789abcdef0123456789abcdef';
+    const oldUrl = 'https://origin.example/feed?path=one';
+    const otherUrl = 'https://origin.example/feed?path=two';
+    const newUrl = 'https://new-origin.example/feed?path=one';
+    fs.writeFileSync(path.join(root, '.edit.allow'), '');
+    fs.writeFileSync(path.join(root, 'poff.config.json'), JSON.stringify({
+      tree: [
+        { name: 'One', type: 'file', pageLink: 'https://origin.example/one', remoteSource: nodeId, remoteFeedNodeId: nodeId, remoteFeedUrl: oldUrl },
+        { name: 'Two', type: 'file', pageLink: 'https://origin.example/two', remoteSource: nodeId, remoteFeedNodeId: nodeId, remoteFeedUrl: otherUrl },
+      ],
+      remoteSources: [{ id: nodeId, nodeId, path: 'one', url: oldUrl }, { id: nodeId, nodeId, path: 'two', url: otherUrl }],
+    }));
+    try {
+      const result = await runRemoteContent('import', root, '', {
+        url: newUrl, replace: true,
+        mockResponse: { status: 200, body: { source: { nodeId, path: 'one' }, items: [{ name: 'Updated', type: 'file', pageLink: 'https://new-origin.example/one' }] } },
+      });
+      expect(result.saved).toBe(true);
+      const config = JSON.parse(fs.readFileSync(path.join(root, 'poff.config.json'), 'utf8'));
+      expect(config.tree.map((item) => item.name).sort()).toEqual(['Two', 'Updated']);
+      expect(config.remoteSources.map((item) => item.url).sort()).toEqual([newUrl, otherUrl].sort());
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
