@@ -578,6 +578,14 @@ class Converter
         return false;
     }
 
+    public static function offerableFor(string $mimeType, string $kind, string $extension, string $rootDir = ''): array
+    {
+        return array_values(array_filter(
+            self::availableFor($mimeType, $kind, $extension, $rootDir),
+            [self::class, 'canOffer']
+        ));
+    }
+
     public static function canOffer(array $definition): bool
     {
         $engine = strtolower(trim((string) ($definition['engine'] ?? '')));

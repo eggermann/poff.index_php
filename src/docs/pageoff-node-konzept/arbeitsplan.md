@@ -22,6 +22,8 @@ Die Namensvergabe bei Remote-Import-Kollisionen liegt jetzt als `PoffConfig::uni
 
 Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet mehrere Treffer als mehrdeutig. `edit=move` erhält IDs bei Folder- und File-Moves, bewegt die dateinamengebundenen File-Sidecars mit und aktualisiert Parent-Tree-Metadaten. Remote-Feed-Regeln liegen transportfrei in `PoffRemoteFeedImport`: Eintragsnormalisierung, Rekursion/Flattening der Copy-Dateien sowie sichere und kollisionsfreie Zielnamen. Die bisherigen `mcpRemote…`-Funktionen bleiben Kompatibilitätsadapter; die Route behält Netzwerkzugriff, Schreiben und Berechtigungsprüfung. Regressionen prüfen Legacy-Felder, ungültige Node-IDs, verschachtelte Assets und die bisherigen Dateinamensregeln.
 
+`Converter::offerableFor()` wählt passende Konverter nach der bestehenden Angebotsregel aus. `converter-offers` liest den Request, erzeugt die Anbieter-URL und gibt nur die öffentlichen Felder im Format `poff-converter/1` aus. Die Auswahl lässt sich im Core ohne HTTP-Request verwenden.
+
 ## Reihenfolge für die Ausarbeitung
 
 1. **Transport/Core trennen:** weitere reine Konfiguration und Import-Operationen aus MCP-Routen in den Core verschieben; vorhandene Routennamen als Adapter erhalten.
