@@ -11,6 +11,12 @@ final class PoffNodeIdentity
         return rtrim($rootDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . self::FILE_NAME;
     }
 
+    public static function normalizeId(mixed $value): string
+    {
+        $id = trim(is_string($value) ? $value : '');
+        return preg_match('/^poff_node_[a-f0-9]{32}$/', $id) === 1 ? $id : '';
+    }
+
     public static function read(string $rootDir): ?string
     {
         $resolvedRoot = realpath($rootDir);
@@ -145,8 +151,8 @@ final class PoffNodeIdentity
     private static function readId(string $identityPath): string
     {
         $decoded = json_decode((string) file_get_contents($identityPath), true);
-        $id = is_array($decoded) ? (string) ($decoded['id'] ?? '') : '';
-        if (preg_match('/^poff_node_[a-f0-9]{32}$/', $id) !== 1) {
+        $id = is_array($decoded) ? self::normalizeId($decoded['id'] ?? null) : '';
+        if ($id === '') {
             throw new RuntimeException('PageOff node identity file is invalid.');
         }
 

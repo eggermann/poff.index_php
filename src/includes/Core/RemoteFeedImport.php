@@ -70,9 +70,9 @@ final class PoffRemoteFeedImport
             ];
 
             $reference = is_array($item['reference'] ?? null) ? $item['reference'] : [];
-            $remoteNodeId = self::validNodeId($reference['nodeId'] ?? ($payload['source']['nodeId'] ?? ''));
+            $remoteNodeId = PoffNodeIdentity::normalizeId($reference['nodeId'] ?? ($payload['source']['nodeId'] ?? ''));
             $remoteWorkId = trim((string) ($reference['workId'] ?? ($item['workId'] ?? '')));
-            $remoteFeedNodeId = self::validNodeId($payload['source']['nodeId'] ?? '');
+            $remoteFeedNodeId = PoffNodeIdentity::normalizeId($payload['source']['nodeId'] ?? '');
             if ($remoteNodeId !== '') {
                 $entry['remoteNodeId'] = $remoteNodeId;
             }
@@ -86,11 +86,5 @@ final class PoffRemoteFeedImport
         }
 
         return $entries;
-    }
-
-    private static function validNodeId(mixed $value): string
-    {
-        $nodeId = trim(is_string($value) ? $value : '');
-        return preg_match('/^poff_node_[a-f0-9]{32}$/', $nodeId) === 1 ? $nodeId : '';
     }
 }

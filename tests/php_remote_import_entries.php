@@ -6,6 +6,7 @@ require __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/includes/MediaType.php';
 require_once __DIR__ . '/../src/includes/Worktype.php';
 require_once __DIR__ . '/../src/includes/PoffConfig.php';
+require_once __DIR__ . '/../src/includes/NodeIdentity.php';
 require_once __DIR__ . '/../src/includes/Core/RemoteFeedImport.php';
 
 $input = json_decode((string) ($argv[1] ?? ''), true);

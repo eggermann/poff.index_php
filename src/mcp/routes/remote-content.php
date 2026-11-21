@@ -281,8 +281,7 @@ function mcpRemoteNormalizeExportItem(array $item, string $baseUrl, string $node
 
 function mcpRemoteStableNodeId(mixed $value): string
 {
-    $nodeId = trim(is_string($value) ? $value : '');
-    return preg_match('/^poff_node_[a-f0-9]{32}$/', $nodeId) === 1 ? $nodeId : '';
+    return PoffNodeIdentity::normalizeId($value);
 }
 
 function mcpRemoteExportSourceId(string $url, array $payload): string

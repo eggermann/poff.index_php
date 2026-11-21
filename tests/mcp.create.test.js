@@ -1833,6 +1833,24 @@ describe('MCP create route helper (CLI)', () => {
     expect(entries[1].remoteFeedNodeId).toBe(feedNodeId);
     expect(entries[1].importedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
+    const malformedIdentityEntries = await runRemoteImportEntries({
+      sourceUrl: 'https://malformed.example/export',
+      sourceId: 'malformed-example',
+      existingTree: [],
+      payload: {
+        source: { nodeId: 'poff_node_invalid' },
+        items: [{
+          title: 'Untrusted identity',
+          type: 'file',
+          pageLink: 'https://malformed.example/work',
+          reference: { nodeId: 'poff_node_invalid', workId: 'poff_aaaaaaaaaaaaaaaa' },
+        }],
+      },
+    });
+    expect(malformedIdentityEntries[0]).not.toHaveProperty('remoteNodeId');
+    expect(malformedIdentityEntries[0]).not.toHaveProperty('remoteFeedNodeId');
+    expect(malformedIdentityEntries[0].remoteWorkId).toBe('poff_aaaaaaaaaaaaaaaa');
+
     const legacyEntries = await runRemoteImportEntries({
       sourceUrl: 'https://legacy.example/export',
       sourceId: 'legacy-example',

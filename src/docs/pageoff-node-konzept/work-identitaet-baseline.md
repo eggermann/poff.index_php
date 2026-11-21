@@ -8,6 +8,8 @@ Die dauerhafte Referenz besteht aus stabiler Node-ID und stabiler Work-ID. Domai
 
 Die Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Exportierte Folder und physische Files erhalten `workId`; Remote-Works werden als `reference: { nodeId, workId }` weitergereicht. Beim Import werden IDs als `remoteNodeId`/`remoteWorkId` abgelegt, nicht als lokale Work-ID. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Identitätserzeugung beim Export braucht Schreibrecht im Node-Root. Eine vollständige Serverkopie übernimmt zunächst die Node-ID; das neue CLI-Werkzeug `php scripts/rotate-node-identity.php <node-root>` rotiert sie explizit, ohne Work-Metadaten anzufassen. Es wurde nicht auf einer realen Node ausgeführt.
 
+Die Formatprüfung von Node-IDs ist in `PoffNodeIdentity::normalizeId()` zentralisiert. Import-Core, Exportadapter und lokale Identitätsdatei nutzen denselben Validator; unpassende Werte werden verworfen beziehungsweise bei einer ungültigen lokalen Identitätsdatei als Fehler behandelt. Work-IDs bleiben opaque Zeichenketten und werden durch diesen Node-ID-Validator nicht eingeschränkt.
+
 ## Vorhandenes Verhalten
 
 - `PoffConfig::generateId()` in `src/includes/PoffConfig/core-helpers.php` erzeugt einen neuen zufälligen `poff_…` Wert.
