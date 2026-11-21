@@ -27,7 +27,7 @@ Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet me
 1. **Transport/Core trennen:** weitere reine Konfiguration und Import-Operationen aus MCP-Routen in den Core verschieben; vorhandene Routennamen als Adapter erhalten.
 2. **Node API spezifizieren:** stabile ID-Auflösung, Export, Remote-Referenzen, Fehlerstatus, Auth und Dateisystemeffekte als unabhängige Verträge festhalten.
 3. **Graph-Verbindungen beschreiben:** Parentfolder-Eintrag, direkte Node- und Work-Verbindungen, Offline-Zustand und Unmount festlegen.
-4. **MCP optional machen:** getrennte Assemblierung planen und nachweisen, ohne den bisherigen Einzeldatei-Standard oder vorhandene API-Routen zu ändern.
+4. **MCP optional machen:** die Streamable-Laufzeit ist bereits separat und fehlt im Einzeldatei-Artifact; die Handler bleiben wegen der JSON-Node-API eingebettet. Offen ist die optionale Composer-Dependency und der Startpfad. Beide ändern, ohne den bisherigen Einzeldatei-Standard oder vorhandene API-Routen zu entfernen.
 5. **Host und Rechte ausarbeiten:** `host`-Konfiguration, Open/Curated, Rollen, Vererbung und Grenzen festlegen. Bestehende Eingänge anhand des Quellcodes abgleichen; Host bleibt bis zur abgestimmten Umsetzung unimplementiert.
 6. **Build und Einführung absichern:** jede Änderung in temporärer Einzeldatei prüfen; generierte Inhaltsausgaben und bestehende lokale Build-Dateien unangetastet lassen.
 7. **Erweiterbarkeit erhalten:** Worktype-, Layout- und Converter-Verträge beibehalten; nur capability-spezifische Core-Grenzen extrahieren. [Audit-Baseline](erweiterbarkeit-baseline.md)

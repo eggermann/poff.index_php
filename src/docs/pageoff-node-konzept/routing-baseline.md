@@ -47,6 +47,12 @@ Alle 18 genannten Handler-Routen sind in `viewer.php` und dem Build-Rezept entha
 
 `http-server.php` bietet `workprompt`, `create`, `export_content`, `import_remote`, `converters`, `convert`, `save_converted_work`, `create_converter` und `converter_prompt`. Das ist keine vollständige Abbildung aller JSON-Routen. Dazu kommt der eigenständige `src/mcp/server.php`-Einstieg; seine Adapterrolle muss von der normalen `viewer.php`-Laufzeit getrennt bewertet werden.
 
+### Optionalitätsgrenze
+
+`src/mcp/http-server.php` ist eine separate Laufzeitdatei und wird nicht in `index.php` eingebettet. `build/build.php` fügt jedoch weiterhin die `mcp/routes/*.php`-Handler in den Einzeldatei-Build ein, weil dieselben Handler auch die bestehende JSON-Node-API bedienen. Diese Handler bei einem MCP-Schalter zu entfernen, würde daher bestehende `?mcp=1&route=…`-Clients brechen.
+
+Die Streamable-MCP-Laufzeit ist somit heute **separat startbar und aus dem Single-File-Artifact ausgeschlossen**, aber noch nicht vollständig optional installierbar: Das Root-`composer.json` führt `php-mcp/server` als verpflichtende Dependency. Die engste sichere Zielgrenze ist: JSON-Node-API und ihre kompatiblen Handler bleiben Standard; nur Streamable-MCP-Transport, Tool-Schemas und dessen Bibliothek werden in einer separaten optionalen Laufzeit/Dependency-Gruppe angeboten. MCP-Adapter rufen transportfreie Core-Operationen auf. Ein echtes Composer-Optional-Paket und die Abhängigkeitsinjektion sind noch nicht umgesetzt; dafür müssen Manifest- und Startpfade angepasst werden.
+
 ## Build-Abhängigkeiten und nächste Prüfung
 
 Der Builder fügt Viewer- und Editor-Quellen in Reihenfolge ein, führt `cmsHandleEditAction()` aus und hängt danach MCP-Helfer und Routen an. Er entfernt dafür ausgewählte `require_once`-Zeilen. `PoffConfigBuilder` transformiert Traits; Worktype-Definitionen, Templates und Assets werden zusätzlich eingebettet. Daher reicht das Verschieben einer Datei allein nicht: Source-Imports und Build-Reihenfolge müssen gemeinsam angepasst werden.

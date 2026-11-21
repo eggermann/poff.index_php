@@ -30,7 +30,7 @@ Eine lokale Work-ID liegt bei Foldern in `poff.config.json`, bei Files in `.work
 
 Die bestehenden JSON-Routen unter `?mcp=1&route=…` sind PageOffs rückwärtskompatible Node API mit historischem Namen. Der eigenständige `src/mcp/server.php` ist ein weiterer JSON-Einstieg. Das Streamable-MCP-Tool-Protokoll liegt separat in `src/mcp/http-server.php`. Diese drei Oberflächen haben verschiedene Routen, Initialisierung und Seiteneffekte; sie sind keine austauschbaren Dispatches.
 
-Zielrichtung: Core-Operationen bleiben ohne Netzwerk oder MCP verfügbar. Die Node API adaptiert Requests in die vorhandenen JSON-Routen; das Streamable-MCP-Protokoll ist ein optionaler Adapter. Der Einzeldatei-Builder behält die bestehende JSON-Node-API bei, damit vorhandene Clients weiter funktionieren.
+Zielrichtung: Core-Operationen bleiben ohne Netzwerk oder MCP verfügbar. Die Node API adaptiert Requests in die vorhandenen JSON-Routen; das Streamable-MCP-Protokoll ist ein optionaler Adapter. Der Einzeldatei-Builder behält die bestehende JSON-Node-API bei, damit vorhandene Clients weiter funktionieren. Heute ist nur der Streamable-HTTP-Einstieg außerhalb des Single-File-Artifacts; seine Bibliothek `php-mcp/server` bleibt noch eine verpflichtende Root-Composer-Dependency. Vollständige Installations-Optionalität ist deshalb ein offener Build-/Dependency-Schritt, kein bereits erreichter Zustand.
 
 ### Optionales Host-Modul
 
