@@ -1,6 +1,12 @@
 # Work-Identität: Ist-Stand
 
-Codebefund 20. November 2026; Folgeänderung 21. November 2026. Das ist ein Codebefund und eine branch-lokale Kopierregel, kein beschlossenes öffentliches Identitätsformat.
+Codebefund 20. November 2026; Folgeänderungen 21. November 2026. Die beobachtete Kopierregel war zunächst branch-lokal; die Zielrichtung für Node- und Work-Identität ist seit 21. November 2026 bestätigt.
+
+## Bestätigte Zielrichtung — 21. November 2026
+
+Die dauerhafte Referenz soll aus stabiler Node-ID und stabiler Work-ID bestehen. Domain und URL sind erreichbare Adressen eines Nodes und dürfen wechseln, ohne die Identität zu ändern. Verschieben erhält die Work-ID; Kopieren erzeugt eine neue Work-ID. Remote-Referenzen speichern künftig die Quell-Node-ID und Quell-Work-ID. Ein Pfadindex bleibt abgeleitet und neu aufbaubar.
+
+Die erste Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Das Schreiben der Node-ID braucht Schreibrecht im Node-Root; vollständige Serverkopien übernehmen die Node-ID zunächst mit und benötigen vor dem Betrieb eine explizite Identitätsrotation.
 
 ## Vorhandenes Verhalten
 
@@ -16,7 +22,7 @@ Codebefund 20. November 2026; Folgeänderung 21. November 2026. Das ist ein Code
 
 ## Konsequenz für das Zielmodell
 
-Die zufällige Metadaten-ID ist ein nützlicher Ausgangspunkt, aber aktuell keine sichere, eindeutige dauerhafte Identität über Kopien hinweg. Vor einer öffentlichen Auflösung braucht es eine Regel für ID-Konflikte und eine explizite Kopiersemantik. Ein verwaltetes Verschieben muss Metadaten samt Identität erhalten. Eine lokale Kopie auf demselben Node braucht ebenfalls eine definierte Regel; die Zielanforderung bestimmt eine neue ID für Kopien auf einem anderen Node, legt das Verhalten innerhalb desselben Nodes aber nicht fest.
+Die zufällige Metadaten-ID ist ein nützlicher Ausgangspunkt, aber aktuell keine eindeutige dauerhafte Identität innerhalb eines Nodes, wie der lokale Snapshot zeigt. Vor einer öffentlichen Auflösung braucht es weiterhin eine Regel für bestehende ID-Konflikte. Verwaltetes Verschieben muss Metadaten samt Identität erhalten; jede Kopie wird als neues Work behandelt und erhält eine neue ID.
 
 ## Resolver- und Kollisionsaudit (Workspace-Snapshot 21. November 2026)
 
@@ -24,11 +30,10 @@ Statische Suche in `src/includes` und `src/mcp` fand keinen Work-ID-zu-Pfad-Reso
 
 ## Nächste Entscheidungen
 
-1. Gilt Copy immer als neues Work, auch innerhalb desselben Nodes? Empfohlener Default: ja; Ursprung optional als `copiedFrom` dokumentieren.
-2. Bleibt die Work-ID im Datei-Metadatensatz, wenn eine Datei umbenannt wird, obwohl der Metadaten-Dateiname aktuell an den Work-Namen gekoppelt ist? Rename-Operation muss Quellmetadaten atomar mitbewegen.
-3. Wie werden bestehende doppelte IDs migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
-4. Ist `Node-Adresse + Work-ID` vorerst die öffentliche Referenz, und wie reagiert der Resolver auf temporäre Adresse oder Domainwechsel?
-5. Ein ID-zu-Pfad-Index darf nur abgeleitet und neu aufbaubar sein; die Metadaten bleiben maßgeblicher Bestand.
+1. Wie bleibt die Work-ID beim Umbenennen erhalten, obwohl der Datei-Metadatensatz aktuell an den Dateinamen gekoppelt ist? Eine Rename-Operation muss Quelldaten atomar mitbewegen.
+2. Wie werden bestehende doppelte IDs migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
+3. Wie wird eine vollständige Serverkopie vor dem Betrieb mit einer neuen Node-ID versehen?
+4. Ein ID-zu-Pfad-Index darf nur abgeleitet und neu aufbaubar sein; die Metadaten bleiben maßgeblicher Bestand.
 
 Quelle: `src/includes/PoffConfig/core-helpers.php`, `src/includes/PoffConfig/layout-helpers.php`, `src/mcp/routes/create.php`, `src/includes/nav-render.php`, `tests/mcp.create.test.js`.
 

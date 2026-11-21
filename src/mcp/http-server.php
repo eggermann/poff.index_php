@@ -9,6 +9,7 @@ require __DIR__ . '/../../vendor/autoload.php';
 @require_once __DIR__ . '/../includes/Worktype.php';
 @require_once __DIR__ . '/../includes/Converter.php';
 @require_once __DIR__ . '/../includes/PoffConfig.php';
+@require_once __DIR__ . '/../includes/NodeIdentity.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/routes/workprompt.php';
 require_once __DIR__ . '/routes/create.php';

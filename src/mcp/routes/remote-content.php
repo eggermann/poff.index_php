@@ -697,6 +697,7 @@ function handleExportContent(array $opts): array
         'slug' => $slug,
     ]);
     $baseUrl = mcpRemoteContentBaseUrl($opts);
+    $nodeId = PoffNodeIdentity::ensure($rootDir);
 
     return [
         'route' => 'export-content',
@@ -704,6 +705,7 @@ function handleExportContent(array $opts): array
         'exportedAt' => date('c'),
         'source' => [
             'id' => trim((string) ($opts['sourceId'] ?? parse_url($baseUrl, PHP_URL_HOST) ?? basename($rootDir))),
+            'nodeId' => $nodeId,
             'baseUrl' => $baseUrl,
             'path' => $path,
         ],

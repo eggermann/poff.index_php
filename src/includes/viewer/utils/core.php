@@ -30,6 +30,8 @@ function cmsIsHiddenSystemEntry(string $entry): bool
 {
     return in_array($entry, [
         'poff.config.json',
+        'poff.node.json',
+        '.poff-node-identity.lock',
         '.poff-auth.php',
         'auth.config.php',
         '.works',

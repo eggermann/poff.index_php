@@ -255,6 +255,7 @@ PHP
         $poffConfigPromptHelpers,
     ]);
     $poffConfigContent = $stripPhp($poffConfigContent);
+    $nodeIdentityContent = $stripPhp($readSourceFile('/includes/NodeIdentity.php'));
     $authHelpers = $stripPhp($readSourceFile('/includes/auth.php'));
     $navRenderHelpers = $stripPhp($readSourceFile('/includes/nav-render.php'));
     foreach ([
@@ -264,6 +265,7 @@ PHP
         $promptTemplateSanitize,
         $viewerLinkTargets,
         $poffConfigContent,
+        $nodeIdentityContent,
         $navRenderHelpers,
     ] as $phpBlock) {
         $appendPhpBlock($buildContent, $phpBlock);

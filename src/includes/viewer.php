@@ -15,6 +15,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
     @require_once __DIR__ . '/Worktype.php';
     @require_once __DIR__ . '/Converter.php';
     @require_once __DIR__ . '/PoffConfig.php';
+    @require_once __DIR__ . '/NodeIdentity.php';
     require_once __DIR__ . '/../mcp/routes/workprompt.php';
     require_once __DIR__ . '/../mcp/routes/create.php';
     require_once __DIR__ . '/../mcp/routes/edit-config.php';

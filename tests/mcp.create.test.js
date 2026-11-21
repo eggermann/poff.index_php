@@ -1569,6 +1569,8 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.file[0]).not.toBe(result.folder[0]);
     expect(result.newIds[0]).toMatch(/^poff_[a-f0-9]{16}$/);
     expect(result.newIds[1]).not.toBe(result.newIds[0]);
+    expect(result.nodeIds[0]).toMatch(/^poff_node_[a-f0-9]{32}$/);
+    expect(result.nodeIds[1]).toBe(result.nodeIds[0]);
   });
 
   test('formats prompt provider failures with status and redacted detail', async () => {
@@ -4259,6 +4261,7 @@ describe('Worktype HBS renderer', () => {
         'Worktype::setEmbeddedLayoutAssets(',
         'newWorkId',
         'reassignWorkIdForCopy',
+        'class PoffNodeIdentity',
         'image/*',
         'max-h-screen max-w-full object-contain',
         '--poff-shell-bg',
@@ -6075,34 +6078,52 @@ describe('Worktype HBS renderer', () => {
   });
 
   test('exports normalized remote content with absolute viewer and asset links', async () => {
-    const result = await runRemoteContent('export', POFF_DIR, 'viewer-folder', {
-      baseUrl: 'https://origin.example/index.php',
-      sourceId: 'origin-example',
-    });
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-export-'));
+    const exportFolder = path.join(tempRoot, 'viewer-folder');
+    fs.mkdirSync(path.join(exportFolder, 'nested-child'), { recursive: true });
+    fs.writeFileSync(path.join(exportFolder, 'child.txt'), 'export identity fixture');
 
-    expect(result.route).toBe('export-content');
-    expect(result.source).toEqual(expect.objectContaining({
-      id: 'origin-example',
-      baseUrl: 'https://origin.example/index.php',
-      path: 'viewer-folder',
-    }));
-    expect(result.root.pageLink).toBe('https://origin.example/index.php?view=1&path=viewer-folder');
-    expect(result.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        name: 'child.txt',
-        pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
-        srcUrl: 'https://origin.example/viewer-folder/child.txt',
-        routeSlug: 'child-txt',
-        routePath: 'viewer-folder/child.txt',
-      }),
-      expect.objectContaining({
-        name: 'nested-child',
-        isFolder: true,
-        pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
-        routeSlug: 'nested-child',
-        routePath: 'viewer-folder/nested-child',
-      }),
-    ]));
+    try {
+      const result = await runRemoteContent('export', tempRoot, 'viewer-folder', {
+        baseUrl: 'https://origin.example/index.php',
+        sourceId: 'origin-example',
+      });
+      const repeatedResult = await runRemoteContent('export', tempRoot, 'viewer-folder', {
+        baseUrl: 'https://origin.example/index.php',
+        sourceId: 'origin-example',
+      });
+
+      expect(result.route).toBe('export-content');
+      expect(result.source).toEqual(expect.objectContaining({
+        id: 'origin-example',
+        nodeId: expect.stringMatching(/^poff_node_[a-f0-9]{32}$/),
+        baseUrl: 'https://origin.example/index.php',
+        path: 'viewer-folder',
+      }));
+      expect(repeatedResult.source.nodeId).toBe(result.source.nodeId);
+      expect(repeatedResult.items).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'poff.node.json' }),
+      ]));
+      expect(result.root.pageLink).toBe('https://origin.example/index.php?view=1&path=viewer-folder');
+      expect(result.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'child.txt',
+          pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
+          srcUrl: 'https://origin.example/viewer-folder/child.txt',
+          routeSlug: 'child-txt',
+          routePath: 'viewer-folder/child.txt',
+        }),
+        expect.objectContaining({
+          name: 'nested-child',
+          isFolder: true,
+          pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
+          routeSlug: 'nested-child',
+          routePath: 'viewer-folder/nested-child',
+        }),
+      ]));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('inspects and atomically replaces a compatible remote work presentation', async () => {

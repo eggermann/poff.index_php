@@ -6,6 +6,7 @@ require_once __DIR__ . '/../src/includes/functions.php';
 require_once __DIR__ . '/../src/includes/MediaType.php';
 require_once __DIR__ . '/../src/includes/Worktype.php';
 require_once __DIR__ . '/../src/includes/PoffConfig.php';
+require_once __DIR__ . '/../src/includes/NodeIdentity.php';
 require_once __DIR__ . '/../src/includes/viewer/render.php';
 require_once __DIR__ . '/../src/mcp/helpers.php';
 require_once __DIR__ . '/../src/mcp/routes/remote-content.php';
