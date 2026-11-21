@@ -18,6 +18,10 @@ Codebefund 20. November 2026; Folgeänderung 21. November 2026. Das ist ein Code
 
 Die zufällige Metadaten-ID ist ein nützlicher Ausgangspunkt, aber aktuell keine sichere, eindeutige dauerhafte Identität über Kopien hinweg. Vor einer öffentlichen Auflösung braucht es eine Regel für ID-Konflikte und eine explizite Kopiersemantik. Ein verwaltetes Verschieben muss Metadaten samt Identität erhalten. Eine lokale Kopie auf demselben Node braucht ebenfalls eine definierte Regel; die Zielanforderung bestimmt eine neue ID für Kopien auf einem anderen Node, legt das Verhalten innerhalb desselben Nodes aber nicht fest.
 
+## Resolver- und Kollisionsaudit (Workspace-Snapshot 21. November 2026)
+
+Statische Suche in `src/includes` und `src/mcp` fand keinen Work-ID-zu-Pfad-Resolver oder ID-Index. Vorhandene Viewer-Auflösung arbeitet über Pfade und Slugs. Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadatendateien unter dem lokalen `pages/`-Baum fand eine doppelt vergebene ID in zwei Konfigurationen: `.layout/poff.config.json` und `.layout copy/poff.config.json` unter `dominikeggermann.comX`. Das deutet auf eine kopierte lokale Layout-Konfiguration, beweist aber weder Herkunft noch Auswirkungen für andere Nodes. Keine Migration wurde ausgeführt; der Snapshot muss vor einer Migrationsplanung geprüft und gegen weitere Node-Bestände neu erhoben werden.
+
 ## Nächste Entscheidungen
 
 1. Gilt Copy immer als neues Work, auch innerhalb desselben Nodes? Empfohlener Default: ja; Ursprung optional als `copiedFrom` dokumentieren.
