@@ -14,6 +14,22 @@ $rootDir = $argv[1] ?? '';
 $relativePath = $argv[2] ?? '';
 $destination = $argv[3] ?? '';
 $name = $argv[4] ?? '';
+$failure = $argv[5] ?? '';
+if (in_array($failure, ['metadata', 'tree', 'tree-rollback'], true)) {
+    $rootDir = realpath($rootDir) ?: $rootDir;
+    $failPath = $failure === 'metadata'
+        ? $rootDir . '/' . trim($destination, '/') . '/.works/' . $name . '.config.json'
+        : $rootDir . '/' . trim($destination, '/') . '/poff.config.json';
+    $GLOBALS['__poff_move_write_guard'] = static fn(string $path): bool => $path !== $failPath;
+}
+if (in_array($failure, ['layout', 'rollback', 'tree-rollback'], true)) {
+    $GLOBALS['__poff_move_rename_guard'] = static function (string $from, string $to, bool $rollback) use ($failure): bool {
+        if ($failure !== 'tree-rollback' && !$rollback && str_ends_with($from, '.layout')) {
+            return false;
+        }
+        return !($failure !== 'layout' && $rollback && str_ends_with($from, '.config.json'));
+    };
+}
 $result = cmsMoveTarget($rootDir, $relativePath, $destination, $name);
 
 echo json_encode([

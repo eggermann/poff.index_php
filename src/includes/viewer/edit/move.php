@@ -34,6 +34,11 @@ function cmsMovePathHasSymlink(string $rootDir, string $relativePath): bool
 
 function cmsMoveWriteConfig(string $path, array $config): bool
 {
+    // Test seam for exercising write failures; normal requests do not set this guard.
+    $writeGuard = $GLOBALS['__poff_move_write_guard'] ?? null;
+    if (is_callable($writeGuard) && !$writeGuard($path, $config)) {
+        return false;
+    }
     $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if (!is_string($encoded)) {
         return false;
@@ -52,6 +57,18 @@ function cmsMoveWriteConfig(string $path, array $config): bool
     }
     @unlink($temporaryPath);
     return false;
+}
+
+function cmsMoveRename(string $from, string $to, bool $rollback = false): bool
+{
+    $guard = $GLOBALS['__poff_move_rename_guard'] ?? null;
+    if (is_callable($guard) && !$guard($from, $to, $rollback)) {
+        return false;
+    }
+    if ($rollback && (file_exists($to) || is_link($to))) {
+        return false;
+    }
+    return @rename($from, $to);
 }
 
 function cmsMoveApplyTreeMetadata(string $destinationParent, string $newName, string $sourceName, ?array $sourceEntry): bool
@@ -194,10 +211,10 @@ function cmsMoveTarget(string $rootDir, string $relativePath, string $destinatio
 
     $moved = [];
     foreach ($moves as [$moveSource, $moveDestination]) {
-        if (!@rename($moveSource, $moveDestination)) {
+        if (!cmsMoveRename($moveSource, $moveDestination)) {
             $rollbackFailed = false;
             foreach (array_reverse($moved) as [$rollbackSource, $rollbackDestination]) {
-                if (!@rename($rollbackDestination, $rollbackSource)) {
+                if (!cmsMoveRename($rollbackDestination, $rollbackSource, true)) {
                     $rollbackFailed = true;
                 }
             }
@@ -241,7 +258,7 @@ function cmsMoveTarget(string $rootDir, string $relativePath, string $destinatio
     if (!$metadataUpdated) {
         $rollbackFailed = false;
         foreach (array_reverse($moved) as [$rollbackSource, $rollbackDestination]) {
-            if (!@rename($rollbackDestination, $rollbackSource)) {
+            if (!cmsMoveRename($rollbackDestination, $rollbackSource, true)) {
                 $rollbackFailed = true;
             }
         }
@@ -257,16 +274,21 @@ function cmsMoveTarget(string $rootDir, string $relativePath, string $destinatio
     if (!cmsMoveApplyTreeMetadata((string) $destination['dir'], $newName, $sourceName, $sourceTreeEntry)) {
         $rollbackFailed = false;
         foreach (array_reverse($moved) as [$rollbackSource, $rollbackDestination]) {
-            if (!@rename($rollbackDestination, $rollbackSource)) {
+            if (!cmsMoveRename($rollbackDestination, $rollbackSource, true)) {
                 $rollbackFailed = true;
             }
         }
-        if (!cmsMoveWriteConfig($sourceMetadataPath, $sourceMetadataSnapshot)) {
+        if (!$rollbackFailed && !cmsMoveWriteConfig($sourceMetadataPath, $sourceMetadataSnapshot)) {
             $rollbackFailed = true;
         }
-        PoffConfig::ensure($sourceParent);
-        if ($sourceParent !== (string) $destination['dir']) {
-            PoffConfig::ensure((string) $destination['dir']);
+        if (!$rollbackFailed) {
+            PoffConfig::ensure($sourceParent);
+            if ($sourceParent !== (string) $destination['dir']) {
+                PoffConfig::ensure((string) $destination['dir']);
+            }
+            if (!cmsMoveApplyTreeMetadata($sourceParent, $sourceName, $sourceName, $sourceTreeEntry)) {
+                $rollbackFailed = true;
+            }
         }
         return ['errors' => [$rollbackFailed ? 'Move failed and rollback was incomplete.' : 'Move tree update failed; previous paths were restored.']];
     }

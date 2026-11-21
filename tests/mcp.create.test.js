@@ -484,9 +484,9 @@ function runRemoteImportEntries(input) {
   });
 }
 
-function runMoveWork(rootDir, source, destination, name = '') {
+function runMoveWork(rootDir, source, destination, name = '', failure = '') {
   return new Promise((resolve, reject) => {
-    const args = [path.join(ROOT, 'tests/php_move_work.php'), rootDir, source, destination, name];
+    const args = [path.join(ROOT, 'tests/php_move_work.php'), rootDir, source, destination, name, failure];
     const proc = spawn('php', args, {
       cwd: ROOT,
       env: withTestEnv(),
@@ -1681,6 +1681,118 @@ describe('MCP create route helper (CLI)', () => {
       }));
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  (typeof process.getuid === 'function' && process.getuid() === 0 ? test.skip : test)('rolls back a file move when its metadata cannot be moved', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-move-rollback-'));
+    const sourceDir = path.join(tempRoot, 'source');
+    const destinationDir = path.join(tempRoot, 'destination');
+    const sourceWorks = path.join(sourceDir, '.works');
+    const destinationWorks = path.join(destinationDir, '.works');
+    fs.mkdirSync(path.join(sourceWorks, 'note.txt.layout'), { recursive: true });
+    fs.mkdirSync(destinationWorks, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'note.txt'), 'original');
+    fs.writeFileSync(path.join(sourceWorks, 'note.txt.config.json'), JSON.stringify({ id: 'poff_move_rollback', work: { type: 'text' } }));
+    fs.writeFileSync(path.join(sourceWorks, 'note.txt.layout', 'template.hbs'), 'original layout');
+    fs.chmodSync(destinationWorks, 0o555);
+
+    try {
+      const result = await runMoveWork(tempRoot, 'source/note.txt', 'destination', 'renamed.txt');
+      expect(result.errors).toContain('Move failed; previous paths were restored.');
+      expect(fs.readFileSync(path.join(sourceDir, 'note.txt'), 'utf8')).toBe('original');
+      expect(JSON.parse(fs.readFileSync(path.join(sourceWorks, 'note.txt.config.json'), 'utf8')).id).toBe('poff_move_rollback');
+      expect(fs.readFileSync(path.join(sourceWorks, 'note.txt.layout', 'template.hbs'), 'utf8')).toBe('original layout');
+      expect(fs.existsSync(path.join(destinationDir, 'renamed.txt'))).toBe(false);
+    } finally {
+      fs.chmodSync(destinationWorks, 0o755);
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ['metadata', 'Move metadata update failed; previous paths were restored.'],
+    ['tree', 'Move tree update failed; previous paths were restored.'],
+  ])('restores file and sidecars when %s update fails', async (failure, error) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-move-write-failure-'));
+    const source = path.join(root, 'source');
+    const destination = path.join(root, 'destination');
+    const works = path.join(source, '.works');
+    fs.mkdirSync(path.join(works, 'note.txt.layout'), { recursive: true });
+    fs.mkdirSync(destination, { recursive: true });
+    fs.writeFileSync(path.join(source, 'note.txt'), 'original');
+    fs.writeFileSync(path.join(source, 'poff.config.json'), JSON.stringify({ id: 'poff_source', tree: [{ name: 'note.txt', type: 'file', path: 'note.txt', title: 'Custom title' }] }));
+    fs.writeFileSync(path.join(works, 'note.txt.config.json'), JSON.stringify({ id: 'poff_rollback_file', work: { type: 'text' } }));
+    fs.writeFileSync(path.join(works, 'note.txt.layout', 'template.hbs'), 'layout');
+    try {
+      const result = await runMoveWork(root, 'source/note.txt', 'destination', 'renamed.txt', failure);
+      expect(result.errors).toContain(error);
+      expect(fs.readFileSync(path.join(source, 'note.txt'), 'utf8')).toBe('original');
+      const config = JSON.parse(fs.readFileSync(path.join(works, 'note.txt.config.json'), 'utf8'));
+      expect(config.id).toBe('poff_rollback_file');
+      expect(config.name).not.toBe('renamed.txt');
+      expect(fs.readFileSync(path.join(works, 'note.txt.layout', 'template.hbs'), 'utf8')).toBe('layout');
+      expect(fs.existsSync(path.join(destination, 'renamed.txt'))).toBe(false);
+      expect(fs.existsSync(path.join(destination, '.works', 'renamed.txt.config.json'))).toBe(false);
+      expect(fs.existsSync(path.join(destination, '.works', 'renamed.txt.layout'))).toBe(false);
+      if (failure === 'tree') {
+        const sourceConfig = JSON.parse(fs.readFileSync(path.join(source, 'poff.config.json'), 'utf8'));
+        expect(sourceConfig.tree).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'note.txt', title: 'Custom title' })]));
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ['layout', 'Move failed; previous paths were restored.'],
+    ['rollback', 'Move failed and rollback was incomplete.'],
+  ])('reports %s rename failure and preserves remaining data', async (failure, error) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-move-rename-failure-'));
+    const source = path.join(root, 'source');
+    const destination = path.join(root, 'destination');
+    const works = path.join(source, '.works');
+    fs.mkdirSync(path.join(works, 'note.txt.layout'), { recursive: true });
+    fs.mkdirSync(destination, { recursive: true });
+    fs.writeFileSync(path.join(source, 'note.txt'), 'original');
+    fs.writeFileSync(path.join(works, 'note.txt.config.json'), JSON.stringify({ id: 'poff_rename_failure', work: { type: 'text' } }));
+    fs.writeFileSync(path.join(works, 'note.txt.layout', 'template.hbs'), 'layout');
+    try {
+      const result = await runMoveWork(root, 'source/note.txt', 'destination', 'renamed.txt', failure);
+      expect(result.errors).toContain(error);
+      expect(fs.readFileSync(path.join(source, 'note.txt'), 'utf8')).toBe('original');
+      expect(fs.readFileSync(path.join(works, 'note.txt.layout', 'template.hbs'), 'utf8')).toBe('layout');
+      const configPath = failure === 'rollback'
+        ? path.join(destination, '.works', 'renamed.txt.config.json')
+        : path.join(works, 'note.txt.config.json');
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8')).id).toBe('poff_rename_failure');
+      expect(fs.existsSync(path.join(destination, 'renamed.txt'))).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('does not recreate a source sidecar after an incomplete tree rollback', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-move-tree-rollback-'));
+    const source = path.join(root, 'source');
+    const destination = path.join(root, 'destination');
+    const works = path.join(source, '.works');
+    fs.mkdirSync(path.join(works, 'note.txt.layout'), { recursive: true });
+    fs.mkdirSync(destination, { recursive: true });
+    fs.writeFileSync(path.join(source, 'note.txt'), 'original');
+    fs.writeFileSync(path.join(source, 'poff.config.json'), JSON.stringify({ id: 'poff_source', tree: [{ name: 'note.txt', type: 'file', path: 'note.txt', title: 'Custom title' }] }));
+    fs.writeFileSync(path.join(works, 'note.txt.config.json'), JSON.stringify({ id: 'poff_tree_rollback', work: { type: 'text' } }));
+    fs.writeFileSync(path.join(works, 'note.txt.layout', 'template.hbs'), 'layout');
+    try {
+      const result = await runMoveWork(root, 'source/note.txt', 'destination', 'renamed.txt', 'tree-rollback');
+      expect(result.errors).toContain('Move failed and rollback was incomplete.');
+      expect(fs.readFileSync(path.join(source, 'note.txt'), 'utf8')).toBe('original');
+      expect(fs.existsSync(path.join(works, 'note.txt.config.json'))).toBe(false);
+      const retained = JSON.parse(fs.readFileSync(path.join(destination, '.works', 'renamed.txt.config.json'), 'utf8'));
+      expect(retained.id).toBe('poff_tree_rollback');
+      expect(fs.readFileSync(path.join(works, 'note.txt.layout', 'template.hbs'), 'utf8')).toBe('layout');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
