@@ -608,7 +608,7 @@ function mcpRemoteCopyExport(
             'title' => $fallbackTitle !== '' ? $fallbackTitle : $folderName,
             'description' => 'Local copy from ' . $sourceHost,
             'type' => 'folder',
-            'id' => 'poff_' . bin2hex(random_bytes(8)),
+            'id' => PoffConfig::newWorkId(),
             'tree' => $tree,
             'treeHash' => hash('sha256', json_encode($tree)),
             'updatedAt' => date('c'),

@@ -39,9 +39,14 @@ trait PoffConfigCoreHelpers
         }
     }
 
+    public static function newWorkId(): string
+    {
+        return self::generateId();
+    }
+
     public static function reassignWorkIdForCopy(array $workMetadata): array
     {
-        $workMetadata['id'] = self::generateId();
+        $workMetadata['id'] = self::newWorkId();
         return $workMetadata;
     }
 

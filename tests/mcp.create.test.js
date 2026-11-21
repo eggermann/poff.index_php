@@ -1567,6 +1567,8 @@ describe('MCP create route helper (CLI)', () => {
     expect(result.folder[1]).toBe(result.folder[0]);
     expect(result.file[1]).toBe(result.file[0]);
     expect(result.file[0]).not.toBe(result.folder[0]);
+    expect(result.newIds[0]).toMatch(/^poff_[a-f0-9]{16}$/);
+    expect(result.newIds[1]).not.toBe(result.newIds[0]);
   });
 
   test('formats prompt provider failures with status and redacted detail', async () => {
@@ -4255,6 +4257,7 @@ describe('Worktype HBS renderer', () => {
         'Worktype::setEmbedded(',
         'Worktype::setEmbeddedTemplates(',
         'Worktype::setEmbeddedLayoutAssets(',
+        'newWorkId',
         'reassignWorkIdForCopy',
         'image/*',
         'max-h-screen max-w-full object-contain',
@@ -6377,6 +6380,7 @@ describe('Worktype HBS renderer', () => {
       expect(playerScript).toContain("loopToggle?.addEventListener('click'");
       expect(playerScript).toContain("tracks.forEach((track, trackIndex) => track.addEventListener('click'");
       const copiedConfig = JSON.parse(fs.readFileSync(path.join(tempRoot, 'local-films', 'poff.config.json'), 'utf8'));
+      expect(copiedConfig.id).toMatch(/^poff_[a-f0-9]{16}$/);
       expect(copiedConfig.tree).toEqual([
         expect.objectContaining({
           name: 'clip.mp4',

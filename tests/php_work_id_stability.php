@@ -20,6 +20,7 @@ try {
     echo json_encode([
         'folder' => [$firstFolder['id'] ?? '', $secondFolder['id'] ?? ''],
         'file' => [$firstFile['id'] ?? '', $secondFile['id'] ?? ''],
+        'newIds' => [PoffConfig::newWorkId(), PoffConfig::newWorkId()],
     ], JSON_UNESCAPED_SLASHES);
 } finally {
     $iterator = new RecursiveIteratorIterator(
