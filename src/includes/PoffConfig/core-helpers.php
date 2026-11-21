@@ -502,6 +502,9 @@ trait PoffConfigCoreHelpers
             if (isset($existing['id'])) {
                 $data['id'] = $existing['id'];
             }
+            if (isset($existing['externalSubmissions']) && is_array($existing['externalSubmissions'])) {
+                $data['externalSubmissions'] = $existing['externalSubmissions'];
+            }
             $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
         }
         $data['work'] = array_merge($workDefault, $existingWork);
@@ -666,5 +669,151 @@ trait PoffConfigCoreHelpers
         }
 
         return self::hydrateConfigLayout($data, $dir, $fileName);
+    }
+
+    public static function read(string $dir): array
+    {
+        $normalizedDir = self::normalizeExistingDirectoryPath($dir);
+        $configPath = self::configPath($dir);
+        $defaults = self::defaultConfig($dir);
+        $existing = self::readDecodedConfigFile($configPath);
+
+        if (
+            is_array($existing)
+            && is_dir($normalizedDir)
+            && is_file($configPath)
+            && (($existing['work'] ?? null) === null || is_array($existing['work']))
+        ) {
+            $configMtime = @filemtime($configPath);
+            $dirMtime = @filemtime($normalizedDir);
+            if ($configMtime !== false && $dirMtime !== false && $dirMtime < $configMtime) {
+                $fastData = $existing;
+                $fastData['folderName'] = $fastData['folderName'] ?? basename(rtrim($dir, DIRECTORY_SEPARATOR));
+                $fastData['slug'] = trim((string) ($fastData['slug'] ?? self::slugify((string) $fastData['folderName'])), '-') ?: 'untitled';
+                $fastData['title'] = $fastData['title'] ?? '';
+                $fastData['description'] = $fastData['description'] ?? '';
+                if (empty($fastData['id'])) {
+                    $fastData['id'] = self::generateId();
+                }
+                $existingWork = (isset($fastData['work']) && is_array($fastData['work'])) ? $fastData['work'] : [];
+                $fastData['work'] = array_merge(self::defaultWork('folder'), $existingWork);
+                $fastData['work']['layout'] = Worktype::normalizeLayout($fastData['work']['layout'] ?? null, 'works');
+
+                return self::hydrateConfigLayout($fastData, $dir);
+            }
+        }
+
+        $mergedTree = $defaults['tree'];
+        if (is_array($existing) && isset($existing['tree']) && is_array($existing['tree'])) {
+            $existingByName = [];
+            foreach ($existing['tree'] as $item) {
+                if (!isset($item['name'])) {
+                    continue;
+                }
+                $existingByName[$item['name']] = $item;
+            }
+
+            foreach ($mergedTree as &$item) {
+                $name = $item['name'];
+                if (isset($existingByName[$name]) && is_array($existingByName[$name])) {
+                    $existingItem = $existingByName[$name];
+                    if (array_key_exists('visible', $existingItem)) {
+                        $item['visible'] = $existingItem['visible'];
+                    }
+                    foreach ($existingItem as $k => $v) {
+                        if (in_array($k, ['name', 'type', 'path', 'modifiedAt'], true)) {
+                            continue;
+                        }
+                        if (!array_key_exists($k, $item)) {
+                            $item[$k] = $v;
+                        } elseif ($k === 'slug' && is_string($v) && trim($v) !== '') {
+                            $item[$k] = trim($v);
+                        }
+                    }
+                }
+            }
+            unset($item);
+
+            $mergedNames = [];
+            foreach ($mergedTree as $item) {
+                if (isset($item['name']) && is_string($item['name']) && $item['name'] !== '') {
+                    $mergedNames[$item['name']] = true;
+                }
+            }
+
+            foreach ($existing['tree'] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $name = trim((string) ($item['name'] ?? ''));
+                if ($name === '' || isset($mergedNames[$name])) {
+                    continue;
+                }
+                if (self::isEditOnlyTreeEntry($name)) {
+                    continue;
+                }
+                if (cmsConfiguredTreeLinkTarget($item) === '') {
+                    continue;
+                }
+
+                $virtualItem = [
+                    'name' => $name,
+                    'slug' => (string) ($item['slug'] ?? self::slugify($name)),
+                    'type' => (string) ($item['type'] ?? 'file'),
+                    'path' => (string) ($item['path'] ?? $name),
+                    'modifiedAt' => $item['modifiedAt'] ?? null,
+                    'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
+                ];
+
+                foreach ($item as $key => $value) {
+                    if (array_key_exists($key, $virtualItem)) {
+                        continue;
+                    }
+                    $virtualItem[$key] = $value;
+                }
+
+                $mergedTree[] = $virtualItem;
+                $mergedNames[$name] = true;
+            }
+        }
+
+        $data = $defaults;
+        $data['tree'] = $mergedTree;
+        $data['treeHash'] = hash('sha256', json_encode($mergedTree));
+        $workDefault = self::defaultWork('folder');
+        $existingWork = [];
+        if (is_array($existing)) {
+            $data['title'] = $existing['title'] ?? $data['title'] ?? '';
+            $data['description'] = $existing['description'] ?? $data['description'] ?? '';
+            if (isset($existing['link'])) {
+                $data['link'] = $existing['link'];
+            }
+            if (isset($existing['url'])) {
+                $data['url'] = $existing['url'];
+            }
+            if (isset($existing['id'])) {
+                $data['id'] = $existing['id'];
+            }
+            if (isset($existing['externalSubmissions']) && is_array($existing['externalSubmissions'])) {
+                $data['externalSubmissions'] = $existing['externalSubmissions'];
+            }
+            $existingWork = (isset($existing['work']) && is_array($existing['work'])) ? $existing['work'] : [];
+        }
+        $data['work'] = array_merge($workDefault, $existingWork);
+        $data['work']['layout'] = Worktype::normalizeLayout($data['work']['layout'] ?? null, 'works');
+        if (empty($data['id'])) {
+            $data['id'] = self::generateId();
+        }
+        if (empty($data['work'])) {
+            $data['work'] = $workDefault;
+        }
+        if (!isset($data['title'])) {
+            $data['title'] = '';
+        }
+        if (!isset($data['description'])) {
+            $data['description'] = '';
+        }
+
+        return self::hydrateConfigLayout($data, $dir);
     }
 }

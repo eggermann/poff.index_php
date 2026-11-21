@@ -22,6 +22,26 @@ function cmsCompactFolderRenderTree(array $items, int $depthRemaining): array
     return $compacted;
 }
 
+function cmsDominikEggermannRootStory(string $relativePath, array $folderConfig): string
+{
+    $folderName = strtolower(trim((string) ($folderConfig['folderName'] ?? '')));
+    $requestHost = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? '')));
+    $requestHost = preg_replace('/:\\d+$/', '', $requestHost) ?? '';
+    $isDominikSite = in_array($requestHost, ['dominikeggermann.com', 'www.dominikeggermann.com'], true)
+        || $folderName === 'dominikeggermann.com';
+
+    if (trim($relativePath, '/\\') !== '' || !$isDominikSite) {
+        return '';
+    }
+
+    return '<section class="poff-owner-intro" aria-labelledby="poff-owner-intro-title">'
+        . '<p class="poff-owner-intro__eyebrow">Dominik Eggermann</p>'
+        . '<h2 id="poff-owner-intro-title">Work moving between image, film, and the in-between.</h2>'
+        . '<p>This is a living studio archive: selections, experiments, and projects that keep changing shape. Start with a selection, then follow what catches you.</p>'
+        . '<a class="poff-owner-intro__action" href="?view=1&amp;path=HRMueller-2">Open selected work <span aria-hidden="true">→</span></a>'
+        . '</section>';
+}
+
 function cmsCompactFolderRenderContext(array $context): array
 {
     $allItems = is_array($context['allItems'] ?? null) ? $context['allItems'] : [];
@@ -169,6 +189,7 @@ function cmsBuildFolderViewerSnapshotPayload(string $relativePath, string $fullP
     }
 
     $viewerType = $isConverterWork ? 'converter' : 'folder';
+    $context['ownerStory'] = cmsDominikEggermannRootStory($relativePath, $folderConfig);
     $bodyContent = Worktype::render($viewerType, $context);
 
     return [

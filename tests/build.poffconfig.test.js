@@ -1,5 +1,21 @@
 const { spawnSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
+
+const ROOT = path.join(__dirname, '..');
+
+test('single-file MCP recipe includes the config save helpers and dispatches remote layout requests', () => {
+  const builder = fs.readFileSync(path.join(ROOT, 'build/build.php'), 'utf8');
+  const modules = builder.match(/\$mcpParts = \[([\s\S]*?)\];/)[1];
+  for (const file of ['edit-config/payload.php', 'edit-config/apply.php', 'remote-presentation.php']) {
+    expect(modules).toContain(`'/mcp/routes/${file}'`);
+  }
+  const dispatch = builder.match(/case 'remote-work-presentation':([\s\S]*?)\n\s*case /);
+  expect(dispatch).not.toBeNull();
+  expect(dispatch[1]).toContain('mcpJsonResponse(handleRemoteWorkPresentation(');
+  expect(dispatch[1]).toContain("'rootDir' => $baseDir");
+  expect(dispatch[1]).toContain("'input' => mcpReadRequestData()");
+});
 
 test('build flattens PoffConfig helper traits into a syntax-valid class', () => {
   const script = path.join(__dirname, 'php_build_poff_config.php');
@@ -17,4 +33,36 @@ test('build flattens PoffConfig helper traits into a syntax-valid class', () => 
   expect(payload.containsPersistLayoutFiles).toBe(true);
   expect(payload.containsLayoutCollectionPackage).toBe(true);
   expect(payload.lintExitCode).toBe(0);
+});
+
+test('build owns distribution copies while watcher only links the build output', () => {
+  const result = spawnSync('php', [path.join(ROOT, 'build', 'export-config.php')], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  const config = JSON.parse(result.stdout);
+  expect(config.standaloneCopyTargets).toEqual(expect.arrayContaining([
+    'pageoff',
+    'pageoff-artist',
+    'pageoff-writer',
+    'pageoff-curator',
+    'pageoff-civic',
+  ]));
+  expect(config.additionalIndexCopyTargets).toContainEqual({
+    name: 'dominikeggermann-project',
+    cleanSubdirectories: false,
+  });
+
+  const buildSource = fs.readFileSync(path.join(ROOT, 'build', 'build.php'), 'utf8');
+  const watcherSource = fs.readFileSync(path.join(ROOT, 'scripts', 'watch-build.js'), 'utf8');
+  expect(buildSource).toContain("$config['standaloneCopyTargets']");
+  expect(watcherSource).toContain('ensureSymlink(freshConfig.outputDir, freshConfig)');
+  expect(watcherSource).not.toContain('ensureStandaloneCopies');
+  expect(watcherSource).not.toContain('removeGeneratedEntrypointsFromSubdirectories');
+  expect(buildSource).not.toContain('SSHUploader');
+  expect(buildSource).not.toContain("glob($sourceDir . '/includes/worktypes/templates/*.tpl')");
+  expect(buildSource).not.toMatch(/legacy/i);
+  expect(buildSource).not.toContain('is_array($target)');
 });

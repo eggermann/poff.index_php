@@ -12,22 +12,23 @@ require_once __DIR__ . '/PoffConfigBuilder.php';
 
 // Extract configuration
 $sourceDir = $config['sourceDir'];
-$outputDir = $config['outputDir'];
-$outputDir = rtrim($outputDir, '/\\') . DIRECTORY_SEPARATOR;
+$outputDir = rtrim((string) $config['outputDir'], '/\\') . DIRECTORY_SEPARATOR;
 $outputFileName = $config['outputFile'];
 $outputFile = $outputDir . $outputFileName;
-$legacyOutputFile = rtrim((string) $config['outputDir'], '/\\') . $outputFileName;
 $buildMode = getenv('POFF_BUILD_MODE') === 'production' ? 'production' : 'development';
 $isProductionBuild = $buildMode === 'production';
 $skipDistributionCopies = getenv('POFF_SKIP_DISTRIBUTION_COPIES') === '1';
-$standaloneCopyTargets = [
-    '/Applications/MAMP/htdocs/MAUSMAUS',
-];
-// Prevent accidental creation of "<outputDir>index.php" when the separator is missing.
-if ($legacyOutputFile !== $outputFile && file_exists($legacyOutputFile)) {
-    unlink($legacyOutputFile);
+$mampHtdocs = rtrim((string) ($config['mampHtdocs'] ?? ''), '/\\');
+$standaloneCopyTargets = is_array($config['standaloneCopyTargets'] ?? null)
+    ? $config['standaloneCopyTargets']
+    : [];
+$additionalIndexCopyTargets = is_array($config['additionalIndexCopyTargets'] ?? null)
+    ? $config['additionalIndexCopyTargets']
+    : [];
+if ($mampHtdocs === '') {
+    $standaloneCopyTargets = [];
+    $additionalIndexCopyTargets = [];
 }
-
 // Ensure output directory exists
 if (!is_dir($outputDir)) {
     mkdir($outputDir, 0755, true);
@@ -181,9 +182,6 @@ PHP
             'poff-layout' => $sourceDir . '/includes/worktypes/templates/layout/default/template.hbs',
             'filesystem-layout' => $sourceDir . '/includes/worktypes/templates/layout/file-system/template.hbs',
         ]);
-        if (!$templateFiles) {
-            $templateFiles = glob($sourceDir . '/includes/worktypes/templates/*.tpl') ?: [];
-        }
         foreach ($templateFiles as $key => $tplFile) {
             if (!is_file($tplFile)) {
                 continue;
@@ -288,7 +286,11 @@ PHP
         '/includes/viewer/edit/prompt-context/parent.php',
         '/includes/viewer/edit/prompt/context-state.php',
         '/includes/viewer/edit/prompt/context-build.php',
-        '/includes/viewer/edit/upload.php',
+        // upload.php only wires these helpers together with require_once. Inline the
+        // implementations so the generated single-file runtime keeps folder uploads.
+        '/includes/viewer/edit/upload/core.php',
+        '/includes/viewer/edit/upload/work-folder.php',
+        '/includes/viewer/edit/upload/links.php',
         '/includes/viewer/edit/delete.php',
         '/includes/viewer/edit/reset.php',
         '/includes/viewer/edit/action/context.php',
@@ -320,11 +322,15 @@ PHP
         '/mcp/helpers.php',
         '/mcp/routes/workprompt.php',
         '/mcp/routes/create.php',
+        '/mcp/routes/edit-config/payload.php',
+        '/mcp/routes/edit-config/apply.php',
         '/mcp/routes/edit-config.php',
         '/mcp/routes/prompt-template.php',
         '/mcp/routes/remote-content.php',
+        '/mcp/routes/remote-presentation.php',
         '/mcp/routes/converters.php',
         '/mcp/routes/convert.php',
+        '/mcp/routes/converter-network.php',
         '/mcp/routes/create-converter.php',
         '/mcp/routes/converter-prompt.php',
         '/mcp/routes/style.php',
@@ -418,12 +424,21 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'path' => mcpRoutePath(),
                 ]));
             case 'import-remote':
+                $remoteInput = mcpReadRequestData();
                 mcpJsonResponse(handleImportRemote([
                     'rootDir' => $baseDir,
-                    'path' => mcpRoutePath(),
-                    'url' => mcpQueryString('url', '') ?? '',
-                    'sourceId' => mcpQueryString('sourceId', '') ?? '',
-                    'replace' => in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true),
+                    'path' => (string) ($remoteInput['path'] ?? mcpRoutePath()),
+                    'url' => (string) ($remoteInput['url'] ?? (mcpQueryString('url', '') ?? '')),
+                    'sourceId' => (string) ($remoteInput['sourceId'] ?? (mcpQueryString('sourceId', '') ?? '')),
+                    'replace' => (bool) ($remoteInput['replace'] ?? in_array(strtolower(mcpQueryString('replace', '') ?? ''), ['1', 'true', 'yes'], true)),
+                    'mode' => (string) ($remoteInput['mode'] ?? 'follow'),
+                    'destinationName' => (string) ($remoteInput['destinationName'] ?? ''),
+                    'createPlayer' => (bool) ($remoteInput['createPlayer'] ?? false),
+                ]));
+            case 'remote-work-presentation':
+                mcpJsonResponse(handleRemoteWorkPresentation([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
                 ]));
             case 'converters':
                 mcpJsonResponse(handleConverters([
@@ -435,6 +450,26 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                     'rootDir' => $baseDir,
                     'payload' => mcpReadRequestData(),
                 ]));
+            case 'converter-offers':
+                mcpJsonResponse(handleConverterOffers([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'remote-converters':
+                mcpJsonResponse(handleRemoteConverters([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'register-node':
+                mcpJsonResponse(handleRegisterPoffNode([
+                    'rootDir' => $baseDir,
+                    'input' => mcpReadRequestData(),
+                ]));
+            case 'convert-offered':
+                mcpJsonResponse(handleConvertOffered([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
             case 'create-converter':
                 mcpJsonResponse(handleCreateConverter([
                     'rootDir' => $baseDir,
@@ -443,6 +478,11 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
                 ]));
             case 'save-converted-work':
                 mcpJsonResponse(handleSaveConvertedWork([
+                    'rootDir' => $baseDir,
+                    'payload' => mcpReadRequestData(),
+                ]));
+            case 'bulk-convert':
+                mcpJsonResponse(handleBulkConvert([
                     'rootDir' => $baseDir,
                     'payload' => mcpReadRequestData(),
                 ]));
@@ -568,8 +608,8 @@ PHP;
     }
 
     if (!$skipDistributionCopies) {
-        foreach ($standaloneCopyTargets as $targetDir) {
-            $resolvedTargetDir = rtrim((string) $targetDir, '/\\');
+        foreach ($standaloneCopyTargets as $targetName) {
+            $resolvedTargetDir = $mampHtdocs . DIRECTORY_SEPARATOR . trim((string) $targetName, '/\\');
             if ($resolvedTargetDir === '') {
                 continue;
             }
@@ -593,6 +633,26 @@ PHP;
             }
         }
 
+        foreach ($additionalIndexCopyTargets as $target) {
+            $targetName = (string) $target['name'];
+            $cleanSubdirectories = (bool) $target['cleanSubdirectories'];
+            $resolvedTargetDir = $mampHtdocs . DIRECTORY_SEPARATOR . trim($targetName, '/\\');
+            if ($resolvedTargetDir === '') {
+                continue;
+            }
+            if (!is_dir($resolvedTargetDir) && !mkdir($resolvedTargetDir, 0755, true) && !is_dir($resolvedTargetDir)) {
+                throw new Exception("Failed to create additional index target directory: $resolvedTargetDir");
+            }
+
+            $targetFile = $resolvedTargetDir . DIRECTORY_SEPARATOR . $outputFileName;
+            if (!copy($outputFile, $targetFile)) {
+                throw new Exception("Failed to copy additional index build to: $targetFile");
+            }
+            if ($cleanSubdirectories) {
+                FileCopier::removeGeneratedEntrypointsFromSubdirectories($resolvedTargetDir, $outputFileName);
+            }
+        }
+
         FileCopier::removeGeneratedEntrypointsFromSubdirectories($outputDir, $outputFileName);
 
         // Copy bundled default layout assets into each public .layout folder so wrapper assets stay web-accessible.
@@ -607,10 +667,6 @@ PHP;
     }
 
     echo "Build completed successfully ($buildMode): $outputFile\n";
-
-    // Trigger SSH upload using SSHUploader
-    require_once __DIR__ . '/SSHUploader.php';
-    //--> SSHUploader::upload();
 
 } catch (Exception $e) {
     echo "Build failed: " . $e->getMessage() . "\n";

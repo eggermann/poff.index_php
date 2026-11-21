@@ -24,6 +24,179 @@ function cmsAuthSessionKey(string $rootDir): string
     return sha1($resolved);
 }
 
+function cmsAuthCookieName(): string
+{
+    return 'poff_editor_auth';
+}
+
+function cmsAuthCookiePath(): string
+{
+    $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/'));
+    $directory = trim((string) dirname($scriptName), '/');
+    if ($directory === '' || $directory === '.') {
+        return '/';
+    }
+
+    return '/' . $directory . '/';
+}
+
+function cmsAuthCookieEncode(array $entries): string
+{
+    $json = json_encode($entries, JSON_UNESCAPED_SLASHES);
+    if (!is_string($json) || $json === '') {
+        return '';
+    }
+
+    return rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+}
+
+function cmsAuthCookieDecode(string $value): array
+{
+    $raw = trim($value);
+    if ($raw === '') {
+        return [];
+    }
+
+    $decoded = base64_decode(strtr($raw, '-_', '+/'), true);
+    if (!is_string($decoded) || $decoded === '') {
+        return [];
+    }
+
+    $parsed = json_decode($decoded, true);
+    return is_array($parsed) ? $parsed : [];
+}
+
+function cmsEditorAuthToken(string $rootDir, string $passwordHash): string
+{
+    $rootKey = cmsAuthSessionKey($rootDir);
+    return hash_hmac('sha256', $rootKey . '|' . $passwordHash, $passwordHash);
+}
+
+function cmsAuthCookieToken(string $rootDir, string $passwordHash): string
+{
+    return cmsEditorAuthToken($rootDir, $passwordHash);
+}
+
+function cmsEditorAuthHeaderToken(): string
+{
+    return trim((string) ($_GET['authToken'] ?? $_SERVER['HTTP_X_POFF_EDITOR_AUTH'] ?? ''));
+}
+
+function cmsRestoreEditorAuthFromToken(string $rootDir, string $token): bool
+{
+    if ($token === '' || cmsAuthBypassEnabled()) {
+        return false;
+    }
+
+    $config = cmsLoadAuthConfig($rootDir);
+    $hash = (string) ($config['passwordHash'] ?? '');
+    if ($hash === '') {
+        return false;
+    }
+
+    $expected = cmsEditorAuthToken($rootDir, $hash);
+    if (!hash_equals($expected, $token)) {
+        return false;
+    }
+
+    cmsAuthStartSession();
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $rootKey = cmsAuthSessionKey($rootDir);
+        $grants = $_SESSION['poff_can_edit_roots'] ?? [];
+        if (!is_array($grants)) {
+            $grants = [];
+        }
+        $grants[$rootKey] = true;
+        $_SESSION['poff_can_edit_roots'] = $grants;
+    }
+
+    return true;
+}
+
+function cmsAuthCookieEntries(): array
+{
+    return cmsAuthCookieDecode((string) ($_COOKIE[cmsAuthCookieName()] ?? ''));
+}
+
+function cmsPersistEditorAuthCookie(string $rootDir, bool $allowed): void
+{
+    if (cmsAuthBypassEnabled() || headers_sent()) {
+        return;
+    }
+
+    $cookieName = cmsAuthCookieName();
+    $cookiePath = cmsAuthCookiePath();
+    $entries = cmsAuthCookieEntries();
+    $rootKey = cmsAuthSessionKey($rootDir);
+
+    if ($allowed) {
+        $config = cmsLoadAuthConfig($rootDir);
+        $hash = (string) ($config['passwordHash'] ?? '');
+        if ($hash === '') {
+            return;
+        }
+
+        $entries[$rootKey] = cmsAuthCookieToken($rootDir, $hash);
+    } else {
+        unset($entries[$rootKey]);
+    }
+
+    if ($entries === []) {
+        header(sprintf(
+            'Set-Cookie: %s=; Expires=%s; Max-Age=0; Path=%s; %sHttpOnly; SameSite=Strict',
+            $cookieName,
+            gmdate('D, d M Y H:i:s T', time() - 3600),
+            $cookiePath,
+            !empty($_SERVER['HTTPS']) ? 'Secure; ' : ''
+        ), false);
+        return;
+    }
+
+    $encoded = cmsAuthCookieEncode($entries);
+    if ($encoded === '') {
+        return;
+    }
+
+    header(sprintf(
+        'Set-Cookie: %s=%s; Path=%s; %sHttpOnly; SameSite=Strict',
+        $cookieName,
+        $encoded,
+        $cookiePath,
+        !empty($_SERVER['HTTPS']) ? 'Secure; ' : ''
+    ), false);
+}
+
+function cmsRestoreEditorAuthFromCookie(string $rootDir): bool
+{
+    if (cmsAuthBypassEnabled()) {
+        return true;
+    }
+
+    $entries = cmsAuthCookieEntries();
+    if ($entries === []) {
+        return false;
+    }
+
+    $config = cmsLoadAuthConfig($rootDir);
+    $hash = (string) ($config['passwordHash'] ?? '');
+    if ($hash === '') {
+        return false;
+    }
+
+    $rootKey = cmsAuthSessionKey($rootDir);
+    $cookieValue = (string) ($entries[$rootKey] ?? '');
+    if ($cookieValue === '') {
+        return false;
+    }
+
+    return cmsRestoreEditorAuthFromToken($rootDir, $cookieValue);
+}
+
+function cmsRestoreEditorAuthFromHeader(string $rootDir): bool
+{
+    return cmsRestoreEditorAuthFromToken($rootDir, cmsEditorAuthHeaderToken());
+}
+
 function cmsAuthBypassEnabled(): bool
 {
     $flag = getenv('POFF_TEST_AUTH_BYPASS');
@@ -112,7 +285,15 @@ function cmsIsEditorAuthenticated(string $rootDir): bool
     $rootKey = cmsAuthSessionKey($rootDir);
     $grants = $_SESSION['poff_can_edit_roots'] ?? null;
 
-    return is_array($grants) && !empty($grants[$rootKey]);
+    if (is_array($grants) && !empty($grants[$rootKey])) {
+        return true;
+    }
+
+    if (cmsRestoreEditorAuthFromHeader($rootDir)) {
+        return true;
+    }
+
+    return cmsRestoreEditorAuthFromCookie($rootDir);
 }
 
 function cmsSetEditorAuthenticated(string $rootDir, bool $allowed): void
@@ -135,6 +316,7 @@ function cmsSetEditorAuthenticated(string $rootDir, bool $allowed): void
     }
 
     $_SESSION['poff_can_edit_roots'] = $grants;
+    cmsPersistEditorAuthCookie($rootDir, $allowed);
 }
 
 function cmsBuildEditorAuthView(string $rootDir, bool $editModeAllowed = true): array

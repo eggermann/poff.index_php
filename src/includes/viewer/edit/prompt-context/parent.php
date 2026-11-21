@@ -3,30 +3,6 @@
 require_once __DIR__ . '/../../utils.php';
 require_once __DIR__ . '/wrapper.php';
 
-function cmsPromptParentWork(array $parentConfig, string $parentRelativePath): array
-{
-    $items = is_array($parentConfig['tree'] ?? null) ? $parentConfig['tree'] : [];
-    $files = [];
-    $folders = [];
-    foreach ($items as $item) {
-        if (!is_array($item)) {
-            continue;
-        }
-        if (($item['type'] ?? 'file') === 'folder') {
-            $folders[] = $item;
-        } else {
-            $files[] = $item;
-        }
-    }
-
-    return [
-        'relativePath' => $parentRelativePath,
-        'files' => $files,
-        'folders' => $folders,
-        'layout' => is_array($parentConfig['work']['layout'] ?? null) ? $parentConfig['work']['layout'] : [],
-    ];
-}
-
 function cmsApplyParentPromptContext(array &$context, array $parentPrompt, string $currentPath): void
 {
     if ($parentPrompt === []) {

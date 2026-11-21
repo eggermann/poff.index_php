@@ -2,11 +2,10 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const BUILD_SHARED_CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, 'build', 'BuildConfig.shared.json'), 'utf8'));
-const RUNTIME_ROOT = path.join(ROOT, BUILD_SHARED_CONFIG.pagesDir, BUILD_SHARED_CONFIG.siteHost);
 const POFF_DIR = path.join(ROOT, 'tests/poff-tests');
 const TEST_NAME = 'jest-create-route';
 const TEST_DEST = path.join(POFF_DIR, TEST_NAME);
@@ -592,6 +591,7 @@ function loadPromptApiHelpers() {
       throw new Error('fetch should be mocked in test');
     },
   };
+  const storage = new Map();
   const context = vm.createContext({
     module,
     exports: module.exports,
@@ -602,10 +602,22 @@ function loadPromptApiHelpers() {
     AbortController: global.AbortController,
     TextDecoder: global.TextDecoder,
     URL: global.URL,
+    URLSearchParams: global.URLSearchParams,
     window: {
       location: {
         pathname: '/dominikeggermann.com/',
         origin: 'http://localhost:8888',
+      },
+      localStorage: {
+        getItem(key) {
+          return storage.has(key) ? storage.get(key) : null;
+        },
+        setItem(key, value) {
+          storage.set(String(key), String(value));
+        },
+        removeItem(key) {
+          storage.delete(String(key));
+        },
       },
     },
     setTimeout,
@@ -617,9 +629,13 @@ function loadPromptApiHelpers() {
 module.exports = {
   buildCmsUrl,
   buildLocalModelsUrl,
+  clearEditorAuthToken,
+  getEditorAuthToken,
+  requestEditAuth,
   requestPromptModels,
   requestLocalPromptModels,
   requestPromptTemplateStream,
+  setEditorAuthToken,
 };
 `, context);
 
@@ -666,7 +682,6 @@ function runPromptTemplateLocal(rootDir, relativePath, payload = {}, mockRespons
       path.join(ROOT, 'tests/php_prompt_template_local.php'),
       rootDir,
       relativePath,
-      __filename,
       JSON.stringify(payload),
       mockResponse ? JSON.stringify(mockResponse) : '',
       capturePath,
@@ -843,6 +858,35 @@ function runEditRequestBypass(cwd, action, relativePath = '', payload = {}, sess
         resolve(JSON.parse(stdout));
       } catch (err) {
         reject(new Error(`invalid json from edit request helper: ${stdout}`));
+      }
+    });
+  });
+}
+
+function runEditAuthCookieProbe(cwd, password = 'secret-pass') {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('php', [
+      path.join(ROOT, 'tests/php_edit_auth_cookie.php'),
+      cwd,
+      password,
+    ], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`edit auth cookie probe failed: ${code} ${stderr}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (err) {
+        reject(new Error(`invalid json from edit auth cookie probe: ${stdout}`));
       }
     });
   });
@@ -1055,7 +1099,6 @@ describe('MCP create route helper (CLI)', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-auth-'));
     const sessionId = 'poff-auth-session';
     const hash = await makePasswordHash('secret-pass');
-    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
     fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
 
     const denied = await runEditRequest(tempDir, 'save', '', { title: 'Blocked title' });
@@ -1097,17 +1140,75 @@ describe('MCP create route helper (CLI)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
+  test('editor auth survives reload through the explicit editor token', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-auth-cookie-'));
+    const result = await runEditAuthCookieProbe(tempDir, 'secret-pass');
+    expect(result.passwordOk).toBe(true);
+    expect(result.token).toBeTruthy();
+    expect(result.restored).toBe(true);
+    expect(result.authenticated).toBe(true);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('edit auth requests attach the stored editor token header', async () => {
+    const api = loadPromptApiHelpers();
+    api.setEditorAuthToken('token-123');
+    let requestUrl = null;
+    let requestOptions = null;
+    api.setFetch(async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          allowed: true,
+          auth: {
+            configured: true,
+            authenticated: true,
+            editModeAllowed: true,
+            canEdit: true,
+          },
+        }),
+      };
+    });
+
+    await api.requestEditAuth({ method: 'GET', path: '' });
+
+    expect(requestUrl.toString()).toContain('authToken=token-123');
+    expect(requestOptions.headers['X-Poff-Editor-Auth']).toBe('token-123');
+  });
+
   test('guest poff links stay pending until an authenticated editor approves them', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-link-'));
     const sessionId = 'poff-pending-link-session';
     const hash = await makePasswordHash('secret-pass');
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
     fs.writeFileSync(path.join(tempDir, '.poff-auth.php'), `<?php return ['passwordHash' => '${hash}'];`);
+    fs.writeFileSync(path.join(tempDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-pending-link',
+      slug: 'poff-pending-link',
+      type: 'folder',
+      tree: [],
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['remote.example'],
+        maxPending: 3,
+      },
+    }, null, 2));
 
     const submitted = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
       linkName: 'remote-link',
       linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+      categories: ['image', 'collection'],
+      poffNode: {
+        protocol: 'poff-node/1',
+        baseUrl: 'https://remote.example/index.php',
+        workCatalogUrl: 'https://remote.example/index.php?mcp=1&route=export-content&path=portfolio',
+        converterCatalogUrl: 'https://remote.example/index.php?mcp=1&route=converter-offers',
+      },
     }, sessionId);
     expect(submitted.allowed).toBe(true);
     expect(submitted.pendingApproval).toBe(true);
@@ -1116,6 +1217,30 @@ describe('MCP create route helper (CLI)', () => {
     const guestConfig = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
     expect(guestConfig.tree[0].visible).toBe(false);
     expect(guestConfig.tree[0].approvalStatus).toBe('pending');
+    expect(guestConfig.tree[0].categories).toEqual(['image', 'collection']);
+    expect(guestConfig.tree[0].work.categories).toEqual(['image', 'collection']);
+    expect(guestConfig.tree[0].poffNode).toEqual(expect.objectContaining({
+      protocol: 'poff-node/1',
+      baseUrl: 'https://remote.example/index.php',
+    }));
+
+    const updated = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'remote-link-updated',
+      linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
+      categories: ['converter', 'collection'],
+      poffNode: {
+        protocol: 'poff-node/1',
+        baseUrl: 'https://remote.example/index.php',
+        workCatalogUrl: 'https://remote.example/index.php?mcp=1&route=export-content&path=portfolio',
+        converterCatalogUrl: 'https://remote.example/index.php?mcp=1&route=converter-offers',
+      },
+    }, sessionId);
+    expect(updated.uploaded[0].updatedRegistration).toBe(true);
+    const updatedConfig = JSON.parse(fs.readFileSync(path.join(tempDir, 'poff.config.json'), 'utf8'));
+    expect(updatedConfig.tree).toHaveLength(1);
+    expect(updatedConfig.tree[0].title).toBe('remote-link-updated');
+    expect(updatedConfig.tree[0].categories).toEqual(['converter', 'collection']);
 
     const login = await runEditRequest(tempDir, 'auth', '', {
       intent: 'login',
@@ -1134,20 +1259,28 @@ describe('MCP create route helper (CLI)', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test('guest external submissions reject non-poff urls and enforce the pending limit', async () => {
+  test('guest external submissions require host opt-in, honor whitelist, and enforce the pending limit', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-limit-'));
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
 
-    const invalid = await runEditRequest(tempDir, 'upload', '', {
+    const disabled = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
-      linkName: 'not-poff',
-      linkUrl: 'https://example.com/plain-page',
+      linkName: 'disabled-node',
+      linkUrl: 'https://remote.example/index.php?view=1&path=portfolio',
     });
-    expect(invalid.allowed).toBe(true);
-    expect(invalid.error).toContain('Only links from another Poff system are allowed');
+    expect(disabled.allowed).toBe(false);
+
+    const direct = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      submissionIntent: 'external-link',
+      linkName: 'direct-link',
+      linkUrl: 'https://remote.example/index.php?view=1&path=direct-work',
+    });
+    expect(direct.allowed).toBe(true);
+    expect(direct.pendingApproval).toBe(true);
 
     const tree = [];
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 2; index += 1) {
       tree.push({
         name: `pending-${index}`,
         slug: `pending-${index}`,
@@ -1166,7 +1299,29 @@ describe('MCP create route helper (CLI)', () => {
       slug: 'pending-limit',
       type: 'folder',
       tree,
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['remote.example'],
+        maxPending: 2,
+      },
     }, null, 2));
+
+    const invalid = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'not-poff',
+      linkUrl: 'https://example.com/plain-page',
+    });
+    expect(invalid.allowed).toBe(true);
+    expect(invalid.error).toContain('Only links from another Poff system are allowed');
+
+    const notWhitelisted = await runEditRequest(tempDir, 'upload', '', {
+      source: 'url',
+      linkName: 'not-whitelisted',
+      linkUrl: 'https://other.example/index.php?view=1&path=portfolio',
+    });
+    expect(notWhitelisted.allowed).toBe(true);
+    expect(notWhitelisted.error).toContain('whitelist');
 
     const overLimit = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
@@ -1182,6 +1337,18 @@ describe('MCP create route helper (CLI)', () => {
   test('guest external submissions accept poff hash routes', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-pending-hash-link-'));
     fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'poff.config.json'), JSON.stringify({
+      folderName: 'poff-pending-hash-link',
+      slug: 'poff-pending-hash-link',
+      type: 'folder',
+      tree: [],
+      externalSubmissions: {
+        enabled: true,
+        whitelistEnabled: true,
+        whitelist: ['dominikeggermann.com'],
+        maxPending: 5,
+      },
+    }, null, 2));
 
     const submitted = await runEditRequest(tempDir, 'upload', '', {
       source: 'url',
@@ -2148,6 +2315,31 @@ function runPageoffRemoteConverter(payload = {}) {
   });
 }
 
+function runPageoffRemoteImageConverter(payload = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      path.join(ROOT, 'tests/php_pageoff_remote_image_converter.php'),
+      JSON.stringify(payload),
+    ];
+    const proc = spawn('php', args, {
+      cwd: ROOT,
+      env: withTestEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d.toString()));
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(stdout.trim()));
+        return;
+      }
+      reject(new Error(`pageoff remote image converter helper failed: ${code} ${stderr}`));
+    });
+  });
+}
+
 function runTextEditorRemoteConverter(payload = {}) {
   return new Promise((resolve, reject) => {
     const args = [
@@ -2307,7 +2499,345 @@ describe('Poff converters', () => {
         name: 'convert-remote-node',
         label: 'Convert Remote Node',
       }),
+      expect.objectContaining({
+        id: 'converter/convert-pageoff-remote-image',
+        name: 'convert-pageoff-remote-image',
+        label: 'Convert Pageoff Remote Image',
+        engine: 'remote-node',
+        url: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-image',
+        remote: expect.objectContaining({
+          endpoint: 'https://pageoff.de/worktypes/templates/converter/convert-pageoff-remote-image/converter.php',
+          publicUrl: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-image',
+        }),
+      }),
     ]));
+  });
+
+  test('publishes locally executable converters as generic Poff node offers', async () => {
+    const result = await runConverterRoute('offers', POFF_DIR, {
+      mimeType: 'image/tiff',
+      kind: 'image',
+      extension: 'tiff',
+      nodeUrl: 'https://provider.example/index.php',
+      nodeId: 'provider-example',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      protocol: 'poff-converter/1',
+      node: expect.objectContaining({
+        id: 'provider-example',
+        endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+      }),
+    }));
+    expect(result.converters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'converter/convert-image',
+        accepts: expect.arrayContaining(['image/*']),
+        formats: expect.arrayContaining(['png']),
+      }),
+    ]));
+    expect(result.converters.every((converter) => converter.engine === undefined)).toBe(true);
+  });
+
+  test('registers the current page with Poff using existing work categories', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-register-node-'));
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+        folderName: 'gallery',
+        title: 'Public gallery',
+        type: 'folder',
+        tree: [],
+        work: {
+          type: 'folder',
+          categories: ['image', 'collection'],
+        },
+      }, null, 2));
+
+      const result = await runConverterRoute('register-node', tempRoot, {
+        pageUrl: 'https://node.example/index.php?view=1&path=.',
+        registryUrl: 'https://pageoff.de/',
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        route: 'register-node',
+        pendingApproval: true,
+        categories: ['image', 'collection'],
+      }));
+      expect(result.node).toEqual(expect.objectContaining({
+        protocol: 'poff-node/1',
+        baseUrl: 'https://node.example/index.php',
+      }));
+      expect(result._capturedRegistry.url).toBe('https://pageoff.de/index.php?edit=upload');
+      expect(result._capturedRegistry.payload).toEqual(expect.objectContaining({
+        source: 'url',
+        linkName: 'Public gallery',
+        linkUrl: 'https://node.example/index.php?view=1&path=.',
+        categories: ['image', 'collection'],
+      }));
+      expect(result._capturedRegistry.payload.poffNode).toEqual(expect.objectContaining({
+        workCatalogUrl: expect.stringContaining('route=export-content'),
+        converterCatalogUrl: expect.stringContaining('route=converter-offers'),
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('discovers converter offers from an external Poff node', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-catalog-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+
+    try {
+      const result = await runConverterRoute('remote-catalog', tempRoot, {
+        path: 'photo.heic',
+        nodeUrl: 'https://example.com/index.php',
+        mimeType: 'image/heic',
+        kind: 'image',
+        extension: 'heic',
+        mockCatalog: {
+          ok: true,
+          protocol: 'poff-converter/1',
+          node: {
+            id: 'provider-example',
+            url: 'https://example.com/index.php',
+            endpoint: 'https://example.com/index.php?mcp=1&route=convert-offered',
+          },
+          converters: [
+            {
+              id: 'converter/convert-image',
+              name: 'convert-image',
+              label: 'Convert Image',
+              accepts: ['image/*'],
+              outputs: ['image/png'],
+              formats: ['png'],
+              defaults: { format: 'png' },
+              ui: {
+                format: {
+                  type: 'select',
+                  options: ['png'],
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        protocol: 'poff-converter/1',
+        node: expect.objectContaining({ id: 'provider-example' }),
+      }));
+      expect(result.available).toEqual([
+        expect.objectContaining({
+          id: 'converter/remote-provider-example-convert-image',
+          engine: 'remote-node',
+          enabled: true,
+          source: 'remote-node-catalog',
+          node: expect.objectContaining({
+            id: 'provider-example',
+            converterId: 'converter/convert-image',
+            endpoint: 'https://example.com/index.php?mcp=1&route=convert-offered',
+          }),
+        }),
+      ]);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('converts an inline file offered by a foreign Poff node', async () => {
+    const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
+    const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      source: {
+        name: 'scan-001.tiff',
+        path: 'scan-001.tiff',
+        mimeType: 'image/tiff',
+        bodyBase64: body.toString('base64'),
+      },
+      converter: {
+        id: 'converter/convert-image',
+        format: 'png',
+        quality: 'default',
+      },
+      target: {
+        saveAs: 'scan-001.png',
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      route: 'convert-offered',
+      output: expect.objectContaining({
+        name: 'scan-001.png',
+        mimeType: 'image/png',
+      }),
+      generatedBy: expect.objectContaining({
+        id: 'converter/convert-image',
+        node: 'provider',
+      }),
+    }));
+    expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
+  });
+
+  test('keeps a requested jpg filename for a jpeg result', async () => {
+    const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
+    const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      source: {
+        name: 'scan-001.tiff',
+        path: 'scan-001.tiff',
+        mimeType: 'image/tiff',
+        bodyBase64: body.toString('base64'),
+      },
+      converter: {
+        id: 'converter/convert-image',
+        format: 'jpeg',
+        quality: 'default',
+      },
+      target: {
+        saveAs: 'scan-001.jpg',
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      route: 'convert-offered',
+      output: expect.objectContaining({
+        name: 'scan-001.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    }));
+    expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 3).toString('hex')).toBe('ffd8ff');
+  });
+
+  test('sends a local source to a discovered provider converter and receives its result', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-consumer-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'scan-001.tiff',
+          path: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          extension: 'tiff',
+          size: fs.statSync(sourcePath).size,
+        },
+        converter: {
+          id: 'converter/remote-provider-example-convert-image',
+          name: 'remote-provider-example-convert-image',
+          label: 'Convert Image · provider-example',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          formats: ['png'],
+          defaults: { format: 'png' },
+          ui: {},
+          engine: 'remote-node',
+          format: 'png',
+          quality: 'default',
+          node: {
+            id: 'provider-example',
+            baseUrl: 'https://provider.example/index.php',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+        target: {
+          folder: '',
+          saveAs: 'scan-001.png',
+          mode: 'new-hidden-work',
+        },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'scan-001.png',
+              mimeType: 'image/png',
+              kind: 'image',
+              size: 3,
+              bodyBase64: Buffer.from('png').toString('base64'),
+            },
+          },
+        },
+        captureRemotePayload: true,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('image/png');
+      expect(result._capturedRemotePayload.source.bodyBase64).toBe(
+        fs.readFileSync(sourcePath).toString('base64')
+      );
+      expect(result._capturedRemotePayload.converter.id).toBe('converter/convert-image');
+      expect(result._capturedRemotePayload.converter.node).toBe('provider');
+      expect(result.generatedBy.node).toBe('provider-example');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('bulk converts eligible folder images and applies converted-only visibility', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-bulk-${Date.now()}`);
+    const albumDir = path.join(tempRoot, 'album');
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(albumDir, 'scan-a.tiff'));
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(albumDir, 'scan-b.tiff'));
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(albumDir, 'photo.jpg'));
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(albumDir, 'thumb-photo.jpg'));
+    fs.writeFileSync(path.join(albumDir, 'notes.txt'), 'not an image');
+
+    try {
+      const result = await runConverterRoute('bulk-convert', tempRoot, {
+        path: 'album',
+        converter: {
+          id: 'converter/convert-image',
+          name: 'convert-image',
+          format: 'png',
+          quality: 'default',
+        },
+        mimeType: 'image/tiff',
+        hideThumbnails: true,
+        visibilityMode: 'converted-only',
+        enableImageMagickCli: true,
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        convertedCount: 2,
+        failedCount: 0,
+        hiddenThumbnailCount: 1,
+        visibilityMode: 'converted-only',
+      }));
+      expect(fs.existsSync(path.join(albumDir, 'scan-a.png'))).toBe(true);
+      expect(fs.existsSync(path.join(albumDir, 'scan-b.png'))).toBe(true);
+      expect(fs.existsSync(path.join(albumDir, 'photo.png'))).toBe(false);
+      const config = JSON.parse(fs.readFileSync(path.join(albumDir, 'poff.config.json'), 'utf8'));
+      const byName = new Map(config.tree.map((item) => [item.name, item]));
+      expect(byName.get('scan-a.tiff').visible).toBe(false);
+      expect(byName.get('scan-b.tiff').visible).toBe(false);
+      expect(byName.get('scan-a.png')).toEqual(expect.objectContaining({
+        visible: true,
+        generated: true,
+        sourceWork: 'scan-a.tiff',
+      }));
+      expect(byName.get('scan-b.png')).toEqual(expect.objectContaining({
+        visible: true,
+        generated: true,
+        sourceWork: 'scan-b.tiff',
+      }));
+      expect(byName.get('notes.txt').visible).toBe(true);
+      expect(byName.get('photo.jpg').visible).toBe(true);
+      expect(byName.get('thumb-photo.jpg').visible).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('discovers the text converter for text/plain', async () => {
@@ -2331,7 +2861,12 @@ describe('Poff converters', () => {
         name: 'convert-pageoff-remote-text',
         label: 'Convert Pageoff Remote Text',
         engine: 'remote-node',
+        url: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-text',
         outputs: ['text/html', 'text/plain'],
+        remote: expect.objectContaining({
+          endpoint: 'https://pageoff.de/worktypes/templates/converter/convert-pageoff-remote-text/converter.php',
+          publicUrl: 'https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-text',
+        }),
       }),
       expect.objectContaining({
         id: 'converter/convert-text-editor',
@@ -2344,6 +2879,24 @@ describe('Poff converters', () => {
     const editorDefinition = result.find((item) => item.id === 'converter/convert-text-editor');
     expect(editorDefinition?.folder || '').toContain('worktypes/templates/converter/convert-text-editor');
     expect(editorDefinition?.templateFolder || '').toContain('worktypes/templates/converter/convert-text-editor');
+  });
+
+  test('pageoff remote image converter payload prefixes generated files as external works', async () => {
+    const payload = await runConverterRoute('build-payload', POFF_DIR, {
+      source: {
+        path: 'scan-001.tiff',
+        name: 'scan-001.tiff',
+        mimeType: 'image/tiff',
+      },
+      converter: {
+        id: 'converter/convert-pageoff-remote-image',
+        format: 'png',
+        quality: 'default',
+      },
+    });
+
+    expect(payload.converter.id).toBe('converter/convert-pageoff-remote-image');
+    expect(payload.target.saveAs).toBe('external-scan-001.png');
   });
 
   test('pageoff local converter.php returns a php-generated text conversion response', async () => {
@@ -2521,6 +3074,81 @@ describe('Poff converters', () => {
       expect(result.output.name).toBe('draft.html');
       expect(Buffer.from(result.output.bodyBase64, 'base64').toString('utf8')).toBe('mock prefixed remote body');
       expect(result.generatedBy.endpoint).toContain('/MAUSMAUS/worktypes/templates/converter/convert-pageoff-remote-text/converter.php');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('pageoff remote image converter turns a tiff source into a png body', async () => {
+    const tempRoot = path.join(POFF_DIR, `pageoff-remote-image-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      const result = await runPageoffRemoteImageConverter({
+        source: {
+          path: 'scan-001.tiff',
+          name: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          bodyBase64: fs.readFileSync(sourcePath).toString('base64'),
+        },
+        converter: {
+          id: 'converter/convert-pageoff-remote-image',
+          format: 'png',
+          quality: 'default',
+        },
+        target: {
+          saveAs: 'scan-001.png',
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('image/png');
+      expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
+
+      const saved = await runConverterRoute('save', tempRoot, {
+        sourcePath: 'scan-001.tiff',
+        conversion: result,
+      });
+
+      expect(saved.ok).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'scan-001.png'))).toBe(true);
+      expect(fs.readFileSync(path.join(tempRoot, 'scan-001.png')).subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('pageoff remote image converter can fetch the source from a URL when base64 is missing', async () => {
+    const tempRoot = path.join(POFF_DIR, `pageoff-remote-image-url-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      const result = await runPageoffRemoteImageConverter({
+        source: {
+          path: 'scan-001.tiff',
+          name: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+          srcUrl: pathToFileURL(sourcePath).href,
+        },
+        converter: {
+          id: 'converter/convert-pageoff-remote-image',
+          format: 'png',
+          quality: 'default',
+        },
+        target: {
+          saveAs: 'scan-001.png',
+        },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.output.mimeType).toBe('image/png');
+      expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 8).toString('binary')).toBe('\x89PNG\r\n\x1a\n');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -3769,6 +4397,26 @@ describe('Worktype HBS renderer', () => {
       .toContain('DOMContentLoaded');
   });
 
+  test('uses the file name when persisted file title is blank', async () => {
+    const tempDir = path.join(POFF_DIR, `blank-viewer-title-${Date.now()}`);
+    const fileName = 'public-note.txt';
+    fs.mkdirSync(path.join(tempDir, '.works'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, fileName), 'Public note', 'utf8');
+    fs.writeFileSync(
+      path.join(tempDir, '.works', `${fileName}.config.json`),
+      JSON.stringify({ title: '', work: { type: 'text', template: 'text' } }),
+      'utf8',
+    );
+
+    try {
+      const output = await runViewer(fileName, tempDir);
+      expect(output).toContain('public-note.txt');
+      expect(output).toContain('<title>public-note.txt</title>');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('falls back to the default layout script when a filesystem layout has no script.js', async () => {
     const tempDir = path.join(POFF_DIR, 'missing-script-layout');
     const fileName = 'poster.png';
@@ -4178,6 +4826,36 @@ describe('Worktype HBS renderer', () => {
     expect(output).toContain('?view&#x3D;1&amp;file&#x3D;viewer-folder%2Fchild.txt');
     expect(output).toContain('child.txt:file');
     expect(output).toContain('.layout/background.txt');
+  });
+
+  test('default folder cards show thumbnails for browser-readable images', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-folder-image-cards-'));
+    const name = `folder-image-cards-${Date.now()}`;
+    const folder = path.join(tempRoot, name);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(folder, 'photo.jpg'));
+
+    try {
+      const output = await runViewer(name, tempRoot);
+      expect(output).toContain('folder-view-card-preview');
+      expect(output).toMatch(/<img[^>]+src="[^"]*photo\.jpg"[^>]+loading="lazy"/);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('keeps the single-file index entrypoint out of the content tree', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-single-file-root-'));
+    fs.writeFileSync(path.join(tempDir, 'index.php'), '<?php // generated entrypoint');
+    fs.writeFileSync(path.join(tempDir, 'public-note.txt'), 'hello');
+
+    try {
+      const config = JSON.parse(await runLayoutFilesystem('ensure-folder', tempDir));
+      expect(config.tree.map((item) => item.name)).toContain('public-note.txt');
+      expect(config.tree.map((item) => item.name)).not.toContain('index.php');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test('renders configured virtual links without nesting viewer urls', async () => {
@@ -4816,9 +5494,35 @@ describe('Worktype HBS renderer', () => {
       });
 
       expect(rendered).toContain('external-work--embedded__toolbar');
-      expect(rendered).toContain('Direct link');
+      expect(rendered).toContain('External work · live');
+      expect(rendered).toContain('Visit source');
       expect(rendered).toContain('href="https://dominikeggermann.com/#/joined-test-1762176567798-mp4"');
       expect(rendered).toContain('width: 100%');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('renders ordinary webloc targets immediately without fetching remote HTML', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-webloc-iframe-'));
+    try {
+      fs.writeFileSync(
+        path.join(tempRoot, 'sample.webloc'),
+        '<?xml version="1.0"?><plist><dict><key>URL</key><string>https://example.org/player.php?word=1984&amp;lang=en</string></dict></plist>',
+      );
+
+      const rendered = await runViewerWithMock('sample.webloc', tempRoot, false, {
+        ok: true,
+        status: 200,
+        statusLine: 'HTTP/1.1 200 OK',
+        body: '<html><body>REMOTE FETCH SHOULD NOT RUN</body></html>',
+      });
+
+      expect(rendered).toContain('<iframe');
+      expect(rendered).toContain('src="https://example.org/player.php?word&#x3D;1984&amp;lang&#x3D;en"');
+      expect(rendered).toContain('allow="autoplay; encrypted-media; picture-in-picture"');
+      expect(rendered).toContain('href="https://example.org/player.php?word&#x3D;1984&amp;lang&#x3D;en"');
+      expect(rendered).not.toContain('REMOTE FETCH SHOULD NOT RUN');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -4853,6 +5557,124 @@ describe('Worktype HBS renderer', () => {
         routePath: 'viewer-folder/nested-child',
       }),
     ]));
+  });
+
+  test('inspects and atomically replaces a compatible remote work presentation', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-presentation-'));
+    const localName = 'local-image.jpg';
+    const workUrl = 'https://origin.example/index.php?view=1&file=works%2Ffullscreen.jpg';
+    const snapshotUrl = 'https://origin.example/index.php?ajax=snapshot&file=works%2Ffullscreen.jpg';
+    fs.copyFileSync(path.join(POFF_DIR, '.layout', 'poff.profile.jpg'), path.join(tempRoot, localName));
+
+    try {
+      const request = {
+        url: workUrl,
+        mockResponses: {
+          [snapshotUrl]: {
+            status: 200,
+            body: {
+              resolved: true,
+              kind: 'image',
+              meta: {
+                title: 'Fullscreen image',
+                path: 'works/fullscreen.jpg',
+              },
+              context: {
+                mimeType: 'image/jpeg',
+                work: {
+                  type: 'image',
+                  layout: {
+                    sectionTemplate: '<div class="fullscreen"><img src="{{srcUrl}}" alt="{{title}}" onerror="bad()"><script>bad()</script></div>',
+                    css: '.fullscreen{position:fixed;inset:0}.fullscreen img{width:100%;height:100%;object-fit:cover}',
+                    js: 'document.addEventListener("DOMContentLoaded",()=>document.body.classList.add("fullscreen-ready"));',
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+      const result = await runRemoteContent('presentation', tempRoot, localName, request);
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        route: 'remote-work-presentation',
+        compatible: true,
+        matches: expect.arrayContaining(['same suffix', 'same MIME', 'same work type']),
+      }));
+      expect(result.remote).toEqual(expect.objectContaining({
+        title: 'Fullscreen image',
+        path: 'works/fullscreen.jpg',
+        url: workUrl,
+      }));
+      expect(result.presentation.workHbs).toContain('class="fullscreen"');
+      expect(result.presentation.workHbs).toContain('{{srcUrl}}');
+      expect(result.presentation.workHbs).not.toContain('<script>');
+      expect(result.presentation.workHbs).not.toContain('onerror=');
+      expect(result.presentation.styleCss).toContain('object-fit:cover');
+      expect(result.presentation.scriptJs).toContain('fullscreen-ready');
+      expect(result.localPresentation.hasPresentation).toBe(false);
+      expect(fs.existsSync(path.join(tempRoot, '.works', `${localName}.layout`, 'work.hbs'))).toBe(false);
+
+      const copied = await runRemoteContent('presentation', tempRoot, localName, {
+        ...request,
+        action: 'copy',
+      });
+      const layoutDir = path.join(tempRoot, '.works', `${localName}.layout`);
+      expect(copied).toEqual(expect.objectContaining({
+        ok: true,
+        copied: true,
+        replaced: false,
+        backupPath: '',
+      }));
+      expect(fs.readFileSync(path.join(layoutDir, 'work.hbs'), 'utf8')).toContain('class="fullscreen"');
+      expect(fs.readFileSync(path.join(layoutDir, 'style.css'), 'utf8')).toContain('object-fit:cover');
+      expect(fs.readFileSync(path.join(layoutDir, 'script.js'), 'utf8')).toContain('fullscreen-ready');
+      expect(fs.existsSync(path.join(layoutDir, 'template.hbs'))).toBe(true);
+
+      fs.writeFileSync(path.join(layoutDir, 'style.css'), '.local-before-replace{display:block}');
+      const blockedReplace = await runRemoteContent('presentation', tempRoot, localName, {
+        ...request,
+        action: 'copy',
+      });
+      expect(blockedReplace).toEqual(expect.objectContaining({
+        ok: false,
+        requiresConfirmation: true,
+      }));
+      expect(fs.readFileSync(path.join(layoutDir, 'style.css'), 'utf8')).toContain('local-before-replace');
+
+      const replaced = await runRemoteContent('presentation', tempRoot, localName, {
+        ...request,
+        action: 'copy',
+        confirmReplace: true,
+      });
+      expect(replaced.replaced).toBe(true);
+      expect(replaced.backupPath).toContain(`.works/${localName}.layout.history/`);
+      expect(fs.readFileSync(path.join(tempRoot, replaced.backupPath, 'style.css'), 'utf8')).toContain('local-before-replace');
+      expect(fs.readFileSync(path.join(layoutDir, 'style.css'), 'utf8')).toContain('object-fit:cover');
+
+      const config = JSON.parse(fs.readFileSync(path.join(tempRoot, '.works', `${localName}.config.json`), 'utf8'));
+      expect(config.work.presentationSource).toEqual(expect.objectContaining({
+        url: workUrl,
+        files: ['work.hbs', 'style.css', 'script.js'],
+      }));
+      expect(config.work.layout).not.toHaveProperty('sectionTemplate');
+      expect(config.work.layout).not.toHaveProperty('css');
+      expect(config.work.layout).not.toHaveProperty('js');
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('public remote exports reject hidden implementation folders', async () => {
+    const result = await runRemoteContent('export', POFF_DIR, '.works', {
+      baseUrl: 'https://origin.example/',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      route: 'export-content',
+      error: 'Invalid public folder path.',
+    }));
   });
 
   test('imports remote exports into config tree as virtual entries and renders their links', async () => {
@@ -4924,6 +5746,7 @@ describe('Worktype HBS renderer', () => {
         type: 'folder',
         pageLink: 'https://origin.example/index.php?view=1&path=viewer-folder%2Fnested-child',
         remoteSource: 'origin-example',
+        externalWork: true,
         routeSlug: 'nested-child',
         routePath: 'viewer-folder/nested-child',
       }),
@@ -4932,6 +5755,7 @@ describe('Worktype HBS renderer', () => {
         type: 'file',
         pageLink: 'https://origin.example/index.php?view=1&file=viewer-folder%2Fchild.txt',
         remoteSource: 'origin-example',
+        externalWork: true,
         routeSlug: 'child-txt',
         routePath: 'viewer-folder/child.txt',
       }),
@@ -4941,6 +5765,85 @@ describe('Worktype HBS renderer', () => {
     expect(leafEntry).toBeTruthy();
     expect(leafEntry.renderedHtml).toBeUndefined();
     expect(leafEntry.template).toBeUndefined();
+  });
+
+  test('copies remote export files into a new local folder and creates a looping player', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-remote-copy-'));
+    const exportUrl = 'https://origin.example/?mcp=1&route=export-content&path=films';
+    const assetUrl = 'https://origin.example/films/clip.mp4';
+    const remoteFeed = {
+      route: 'export-content',
+      root: {
+        name: 'films',
+        title: 'Remote Films',
+      },
+      items: [
+        {
+          name: 'clip.mp4',
+          title: 'Clip',
+          type: 'file',
+          isFile: true,
+          srcUrl: assetUrl,
+        },
+      ],
+    };
+
+    try {
+      fs.writeFileSync(path.join(tempRoot, 'poff.config.json'), JSON.stringify({
+        folderName: path.basename(tempRoot),
+        title: 'Copy target',
+        type: 'folder',
+        tree: [],
+        work: {
+          type: 'folder',
+        },
+      }, null, 2));
+
+      const result = await runRemoteContent('import', tempRoot, '', {
+        url: exportUrl,
+        mode: 'copy',
+        destinationName: 'local-films',
+        createPlayer: true,
+        mockResponses: {
+          [exportUrl]: {
+            status: 200,
+            body: remoteFeed,
+          },
+          [assetUrl]: {
+            status: 200,
+            bodyRaw: 'fake-mp4-data',
+          },
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        route: 'import-remote',
+        saved: true,
+        mode: 'copy',
+        copiedCount: 1,
+        destinationPath: 'local-films',
+        openPath: 'local-films',
+        playerCreated: true,
+      }));
+      expect(fs.readFileSync(path.join(tempRoot, 'local-films', 'clip.mp4'), 'utf8')).toBe('fake-mp4-data');
+      const playerTemplate = fs.readFileSync(path.join(tempRoot, 'local-films', '.layout', 'works.hbs'), 'utf8');
+      expect(playerTemplate).toContain('data-remote-playlist');
+      expect(playerTemplate).toContain('<source src="{{srcUrl}}"');
+      expect(playerTemplate).toContain('data-remote-loop');
+      const playerScript = fs.readFileSync(path.join(tempRoot, 'local-films', '.layout', 'script.js'), 'utf8');
+      expect(playerScript).toContain("loopToggle?.addEventListener('click'");
+      expect(playerScript).toContain("tracks.forEach((track, trackIndex) => track.addEventListener('click'");
+      const copiedConfig = JSON.parse(fs.readFileSync(path.join(tempRoot, 'local-films', 'poff.config.json'), 'utf8'));
+      expect(copiedConfig.tree).toEqual([
+        expect.objectContaining({
+          name: 'clip.mp4',
+          visible: true,
+        }),
+      ]);
+      expect(copiedConfig.copiedFrom.url).toBe(exportUrl);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test('keeps the active wrapper and strips only the remote shell chrome', async () => {
@@ -5365,40 +6268,43 @@ describe('Worktype HBS renderer', () => {
     expect(fs.readFileSync(runtimeWorkPath, 'utf8')).toContain('source-only-update');
   });
 
-  test('inherits edit mode from an ancestor allow marker', async () => {
-    const runtimeRoot = RUNTIME_ROOT;
-    const nestedRuntimeDir = path.join(runtimeRoot, 'tests', 'poff-tests', 'viewer-folder');
-    fs.mkdirSync(nestedRuntimeDir, { recursive: true });
-    fs.writeFileSync(path.join(runtimeRoot, '.edit.allow'), 'allow');
-    const denyPath = path.join(nestedRuntimeDir, 'edit.not-allow');
-    if (fs.existsSync(denyPath)) {
-      fs.unlinkSync(denyPath);
+  test('allows edit mode without an allow marker', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-markerless-edit-'));
+
+    try {
+      expect(fs.existsSync(path.join(tempDir, '.edit.allow'))).toBe(false);
+      expect(fs.existsSync(path.join(tempDir, 'edit.allow'))).toBe(false);
+
+      const result = await runViewerSave(tempDir, '', {
+        description: 'Markerless edit mode works',
+      });
+
+      expect(result.allowed).toBe(true);
+      expect(result.saved).toBe(true);
+      expect(result.config.description).toBe('Markerless edit mode works');
+      expect(fs.existsSync(path.join(tempDir, '.edit.allow'))).toBe(false);
+      expect(fs.existsSync(path.join(tempDir, 'edit.allow'))).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
-
-    const result = await runViewerSave(runtimeRoot, 'tests/poff-tests/viewer-folder', {
-      description: 'Inherited edit mode works',
-    });
-
-    expect(result.allowed).toBe(true);
-    expect(result.saved).toBe(true);
-    expect(result.config.description).toBe('Inherited edit mode works');
   });
 
-  test('stops inherited edit mode when edit.not-allow exists locally', async () => {
-    const runtimeRoot = RUNTIME_ROOT;
-    const nestedRuntimeDir = path.join(runtimeRoot, 'tests', 'poff-tests', 'viewer-folder');
+  test('stops edit mode when edit.not-allow exists locally', async () => {
+    const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-denied-edit-'));
+    const nestedRuntimeDir = path.join(runtimeRoot, 'nested');
     fs.mkdirSync(nestedRuntimeDir, { recursive: true });
-    fs.writeFileSync(path.join(runtimeRoot, '.edit.allow'), 'allow');
     fs.writeFileSync(path.join(nestedRuntimeDir, 'edit.not-allow'), 'deny');
 
-    const result = await runViewerSave(runtimeRoot, 'tests/poff-tests/viewer-folder', {
-      description: 'This should be blocked',
-    });
+    try {
+      const result = await runViewerSave(runtimeRoot, 'nested', {
+        description: 'This should be blocked',
+      });
 
-    expect(result.allowed).toBe(false);
-    expect(result.error).toBe('Edit mode not enabled.');
-
-    fs.unlinkSync(path.join(nestedRuntimeDir, 'edit.not-allow'));
+      expect(result.allowed).toBe(false);
+      expect(result.error).toBe('Edit mode not enabled.');
+    } finally {
+      fs.rmSync(runtimeRoot, { recursive: true, force: true });
+    }
   });
 
   test('exposes worktype-specific config fields in the default work definitions', async () => {
@@ -5503,6 +6409,54 @@ describe('Worktype HBS renderer', () => {
       expect(result.saved).toBe(true);
       expect(result.config.title).toBe(fileName);
       expect(savedConfig.title).toBe(fileName);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('saves nested item description into the parent tree metadata', async () => {
+    const tempDir = path.join(POFF_DIR, `nested-description-save-${Date.now()}`);
+    fs.mkdirSync(path.join(tempDir, 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'nested', 'item.txt'), 'hello');
+    fs.writeFileSync(path.join(tempDir, 'nested', 'poff.config.json'), JSON.stringify({
+      folderName: 'nested',
+      slug: 'nested',
+      title: 'nested',
+      description: '',
+      tree: [
+        {
+          name: 'item.txt',
+          title: 'item.txt',
+          description: '',
+          type: 'file',
+          path: 'item.txt',
+        },
+      ],
+      work: {
+        type: 'folder',
+        layout: {
+          mode: 'actual',
+          name: 'actual',
+          preset: 'actual',
+        },
+      },
+    }, null, 2));
+
+    try {
+      const result = await runViewerSave(tempDir, 'nested/item.txt', {
+        title: 'Nested Title',
+        description: 'Nested Description',
+      });
+      const parentConfigPath = path.join(tempDir, 'nested', 'poff.config.json');
+      const parentConfig = JSON.parse(fs.readFileSync(parentConfigPath, 'utf8'));
+      const treeItem = parentConfig.tree.find((item) => item.name === 'item.txt');
+
+      expect(result.saved).toBe(true);
+      expect(treeItem).toEqual(expect.objectContaining({
+        title: 'Nested Title',
+        description: 'Nested Description',
+      }));
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

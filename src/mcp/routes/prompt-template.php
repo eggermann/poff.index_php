@@ -771,23 +771,6 @@ function mcpPromptTrimText(string $text, int $maxLength = 240): string
     return substr($normalized, 0, max(0, $maxLength - 3)) . '...';
 }
 
-function mcpPromptNormalizeStringList(array|string|null $value): array
-{
-    $items = is_array($value)
-        ? $value
-        : (is_string($value) && trim($value) !== '' ? preg_split('/\r?\n|,/', $value) : []);
-    $result = [];
-    foreach ($items ?: [] as $item) {
-        $normalized = strtolower(trim((string) $item));
-        if ($normalized === '' || in_array($normalized, $result, true)) {
-            continue;
-        }
-        $result[] = $normalized;
-    }
-
-    return $result;
-}
-
 function mcpPromptCompactRef(array $ref): array
 {
     $compact = [];
@@ -823,85 +806,6 @@ function mcpPromptCompactTreeItems(array $items, int $maxDepth = 3, int $maxChil
     }
 
     return $compactItems;
-}
-
-function mcpPromptCompactConfig(array $config): array
-{
-    $summary = [];
-
-    foreach (['title', 'description', 'folderName', 'updatedAt', 'treeHash'] as $key) {
-        if (array_key_exists($key, $config) && is_scalar($config[$key])) {
-            $summary[$key] = is_string($config[$key])
-                ? mcpPromptTrimText((string) $config[$key], 240)
-                : $config[$key];
-        }
-    }
-
-    $work = is_array($config['work'] ?? null) ? $config['work'] : [];
-    if ($work !== []) {
-        $summary['work'] = [];
-        foreach ($work as $key => $value) {
-            if ($key === 'layout' && is_array($value)) {
-                $layoutSummary = [];
-                foreach (['name', 'mode', 'value', 'engine', 'section', 'storage', 'directory', 'inheritedDirectory', 'sectionDirectory', 'phpTemplate'] as $layoutKey) {
-                    if (array_key_exists($layoutKey, $value) && is_scalar($value[$layoutKey])) {
-                        $layoutSummary[$layoutKey] = is_string($value[$layoutKey])
-                            ? mcpPromptTrimText((string) $value[$layoutKey], 180)
-                            : $value[$layoutKey];
-                    }
-                }
-                foreach (['template', 'sectionTemplate', 'css', 'style', 'js', 'script'] as $layoutKey) {
-                    if (isset($value[$layoutKey]) && is_string($value[$layoutKey]) && $value[$layoutKey] !== '') {
-                        $layoutSummary[$layoutKey . 'Length'] = strlen($value[$layoutKey]);
-                    }
-                }
-                if (is_array($value['assets'] ?? null)) {
-                    $layoutSummary['assetCount'] = count($value['assets']);
-                }
-                $summary['work']['layout'] = $layoutSummary;
-                continue;
-            }
-
-            if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
-                $summary['work'][$key] = $value;
-                continue;
-            }
-
-            if ($key === 'categories' || $key === 'category') {
-                $categories = mcpPromptNormalizeStringList($value);
-                if ($categories !== []) {
-                    $summary['work']['categories'] = $categories;
-                }
-                continue;
-            }
-
-            if (is_string($value)) {
-                $summary['work'][$key] = mcpPromptTrimText($value, 180);
-            }
-        }
-    }
-
-    $tree = is_array($config['tree'] ?? null) ? $config['tree'] : [];
-    if ($tree !== []) {
-        $sample = [];
-        foreach (array_slice($tree, 0, 24) as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $sample[] = [
-                'name' => mcpPromptTrimText((string) ($item['name'] ?? $item['path'] ?? ''), 120),
-                'type' => (string) ($item['type'] ?? 'file'),
-                'path' => mcpPromptTrimText((string) ($item['path'] ?? ''), 160),
-                'visible' => array_key_exists('visible', $item) ? (bool) $item['visible'] : true,
-            ];
-        }
-        $summary['tree'] = [
-            'count' => count($tree),
-            'sample' => $sample,
-        ];
-    }
-
-    return $summary;
 }
 
 function mcpPromptCompactContext(array $context): array
@@ -1209,14 +1113,7 @@ function handlePromptTemplate(array $opts): array
 {
     $rootDir = $opts['rootDir'];
     $path = $opts['path'] ?? '';
-    $allowFile = $opts['allowFile'] ?? null;
     $access = mcpEditorAccessState($rootDir, (string) $path);
-    if (is_string($allowFile) && $allowFile !== '' && is_file($allowFile) && !$access['editModeAllowed']) {
-        $access['editModeAllowed'] = true;
-        $access['allowed'] = cmsIsEditorAuthenticated($rootDir);
-        $access['auth'] = cmsBuildEditorAuthView($rootDir, true);
-        $access['error'] = cmsEditorAuthError($rootDir, true);
-    }
     if (!class_exists('PoffConfig')) {
         return mcpPromptError('PoffConfig unavailable.');
     }
@@ -1226,9 +1123,7 @@ function handlePromptTemplate(array $opts): array
         return mcpPromptError('Invalid folder path.');
     }
 
-    $allowed = is_string($allowFile) && $allowFile !== ''
-        ? is_file($allowFile)
-        : cmsEditModeAllowedForDirectory($targetDir, $rootDir);
+    $allowed = cmsEditModeAllowedForDirectory($targetDir, $rootDir);
     if (!$allowed) {
         return mcpPromptError('Edit mode not enabled.', false);
     }

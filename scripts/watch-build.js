@@ -4,10 +4,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
-const mampHtdocs = '/Applications/MAMP/htdocs';
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
-const standaloneCopyTargets = ['MAUSMAUS'];
-const bundledLayoutAsset = path.join(rootDir, 'src', 'includes', 'worktypes', 'templates', 'layout', 'default', 'poff.profile.jpg');
 
 function logBrowseUrl(linkName) {
   if (!linkName) return;
@@ -33,9 +30,13 @@ function readBuildConfig() {
   }
 }
 
-function ensureSymlink(outputDir) {
+function ensureSymlink(outputDir, config) {
+  if (!config.mampHtdocs) {
+    console.warn('[watch] MAMP htdocs is not configured, skipping symlink.');
+    return null;
+  }
   const resolvedOutput = path.resolve(outputDir);
-  const resolvedHtdocs = path.resolve(mampHtdocs);
+  const resolvedHtdocs = path.resolve(config.mampHtdocs);
   const linkName = path.basename(resolvedOutput);
 
   if (!fs.existsSync(resolvedHtdocs)) {
@@ -73,89 +74,6 @@ function ensureSymlink(outputDir) {
   console.log(`[watch] Created symlink ${linkPath} -> ${resolvedOutput}.`);
   logBrowseUrl(linkName);
   return linkName;
-}
-
-function ensureStandaloneCopies(outputDir, outputFile) {
-  const resolvedHtdocs = path.resolve(mampHtdocs);
-  if (!fs.existsSync(resolvedHtdocs)) {
-    console.warn(`[watch] MAMP htdocs not found at ${resolvedHtdocs}, skipping standalone copies.`);
-    return;
-  }
-
-  const sourceFile = path.join(path.resolve(outputDir), outputFile);
-  if (!fs.existsSync(sourceFile)) {
-    console.warn(`[watch] Built file not found at ${sourceFile}, skipping standalone copies.`);
-    return;
-  }
-
-  standaloneCopyTargets.forEach((targetName) => {
-    const targetDir = path.join(resolvedHtdocs, targetName);
-    const targetFile = path.join(targetDir, outputFile);
-    fs.mkdirSync(targetDir, { recursive: true });
-    fs.copyFileSync(sourceFile, targetFile);
-    removeGeneratedEntrypointsFromSubdirectories(targetDir, outputFile);
-    if (fs.existsSync(bundledLayoutAsset)) {
-      copyFileToLayoutDirectories(bundledLayoutAsset, targetDir);
-    }
-    console.log(`[watch] Copied standalone build ${sourceFile} -> ${targetFile}.`);
-    logBrowseUrl(targetName);
-  });
-}
-
-function findAllDirectories(rootDir) {
-  const dirs = [];
-  const stack = [rootDir];
-
-  while (stack.length > 0) {
-    const currentDir = stack.pop();
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-
-    entries.forEach((entry) => {
-      if (!entry.isDirectory()) {
-        return;
-      }
-
-      const fullPath = path.join(currentDir, entry.name);
-      if (
-        entry.name.startsWith('.')
-        || entry.name === 'build'
-        || entry.name === 'vendor'
-        || entry.name === 'node_modules'
-      ) {
-        return;
-      }
-
-      dirs.push(fullPath);
-      stack.push(fullPath);
-    });
-  }
-
-  return dirs;
-}
-
-function copyFileToLayoutDirectories(sourceFile, targetRoot, layoutDirName = '.layout') {
-  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
-    const destinationDir = path.join(dir, layoutDirName);
-    fs.mkdirSync(destinationDir, { recursive: true });
-    fs.copyFileSync(sourceFile, path.join(destinationDir, path.basename(sourceFile)));
-  });
-}
-
-function removeGeneratedEntrypointsFromSubdirectories(targetRoot, fileName = 'index.php') {
-  [targetRoot, ...findAllDirectories(targetRoot)].forEach((dir) => {
-    const candidate = path.join(dir, fileName);
-    if (dir === targetRoot || !fs.existsSync(candidate)) {
-      return;
-    }
-
-    const stat = fs.statSync(candidate);
-    if (!stat.isFile()) {
-      return;
-    }
-
-    fs.unlinkSync(candidate);
-    console.log(`[watch] Removed subdirectory entrypoint: ${candidate}`);
-  });
 }
 
 function refreshBrowser() {
@@ -211,8 +129,7 @@ function startWatcher() {
       if (code === 0) {
         try {
           const freshConfig = readBuildConfig();
-          ensureSymlink(freshConfig.outputDir);
-          ensureStandaloneCopies(freshConfig.outputDir, freshConfig.outputFile);
+          ensureSymlink(freshConfig.outputDir, freshConfig);
           refreshBrowser();
         } catch (err) {
           console.error(`[watch] Post-build step failed: ${err.message}`);

@@ -73,7 +73,7 @@ function renderFileViewer(string $relativePath, string $fullPath, ?array $fileCo
     renderViewerShell([
         'type' => $type,
         'name' => $rawName,
-        'title' => $treeConfig['title'] ?? ($fileConfig['title'] ?? $rawName),
+        'title' => cmsResolveFileViewerTitle($rawName, $treeConfig, $fileConfig),
         'path' => $relativePath,
         'layout' => $work['layout'] ?? [],
         'bodyContent' => $bodyContent,
@@ -149,7 +149,7 @@ function buildFileViewerSnapshotPayload(string $relativePath, string $fullPath, 
     return [
         'type' => $type,
         'name' => $rawName,
-        'title' => $treeConfig['title'] ?? ($fileConfig['title'] ?? $rawName),
+        'title' => cmsResolveFileViewerTitle($rawName, $treeConfig, $fileConfig),
         'path' => $relativePath,
         'layout' => $work['layout'] ?? [],
         'openHref' => ($linkUrl !== null && trim($linkUrl) !== '') ? $linkUrl : viewerAssetHref($relativePath),
@@ -157,6 +157,18 @@ function buildFileViewerSnapshotPayload(string $relativePath, string $fullPath, 
         'snapshotContext' => $snapshotContext,
         'renderedHtml' => $rendered,
     ];
+}
+
+function cmsResolveFileViewerTitle(string $rawName, array $treeConfig, array $fileConfig): string
+{
+    foreach ([$treeConfig['title'] ?? null, $fileConfig['title'] ?? null, $rawName] as $candidate) {
+        $title = trim((string) $candidate);
+        if ($title !== '') {
+            return $title;
+        }
+    }
+
+    return $rawName;
 }
 
 function cmsResolveConverterDefinitionViewerTarget(string $relativePath, string $fullPath): ?array
@@ -267,7 +279,8 @@ function cmsResolveFileViewerLinkState(string $fullPath, string $type, array $tr
     }
 
     $renderedHtml = '';
-    $shouldInlineRemoteHtml = $previewUrl === '' || $hasPhysicalFile;
+    $shouldInlineRemoteHtml = $previewUrl === ''
+        || ($hasPhysicalFile && cmsIsRemoteCmsViewerLink($previewUrl));
     if ($shouldInlineRemoteHtml) {
         $renderedHtml = cmsResolveRemoteRenderedHtml([
             'linkUrl' => $linkUrl ?? '',
@@ -284,6 +297,17 @@ function cmsResolveFileViewerLinkState(string $fullPath, string $type, array $tr
         'renderedHtml' => $renderedHtml,
         'previewUrl' => $previewUrl,
     ];
+}
+
+function cmsIsRemoteCmsViewerLink(string $url): bool
+{
+    if (cmsParseExternalCmsViewerUrl($url) !== null) {
+        return true;
+    }
+
+    $parts = parse_url(trim($url));
+    $fragment = is_array($parts) ? trim((string) ($parts['fragment'] ?? '')) : '';
+    return str_starts_with($fragment, '/');
 }
 
 function cmsBuildFileViewerContext(
@@ -329,7 +353,7 @@ function cmsBuildFileViewerContext(
         'assetUrl' => viewerAssetHref($relativePath),
         'mimeType' => $mimeType ?? '',
         'name' => $rawName,
-        'title' => $treeConfig['title'] ?? ($fileConfig['title'] ?? $rawName),
+        'title' => cmsResolveFileViewerTitle($rawName, $treeConfig, $fileConfig),
         'description' => $treeConfig['description'] ?? ($fileConfig['description'] ?? ''),
         'descriptionHtml' => $descriptionHtml,
         'linkUrl' => $linkUrl ?? '',

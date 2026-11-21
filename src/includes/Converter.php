@@ -417,13 +417,15 @@ class Converter
         $templateFolder = (string) ($definition['templateFolder'] ?? ($folder !== '' ? $folder . '/.layout' : '.layout/converters/' . $name));
         $path = self::definitionPath($folder);
         $viewerHref = $path !== '' ? '?view=1&path=' . rawurlencode($path) : '';
-        $url = $viewerHref;
+        $remote = is_array($definition['remote'] ?? null) ? $definition['remote'] : [];
+        $url = trim((string) ($definition['url'] ?? $remote['url'] ?? $remote['publicUrl'] ?? $viewerHref));
 
         return [
             'id' => $id,
             'type' => 'converter',
             'name' => $name,
             'label' => $label,
+            'description' => (string) ($definition['description'] ?? ''),
             'accepts' => array_values(array_map('strtolower', (array) ($definition['accepts'] ?? []))),
             'outputs' => $outputs,
             'formats' => $formats,
@@ -437,7 +439,7 @@ class Converter
             'disabledReason' => $disabledReason,
             'defaults' => is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [],
             'ui' => is_array($definition['ui'] ?? null) ? $definition['ui'] : self::defaultUi(),
-            'remote' => is_array($definition['remote'] ?? null) ? $definition['remote'] : [],
+            'remote' => $remote,
             'source' => (string) ($definition['source'] ?? ''),
             'grain' => (bool) ($definition['grain'] ?? false),
         ];
@@ -576,6 +578,59 @@ class Converter
         return false;
     }
 
+    public static function canOffer(array $definition): bool
+    {
+        $engine = strtolower(trim((string) ($definition['engine'] ?? '')));
+        if ($engine === 'text-copy') {
+            return ($definition['enabled'] ?? false) === true;
+        }
+        if (in_array($engine, ['imagemagick', 'simple-image'], true)) {
+            return class_exists('Imagick') || self::findCliBinary() !== null;
+        }
+        return false;
+    }
+
+    public static function remoteDefinition(array $offered, array $node): ?array
+    {
+        $providerId = self::normalizeConverterId((string) ($offered['id'] ?? ''));
+        $name = self::normalizeConverterName((string) ($offered['name'] ?? $providerId));
+        $endpoint = trim((string) ($node['endpoint'] ?? ''));
+        if ($providerId === '' || $name === '' || self::validateRemoteEndpoint($endpoint) !== null) {
+            return null;
+        }
+
+        $nodeId = trim((string) ($node['id'] ?? parse_url($endpoint, PHP_URL_HOST) ?? 'remote'));
+        $nodeSlug = preg_replace('/[^a-z0-9._-]+/i', '-', strtolower($nodeId)) ?: 'remote';
+        $definition = self::converterDefinition([
+            'id' => 'converter/remote-' . $nodeSlug . '-' . $name,
+            'name' => 'remote-' . $nodeSlug . '-' . $name,
+            'label' => trim((string) ($offered['label'] ?? $name)) . ' · ' . $nodeId,
+            'description' => (string) ($offered['description'] ?? ''),
+            'accepts' => array_values((array) ($offered['accepts'] ?? [])),
+            'outputs' => array_values((array) ($offered['outputs'] ?? [])),
+            'formats' => array_values((array) ($offered['formats'] ?? [])),
+            'engine' => 'remote-node',
+            'enabled' => true,
+            'defaults' => is_array($offered['defaults'] ?? null) ? $offered['defaults'] : [],
+            'ui' => is_array($offered['ui'] ?? null) ? $offered['ui'] : [],
+            'remote' => [
+                'nodeId' => $nodeId,
+                'endpoint' => $endpoint,
+                'publicUrl' => (string) ($node['baseUrl'] ?? ''),
+            ],
+            'source' => 'remote-node-catalog',
+        ]);
+        $definition['providerConverterId'] = $providerId;
+        $definition['node'] = [
+            'id' => $nodeId,
+            'baseUrl' => (string) ($node['baseUrl'] ?? ''),
+            'catalogUrl' => (string) ($node['catalogUrl'] ?? ''),
+            'endpoint' => $endpoint,
+            'converterId' => $providerId,
+        ];
+        return $definition;
+    }
+
     public static function normalizeSelectedConverter(array $converter): array
     {
         $id = strtolower(trim((string) ($converter['id'] ?? $converter['name'] ?? '')));
@@ -682,6 +737,9 @@ class Converter
         $name = trim((string) ($definition['name'] ?? $converterOptions['name'] ?? 'converter'));
         $format = self::normalizeFormat((string) ($converterOptions['format'] ?? self::defaultOptions($id)['format'] ?? 'webp'));
         $baseName = pathinfo($sourceName, PATHINFO_FILENAME);
+        if ((string) ($definition['engine'] ?? '') === 'remote-node' && !str_starts_with($baseName, 'external-')) {
+            $baseName = 'external-' . $baseName;
+        }
         $saveAs = $format === 'source'
             ? $sourceName
             : self::sanitizeOutputName($baseName . '.' . $format);
@@ -723,6 +781,9 @@ class Converter
         $payload['converter'] = $converter;
         $definition = self::definition((string) ($converter['id'] ?? $converter['name'] ?? ''), $rootDir);
         if ($definition === null) {
+            $definition = self::definitionFromRemoteSelection($converter);
+        }
+        if ($definition === null) {
             return self::error('Unknown converter.');
         }
 
@@ -733,6 +794,21 @@ class Converter
         }
         if ((int) ($source['size'] ?? 0) > self::MAX_SOURCE_BYTES) {
             return self::error('Source file is too large.');
+        }
+
+        if (($definition['engine'] ?? '') === 'remote-node') {
+            $root = realpath($rootDir);
+            $sourcePath = str_replace('\\', '/', trim((string) ($source['path'] ?? ''), '/'));
+            if (is_string($root) && $root !== '' && $sourcePath !== '') {
+                $fullPath = realpath($root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $sourcePath));
+                if (is_string($fullPath) && is_file($fullPath) && str_starts_with($fullPath, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+                    $body = @file_get_contents($fullPath);
+                    if (is_string($body) && $body !== '') {
+                        $source['bodyBase64'] = base64_encode($body);
+                        $payload['source'] = $source;
+                    }
+                }
+            }
         }
 
         $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'webp')));
@@ -756,6 +832,107 @@ class Converter
         }
 
         return self::convertLocalImage($payload, $definition, $rootDir);
+    }
+
+    public static function convertOffered(array $payload, string $rootDir): array
+    {
+        $source = is_array($payload['source'] ?? null) ? $payload['source'] : [];
+        $converter = self::normalizeSelectedConverter(
+            is_array($payload['converter'] ?? null) ? $payload['converter'] : []
+        );
+        $definition = self::definition((string) ($converter['id'] ?? ''), $rootDir);
+        if ($definition === null || !self::canOffer($definition)) {
+            return self::error('Converter is not offered by this Poff node.');
+        }
+
+        $bodyBase64 = (string) ($source['bodyBase64'] ?? '');
+        if ($bodyBase64 === '' || strlen($bodyBase64) > (int) ceil(self::MAX_SOURCE_BYTES * 4 / 3) + 4) {
+            return self::error('Missing or oversized inline source payload.');
+        }
+        $body = base64_decode($bodyBase64, true);
+        if (!is_string($body) || $body === '' || strlen($body) > self::MAX_SOURCE_BYTES) {
+            return self::error('Invalid inline source payload.');
+        }
+
+        $mime = strtolower(trim((string) ($source['mimeType'] ?? '')));
+        $sourceName = basename((string) ($source['name'] ?? $source['path'] ?? 'source'));
+        $extension = strtolower(pathinfo($sourceName, PATHINFO_EXTENSION));
+        $kind = $extension !== '' ? MediaType::classifyExtension($sourceName) : '';
+        if (!self::matches($definition, $mime, $kind, $extension)) {
+            return self::error('Source MIME type is not accepted.');
+        }
+
+        $format = self::normalizeFormat((string) ($converter['format'] ?? ($definition['defaults']['format'] ?? 'webp')));
+        $engine = strtolower((string) ($definition['engine'] ?? ''));
+        $outputMime = $engine === 'text-copy'
+            ? self::textMimeFromFormat($format, $sourceName, $mime)
+            : self::mimeFromFormat($format);
+        if (!self::mimeAccepted($outputMime, $definition['outputs'] ?? [])) {
+            return self::error('Output MIME type is not allowed.');
+        }
+
+        $target = is_array($payload['target'] ?? null) ? $payload['target'] : [];
+        $actualFormat = $engine === 'text-copy'
+            ? self::resolveTextOutputFormat($format, $sourceName, $mime)
+            : $format;
+        $defaultName = $format === 'source'
+            ? $sourceName
+            : pathinfo($sourceName, PATHINFO_FILENAME) . '.' . $actualFormat;
+        $outputName = self::sanitizeOutputName((string) ($target['saveAs'] ?? $defaultName));
+        $outputBody = null;
+
+        if ($engine === 'text-copy') {
+            $editor = is_array($payload['editor'] ?? null) ? $payload['editor'] : [];
+            $outputBody = array_key_exists('content', $editor) ? (string) $editor['content'] : $body;
+            if ($actualFormat === 'html') {
+                $outputBody = self::renderTextEditorHtmlDocument(
+                    $outputBody,
+                    $sourceName,
+                    (string) ($definition['label'] ?? ($definition['name'] ?? 'Remote Text Converter'))
+                );
+            }
+        } else {
+            $input = tempnam(sys_get_temp_dir(), 'poff-node-convert-');
+            if (!is_string($input) || file_put_contents($input, $body) === false) {
+                return self::error('Failed to prepare inline source payload.');
+            }
+            $preset = self::qualityPreset((string) ($converter['quality'] ?? 'default'));
+            $outputBody = self::convertWithImagick($input, $format, $preset);
+            if ($outputBody === null) {
+                $outputBody = self::convertWithCli($input, $format, $preset);
+            }
+            @unlink($input);
+        }
+
+        if (!is_string($outputBody) || $outputBody === '') {
+            return self::error('Offered converter failed.');
+        }
+
+        return [
+            'ok' => true,
+            'type' => 'converted-work',
+            'source' => [
+                'path' => (string) ($source['path'] ?? $sourceName),
+                'mimeType' => $mime,
+            ],
+            'output' => [
+                'name' => $outputName,
+                'mimeType' => $outputMime,
+                'kind' => $engine === 'text-copy' ? 'text' : 'image',
+                'size' => strlen($outputBody),
+                'bodyBase64' => base64_encode($outputBody),
+            ],
+            'generatedBy' => [
+                'type' => 'converter',
+                'name' => (string) ($definition['name'] ?? ''),
+                'id' => (string) ($definition['id'] ?? ''),
+                'node' => 'provider',
+                'engine' => $engine,
+                'quality' => self::normalizeQuality((string) ($converter['quality'] ?? 'default')),
+                'format' => $format,
+                'convertedAt' => date('c'),
+            ],
+        ];
     }
 
     public static function saveGeneratedWork(array $conversion, string $rootDir, string $sourcePath = ''): array
@@ -830,20 +1007,26 @@ class Converter
         }
 
         $generatedBy = is_array($conversion['generatedBy'] ?? null) ? $conversion['generatedBy'] : [];
+        $visibilityMode = self::normalizeVisibilityMode((string) ($target['visibilityMode'] ?? 'preserve'));
+        $generatedVisible = match ($visibilityMode) {
+            'converted-only', 'both' => true,
+            'originals-only' => false,
+            default => false,
+        };
         $entry = [
             'name' => $outputName,
             'title' => pathinfo($outputName, PATHINFO_FILENAME),
             'type' => 'file',
             'kind' => (string) ($output['kind'] ?? 'image'),
             'mimeType' => $outputMime,
-            'visible' => false,
+            'visible' => $generatedVisible,
             'generated' => true,
             'sourceWork' => basename($sourcePath),
             'generatedBy' => $generatedBy,
             'external' => [
                 'type' => 'node-work',
                 'relation' => 'converted-from',
-                'visible' => false,
+                'visible' => $generatedVisible,
                 'sourceWork' => [
                     'path' => $sourcePath,
                     'mimeType' => (string) ($source['mimeType'] ?? ''),
@@ -858,7 +1041,7 @@ class Converter
             ],
         ];
 
-        self::upsertFolderTreeEntry($folderDir, $entry);
+        self::upsertFolderTreeEntry($folderDir, $entry, basename($sourcePath), $visibilityMode);
         self::writeGeneratedFileConfig($folderDir, $outputName, $entry, $targetPath);
 
         return [
@@ -1071,7 +1254,23 @@ HTML;
             return self::error($validation);
         }
 
-        $response = self::httpPost($endpoint, $payload);
+        $remotePayload = $payload;
+        $remotePayload['converter'] = is_array($remotePayload['converter'] ?? null)
+            ? $remotePayload['converter']
+            : [];
+        $providerConverterId = trim((string) (
+            $node['converterId']
+            ?? $definition['providerConverterId']
+            ?? $remotePayload['converter']['id']
+            ?? ''
+        ));
+        if ($providerConverterId !== '') {
+            $remotePayload['converter']['id'] = $providerConverterId;
+            $remotePayload['converter']['name'] = self::normalizeConverterName($providerConverterId);
+        }
+        $remotePayload['converter']['node'] = 'provider';
+
+        $response = self::httpPost($endpoint, $remotePayload);
         if (($response['ok'] ?? false) !== true) {
             return self::error('Remote converter request failed.', ['status' => $response['status'] ?? 0]);
         }
@@ -1120,9 +1319,41 @@ HTML;
         return null;
     }
 
-    private static function matchesDefinition(array $definition, string $mime, string $kind, string $extension): bool
+    private static function definitionFromRemoteSelection(array $converter): ?array
     {
-        return self::matches($definition, $mime, $kind, $extension);
+        $node = is_array($converter['node'] ?? null) ? $converter['node'] : [];
+        $endpoint = trim((string) ($node['endpoint'] ?? ''));
+        $providerId = trim((string) ($node['converterId'] ?? $converter['providerConverterId'] ?? ''));
+        if ($endpoint === '' || $providerId === '') {
+            return null;
+        }
+
+        if (self::validateRemoteEndpoint($endpoint) !== null) {
+            return null;
+        }
+
+        $definition = self::converterDefinition([
+            'id' => (string) ($converter['id'] ?? ''),
+            'name' => (string) ($converter['name'] ?? $providerId),
+            'label' => (string) ($converter['label'] ?? $converter['name'] ?? $providerId),
+            'description' => (string) ($converter['description'] ?? ''),
+            'accepts' => (array) ($converter['accepts'] ?? []),
+            'outputs' => (array) ($converter['outputs'] ?? []),
+            'formats' => (array) ($converter['formats'] ?? []),
+            'engine' => 'remote-node',
+            'enabled' => true,
+            'defaults' => is_array($converter['defaults'] ?? null) ? $converter['defaults'] : [],
+            'ui' => is_array($converter['ui'] ?? null) ? $converter['ui'] : [],
+            'remote' => [
+                'nodeId' => (string) ($node['id'] ?? 'remote'),
+                'endpoint' => $endpoint,
+                'publicUrl' => (string) ($node['baseUrl'] ?? ''),
+            ],
+            'source' => 'remote-node-catalog',
+        ]);
+        $definition['providerConverterId'] = self::normalizeConverterId($providerId);
+        $definition['node'] = $node;
+        return $definition;
     }
 
     private static function mimeAccepted(string $mime, array $patterns): bool
@@ -1214,6 +1445,9 @@ HTML;
     private static function normalizeFormat(string $format): string
     {
         $format = strtolower(trim($format));
+        if ($format === 'jpg') {
+            return 'jpeg';
+        }
         return in_array($format, ['source', 'webp', 'jpeg', 'png', 'json', 'txt', 'md', 'html'], true) ? $format : 'webp';
     }
 
@@ -1227,6 +1461,14 @@ HTML;
     {
         $mode = strtolower(trim($mode));
         return in_array($mode, ['new-hidden-work', 'replace-generated-work', 'replace-source-file', 'temporary-preview-only'], true) ? $mode : 'new-hidden-work';
+    }
+
+    private static function normalizeVisibilityMode(string $mode): string
+    {
+        $mode = strtolower(trim($mode));
+        return in_array($mode, ['preserve', 'converted-only', 'originals-only', 'both'], true)
+            ? $mode
+            : 'preserve';
     }
 
     private static function qualityPreset(string $quality): array
@@ -1310,6 +1552,18 @@ HTML;
 
     private static function findCliBinary(): ?string
     {
+        foreach ([
+            '/opt/homebrew/bin/magick',
+            '/opt/homebrew/bin/convert',
+            '/usr/local/bin/magick',
+            '/usr/local/bin/convert',
+            '/usr/bin/magick',
+            '/usr/bin/convert',
+        ] as $path) {
+            if (is_file($path) && is_executable($path)) {
+                return $path;
+            }
+        }
         foreach (['magick', 'convert'] as $binary) {
             $path = trim((string) @shell_exec('command -v ' . escapeshellarg($binary) . ' 2>/dev/null'));
             if ($path !== '') {
@@ -1380,13 +1634,20 @@ HTML;
     private static function sanitizeOutputName(string $name): string
     {
         $name = basename(str_replace('\\', '/', trim($name)));
-        $extension = self::normalizeFormat(pathinfo($name, PATHINFO_EXTENSION));
+        $requestedExtension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        $format = self::normalizeFormat($requestedExtension);
+        $extension = $requestedExtension === 'jpg' ? 'jpg' : $format;
         $base = pathinfo($name, PATHINFO_FILENAME);
         $base = preg_replace('/[^a-z0-9._-]+/i', '-', $base) ?: 'converted';
         return trim($base, '.-') . '.' . $extension;
     }
 
-    private static function upsertFolderTreeEntry(string $folderDir, array $entry): void
+    private static function upsertFolderTreeEntry(
+        string $folderDir,
+        array $entry,
+        string $sourceName = '',
+        string $visibilityMode = 'preserve'
+    ): void
     {
         if (!class_exists('PoffConfig')) {
             return;
@@ -1404,6 +1665,16 @@ HTML;
         unset($item);
         if (!$found) {
             $tree[] = $entry;
+        }
+        if ($visibilityMode !== 'preserve' && $sourceName !== '') {
+            $sourceVisible = $visibilityMode !== 'converted-only';
+            foreach ($tree as &$item) {
+                if (is_array($item) && (string) ($item['name'] ?? '') === $sourceName) {
+                    $item['visible'] = $sourceVisible;
+                    break;
+                }
+            }
+            unset($item);
         }
         $config['tree'] = $tree;
         $config['treeHash'] = hash('sha256', json_encode($tree));
@@ -1488,6 +1759,8 @@ HTML;
                 'content' => json_encode($payload, JSON_UNESCAPED_SLASHES),
                 'timeout' => 30,
                 'ignore_errors' => true,
+                'follow_location' => 0,
+                'max_redirects' => 0,
             ],
         ]);
         $body = @file_get_contents($url, false, $context);

@@ -46,10 +46,14 @@ function cmsHandleEditAuthAction(array $ctx): void
             ], 403);
         }
 
+        $config = cmsLoadAuthConfig($rootDir);
+        $authToken = cmsEditorAuthToken($rootDir, (string) ($config['passwordHash'] ?? ''));
+
         cmsJsonResponse([
             'allowed' => true,
             'authenticated' => true,
             'sessionId' => session_id(),
+            'authToken' => $authToken,
             'auth' => cmsBuildEditorAuthView($rootDir, true),
         ]);
     }

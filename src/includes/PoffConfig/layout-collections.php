@@ -172,8 +172,10 @@ trait PoffConfigLayoutCollectionHelpers
 
         $cursor = $current;
         while ($cursor !== false) {
-            if (is_file($cursor . DIRECTORY_SEPARATOR . '.edit.allow')) {
-                return $cursor;
+            foreach (['.poff-auth.php', 'auth.config.php'] as $authConfig) {
+                if (is_file($cursor . DIRECTORY_SEPARATOR . $authConfig)) {
+                    return $cursor;
+                }
             }
             $parent = dirname($cursor);
             if ($parent === $cursor || ($cwd !== false && $cursor === $cwd)) {

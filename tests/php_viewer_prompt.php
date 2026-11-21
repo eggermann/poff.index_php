@@ -92,7 +92,4 @@ $_POST = $payload;
 $_SERVER['REQUEST_METHOD'] = 'POST';
 
 chdir($rootDir);
-if (!is_file($rootDir . DIRECTORY_SEPARATOR . '.edit.allow')) {
-    touch($rootDir . DIRECTORY_SEPARATOR . '.edit.allow');
-}
 cmsHandleEditAction();

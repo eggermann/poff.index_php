@@ -24,7 +24,7 @@ function extractLinkFileUrl(string $filePath): ?string {
     switch ($ext) {
         case 'webloc':   // macOS .webloc (plist xml)
             if (preg_match('/<key>URL<\/key>\s*<string>([^<]+)<\/string>/i', $content, $m)) {
-                return trim($m[1]);
+                return trim(html_entity_decode($m[1], ENT_QUOTES | ENT_XML1, 'UTF-8'));
             }
             break;
 

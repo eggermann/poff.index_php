@@ -11,6 +11,7 @@ require_once __DIR__ . '/../src/includes/viewer/utils.php';
 require_once __DIR__ . '/../src/mcp/helpers.php';
 require_once __DIR__ . '/../src/mcp/routes/converters.php';
 require_once __DIR__ . '/../src/mcp/routes/convert.php';
+require_once __DIR__ . '/../src/mcp/routes/converter-network.php';
 require_once __DIR__ . '/../src/mcp/routes/create-converter.php';
 require_once __DIR__ . '/../src/mcp/routes/converter-prompt.php';
 
@@ -50,6 +51,14 @@ if ($mode === 'normalize') {
     exit(0);
 }
 
+if ($mode === 'build-payload') {
+    echo json_encode(Converter::buildPayload(
+        is_array($payload['source'] ?? null) ? $payload['source'] : [],
+        is_array($payload['converter'] ?? null) ? $payload['converter'] : []
+    ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
 if ($mode === 'converter-prompt') {
     echo json_encode(handleConverterPrompt([
         'rootDir' => $rootDir,
@@ -77,8 +86,11 @@ if ($mode === 'save') {
 
 if ($mode === 'convert') {
     $mockHttpPost = $payload['mockHttpPost'] ?? null;
+    $captureRemotePayload = (bool) ($payload['captureRemotePayload'] ?? false);
+    $capturedRemotePayload = null;
     if (is_array($mockHttpPost)) {
-        $GLOBALS['__poff_converter_http_post'] = static function (string $url, array $headers, array $requestPayload) use ($mockHttpPost): array {
+        $GLOBALS['__poff_converter_http_post'] = static function (string $url, array $headers, array $requestPayload) use ($mockHttpPost, &$capturedRemotePayload): array {
+            $capturedRemotePayload = $requestPayload;
             return [
                 'ok' => (bool) ($mockHttpPost['ok'] ?? true),
                 'status' => (int) ($mockHttpPost['status'] ?? 200),
@@ -87,7 +99,87 @@ if ($mode === 'convert') {
         };
         unset($payload['mockHttpPost']);
     }
-    echo json_encode(handleConvert([
+    unset($payload['captureRemotePayload']);
+    $result = handleConvert([
+        'rootDir' => $rootDir,
+        'payload' => $payload,
+    ]);
+    if ($captureRemotePayload) {
+        $result['_capturedRemotePayload'] = $capturedRemotePayload;
+    }
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'offers') {
+    echo json_encode(handleConverterOffers([
+        'rootDir' => $rootDir,
+        'input' => $payload,
+        'nodeUrl' => (string) ($payload['nodeUrl'] ?? 'https://provider.example/index.php'),
+        'nodeId' => (string) ($payload['nodeId'] ?? 'provider-example'),
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'remote-catalog') {
+    $mockCatalog = is_array($payload['mockCatalog'] ?? null) ? $payload['mockCatalog'] : [];
+    $GLOBALS['__poff_converter_catalog_post'] = static function (string $url, array $requestPayload) use ($mockCatalog): array {
+        return [
+            'ok' => true,
+            'status' => 200,
+            'body' => json_encode($mockCatalog, JSON_UNESCAPED_SLASHES),
+        ];
+    };
+    unset($payload['mockCatalog']);
+    echo json_encode(handleRemoteConverters([
+        'rootDir' => $rootDir,
+        'input' => $payload,
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'register-node') {
+    $mockRegistry = is_array($payload['mockRegistry'] ?? null) ? $payload['mockRegistry'] : [];
+    $captured = [];
+    $GLOBALS['__poff_registry_post'] = static function (string $url, array $requestPayload) use ($mockRegistry, &$captured): array {
+        $captured = [
+            'url' => $url,
+            'payload' => $requestPayload,
+        ];
+        return [
+            'ok' => (bool) ($mockRegistry['ok'] ?? true),
+            'status' => (int) ($mockRegistry['status'] ?? 200),
+            'body' => json_encode($mockRegistry['body'] ?? [
+                'allowed' => true,
+                'pendingApproval' => true,
+                'uploaded' => [['pendingApproval' => true]],
+            ], JSON_UNESCAPED_SLASHES),
+        ];
+    };
+    unset($payload['mockRegistry']);
+    $result = handleRegisterPoffNode([
+        'rootDir' => $rootDir,
+        'input' => $payload,
+    ]);
+    $result['_capturedRegistry'] = $captured;
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'convert-offered') {
+    echo json_encode(handleConvertOffered([
+        'rootDir' => $rootDir,
+        'payload' => $payload,
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'bulk-convert') {
+    if (($payload['enableImageMagickCli'] ?? false) === true) {
+        putenv('POFF_ENABLE_IMAGEMAGICK_CLI=1');
+        unset($payload['enableImageMagickCli']);
+    }
+    echo json_encode(handleBulkConvert([
         'rootDir' => $rootDir,
         'payload' => $payload,
     ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

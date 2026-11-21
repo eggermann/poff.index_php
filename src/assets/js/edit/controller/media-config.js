@@ -31,6 +31,20 @@ export function resolveConverterPayloadProvider() {
 
 export function readMediaConfigFromElements(elements, form, currentWork = {}) {
     const nextWork = { ...(currentWork && typeof currentWork === 'object' ? currentWork : {}) };
+    const normalizeSourceUrl = (value) => {
+        const raw = String(value || '').trim();
+        if (!raw) {
+            return '';
+        }
+        try {
+            const baseHref = typeof window?.location?.href === 'string' && window.location.href
+                ? window.location.href
+                : 'http://localhost/';
+            return new URL(raw, baseHref).toString();
+        } catch {
+            return raw;
+        }
+    };
     const typeField = elements.work_type;
     if (typeField && typeof typeField.value === 'string') {
         const type = typeField.value.trim();
@@ -89,9 +103,25 @@ export function readMediaConfigFromElements(elements, form, currentWork = {}) {
     const converterPath = String(selectedOption?.dataset?.converterPath || '').trim();
     const converterViewerHref = String(selectedOption?.dataset?.converterViewerHref || '').trim();
     const converterUrl = String(selectedOption?.dataset?.converterUrl || '').trim();
+    const converterLabel = String(selectedOption?.dataset?.converterLabel || '').trim();
+    const converterDescription = String(selectedOption?.dataset?.converterDescription || '').trim();
+    const parseConverterData = (key, fallback) => {
+        try {
+            const value = JSON.parse(selectedOption?.dataset?.[key] || '');
+            return value && typeof value === 'object' ? value : fallback;
+        } catch {
+            return fallback;
+        }
+    };
+    const converterNode = parseConverterData('converterNode', null);
+    const converterAccepts = parseConverterData('converterAccepts', []);
+    const converterOutputs = parseConverterData('converterOutputs', []);
+    const converterDefaults = parseConverterData('converterDefaults', {});
+    const converterUi = parseConverterData('converterUi', {});
+    const converterSourceUrl = normalizeSourceUrl(elements.converter_source_url?.value || '');
     const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
-        nextWork.converter = {
+        const nextConverter = {
             ...existingConverter,
             type: converterType,
             name: converterName || String(existingConverter.name || converterId.split('/').pop() || 'converter'),
@@ -100,14 +130,28 @@ export function readMediaConfigFromElements(elements, form, currentWork = {}) {
             path: converterPath,
             viewerHref: converterViewerHref,
             url: converterUrl,
+            label: converterLabel,
+            description: converterDescription,
+            accepts: Array.isArray(converterAccepts) ? converterAccepts : [],
+            outputs: Array.isArray(converterOutputs) ? converterOutputs : [],
+            formats: String(selectedOption?.dataset?.converterFormats || '').split(',').map((item) => item.trim()).filter(Boolean),
+            defaults: converterDefaults,
+            ui: converterUi,
+            sourceUrl: converterSourceUrl || String(existingConverter.sourceUrl || '').trim(),
             node: converterEngine === 'remote-node'
-                ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+                ? (converterNode || (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '', converterId: '' }))
                 : 'local',
             quality: String(elements.converter_quality?.value || 'default').trim() || 'default',
             format: String(elements.converter_format?.value || '').trim() || 'source',
             saveMode: String(elements.converter_save_mode?.value || 'new-hidden-work').trim() || 'new-hidden-work',
             hiddenByDefault: true,
         };
+        if (converterSourceUrl) {
+            nextConverter.sourceUrl = converterSourceUrl;
+        } else {
+            delete nextConverter.sourceUrl;
+        }
+        nextWork.converter = nextConverter;
     } else if (Object.prototype.hasOwnProperty.call(nextWork, 'converter')) {
         delete nextWork.converter;
     }

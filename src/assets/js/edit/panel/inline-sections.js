@@ -10,7 +10,7 @@ import {
 } from './categories.js';
 import { renderPersistentDetailsSection } from './shared.js';
 
-export const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter']);
+export const RESERVED_WORK_CONFIG_KEYS = new Set(['type', 'template', 'templateMap', 'layout', 'fields', 'categories', 'category', 'kind', 'converter', 'presentationSource']);
 export const PASSWORD_DETAILS_STORAGE_KEY = 'password-details';
 
 function renderMediaTypeOptions(selectedValue = '', catalog = null) {
@@ -114,6 +114,21 @@ export function readMediaConfigFromForm(form, currentWork = {}) {
     const converterPath = String(selectedOption?.dataset?.converterPath || '').trim();
     const converterViewerHref = String(selectedOption?.dataset?.converterViewerHref || '').trim();
     const converterUrl = String(selectedOption?.dataset?.converterUrl || '').trim();
+    const converterLabel = String(selectedOption?.dataset?.converterLabel || '').trim();
+    const converterDescription = String(selectedOption?.dataset?.converterDescription || '').trim();
+    const parseConverterData = (key, fallback) => {
+        try {
+            const value = JSON.parse(selectedOption?.dataset?.[key] || '');
+            return value && typeof value === 'object' ? value : fallback;
+        } catch {
+            return fallback;
+        }
+    };
+    const converterNode = parseConverterData('converterNode', null);
+    const converterAccepts = parseConverterData('converterAccepts', []);
+    const converterOutputs = parseConverterData('converterOutputs', []);
+    const converterDefaults = parseConverterData('converterDefaults', {});
+    const converterUi = parseConverterData('converterUi', {});
     const existingConverter = nextWork.converter && typeof nextWork.converter === 'object' ? nextWork.converter : {};
     if (converterId) {
         nextWork.converter = {
@@ -125,8 +140,15 @@ export function readMediaConfigFromForm(form, currentWork = {}) {
             path: converterPath,
             viewerHref: converterViewerHref,
             url: converterUrl,
+            label: converterLabel,
+            description: converterDescription,
+            accepts: Array.isArray(converterAccepts) ? converterAccepts : [],
+            outputs: Array.isArray(converterOutputs) ? converterOutputs : [],
+            formats: String(selectedOption?.dataset?.converterFormats || '').split(',').map((item) => item.trim()).filter(Boolean),
+            defaults: converterDefaults,
+            ui: converterUi,
             node: converterEngine === 'remote-node'
-                ? (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '' })
+                ? (converterNode || (existingConverter.node && typeof existingConverter.node === 'object' ? existingConverter.node : { id: '', baseUrl: '', mcpUrl: '', endpoint: '', converterId: '' }))
                 : 'local',
             quality: String(form?.elements?.converter_quality?.value || 'default').trim() || 'default',
             format: String(form?.elements?.converter_format?.value || '').trim() || 'source',
@@ -190,12 +212,71 @@ export function renderWorkConfigFieldsSection(config = {}) {
     `;
 }
 
+export function renderRemoteWorkPresentationSection(config = {}) {
+    const work = config?.work && typeof config.work === 'object' ? config.work : {};
+    const layout = work?.layout && typeof work.layout === 'object' ? work.layout : {};
+    const source = work?.presentationSource && typeof work.presentationSource === 'object' ? work.presentationSource : {};
+    const localLayoutDirectory = `.works/${String(config?.name || config?.path || 'item').split('/').pop()}.layout`;
+    const hasLocalPresentation = String(layout.sectionDirectory || '').trim() === localLayoutDirectory || Boolean(source.url);
+    const sourceUrl = String(source.url || '').trim();
+    const sourceTitle = String(source.title || '').trim();
+    return `
+        <div class="edit-work-fields edit-remote-presentation">
+            <div class="edit-work-fields-header">
+                <div>
+                    <div class="edit-work-fields-title">Reuse complete work presentation</div>
+                    <div class="small-note">Copy <code>work.hbs</code>, <code>style.css</code>, and <code>script.js</code> from another file work. Your local media stays unchanged.</div>
+                </div>
+            </div>
+            ${sourceUrl ? `
+            <div class="edit-remote-presentation-current">
+                <span>Current presentation source:</span>
+                <a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceTitle || sourceUrl)}</a>
+            </div>
+            ` : ''}
+            <div class="edit-remote-presentation-check">
+                <div>
+                    <label class="edit-label" for="edit-remote-presentation-url">Remote file-work URL</label>
+                    <input class="form-input" id="edit-remote-presentation-url" type="url" value="${escapeHtml(sourceUrl)}" placeholder="https://pageoff.de/?view=1&file=works%2Fimage.jpg">
+                    <div class="small-note">Poff checks file type and all three presentation files. Existing local presentation files are backed up, then replaced together.</div>
+                </div>
+                <button class="btn btn-secondary" type="button" id="editCheckRemotePresentation">Check presentation</button>
+            </div>
+            <div class="edit-status" id="editRemotePresentationStatus"></div>
+            <div class="edit-remote-presentation-offer" id="editRemotePresentationOffer" role="status" hidden>
+                <div class="edit-remote-presentation-offer-head">
+                    <span class="edit-remote-presentation-offer-dot" aria-hidden="true"></span>
+                    <div>
+                        <strong id="editRemotePresentationOfferTitle">Remote presentation</strong>
+                        <small id="editRemotePresentationOfferMeta"></small>
+                    </div>
+                </div>
+                <a id="editRemotePresentationSource" target="_blank" rel="noopener noreferrer">View source work</a>
+                <div class="edit-remote-presentation-conflict" id="editRemotePresentationConflict" hidden></div>
+                <div class="edit-remote-presentation-files">
+                    <details><summary id="editRemotePresentationHbsMeta">work.hbs</summary><pre><code id="editRemotePresentationHbs"></code></pre></details>
+                    <details><summary id="editRemotePresentationCssMeta">style.css</summary><pre><code id="editRemotePresentationCss"></code></pre></details>
+                    <details><summary id="editRemotePresentationJsMeta">script.js</summary><pre><code id="editRemotePresentationJs"></code></pre></details>
+                </div>
+                <button class="btn" type="button" id="editApplyRemotePresentation" disabled>${hasLocalPresentation ? 'Replace complete presentation' : 'Copy complete presentation'}</button>
+            </div>
+        </div>
+    `;
+}
+
 export function renderConverterSection(config = {}) {
     const catalog = (config?.converterCatalog && typeof config.converterCatalog === 'object') ? config.converterCatalog : null;
     const available = Array.isArray(catalog?.available) ? catalog.available : [];
     const work = (config?.work && typeof config.work === 'object') ? config.work : {};
     const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
-    const selectedId = String(converter.id || '').trim();
+    const selectedId = String(converter.id || available.find((item) => item?.enabled !== false)?.id || '').trim();
+    const converterNode = converter.node && typeof converter.node === 'object' ? converter.node : {};
+    const remoteNodeUrl = String(catalog?.remoteNodeUrl || converterNode.baseUrl || 'https://pageoff.de/index.php').trim();
+    const conversionScope = config?.conversionScope && typeof config.conversionScope === 'object'
+        ? config.conversionScope
+        : {};
+    const sameTypeCount = Math.max(1, Number(conversionScope.sameTypeCount || 1));
+    const scopeMimeType = String(conversionScope.mimeType || config?.mimeType || 'this type').trim();
     const selectedDefinition = selectedId ? (available.find((item) => item?.id === selectedId) || null) : null;
     const defaults = selectedDefinition?.defaults || {};
     const ui = selectedDefinition?.ui && typeof selectedDefinition.ui === 'object' ? selectedDefinition.ui : {};
@@ -211,7 +292,7 @@ export function renderConverterSection(config = {}) {
         ...available.map((item) => {
             const disabled = item.enabled === false;
             const label = `${item.label || item.id}${disabled && item.disabledReason ? ` (${item.disabledReason})` : ''}`;
-            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-outputs="${escapeHtml(Array.isArray(item.outputs) ? item.outputs.join(',') : '')}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+            return `<option value="${escapeHtml(item.id || '')}" data-converter-type="${escapeHtml(item.type || 'converter')}" data-converter-name="${escapeHtml(item.name || '')}" data-converter-label="${escapeHtml(item.label || '')}" data-converter-description="${escapeHtml(item.description || '')}" data-converter-engine="${escapeHtml(item.engine || '')}" data-converter-path="${escapeHtml(item.path || '')}" data-converter-viewer-href="${escapeHtml(item.viewerHref || '')}" data-converter-url="${escapeHtml(item.url || '')}" data-converter-formats="${escapeHtml(Array.isArray(item.formats) ? item.formats.join(',') : '')}" data-converter-accepts="${escapeHtml(JSON.stringify(item.accepts || []))}" data-converter-outputs="${escapeHtml(JSON.stringify(item.outputs || []))}" data-converter-node="${escapeHtml(JSON.stringify(item.node || null))}" data-converter-ui="${escapeHtml(JSON.stringify(item.ui || {}))}" data-converter-defaults="${escapeHtml(JSON.stringify(item.defaults || {}))}"${item.id === selectedId ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
         }),
     ].join('');
     const generated = Array.isArray(config.generatedWorks) ? config.generatedWorks : [];
@@ -238,44 +319,72 @@ export function renderConverterSection(config = {}) {
         <div class="edit-work-fields edit-work-converter">
             <div class="edit-work-fields-header">
                 <div>
-                    <div class="edit-work-fields-title">Converter</div>
-                    <div class="small-note">Creates hidden generated works beside unsupported source files.</div>
+                    <div class="edit-work-fields-title">Convert file</div>
+                    <div class="small-note">Converter found through Poff node. Results return to this folder.</div>
                 </div>
-                <button class="btn btn-secondary" type="button" id="editCreateConverter">New converter</button>
             </div>
             ${unsupportedMessage}
-            <div class="edit-grid edit-grid-cols">
+            <div class="edit-converter-primary">
                 <div>
                     <label class="edit-label" for="edit-converter-id">Converter</label>
                     <select class="form-select" id="edit-converter-id" name="converter_id" form="inlineEditForm">
                         ${options}
                     </select>
                 </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
-                    <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
-                        ${renderSelectOptions(qualityOptions, selectedQuality)}
-                    </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
-                    <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
-                        ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
-                    </select>
-                </div>
-                <div>
-                    <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
-                    <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
-                        ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
-                    </select>
-                </div>
+                <button class="btn" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>${sameTypeCount > 1 ? `Convert all ${sameTypeCount}` : 'Convert'}</button>
             </div>
-            <div class="edit-inline-actions">
-                <button class="btn btn-secondary" type="button" id="editConvertWork"${convertDisabled ? ' disabled' : ''}>Convert</button>
-            </div>
+            ${sameTypeCount > 1 ? `
+            <label class="edit-inline-toggle" for="edit-converter-all-of-type">
+                <input id="edit-converter-all-of-type" type="checkbox" checked>
+                Convert all ${sameTypeCount} <strong>${escapeHtml(scopeMimeType)}</strong> files in this folder
+            </label>
+            ` : ''}
+            <details class="edit-converter-options">
+                <summary>Output and visibility</summary>
+                <div class="edit-grid edit-grid-cols">
+                    <div>
+                        <label class="edit-label" for="edit-converter-quality">${escapeHtml(qualityLabel)}</label>
+                        <select class="form-select" id="edit-converter-quality" name="converter_quality" form="inlineEditForm">
+                            ${renderSelectOptions(qualityOptions, selectedQuality)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-converter-format">${escapeHtml(formatLabel)}</label>
+                        <select class="form-select" id="edit-converter-format" name="converter_format" form="inlineEditForm">
+                            ${renderSelectOptions(formatOptions, selectedFormat, formatOptionLabel)}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="edit-label" for="edit-converter-save-mode">${escapeHtml(saveModeLabel)}</label>
+                        <select class="form-select" id="edit-converter-save-mode" name="converter_save_mode" form="inlineEditForm">
+                            ${renderSelectOptions(saveModeOptions, selectedSaveMode)}
+                        </select>
+                    </div>
+                </div>
+                ${sameTypeCount > 1 ? `
+                <label class="edit-inline-toggle" for="edit-converter-hide-originals">
+                    <input id="edit-converter-hide-originals" type="checkbox" checked>
+                    Show only converted files after conversion
+                </label>
+                <label class="edit-inline-toggle" for="edit-converter-hide-thumbnails">
+                    <input id="edit-converter-hide-thumbnails" type="checkbox" checked>
+                    Hide matching <strong>thumb*</strong> files
+                </label>
+                ` : ''}
+            </details>
+            <details class="edit-converter-options">
+                <summary>Converter node</summary>
+                <div class="edit-converter-node-settings">
+                    <div>
+                        <label class="edit-label" for="edit-converter-node-url">Node URL</label>
+                        <input class="form-input" id="edit-converter-node-url" name="converter_node_url" type="url" value="${escapeHtml(remoteNodeUrl)}">
+                        <div class="small-note">Offers load automatically when URL changes.</div>
+                    </div>
+                    <button class="btn btn-secondary" type="button" id="editCreateConverter">Offer your own converter</button>
+                </div>
+            </details>
             <div class="small-note">
-                Generated works:
-                ${generated.length ? generated.map((item) => `[${escapeHtml(item.name || '')}] [show] [make visible] [delete] [regenerate]`).join(' ') : 'none'}
+                ${generated.length ? `${generated.length} converted ${generated.length === 1 ? 'file' : 'files'} available.` : 'No converted files yet.'}
             </div>
         </div>
     `;

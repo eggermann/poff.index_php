@@ -118,10 +118,26 @@
 
 #appShell.sidebar-collapsed .sidebar-toggle {
     left: 14px;
+    width: auto;
+    min-width: 48px;
+    gap: 0.55rem;
+    padding: 0 0.95rem;
     border-color: rgba(148, 163, 184, 0.28);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.96));
     color: #0f172a;
     box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+}
+
+.sidebar-toggle__label {
+    display: none;
+    font-size: 0.78rem;
+    font-weight: 720;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+#appShell.sidebar-collapsed .sidebar-toggle__label {
+    display: inline;
 }
 
 .sidebar-toggle__icon {
@@ -471,12 +487,14 @@
     pointer-events: auto;
 }
 
-#sidebarLoading {
-    position: fixed;
-    top: 1rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 80;
+.loading-row--menu {
+    position: sticky;
+    top: 0.75rem;
+    z-index: 4;
+    width: calc(100% - 1rem);
+    margin: 0.5rem;
+    border: 1px solid rgba(96, 165, 250, 0.28);
+    background: rgba(15, 23, 42, 0.94);
 }
 
 #navList.nav-list {
@@ -827,5 +845,16 @@
     #appSidebar .app-edit-toggle-wrap {
         margin-bottom: 8px;
         padding: 0.6rem;
+    }
+
+    #appSidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 11;
+        max-width: calc(100vw - 48px);
+    }
+
+    .sidebar-toggle {
+        position: fixed;
     }
 }

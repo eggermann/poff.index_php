@@ -1,4 +1,13 @@
-import { requestEditAuth, requestEditConfig, requestEditDelete, requestEditUpload, requestPromptTemplate } from '../api/edit.js';
+import {
+    clearEditorAuthToken,
+    requestEditAuth,
+    requestEditConfig,
+    requestEditDelete,
+    requestEditUpload,
+    requestMcpRoute,
+    requestPromptTemplate,
+    setEditorAuthToken,
+} from '../api/edit.js';
 import { buildVirtualLayoutPath, getActiveSelection } from '../core/selection.js';
 import { registerEscapeClose, registerEscapeCloseDetails } from '../core/escape-stack.js';
 import { bindPromptWindow } from './prompt.js';
@@ -10,6 +19,16 @@ import { buildLayoutPayload, createLayoutNameForPreset } from './controller/layo
 import { getAddWorkTargetPath, getContentTargetPath, getEditTargetPath } from './controller/paths.js';
 import { createPanelActions } from './controller/panel-actions.js';
 import { setStatusMessage } from './status.js';
+
+function buildPublicPoffWorkUrl(path, isFile = false) {
+    const currentUrl = new URL(window.location.href);
+    const url = new URL(window.location.pathname, currentUrl.origin);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('view', '1');
+    url.searchParams.set(isFile ? 'file' : 'path', String(path || '.'));
+    return url.toString();
+}
 
 export function createEditController({ elements, context, editRequested }) {
     const {
@@ -238,6 +257,7 @@ export function createEditController({ elements, context, editRequested }) {
                 path: getEditTargetPath(selection),
                 intent: 'logout',
             });
+            clearEditorAuthToken();
             if (data?.auth) {
                 updateAuthState(data.auth);
             }
@@ -261,6 +281,14 @@ export function createEditController({ elements, context, editRequested }) {
             }
 
             if (editRequested) {
+                const externalSubmissionsEnabled = currentPoffConfig?.externalSubmissions?.enabled === true;
+                if (!authState.canEdit && !externalSubmissionsEnabled) {
+                    if (editAuthDetails) {
+                        editAuthDetails.open = true;
+                    }
+                    setStatusMessage(editAuthStatus, 'This node is not accepting external work submissions.');
+                    return;
+                }
                 let attempts = 0;
                 const maxAttempts = 24;
                 const openWhenReady = () => {
@@ -494,6 +522,9 @@ export function createEditController({ elements, context, editRequested }) {
                 if (data?.auth) {
                     updateAuthState(data.auth);
                 }
+                if (typeof data?.authToken === 'string' && data.authToken.trim() !== '') {
+                    setEditorAuthToken(data.authToken);
+                }
                 if (!data || data.allowed === false || !data.auth?.authenticated) {
                     syncEditToggle();
                     syncAuthDisclosure(true, data);
@@ -660,9 +691,50 @@ export function createEditController({ elements, context, editRequested }) {
             onSubmit: panelActions.onSubmit,
             onToggleDrawer: panelActions.onToggleDrawer,
             onOpenLayoutPage: () => panelActions.onOpenLayoutPage(buildVirtualLayoutPath),
-            onDeleteTarget: panelActions.onDeleteTarget,
             onConvertWork: panelActions.onConvertWork,
             onCreateConverter: panelActions.onCreateConverter,
+            onLoadConverterNode: async ({ nodeUrl, statusEl }) => {
+                if (!nodeUrl) {
+                    setStatusMessage(statusEl, 'Enter a Poff node URL.');
+                    return;
+                }
+                const selection = getActiveSelection();
+                const sourcePath = getEditTargetPath(selection);
+                setStatusMessage(statusEl, 'Loading remote converter offers...');
+                let remote = null;
+                try {
+                    remote = await requestMcpRoute('remote-converters', {
+                        path: sourcePath,
+                        nodeUrl,
+                        mimeType: String(editConfig?.mimeType || '').trim(),
+                        kind: String(editConfig?.kind || '').trim(),
+                        extension: sourcePath.includes('.') ? sourcePath.split('.').pop() : '',
+                    });
+                } catch (error) {
+                    setStatusMessage(statusEl, error?.message || 'Remote Poff node unavailable.');
+                    return;
+                }
+                if (!remote || remote.ok === false || remote.error) {
+                    setStatusMessage(statusEl, remote?.error || 'Remote Poff node unavailable.');
+                    return;
+                }
+                const catalog = editConfig?.converterCatalog && typeof editConfig.converterCatalog === 'object'
+                    ? editConfig.converterCatalog
+                    : {};
+                editConfig.converterCatalog = {
+                    ...catalog,
+                    remoteNodeUrl: nodeUrl,
+                    available: Array.isArray(remote.available) ? remote.available : [],
+                };
+                renderEditUI(editConfig, status);
+                setStatusMessage(
+                    document.getElementById('editInlineStatus'),
+                    `Loaded ${Array.isArray(remote.available) ? remote.available.length : 0} converter offers from ${remote?.node?.id || nodeUrl}.`,
+                    true
+                );
+            },
+            onInspectRemotePresentation: panelActions.onInspectRemotePresentation,
+            onApplyRemotePresentation: panelActions.onApplyRemotePresentation,
             onResetFolderWork: panelActions.onResetFolderWork,
             onReturnToWork: panelActions.onReturnToWork,
             onSubmitLayout: panelActions.onSubmitLayout,
@@ -671,6 +743,30 @@ export function createEditController({ elements, context, editRequested }) {
             onCreateBlankFile: panelActions.onCreateBlankFile,
             onCreateFolder: panelActions.onCreateFolder,
             onCreateLink: panelActions.onCreateLink,
+            onImportRemote: panelActions.onImportRemote,
+            onRegisterPoff: async ({ statusEl }) => {
+                const selection = getActiveSelection();
+                const path = getEditTargetPath(selection);
+                setStatusMessage(statusEl, 'Registering with Poff...');
+                const result = await requestMcpRoute('register-node', {
+                    path,
+                    pageUrl: buildPublicPoffWorkUrl(path, false),
+                });
+                if (!result || result.ok === false || result.error) {
+                    throw new Error(result?.error || 'Poff registration failed.');
+                }
+                const filterText = Array.isArray(result.categories) && result.categories.length
+                    ? ` Filters: ${result.categories.join(', ')}.`
+                    : '';
+                setStatusMessage(
+                    statusEl,
+                    result.pendingApproval
+                        ? `Registration submitted for approval.${filterText}`
+                        : `Registered with Poff.${filterText}`,
+                    true
+                );
+                return result;
+            },
             onChangePassword: panelActions.onChangePassword,
         });
 

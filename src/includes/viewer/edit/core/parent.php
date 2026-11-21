@@ -142,6 +142,10 @@ function cmsSyncParentTreeItemMeta(string $rootDir, string $subjectRelativePath,
             $item['title'] = $config['title'];
             $changed = true;
         }
+        if (array_key_exists('description', $config) && is_string($config['description'])) {
+            $item['description'] = $config['description'];
+            $changed = true;
+        }
         $item['type'] = $subjectType;
         break;
     }

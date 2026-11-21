@@ -1,0 +1,38 @@
+{
+  "type": "converter",
+  "name": "convert-pageoff-remote-image",
+  "label": "Convert Pageoff Remote Image",
+  "description": "Remote image converter demo for TIFF-to-PNG workflow backed by a PHP endpoint.",
+  "accepts": ["image/tiff", "image/*"],
+  "outputs": ["image/png", "image/jpeg", "image/webp"],
+  "engine": "remote-node",
+  "url": "https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-image",
+  "remote": {
+    "nodeId": "pageoff",
+    "publicUrl": "https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-image",
+    "endpoint": "https://pageoff.de/worktypes/templates/converter/convert-pageoff-remote-image/converter.php"
+  },
+  "defaults": {
+    "format": "png",
+    "quality": "default",
+    "saveMode": "new-hidden-work",
+    "hiddenByDefault": true
+  },
+  "ui": {
+    "format": {
+      "type": "select",
+      "label": "Output format",
+      "options": ["png", "jpeg", "webp"]
+    },
+    "quality": {
+      "type": "select",
+      "label": "Quality",
+      "options": ["preview", "default", "archival", "small-web"]
+    },
+    "saveMode": {
+      "type": "select",
+      "label": "Save mode",
+      "options": ["new-hidden-work", "temporary-preview-only"]
+    }
+  }
+}

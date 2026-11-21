@@ -6,6 +6,12 @@
   "accepts": ["text/plain", "text/*", "application/json"],
   "outputs": ["text/html", "text/plain"],
   "engine": "remote-node",
+  "url": "https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-text",
+  "remote": {
+    "nodeId": "pageoff",
+    "publicUrl": "https://pageoff.de/?edit=true#/converter/convert-pageoff-remote-text",
+    "endpoint": "https://pageoff.de/worktypes/templates/converter/convert-pageoff-remote-text/converter.php"
+  },
   "defaults": {
     "format": "html",
     "quality": "default",

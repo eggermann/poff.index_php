@@ -9,7 +9,7 @@ $tempDir = sys_get_temp_dir() . '/poff-link-test-' . bin2hex(random_bytes(4));
 mkdir($tempDir, 0777, true);
 
 file_put_contents($tempDir . '/sample.url', "[InternetShortcut]\nURL=https://example.com/\n");
-file_put_contents($tempDir . '/sample.webloc', '<?xml version="1.0"?><plist><dict><key>URL</key><string>https://example.org/</string></dict></plist>');
+file_put_contents($tempDir . '/sample.webloc', '<?xml version="1.0"?><plist><dict><key>URL</key><string>https://example.org/?first=one&amp;second=two</string></dict></plist>');
 file_put_contents($tempDir . '/sample.mov', str_repeat('x', 1024));
 
 $url = extractLinkFileUrl($tempDir . '/sample.url');
@@ -21,8 +21,8 @@ if ($url !== 'https://example.com/') {
     exit(1);
 }
 
-if ($webloc !== 'https://example.org/') {
-    fwrite(STDERR, "Expected webloc link extraction to succeed." . PHP_EOL);
+if ($webloc !== 'https://example.org/?first=one&second=two') {
+    fwrite(STDERR, "Expected webloc link extraction to decode XML entities." . PHP_EOL);
     exit(1);
 }
 

@@ -13,6 +13,7 @@ require_once __DIR__ . '/../src/includes/viewer/edit.php';
 $rootDir = sys_get_temp_dir() . '/poff-upload-work-folder-' . bin2hex(random_bytes(4));
 mkdir($rootDir, 0777, true);
 file_put_contents($rootDir . '/original.txt', 'original');
+mkdir($rootDir . '/Original-Work', 0777, true);
 
 $target = cmsResolveUploadTargetDir($rootDir, [
     'saveTarget' => 'work-folder',
@@ -39,7 +40,7 @@ foreach (($folderConfig['tree'] ?? []) as $item) {
 
 $checks = [
     'createdWorkFolder' => !empty($target['createdWorkFolder']),
-    'folderName' => $folderName === 'Original-Work',
+    'folderName' => $folderName === 'Original-Work-2',
     'hasNote' => is_file((string) $target['dir'] . '/note.txt'),
     'hasOriginalFullview' => $originalItem !== null,
     'originalPath' => (string) ($originalItem['path'] ?? '') === '?view=1&file=original.txt',

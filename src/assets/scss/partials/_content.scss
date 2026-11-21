@@ -24,12 +24,12 @@
     scroll-margin-top: 16px;
 }
 
-#iframeLoading {
-    position: fixed;
-    top: 4rem;
+.loading-row--content {
+    position: absolute;
+    top: 1rem;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 80;
+    z-index: 8;
 }
 
 .prompt-dock {
@@ -69,6 +69,11 @@
     min-height: 100%;
     box-sizing: border-box;
     width: 100%;
+}
+
+.content-frame.content-frame-loading > .viewer {
+    opacity: 0.56;
+    transition: opacity 0.16s ease;
 }
 
 .content-frame > .viewer .poff-default-layout__main {

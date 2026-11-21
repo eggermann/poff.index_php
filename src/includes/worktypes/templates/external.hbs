@@ -1,4 +1,4 @@
-<div class="external-work external-work--embedded" style="border: 2px solid #dc2626; border-radius: 16px; padding: 16px; background: rgba(220, 38, 38, 0.04);">
+<div class="external-work external-work--embedded" style="border: 2px solid #0f766e; border-radius: 16px; padding: 16px; background: rgba(13, 148, 136, 0.05);">
     <style>
         .external-work--embedded {
             display: grid;
@@ -18,7 +18,28 @@
             font-size: 0.92rem;
             font-weight: 600;
             letter-spacing: 0.02em;
-            color: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .external-work--embedded__identity {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-bottom: 0.3rem;
+            color: #0f766e;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .external-work--embedded__identity::before {
+            content: '';
+            width: 0.45rem;
+            height: 0.45rem;
+            border-radius: 50%;
+            background: #14b8a6;
+            box-shadow: 0 0 0 0.2rem rgba(20, 184, 166, 0.16);
         }
 
         .external-work--embedded__direct-link {
@@ -27,9 +48,9 @@
             gap: 0.45rem;
             padding: 0.45rem 0.8rem;
             border-radius: 999px;
-            border: 1px solid rgba(248, 113, 113, 0.45);
+            border: 1px solid rgba(45, 212, 191, 0.55);
             background: rgba(15, 23, 42, 0.86);
-            color: #fecaca;
+            color: #ccfbf1;
             text-decoration: none;
             font-size: 0.8rem;
             line-height: 1;
@@ -75,13 +96,14 @@
     </style>
     <div class="external-work--embedded__toolbar">
         <div>
+            <div class="external-work--embedded__identity">External work · live</div>
             <div class="external-work--embedded__title">{{title}}</div>
             {{#if external.relation}}
                 <div class="small-note">Generated relation: {{external.relation}}</div>
             {{/if}}
         </div>
         {{#if linkUrl}}
-            <a class="external-work--embedded__direct-link" href="{{linkUrl}}" target="{{work.target}}" rel="noopener noreferrer">Direct link</a>
+            <a class="external-work--embedded__direct-link" href="{{linkUrl}}" target="{{work.target}}" rel="noopener noreferrer">Visit source</a>
         {{/if}}
     </div>
     {{#if renderedHtml}}
@@ -90,7 +112,7 @@
         </div>
     {{else}}
         {{#if previewUrl}}
-            <iframe class="external-work__body external-work__body--iframe min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}"></iframe>
+            <iframe class="external-work__body external-work__body--iframe min-h-screen w-full rounded-md bg-slate-300" src="{{previewUrl}}" title="{{title}}" allow="autoplay; encrypted-media; picture-in-picture"></iframe>
         {{else}}
             {{#if external.resultWork.srcUrl}}
                 <figure class="external-work__body external-work__body--generated">

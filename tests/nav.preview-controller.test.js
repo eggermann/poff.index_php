@@ -107,6 +107,7 @@ function loadPreviewController(overrides = {}) {
     console,
     URL,
     URLSearchParams,
+    AbortController,
     HTMLElement: FakeHTMLElement,
     HTMLStyleElement: FakeHTMLStyleElement,
     HTMLLinkElement: FakeHTMLLinkElement,
@@ -218,6 +219,65 @@ module.exports = {
 }
 
 describe('preview controller', () => {
+  test('reuses a rendered preview response until a refresh is requested', async () => {
+    const fetchMock = jest.fn(async (url) => ({
+      ok: true,
+      url: `http://example.test${url}`,
+      text: async () => '<!doctype html><html><head></head><body><div class="viewer"></div></body></html>',
+    }));
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({ fetch: fetchMock });
+    const controller = createPreviewController({
+      contentFrame: new FakeHTMLElement(),
+      iframeLoading: new FakeHTMLElement(),
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return { previewPath: '', previewIsFile: false };
+      },
+    });
+
+    await controller.renderPreview('/?view=1&path=work');
+    await controller.renderPreview('/?view=1&path=work');
+    await controller.renderPreview('/?view=1&path=work&_refresh=1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('aborts an obsolete preview request when navigation changes', async () => {
+    const requests = [];
+    const fetchMock = jest.fn((url, options = {}) => new Promise((resolve, reject) => {
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      options.signal?.addEventListener('abort', () => reject(abortError), { once: true });
+      requests.push({ url, options, resolve });
+    }));
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({ fetch: fetchMock });
+    const contentFrame = new FakeHTMLElement();
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: new FakeHTMLElement(),
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return { previewPath: '', previewIsFile: false };
+      },
+    });
+
+    const firstRequest = controller.renderPreview('/slow-preview');
+    const secondRequest = controller.renderPreview('/latest-preview');
+
+    expect(requests[0].options.signal.aborted).toBe(true);
+    requests[1].resolve({
+      ok: true,
+      url: 'http://example.test/latest-preview',
+      text: async () => '<!doctype html><html><head></head><body><div id="contentFrame"><div class="viewer"></div></div></body></html>',
+    });
+
+    await Promise.all([firstRequest, secondRequest]);
+
+    expect(requests).toHaveLength(2);
+  });
+
   test('renders fetched preview HTML without an iframe', async () => {
     const { createPreviewController } = loadPreviewController();
     const contentFrame = {
@@ -405,6 +465,61 @@ describe('preview controller', () => {
     expect(contentFrame.innerHTML).not.toContain('<iframe');
     expect(contentFrame.children).toHaveLength(1);
     expect(contentFrame.children[0].textContent).toContain('poffConverterPayloadProvider');
+  });
+
+  test('executes layout scripts for same-origin previews', async () => {
+    const { createPreviewController, FakeHTMLElement } = loadPreviewController({
+      DOMParser: class {
+        parseFromString() {
+          const layout = new FakeHTMLElement('section', '<button data-next>Next</button>');
+          layout.setAttribute('class', 'cinema');
+          const viewer = new FakeHTMLElement('div', layout.outerHTML);
+          viewer.setAttribute('class', 'viewer');
+          return {
+            head: { children: [] },
+            querySelector(selector) {
+              if (selector === '#contentFrame > .viewer' || selector === '.viewer') {
+                return viewer;
+              }
+              return null;
+            },
+            querySelectorAll(selector) {
+              if (selector === 'script') {
+                const script = new FakeHTMLElement('script');
+                script.setAttribute('src', '/player/.layout/script.js');
+                return [script];
+              }
+              return [];
+            },
+            body: new FakeHTMLElement('body', viewer.outerHTML, {
+              '.viewer': viewer,
+            }),
+          };
+        }
+      },
+      fetch: async (url, options) => ({
+        ok: true,
+        url: `http://example.test${url}`,
+        text: async () => '<html></html>',
+        options,
+      }),
+    });
+    const contentFrame = new FakeHTMLElement();
+    const controller = createPreviewController({
+      contentFrame,
+      iframeLoading: new FakeHTMLElement(),
+      initialQueryPath: '',
+      navigateToPath() {},
+      setLoadingVisible() {},
+      getCurrentSelection() {
+        return null;
+      },
+    });
+
+    await controller.renderPreview('/?view=1&path=player');
+
+    expect(contentFrame.children).toHaveLength(1);
+    expect(contentFrame.children[0].src).toBe('http://example.test/player/.layout/script.js');
   });
 
   test('uses a local preview fallback message instead of remote snapshot text for same-origin responses', async () => {

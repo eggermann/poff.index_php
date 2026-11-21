@@ -14,14 +14,13 @@ export function renderLayoutModeSummary({ displayMode, wrapperSourceLabel, secti
         <div class="edit-layout-launch edit-layout-summary">
             <div class="edit-layout-copy">
                 <div class="edit-layout-title">Layout</div>
-                <div class="edit-layout-summary-line">Editing source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
-                <div class="edit-layout-summary-line">Current mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
-                <div class="edit-layout-summary-line">Inner preview content source: <code id="edit-layout-section-source-preview">${escapeHtml(sectionSourceLabel)}</code></div>
-                <div class="edit-layout-summary-line">Prompt context separates <code>root.title</code> for the layout shell from <code>work.title</code> for the nested item.</div>
+                <div class="edit-layout-summary-line">Source: <code id="edit-layout-source-preview">${escapeHtml(wrapperSourceLabel)}</code></div>
+                <div class="edit-layout-summary-line">Mode: <code id="edit-layout-mode-preview">${escapeHtml(displayMode)}</code></div>
+                <div class="edit-layout-summary-line">Content template: <code id="edit-layout-section-source-preview">${escapeHtml(sectionSourceLabel)}</code></div>
             </div>
             <div class="edit-inline-actions edit-layout-header-actions">
                 <button class="btn btn-secondary" type="button" id="editLayoutBack">Back to work</button>
-                <button class="btn btn-secondary" type="button" id="editLayoutMore">More...</button>
+                <button class="btn btn-secondary" type="button" id="editLayoutMore">Advanced</button>
             </div>
         </div>
     `;
@@ -74,7 +73,7 @@ export function renderSharedLayoutOptions(sharedLayouts = [], selectedName = '',
 
 function renderLayoutPresetSelect(layoutState, sharedLayouts, sharedLayoutName) {
     return `
-        <label class="edit-label" for="edit-layout-preset">Layout select</label>
+        <label class="edit-label" for="edit-layout-preset">Layout source</label>
         <select class="form-select" id="edit-layout-preset" name="layout_preset">
             ${LAYOUT_PRESET_OPTIONS.map((option) => `
                 <option value="${option.value}" ${layoutState.preset === option.value ? 'selected' : ''}>${option.label}</option>
@@ -148,7 +147,7 @@ export function renderEditLayoutPanelHtml({
 
     return `
         <h3 class="edit-panel-title">Edit layout (${subjectLabel})</h3>
-        <div class="small-note">Virtual <code>.layout</code> target for this ${escapeHtml(subjectLabel)}. The preview stays on the current work while you edit the wrapper.</div>
+        <div class="small-note">Choose where this ${escapeHtml(subjectLabel)} gets its visual wrapper. Preview stays on the current work.</div>
         <div class="edit-status" id="editLayoutStatus"></div>
         <form id="editLayoutPanelForm" class="edit-inline edit-layout-panel">
             ${renderLayoutModeSummary({ displayMode, wrapperSourceLabel, sectionSourceLabel })}
@@ -160,7 +159,7 @@ export function renderEditLayoutPanelHtml({
                     <div class="edit-layout-title" id="edit-layout-primary-title"></div>
                     <div class="small-note" id="edit-layout-primary-hint"></div>
                     <div class="edit-inline-actions edit-layout-select-actions">
-                        <button class="btn" type="submit">Save layout</button>
+                        <button class="btn" type="submit">Save changes</button>
                     </div>
                 </div>
             </div>
@@ -173,16 +172,16 @@ export function renderEditLayoutPanelHtml({
             sectionTarget,
         })}
         <details class="edit-layout-advanced edit-layout-manual" id="editLayoutManual" ${sectionWasLocal ? 'open' : ''}>
-            <summary class="edit-layout-advanced-summary">More layout files</summary>
+            <summary class="edit-layout-advanced-summary">Template files (advanced)</summary>
             <div class="edit-layout-overlay-grid">
                 <div class="edit-layout-meta-card">
                     <div class="edit-layout-meta-title">Sources</div>
                     <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
-                    <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
+                    <div class="small-note">Built-in default: <code>poff-layout.hbs</code></div>
                     <div class="small-note">Layout target: <code>${escapeHtml(originalLabel)}</code></div>
                     <div class="small-note">Custom wrapper target: <code>${escapeHtml(wrapperTarget)}</code></div>
                     <div class="small-note">Inner content source: <code>${escapeHtml(sectionSourceLabel)}</code></div>
-                    <div class="small-note">Advanced local override target: <code>${escapeHtml(sectionTarget)}</code></div>
+                    <div class="small-note">Content override: <code>${escapeHtml(sectionTarget)}</code></div>
                 </div>
             </div>
             ${renderLayoutEditorFields({
@@ -213,7 +212,7 @@ export function renderEditLayoutOverlayHtml({
             <div class="drawer-header">
                 <div>
                     <h4 class="drawer-title">Layout overlay</h4>
-                    <div class="small-note">Inherited layouts open as one virtual layout target until a real local <code>.layout</code> exists.</div>
+                    <div class="small-note">Inherited layouts stay read-only until a local <code>.layout</code> exists.</div>
                 </div>
                 <button type="button" class="drawer-close" id="editLayoutOverlayClose">&times;</button>
             </div>
@@ -229,14 +228,14 @@ export function renderEditLayoutOverlayHtml({
                     <div class="edit-layout-meta-card">
                         <div class="edit-layout-meta-title">Inheritance</div>
                         <div class="small-note">Inherited parent layout: <code>${escapeHtml(inheritedLayoutLabel)}</code></div>
-                        <div class="small-note">PHP built-in: <code>poff-layout.hbs</code> from the bundled templates</div>
+                        <div class="small-note">Built-in default: <code>poff-layout.hbs</code></div>
                         <div class="small-note">Wrapped inner content source: <code>${escapeHtml(sectionSourceLabel)}</code></div>
                     </div>
                     <div class="edit-layout-meta-card">
                         <div class="edit-layout-meta-title">Targets</div>
-                        <div class="small-note">Virtual/original target: <code>${escapeHtml(originalLabel)}</code></div>
-                        <div class="small-note">Custom layout target: <code>${escapeHtml(wrapperTarget)}</code></div>
-                        <div class="small-note">Advanced inner override target: <code>${escapeHtml(sectionTarget)}</code></div>
+                        <div class="small-note">Current source: <code>${escapeHtml(originalLabel)}</code></div>
+                        <div class="small-note">Local override: <code>${escapeHtml(wrapperTarget)}</code></div>
+                        <div class="small-note">Content override: <code>${escapeHtml(sectionTarget)}</code></div>
                     </div>
                 </div>
 
@@ -247,7 +246,7 @@ export function renderEditLayoutOverlayHtml({
                 })}
 
                 <div class="edit-inline-actions">
-                    <button class="btn" type="submit">Save layout</button>
+                    <button class="btn" type="submit">Save changes</button>
                     <button class="btn btn-secondary" type="button" id="editLayoutOverlayCancel">Close</button>
                 </div>
             </form>

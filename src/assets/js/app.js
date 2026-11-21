@@ -38,25 +38,33 @@ const editController = createEditController({
     editRequested,
 });
 
-const navigation = initNavigation({
+let navigation = null;
+
+bindSidebarToggle({
+    ...elements,
+    initiallyOpen: editRequested,
+    onStateChange(isOpen) {
+        if (isOpen) {
+            navigation?.refreshCurrentSidebar();
+        }
+    },
+});
+
+navigation = initNavigation({
     elements,
     editQuery,
     currentPathForIframe,
     renderFolderMeta: editController.renderFolderMeta,
     initEditMode: editController.initEditMode,
     getPreviewParams: editController.getPreviewParams,
+    isSidebarOpen: () => !elements.appShell?.classList.contains('sidebar-collapsed'),
 });
 
 editController.setPreviewRefreshHandler(() => {
     navigation.refreshCurrentPreviewLocation();
 });
 
-const sidebarController = bindSidebarToggle(elements);
-
 document.addEventListener('DOMContentLoaded', async () => {
-    if (sidebarController) {
-        sidebarController.syncSidebarState(true);
-    }
     editController.syncEditToggle();
     editController.bindEditToggle();
     editController.bindAddWorkButton();

@@ -1,4 +1,4 @@
-import { requestEditAuth, requestEditDelete, requestEditReset, requestEditUpload, requestMcpRoute } from '../../api/edit.js';
+import { requestEditAuth, requestEditReset, requestEditUpload, requestMcpRoute } from '../../api/edit.js';
 import { buildConverterSaveAs, resolveConverterPayloadProvider, readMediaConfigFromElements } from './media-config.js';
 import { materializeWorkFields } from '../work-fields.js';
 import { setStatusMessage } from '../status.js';
@@ -29,6 +29,33 @@ function formatStoredNames(uploaded = []) {
         return `${names[0]} and ${names[1]}`;
     }
     return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+}
+
+function buildRemoteExportUrl(sourceUrl) {
+    const url = new URL(String(sourceUrl || '').trim());
+    if (url.searchParams.get('route') === 'export-content') {
+        return url.toString();
+    }
+
+    let sourcePath = url.searchParams.get('path') || '';
+    const sourceFile = url.searchParams.get('file') || '';
+    if (!sourcePath && sourceFile) {
+        const parts = sourceFile.split('/').filter(Boolean);
+        parts.pop();
+        sourcePath = parts.join('/');
+    }
+    if (!sourcePath && url.hash) {
+        sourcePath = decodeURIComponent(url.hash.replace(/^#\/?/, '')).replace(/^\/+/, '');
+    }
+
+    url.hash = '';
+    url.search = '';
+    url.searchParams.set('mcp', '1');
+    url.searchParams.set('route', 'export-content');
+    if (sourcePath) {
+        url.searchParams.set('path', sourcePath);
+    }
+    return url.toString();
 }
 
 export function createPanelActions({
@@ -128,6 +155,17 @@ export function createPanelActions({
                 title: (elements.title?.value || '').trim(),
                 description: (elements.description?.value || '').trim(),
             };
+            if (elements.external_submissions_enabled) {
+                payload.externalSubmissions = {
+                    enabled: !!elements.external_submissions_enabled.checked,
+                    whitelistEnabled: !!elements.external_submissions_whitelist_enabled?.checked,
+                    whitelist: String(elements.external_submissions_whitelist?.value || '')
+                        .split(/\r?\n|,/)
+                        .map((item) => item.trim())
+                        .filter(Boolean),
+                    maxPending: Number(elements.external_submissions_max?.value || 5),
+                };
+            }
             if (mediaWork && typeof mediaWork === 'object' && Object.keys(mediaWork).length > 0) {
                 payload.work = materializeWorkFields(mediaWork);
             }
@@ -148,28 +186,49 @@ export function createPanelActions({
             syncDrawerVisibility();
             window.location.hash = `#/${nextPath}`;
         },
-        onDeleteTarget: async ({ statusEl }) => {
+        onInspectRemotePresentation: async ({ sourceUrl }) => {
             const selection = getSelection();
             const targetPath = getEditTargetPath(selection);
-            if (!targetPath) {
-                throw new Error('Delete target unavailable.');
+            if (!targetPath || !sourceUrl) {
+                throw new Error('Enter a remote file-work URL.');
             }
-            const data = await requestEditDelete({
+            const data = await requestMcpRoute('remote-work-presentation', {
                 path: targetPath,
-                return: selection.previewPath || selection.path || '',
+                url: sourceUrl,
+                action: 'inspect',
             });
-            if (!data || data.error) {
-                throw new Error(data?.error || 'Delete failed.');
+            if (!data || data.ok === false || data.error) {
+                throw new Error(data?.error || 'Remote work presentation unavailable.');
             }
-            setDrawerOpen(false);
-            syncDrawerVisibility();
-            setStatusMessage(statusEl, 'Deleted.', true);
-            window.dispatchEvent(new CustomEvent('poff:content-updated'));
-            const nextPath = selection.previewPath ? selection.previewPath.split('/').slice(0, -1).join('/') : '';
-            window.location.hash = nextPath ? `#/${nextPath}` : '';
-            await refreshCurrentEditState(getSelection());
+            return data;
         },
-        onConvertWork: async ({ statusEl, converter }) => {
+        onApplyRemotePresentation: async ({ offer }) => {
+            const selection = getSelection();
+            const targetPath = getEditTargetPath(selection);
+            const sourceUrl = String(offer?.remote?.url || '').trim();
+            if (!targetPath || offer?.compatible !== true || !sourceUrl) {
+                throw new Error('Compatible remote work presentation required.');
+            }
+            const result = await requestMcpRoute('remote-work-presentation', {
+                path: targetPath,
+                url: sourceUrl,
+                action: 'copy',
+                confirmReplace: offer?.localPresentation?.hasPresentation === true,
+            });
+            if (!result || result.ok === false || result.error) {
+                throw new Error(result?.error || 'Copying complete work presentation failed.');
+            }
+            await refreshCurrentEditState(selection, { forcePreviewRefresh: true });
+            return result;
+        },
+        onConvertWork: async ({
+            statusEl,
+            converter,
+            convertAllOfType = false,
+            visibilityMode = 'converted-only',
+            hideThumbnails = true,
+            mimeType = '',
+        }) => {
             const selection = getSelection();
             const sourcePath = getEditTargetPath(selection);
             if (!sourcePath) {
@@ -179,9 +238,45 @@ export function createPanelActions({
                 setStatusMessage(statusEl, 'Choose a converter first.');
                 return;
             }
+            if (convertAllOfType) {
+                const folderPath = sourcePath.split('/').slice(0, -1).join('/');
+                const typeLabel = String(mimeType || 'matching type').trim();
+                setStatusMessage(statusEl, `Converting all ${typeLabel} files...`);
+                const result = await requestMcpRoute('bulk-convert', {
+                    path: folderPath,
+                    mimeType: typeLabel === 'matching type' ? '' : typeLabel,
+                    converter: {
+                        ...converter,
+                        saveMode: 'replace-generated-work',
+                    },
+                    visibilityMode,
+                    hideThumbnails,
+                });
+                if (!result || result.error || result.ok === false) {
+                    throw new Error(result?.error || 'Bulk conversion failed.');
+                }
+                await persistSelectedConverter(selection, converter, statusEl);
+                window.alert(
+                    `OK — ${Number(result.convertedCount || 0)} converted, ${Number(result.hiddenThumbnailCount || 0)} thumbnails hidden, ${Number(result.skippedCount || 0)} skipped, ${Number(result.failedCount || 0)} failed.`
+                );
+                await refreshCurrentEditState(selection);
+                return;
+            }
             setStatusMessage(statusEl, 'Converting...');
             const currentConfig = getEditConfig() && typeof getEditConfig() === 'object' ? getEditConfig() : {};
             const sourceName = sourcePath.split('/').pop() || sourcePath;
+            const sourceUrl = String(converter?.sourceUrl || currentConfig.srcUrl || '').trim();
+            let normalizedSourceUrl = sourceUrl;
+            if (sourceUrl) {
+                try {
+                    const baseHref = typeof window?.location?.href === 'string' && window.location.href
+                        ? window.location.href
+                        : 'http://localhost/';
+                    normalizedSourceUrl = new URL(sourceUrl, baseHref).toString();
+                } catch {
+                    normalizedSourceUrl = sourceUrl;
+                }
+            }
             const payload = {
                 source: {
                     name: sourceName,
@@ -189,7 +284,7 @@ export function createPanelActions({
                     mimeType: currentConfig.mimeType || '',
                     extension: sourceName.includes('.') ? sourceName.split('.').pop() : '',
                     size: currentConfig.size || 0,
-                    srcUrl: currentConfig.srcUrl || '',
+                    srcUrl: normalizedSourceUrl,
                 },
                 converter,
                 target: {
@@ -434,13 +529,14 @@ export function createPanelActions({
             }
             window.dispatchEvent(new CustomEvent('poff:content-updated'));
         },
-        onCreateLink: async ({ source, linkName, linkUrl, saveTarget, closeDialog }) => {
+        onCreateLink: async ({ source, linkName, linkUrl, submissionIntent, saveTarget, closeDialog }) => {
             const selection = getSelection();
             const data = await requestEditUpload(buildAddWorkRequestPayload(selection, {
                 source,
                 linkName,
                 fileName: linkName,
                 linkUrl,
+                submissionIntent,
                 saveTarget,
                 files: [],
             }));
@@ -467,6 +563,40 @@ export function createPanelActions({
                 await refreshCurrentEditState(selection);
                 window.dispatchEvent(new CustomEvent('poff:content-updated'));
             }
+        },
+        onImportRemote: async ({
+            sourceUrl,
+            takeoverMode,
+            destinationName,
+            closeDialog,
+        }) => {
+            const selection = getSelection();
+            const exportUrl = buildRemoteExportUrl(sourceUrl);
+            const data = await requestMcpRoute('import-remote', {
+                path: getAddWorkTargetPath(selection) || getContentTargetPath(selection),
+                url: exportUrl,
+                mode: takeoverMode === 'copy' ? 'copy' : 'follow',
+                destinationName,
+                createPlayer: takeoverMode === 'copy',
+            });
+            if (!data || data.ok === false || data.error) {
+                throw new Error(data?.error || 'Failed to use the remote Poff work.');
+            }
+            closeDialog?.();
+            const inlineStatus = document.getElementById('editInlineStatus');
+            if (inlineStatus) {
+                const message = takeoverMode === 'copy'
+                    ? `Copied ${data.copiedCount || 0} files into ${data.destinationPath || data.destinationName || 'a local folder'}${data.playerCreated ? ' and created a looping player' : ''}.`
+                    : `Added ${data.importedCount || 0} external ${data.importedCount === 1 ? 'work' : 'works'}. Source files and layout stay remote; updates remain live.`;
+                setStatusMessage(inlineStatus, message, true);
+            }
+            if (takeoverMode === 'copy' && data.destinationPath) {
+                window.dispatchEvent(new CustomEvent('poff:content-updated'));
+                window.location.hash = `#/${data.openPath || data.destinationPath}`;
+                return;
+            }
+            await refreshCurrentEditState(selection);
+            window.dispatchEvent(new CustomEvent('poff:content-updated'));
         },
         onChangePassword: async ({ elements, form, statusEl }) => {
             try {

@@ -76,7 +76,7 @@ export function getLayoutState(config) {
             : storage === 'filesystem'
                 ? `Filesystem: ${directory || '.layout'}`
             : storage === 'default'
-                    ? 'Built-in poff-layout'
+                    ? 'Built-in default'
                     : 'Current resolved layout';
         const displayMode = preset === 'shared' || storage === 'shared' || state.source === 'shared'
             ? 'collection-layout'

@@ -82,11 +82,19 @@ trait PoffConfigLayoutViewHelpers
             : '';
         $resolvedDirectory = isset($resolved['directory']) && is_string($resolved['directory']) ? trim($resolved['directory'], "/\\") : '';
         $hasFilesystemLayout = ($resolved['storage'] ?? '') === 'filesystem';
+        $localDirectory = isset($resolved['localDirectory']) && is_string($resolved['localDirectory'])
+            ? trim($resolved['localDirectory'], "/\\")
+            : '';
+        $usesLocalFilesystemDirectory = $hasFilesystemLayout
+            && $localDirectory !== ''
+            && $resolvedDirectory === $localDirectory;
         $usePublicBundleBasePath = in_array($layoutName, [Worktype::defaultLayoutName(), Worktype::filesystemLayoutName()], true)
             && !$hasFilesystemLayout;
-        $basePath = $usePublicBundleBasePath
+        $basePath = $usesLocalFilesystemDirectory
+            ? self::relativeLayoutPath($itemPath, $isFile)
+            : ($usePublicBundleBasePath
             ? ($inheritedDirectory !== '' ? str_replace('\\', '/', $inheritedDirectory) : $publicBundleBasePath)
-            : ($resolvedDirectory !== '' ? str_replace('\\', '/', $resolvedDirectory) : ($publicBundleBasePath !== '' ? $publicBundleBasePath : self::relativeLayoutPath($itemPath, $isFile)));
+            : ($resolvedDirectory !== '' ? str_replace('\\', '/', $resolvedDirectory) : ($publicBundleBasePath !== '' ? $publicBundleBasePath : self::relativeLayoutPath($itemPath, $isFile))));
         $resolved['baseHref'] = self::encodeRelativePath($basePath);
         $sectionBasePath = isset($resolved['sectionDirectory']) && is_string($resolved['sectionDirectory']) && trim($resolved['sectionDirectory']) !== ''
             ? str_replace('\\', '/', trim($resolved['sectionDirectory'], "/\\"))

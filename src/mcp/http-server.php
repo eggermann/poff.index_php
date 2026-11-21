@@ -82,10 +82,13 @@ $server = Server::make()
                 'url' => $args['url'] ?? '',
                 'sourceId' => $args['sourceId'] ?? '',
                 'replace' => (bool) ($args['replace'] ?? false),
+                'mode' => $args['mode'] ?? 'follow',
+                'destinationName' => $args['destinationName'] ?? '',
+                'createPlayer' => (bool) ($args['createPlayer'] ?? false),
             ]);
         },
         name: 'import_remote',
-        description: 'Import a remote export JSON feed into a local folder config as virtual entries. Required: url. Optional: path, sourceId, replace.',
+        description: 'Follow a remote export feed or copy its public files into a local folder. Required: url. Optional: path, sourceId, replace, mode, destinationName, createPlayer.',
         inputSchema: [
             'type' => 'object',
             'properties' => [
@@ -93,6 +96,9 @@ $server = Server::make()
                 'url' => ['type' => 'string', 'description' => 'Public export-content URL to fetch'],
                 'sourceId' => ['type' => 'string', 'description' => 'Optional stable source id used for imported entries'],
                 'replace' => ['type' => 'boolean', 'description' => 'Replace prior imported entries from the same source id before adding the new ones'],
+                'mode' => ['type' => 'string', 'enum' => ['follow', 'copy'], 'description' => 'Follow remote entries or copy their files locally'],
+                'destinationName' => ['type' => 'string', 'description' => 'Folder name for a local copy'],
+                'createPlayer' => ['type' => 'boolean', 'description' => 'Create a looping playlist layout when copied files include videos'],
             ],
             'required' => ['url'],
         ]

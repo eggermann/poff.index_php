@@ -12,6 +12,18 @@ require_once __DIR__ . '/../src/includes/viewer/edit.php';
 
 $targetDir = sys_get_temp_dir() . '/poff-upload-link-' . bin2hex(random_bytes(4));
 mkdir($targetDir, 0777, true);
+file_put_contents($targetDir . '/poff.config.json', json_encode([
+    'folderName' => basename($targetDir),
+    'slug' => basename($targetDir),
+    'type' => 'folder',
+    'tree' => [],
+    'externalSubmissions' => [
+        'enabled' => true,
+        'whitelistEnabled' => true,
+        'whitelist' => ['remote.example'],
+        'maxPending' => 3,
+    ],
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 $_SERVER['REQUEST_METHOD'] = 'POST';
 
 cmsHandleEditUploadAction([
@@ -24,4 +36,10 @@ cmsHandleEditUploadAction([
     ],
     'targetDir' => $targetDir,
     'targetFile' => null,
+    'externalSubmissionSettings' => [
+        'enabled' => true,
+        'whitelistEnabled' => true,
+        'whitelist' => ['remote.example'],
+        'maxPending' => 3,
+    ],
 ]);

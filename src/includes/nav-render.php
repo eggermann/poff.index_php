@@ -82,21 +82,6 @@ function cmsNavIcon(string $name): string
     };
 }
 
-function cmsNavBadgeMarkup(bool $isHidden, bool $isPendingApproval, bool $isApprovedExternal): string
-{
-    if ($isPendingApproval) {
-        return '<span class="nav-link-badge nav-link-badge-pending">new</span>';
-    }
-    if ($isHidden) {
-        return '<span class="nav-link-badge">hidden</span>';
-    }
-    if ($isApprovedExternal) {
-        return '<span class="nav-link-badge nav-link-badge-approved">external</span>';
-    }
-
-    return '';
-}
-
 function cmsNavPathLooksLikeConverter(string $path): bool
 {
     $normalized = trim(str_replace('\\', '/', $path), '/');
@@ -288,7 +273,8 @@ function cmsRenderNavListMarkup(array $context): string
             $isHidden = isset($item['visible']) && $item['visible'] === false;
             $approvalStatus = trim((string) ($item['approvalStatus'] ?? ''));
             $isPendingApproval = $approvalStatus === 'pending';
-            $isApprovedExternal = !empty($item['externalSubmission']) && $approvalStatus === 'approved';
+            $isApprovedExternal = !empty($item['externalWork'])
+                || (!empty($item['externalSubmission']) && $approvalStatus === 'approved');
             if ($isPendingApproval && !$navEditorAuthenticated) {
                 continue;
             }

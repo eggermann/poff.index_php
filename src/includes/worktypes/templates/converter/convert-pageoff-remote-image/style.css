@@ -1,0 +1,51 @@
+.poff-image-converter {
+  display: grid;
+  gap: 1rem;
+}
+
+.poff-image-converter__panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(124, 162, 255, 0.28);
+  border-radius: 1rem;
+  background: rgba(14, 22, 42, 0.88);
+  color: #e5eefb;
+}
+
+.poff-image-converter__meta {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.poff-image-converter__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.poff-image-converter__summary {
+  margin: 0;
+  color: #8da7cb;
+}
+
+.poff-image-converter__preview {
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.poff-image-converter__image {
+  display: block;
+  width: 100%;
+  max-width: 20rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.poff-image-converter__caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #9eb3d5;
+  font-size: 0.9rem;
+}

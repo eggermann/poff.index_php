@@ -1,0 +1,365 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../../includes/Converter.php';
+
+function mcpConverterNodeRouteUrl(string $nodeUrl, string $route): string
+{
+    $trimmed = trim($nodeUrl);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    $parts = parse_url($trimmed);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return '';
+    }
+
+    $scheme = strtolower((string) $parts['scheme']);
+    $host = (string) $parts['host'];
+    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+    $path = (string) ($parts['path'] ?? '/index.php');
+    if ($path === '' || str_ends_with($path, '/')) {
+        $path .= 'index.php';
+    }
+
+    return $scheme . '://' . $host . $port . $path
+        . '?mcp=1&route=' . rawurlencode($route);
+}
+
+function mcpConverterCurrentNodeUrl(): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
+    $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $script = (string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php');
+    return $host !== '' ? $scheme . '://' . $host . $script : $script;
+}
+
+function mcpConverterOfferDefinition(array $definition): array
+{
+    return [
+        'id' => (string) ($definition['id'] ?? ''),
+        'type' => 'converter',
+        'name' => (string) ($definition['name'] ?? ''),
+        'label' => (string) ($definition['label'] ?? ($definition['name'] ?? '')),
+        'description' => (string) ($definition['description'] ?? ''),
+        'accepts' => array_values((array) ($definition['accepts'] ?? [])),
+        'outputs' => array_values((array) ($definition['outputs'] ?? [])),
+        'formats' => array_values((array) ($definition['formats'] ?? [])),
+        'defaults' => is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [],
+        'ui' => is_array($definition['ui'] ?? null) ? $definition['ui'] : [],
+    ];
+}
+
+function handleConverterOffers(array $opts): array
+{
+    $rootDir = (string) ($opts['rootDir'] ?? '');
+    $input = is_array($opts['input'] ?? null) ? $opts['input'] : mcpReadRequestData();
+    $mimeType = strtolower(trim((string) ($input['mimeType'] ?? '')));
+    $kind = strtolower(trim((string) ($input['kind'] ?? '')));
+    $extension = strtolower(trim((string) ($input['extension'] ?? ''), '. '));
+    $nodeUrl = trim((string) ($opts['nodeUrl'] ?? mcpConverterCurrentNodeUrl()));
+    $nodeId = trim((string) ($opts['nodeId'] ?? parse_url($nodeUrl, PHP_URL_HOST) ?? 'poff-node'));
+
+    $available = array_values(array_filter(
+        Converter::availableFor($mimeType, $kind, $extension, $rootDir),
+        static fn(array $definition): bool => Converter::canOffer($definition)
+    ));
+
+    return [
+        'ok' => true,
+        'route' => 'converter-offers',
+        'protocol' => 'poff-converter/1',
+        'node' => [
+            'id' => $nodeId !== '' ? $nodeId : 'poff-node',
+            'url' => $nodeUrl,
+            'endpoint' => mcpConverterNodeRouteUrl($nodeUrl, 'convert-offered'),
+        ],
+        'converters' => array_map('mcpConverterOfferDefinition', $available),
+    ];
+}
+
+function mcpConverterCatalogRequest(string $url, array $payload): array
+{
+    $override = $GLOBALS['__poff_converter_catalog_post'] ?? null;
+    if (is_callable($override)) {
+        $response = $override($url, $payload);
+        return is_array($response) ? $response : ['ok' => false, 'status' => 0, 'body' => ''];
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\nAccept: application/json",
+            'content' => json_encode($payload, JSON_UNESCAPED_SLASHES),
+            'timeout' => 20,
+            'ignore_errors' => true,
+            'follow_location' => 0,
+            'max_redirects' => 0,
+        ],
+    ]);
+    $body = @file_get_contents($url, false, $context);
+    $status = 0;
+    foreach (($http_response_header ?? []) as $header) {
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#i', (string) $header, $matches)) {
+            $status = (int) $matches[1];
+            break;
+        }
+    }
+    return [
+        'ok' => $body !== false && $status >= 200 && $status < 300,
+        'status' => $status,
+        'body' => $body !== false ? $body : '',
+    ];
+}
+
+function handleRemoteConverters(array $opts): array
+{
+    $rootDir = (string) ($opts['rootDir'] ?? '');
+    $input = is_array($opts['input'] ?? null) ? $opts['input'] : mcpReadRequestData();
+    $path = trim((string) ($input['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'remote-converters'], $access);
+    }
+
+    $nodeUrl = trim((string) ($input['nodeUrl'] ?? ''));
+    $catalogUrl = mcpConverterNodeRouteUrl($nodeUrl, 'converter-offers');
+    $validation = Converter::validateRemoteEndpoint($catalogUrl);
+    if ($validation !== null) {
+        return ['ok' => false, 'route' => 'remote-converters', 'error' => $validation];
+    }
+
+    $request = [
+        'mimeType' => strtolower(trim((string) ($input['mimeType'] ?? ''))),
+        'kind' => strtolower(trim((string) ($input['kind'] ?? ''))),
+        'extension' => strtolower(trim((string) ($input['extension'] ?? pathinfo($path, PATHINFO_EXTENSION)), '. ')),
+    ];
+    $response = mcpConverterCatalogRequest($catalogUrl, $request);
+    if (($response['ok'] ?? false) !== true) {
+        return [
+            'ok' => false,
+            'route' => 'remote-converters',
+            'error' => 'Remote Poff converter catalog unavailable.',
+            'status' => (int) ($response['status'] ?? 0),
+        ];
+    }
+
+    $decoded = json_decode((string) ($response['body'] ?? ''), true);
+    if (!is_array($decoded) || ($decoded['protocol'] ?? '') !== 'poff-converter/1') {
+        return ['ok' => false, 'route' => 'remote-converters', 'error' => 'Invalid Poff converter catalog.'];
+    }
+
+    $node = is_array($decoded['node'] ?? null) ? $decoded['node'] : [];
+    $nodeId = trim((string) ($node['id'] ?? parse_url($nodeUrl, PHP_URL_HOST) ?? 'remote'));
+    $endpoint = mcpConverterNodeRouteUrl($nodeUrl, 'convert-offered');
+    if (Converter::validateRemoteEndpoint($endpoint) !== null) {
+        return ['ok' => false, 'route' => 'remote-converters', 'error' => 'Remote Poff converter endpoint is invalid.'];
+    }
+
+    $definitions = [];
+    foreach ((array) ($decoded['converters'] ?? []) as $offered) {
+        if (!is_array($offered)) {
+            continue;
+        }
+        $definition = Converter::remoteDefinition($offered, [
+            'id' => $nodeId,
+            'baseUrl' => $nodeUrl,
+            'catalogUrl' => $catalogUrl,
+            'endpoint' => $endpoint,
+        ]);
+        if ($definition !== null && Converter::matches(
+            $definition,
+            $request['mimeType'],
+            $request['kind'],
+            $request['extension']
+        )) {
+            $definitions[] = $definition;
+        }
+    }
+
+    return [
+        'ok' => true,
+        'route' => 'remote-converters',
+        'protocol' => 'poff-converter/1',
+        'node' => [
+            'id' => $nodeId,
+            'url' => $nodeUrl,
+            'endpoint' => $endpoint,
+        ],
+        'available' => $definitions,
+    ];
+}
+
+function mcpPoffRegistryEndpoint(string $registryUrl, string $registryPath = ''): string
+{
+    $parts = parse_url(trim($registryUrl));
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return '';
+    }
+
+    $scheme = strtolower((string) $parts['scheme']);
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return '';
+    }
+
+    $host = (string) $parts['host'];
+    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+    $path = (string) ($parts['path'] ?? '');
+    if ($path === '' || str_ends_with($path, '/')) {
+        $path = rtrim($path, '/') . '/index.php';
+    }
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+    unset($query['mcp'], $query['route'], $query['authToken']);
+    $query['edit'] = 'upload';
+    if (trim($registryPath) !== '') {
+        $query['path'] = trim($registryPath, "/\\");
+    }
+
+    return $scheme . '://' . $host . $port . $path . '?' . http_build_query($query);
+}
+
+function mcpPoffRegistryCategories(mixed $value): array
+{
+    $source = is_array($value)
+        ? $value
+        : (is_string($value) ? (preg_split('/\r?\n|,/', $value) ?: []) : []);
+    $categories = [];
+    foreach ($source as $candidate) {
+        if (!is_scalar($candidate)) {
+            continue;
+        }
+        $normalized = strtolower(trim((string) $candidate));
+        $normalized = substr($normalized, 0, 24);
+        if ($normalized === '' || in_array($normalized, $categories, true)) {
+            continue;
+        }
+        $categories[] = $normalized;
+        if (count($categories) >= 12) {
+            break;
+        }
+    }
+    return $categories;
+}
+
+function mcpPoffNodeCatalogUrls(string $pageUrl, string $path): array
+{
+    $parts = parse_url($pageUrl);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return [];
+    }
+
+    $base = strtolower((string) $parts['scheme']) . '://' . (string) $parts['host'];
+    if (isset($parts['port'])) {
+        $base .= ':' . (int) $parts['port'];
+    }
+    $base .= (string) ($parts['path'] ?? '/index.php');
+
+    return [
+        'protocol' => 'poff-node/1',
+        'baseUrl' => $base,
+        'workCatalogUrl' => $base . '?' . http_build_query([
+            'mcp' => '1',
+            'route' => 'export-content',
+            'path' => trim($path, "/\\"),
+        ]),
+        'converterCatalogUrl' => $base . '?' . http_build_query([
+            'mcp' => '1',
+            'route' => 'converter-offers',
+        ]),
+    ];
+}
+
+function mcpPoffRegistryRequest(string $url, array $payload): array
+{
+    $override = $GLOBALS['__poff_registry_post'] ?? null;
+    if (is_callable($override)) {
+        $response = $override($url, $payload);
+        return is_array($response) ? $response : ['ok' => false, 'status' => 0, 'body' => ''];
+    }
+    return mcpConverterCatalogRequest($url, $payload);
+}
+
+function handleRegisterPoffNode(array $opts): array
+{
+    $rootDir = (string) ($opts['rootDir'] ?? '');
+    $input = is_array($opts['input'] ?? null) ? $opts['input'] : mcpReadRequestData();
+    $path = trim((string) ($input['path'] ?? ''), "/\\");
+    $access = mcpEditorAccessState($rootDir, $path);
+    if (!$access['allowed']) {
+        return array_merge(['route' => 'register-node'], $access);
+    }
+
+    $target = mcpResolvePathInsideRoot($rootDir, $path);
+    if ($target === null) {
+        return ['ok' => false, 'route' => 'register-node', 'error' => 'Current work is unavailable.'];
+    }
+    $config = is_file($target)
+        ? PoffConfig::ensureFileConfig(dirname($target), basename($target))
+        : PoffConfig::read($target);
+    $work = is_array($config['work'] ?? null) ? $config['work'] : [];
+    $categories = mcpPoffRegistryCategories($work['categories'] ?? ($work['category'] ?? []));
+    $title = trim((string) ($config['title'] ?? $config['name'] ?? basename($target)));
+    if ($title === '') {
+        $title = $path !== '' ? basename($path) : 'Poff node';
+    }
+
+    $pageUrl = trim((string) ($input['pageUrl'] ?? ''));
+    $pageValidation = Converter::validateRemoteEndpoint($pageUrl);
+    if ($pageValidation !== null) {
+        return ['ok' => false, 'route' => 'register-node', 'error' => 'Current page needs a public http or https URL.'];
+    }
+
+    $registryUrl = trim((string) ($input['registryUrl'] ?? 'https://pageoff.de/index.php'));
+    $registryEndpoint = mcpPoffRegistryEndpoint(
+        $registryUrl,
+        (string) ($input['registryPath'] ?? '')
+    );
+    if ($registryEndpoint === '' || Converter::validateRemoteEndpoint($registryEndpoint) !== null) {
+        return ['ok' => false, 'route' => 'register-node', 'error' => 'Poff registry URL is invalid.'];
+    }
+
+    $node = mcpPoffNodeCatalogUrls($pageUrl, $path);
+    $response = mcpPoffRegistryRequest($registryEndpoint, [
+        'source' => 'url',
+        'linkName' => $title,
+        'linkUrl' => $pageUrl,
+        'categories' => $categories,
+        'poffNode' => $node,
+    ]);
+    $decoded = json_decode((string) ($response['body'] ?? ''), true);
+    if (!is_array($decoded)) {
+        $decoded = [];
+    }
+    if (($response['ok'] ?? false) !== true || !empty($decoded['error'])) {
+        return [
+            'ok' => false,
+            'route' => 'register-node',
+            'error' => (string) ($decoded['error'] ?? 'Poff registry unavailable.'),
+            'status' => (int) ($response['status'] ?? 0),
+        ];
+    }
+
+    $uploaded = is_array($decoded['uploaded'][0] ?? null) ? $decoded['uploaded'][0] : [];
+    return [
+        'ok' => true,
+        'route' => 'register-node',
+        'registry' => $registryUrl,
+        'pageUrl' => $pageUrl,
+        'categories' => $categories,
+        'node' => $node,
+        'pendingApproval' => !empty($decoded['pendingApproval']) || !empty($uploaded['pendingApproval']),
+        'updatedRegistration' => !empty($uploaded['updatedRegistration']),
+    ];
+}
+
+function handleConvertOffered(array $opts): array
+{
+    $rootDir = (string) ($opts['rootDir'] ?? '');
+    $payload = is_array($opts['payload'] ?? null) ? $opts['payload'] : mcpReadRequestData();
+    $result = Converter::convertOffered($payload, $rootDir);
+    $result['route'] = 'convert-offered';
+    return $result;
+}

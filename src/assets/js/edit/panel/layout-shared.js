@@ -71,7 +71,7 @@ export function createLayoutModeController({
         const sourcePreview = isVirtual
             ? (preset === 'shared'
                 ? `Collection: ${sharedLayoutName || 'shared'}`
-                : (originalEditable ? `Filesystem: ${originalTarget}` : 'PHP built-in poff-layout'))
+                : (originalEditable ? `Filesystem: ${originalTarget}` : 'Built-in default'))
             : `Filesystem: ${localWrapperDirectory}`;
         const sectionSourcePreview = preset === 'shared'
             ? `Collection: ${sharedLayoutName || 'shared'} (${sectionName}.hbs)`
@@ -89,7 +89,7 @@ export function createLayoutModeController({
         if (primaryTitleEl) {
             primaryTitleEl.textContent = preset === 'shared'
                 ? 'Collection layout'
-                : (isVirtual ? 'Virtual layout' : 'Custom layout');
+                : (isVirtual ? 'Inherited layout' : 'Custom layout');
         }
         if (primaryHintEl) {
             if (preset === 'shared') {
@@ -99,7 +99,7 @@ export function createLayoutModeController({
                     ? (originalTarget === localWrapperDirectory
                         ? `Editing the resolved layout source <code>${escapeHtml(originalTarget)}</code>.`
                         : `Editing the inherited parent layout source <code>${escapeHtml(originalTarget)}</code>. Switch to <code>Custom</code> when you want to create a local <code>${escapeHtml(wrapperTarget)}</code>.`)
-                    : 'Showing the bundled poff-layout. It stays read-only until a parent .layout exists.';
+                    : 'Showing built-in default. Create a local .layout to customize it.';
             } else {
                 primaryHintEl.innerHTML = `Editing the local wrapper override <code>${escapeHtml(wrapperTarget)}</code>.`;
             }

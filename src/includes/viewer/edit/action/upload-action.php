@@ -41,6 +41,9 @@ function cmsHandleEditUploadAction(array $ctx): void
             [
                 'pendingApproval' => !$editorAuthenticated,
                 'htaccessDir' => $rootDir,
+                'categories' => $data['categories'] ?? [],
+                'poffNode' => $data['poffNode'] ?? [],
+                'externalSubmissionSettings' => $ctx['externalSubmissionSettings'] ?? [],
             ]
         ),
         default => function () use ($targetDir, $uploadTarget): array {
@@ -71,7 +74,7 @@ function cmsHandleEditUploadAction(array $ctx): void
 
     $updatedConfig = $ctx['subjectType'] === 'file'
         ? PoffConfig::ensureFileConfig($ctx['targetDir'], (string) $ctx['targetFile'])
-        : PoffConfig::ensure($ctx['targetDir']);
+        : PoffConfig::read($ctx['targetDir']);
 
     cmsJsonResponse([
         'allowed' => true,

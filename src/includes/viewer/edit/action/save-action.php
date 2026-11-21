@@ -7,9 +7,11 @@ function cmsHandleEditSaveAction(array $ctx): void
     $config = $ctx['config'];
     $data = $ctx['data'];
     cmsEditSaveApplyBasicFields($config, $data, $ctx['subjectType'], $ctx['targetFile']);
+    cmsEditSaveApplyExternalSubmissionSettings($config, $data, $ctx['subjectType']);
     cmsEditSaveApplyWorkFields($config, $data, $ctx['targetDir']);
     cmsEditSaveApplyLayoutFields($config, $data, $ctx['subjectType'], $ctx['targetDir'], $ctx['targetFile']);
     cmsEditSaveFinalize($config, $ctx['targetDir'], $ctx['subjectType'], $ctx['targetFile']);
+    cmsEditClearFolderViewerCachesForSave($ctx);
     cmsSyncParentTreeItemMeta($ctx['rootDir'], $ctx['subjectRelativePath'], $ctx['subjectType'], $config);
     if ($ctx['subjectType'] === 'file' && (array_key_exists('treeVisible', $data) || array_key_exists('tree_visible', $data))) {
         cmsApplyParentTreeVisible($ctx['rootDir'], $ctx['subjectRelativePath'], $ctx['subjectType'], $ctx['targetDir'], $data['treeVisible'] ?? $data['tree_visible'] ?? null);

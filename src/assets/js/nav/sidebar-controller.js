@@ -11,6 +11,8 @@ export function createSidebarController({
 }) {
     let activeLink = null;
     let currentFolderPath = '';
+    let navRequestId = 0;
+    let navAbortController = null;
 
     function scrollActiveLinkIntoView(link = activeLink) {
         if (!link || typeof link.scrollIntoView !== 'function') {
@@ -111,33 +113,64 @@ export function createSidebarController({
         }
     }
 
-    function showNavLoading() {
+    function showNavLoading(label = '') {
         if (typeof setLoadingVisible === 'function') {
-            setLoadingVisible(sidebarLoading, true);
+            setLoadingVisible(sidebarLoading, true, label);
         }
     }
 
-    function loadNav(relPath = '') {
+    function loadNav(relPath = '', options = {}) {
         if (!navList) {
             return Promise.resolve('');
         }
+        const requestId = ++navRequestId;
+        navAbortController?.abort();
+        const requestController = typeof AbortController === 'function'
+            ? new AbortController()
+            : null;
+        navAbortController = requestController;
         currentFolderPath = relPath || '';
-        showNavLoading();
-        return fetch(`?ajax=nav&path=${encodeURIComponent(relPath)}${editQuery}`)
-            .then((response) => response.text())
+        showNavLoading(options.loadingLabel || 'Loading navigation...');
+        return fetch(`?ajax=nav&path=${encodeURIComponent(relPath)}${editQuery}`, {
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'text/html',
+                'X-Requested-With': 'fetch-navigation',
+            },
+            ...(requestController ? { signal: requestController.signal } : {}),
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`Navigation request failed: ${response.status}`);
+                }
+                return response.text();
+            })
             .then((html) => {
+                if (requestId !== navRequestId) {
+                    return '';
+                }
                 const extracted = extractNavHtml(html) || '';
                 if (extracted.trim()) {
                     navList.innerHTML = extracted;
                     navList.dataset.loaded = '1';
+                    delete navList.dataset.error;
+                    delete navList.dataset.stale;
                 } else {
                     navList.dataset.stale = '1';
                 }
                 return extracted;
             })
-            .catch(() => {
+            .catch((error) => {
+                if (requestId !== navRequestId || error?.name === 'AbortError') {
+                    return '';
+                }
                 navList.dataset.error = '1';
                 return '';
+            })
+            .finally(() => {
+                if (navAbortController === requestController) {
+                    navAbortController = null;
+                }
             });
     }
 

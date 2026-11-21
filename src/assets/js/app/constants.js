@@ -25,6 +25,6 @@ export const APP_HASHES = {
 };
 
 export const APP_LABELS = {
-    openNavigation: 'Open navigation',
-    closeNavigation: 'Close navigation',
+    openNavigation: 'Open work menu',
+    closeNavigation: 'Close work menu',
 };

@@ -13,4 +13,11 @@ $navContext = [
     'folderPoffConfig' => $folderPoffConfig ?? null,
 ];
 
-echo cmsRenderNavListMarkup($navContext);
+$isNavigationFetch = (string) ($_GET['ajax'] ?? '') === 'nav';
+$isEditorNavigation = isset($_GET['edit']) && $_GET['edit'] === 'true';
+
+// Public visitors start with the work surface, not a duplicate server-rendered tree.
+// The navigation is fetched the first time they open Explore work.
+if ($isNavigationFetch || $isEditorNavigation) {
+    echo cmsRenderNavListMarkup($navContext);
+}

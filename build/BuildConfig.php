@@ -18,6 +18,24 @@ $pagesDir = trim((string) ($sharedConfig['pagesDir'] ?? 'pages'), '/\\');
 $siteHost = trim((string) ($sharedConfig['siteHost'] ?? 'dominikeggermann.com'), '/\\');
 $outputFile = trim((string) ($sharedConfig['outputFile'] ?? 'index.php'));
 $outputDirOverride = trim((string) getenv('POFF_OUTPUT_DIR'));
+$mampHtdocs = rtrim((string) ($sharedConfig['mampHtdocs'] ?? ''), '/\\');
+$standaloneCopyTargets = array_values(array_filter(array_map(
+    static fn(mixed $target): string => trim(is_string($target) ? $target : '', '/\\'),
+    is_array($sharedConfig['standaloneCopyTargets'] ?? null) ? $sharedConfig['standaloneCopyTargets'] : []
+)));
+$additionalIndexCopyTargets = array_values(array_filter(array_map(
+    static function (mixed $target): ?array {
+        if (!is_array($target)) {
+            return null;
+        }
+        $name = trim((string) ($target['name'] ?? ''), '/\\');
+        return $name !== '' ? [
+            'name' => $name,
+            'cleanSubdirectories' => (bool) ($target['cleanSubdirectories'] ?? true),
+        ] : null;
+    },
+    is_array($sharedConfig['additionalIndexCopyTargets'] ?? null) ? $sharedConfig['additionalIndexCopyTargets'] : []
+)));
 
 $defaultOutputDir = __DIR__ . '/../' . $pagesDir . '/' . $siteHost;
 $outputDir = $outputDirOverride !== ''
@@ -29,6 +47,8 @@ return [
     'pagesDir' => __DIR__ . '/../' . $pagesDir,
     'siteHost' => $siteHost,
     'outputDir' => $outputDir,
-    // 'outputDir' => '/Applications/MAMP/htdocs/',
     'outputFile' => $outputFile,
+    'mampHtdocs' => $mampHtdocs,
+    'standaloneCopyTargets' => $standaloneCopyTargets,
+    'additionalIndexCopyTargets' => $additionalIndexCopyTargets,
 ];
