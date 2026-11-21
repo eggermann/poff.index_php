@@ -23,6 +23,59 @@ if (!is_array($payload)) {
     $payload = [];
 }
 
+function createOptedInNetworkConverterFixture(string $engine = 'imagemagick'): string
+{
+    $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'poff-converter-optin-' . bin2hex(random_bytes(8));
+    $folder = $root . DIRECTORY_SEPARATOR . 'poff' . DIRECTORY_SEPARATOR . 'converters' . DIRECTORY_SEPARATOR . 'convert-image';
+    if (!mkdir($folder, 0700, true)) {
+        throw new RuntimeException('Unable to create converter test fixture.');
+    }
+    file_put_contents($folder . DIRECTORY_SEPARATOR . 'converter.json', json_encode([
+        'type' => 'converter',
+        'name' => 'convert-image',
+        'label' => 'Convert Image',
+        'accepts' => ['image/*'],
+        'outputs' => ['image/webp', 'image/jpeg', 'image/png'],
+        'formats' => ['webp', 'jpeg', 'png'],
+        'engine' => $engine,
+        'enabled' => true,
+        'network' => ['publish' => true],
+        'defaults' => ['format' => 'png', 'quality' => 'default'],
+        'ui' => [],
+    ], JSON_UNESCAPED_SLASHES));
+    return $root;
+}
+
+function removeConverterTestDirectory(string $path): void
+{
+    if (!is_dir($path)) {
+        return;
+    }
+    foreach (new FilesystemIterator($path) as $entry) {
+        if ($entry->isDir() && !$entry->isLink()) {
+            removeConverterTestDirectory($entry->getPathname());
+        } else {
+            @unlink($entry->getPathname());
+        }
+    }
+    @rmdir($path);
+}
+
+function signTestConverterPeerRequest(array $requestPayload, string $replayFile, int $timestampOffset = 0): void
+{
+    $peerId = 'test-consumer';
+    $secret = 'test-shared-secret-32-bytes-long';
+    $timestamp = (string) (time() + $timestampOffset);
+    $nonce = bin2hex(random_bytes(16));
+    putenv('POFF_CONVERTER_TRUSTED_PEERS=' . json_encode([$peerId => $secret]));
+    putenv('POFF_CONVERTER_REPLAY_FILE=' . $replayFile);
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SERVER['HTTP_X_POFF_NODE_ID'] = $peerId;
+    $_SERVER['HTTP_X_POFF_TIMESTAMP'] = $timestamp;
+    $_SERVER['HTTP_X_POFF_NONCE'] = $nonce;
+    $_SERVER['HTTP_X_POFF_SIGNATURE'] = Converter::peerRequestSignature($requestPayload, $timestamp, $nonce, $secret);
+}
+
 if ($mode === 'available') {
     echo json_encode(Converter::availableFor(
         (string) ($payload['mimeType'] ?? ''),
@@ -112,12 +165,21 @@ if ($mode === 'convert') {
 }
 
 if ($mode === 'offers') {
+    $networkFixture = ($payload['testNetworkPublishOptIn'] ?? false) === true
+        ? createOptedInNetworkConverterFixture()
+        : '';
+    unset($payload['testNetworkPublishOptIn']);
+    if (($payload['enableImageMagickCli'] ?? false) === true) {
+        putenv('POFF_ENABLE_IMAGEMAGICK_CLI=1');
+        unset($payload['enableImageMagickCli']);
+    }
     echo json_encode(handleConverterOffers([
-        'rootDir' => $rootDir,
+        'rootDir' => $networkFixture !== '' ? $networkFixture : $rootDir,
         'input' => $payload,
         'nodeUrl' => (string) ($payload['nodeUrl'] ?? 'https://provider.example/index.php'),
         'nodeId' => (string) ($payload['nodeId'] ?? 'provider-example'),
     ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    removeConverterTestDirectory($networkFixture);
     exit(0);
 }
 
@@ -166,11 +228,52 @@ if ($mode === 'register-node') {
     exit(0);
 }
 
-if ($mode === 'convert-offered') {
+if (in_array($mode, ['convert-offered', 'convert-offered-unsigned', 'peer-auth-replay', 'peer-auth-expired', 'peer-auth-tampered'], true)) {
+    $networkFixture = ($payload['testNetworkPublishOptIn'] ?? false) === true
+        ? createOptedInNetworkConverterFixture()
+        : '';
+    unset($payload['testNetworkPublishOptIn']);
+    if (($payload['enableImageMagickCli'] ?? false) === true) {
+        putenv('POFF_ENABLE_IMAGEMAGICK_CLI=1');
+        unset($payload['enableImageMagickCli']);
+    }
+    $timestampOffset = (int) ($payload['testPeerTimestampOffset'] ?? 0);
+    unset($payload['testPeerTimestampOffset']);
+    $replayFile = tempnam(sys_get_temp_dir(), 'poff-converter-replay-test-');
+    if ($mode !== 'convert-offered-unsigned') {
+        signTestConverterPeerRequest($payload, (string) $replayFile, $timestampOffset);
+    }
+    if ($mode === 'peer-auth-replay') {
+        $result = [
+            'first' => mcpConverterAuthenticatePeer($payload),
+            'second' => mcpConverterAuthenticatePeer($payload),
+        ];
+        echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        @unlink($replayFile);
+        removeConverterTestDirectory($networkFixture);
+        exit(0);
+    }
+    if ($mode === 'peer-auth-expired') {
+        $result = mcpConverterAuthenticatePeer($payload);
+        echo json_encode(['authenticated' => $result], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        @unlink($replayFile);
+        removeConverterTestDirectory($networkFixture);
+        exit(0);
+    }
+    if ($mode === 'peer-auth-tampered') {
+        $payload['source']['name'] = 'tampered-after-signing.tiff';
+        $result = mcpConverterAuthenticatePeer($payload);
+        echo json_encode(['authenticated' => $result], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        @unlink($replayFile);
+        removeConverterTestDirectory($networkFixture);
+        exit(0);
+    }
     echo json_encode(handleConvertOffered([
-        'rootDir' => $rootDir,
+        'rootDir' => $networkFixture !== '' ? $networkFixture : $rootDir,
         'payload' => $payload,
     ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    @unlink($replayFile);
+    removeConverterTestDirectory($networkFixture);
     exit(0);
 }
 
@@ -190,6 +293,28 @@ if ($mode === 'remote-security') {
     echo json_encode([
         'error' => Converter::validateRemoteEndpoint((string) ($payload['url'] ?? '')),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'dns-resolve') {
+    $addresses = array_values((array) ($payload['addresses'] ?? []));
+    $GLOBALS['__poff_converter_dns_lookup'] = static fn(string $host): array => $addresses;
+    echo json_encode(Converter::resolveRemoteAddresses((string) ($payload['host'] ?? 'provider.example')), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit(0);
+}
+
+if ($mode === 'pinned-http-probe') {
+    $addresses = array_values((array) ($payload['addresses'] ?? []));
+    $GLOBALS['__poff_converter_dns_lookup'] = static fn(string $host): array => $addresses;
+    echo json_encode(Converter::httpRequestPinned(
+        'GET',
+        (string) ($payload['url'] ?? ''),
+        null,
+        ['Accept: application/json'],
+        10,
+        1024,
+        true
+    ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit(0);
 }
 

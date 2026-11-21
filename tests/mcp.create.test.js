@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -2997,8 +2998,15 @@ describe('Poff converters', () => {
     };
     writeDefinition('poff/converters/collision', { label: 'Poff converter' });
     writeDefinition('converters/collision', { label: 'Visible converter' });
-    writeDefinition('.converters/collision', { label: 'Hidden converter' });
+    writeDefinition('.converters/collision', { label: 'Hidden converter', network: { publish: true } });
     writeDefinition('poff/converters/disabled', { label: 'Disabled converter', enabled: false });
+    writeDefinition('poff/converters/disabled-image', {
+      label: 'Disabled image converter',
+      accepts: ['image/*'],
+      outputs: ['image/png'],
+      engine: 'imagemagick',
+      enabled: false,
+    });
 
     try {
       const discovered = await runConverterRoute('discover', tempRoot);
@@ -3015,6 +3023,22 @@ describe('Poff converters', () => {
       const offers = await runConverterRoute('offers', tempRoot, { mimeType: 'text/plain' });
       expect(offers.converters.map(({ id }) => id)).toContain('converter/collision');
       expect(offers.converters.map(({ id }) => id)).not.toContain('converter/disabled');
+
+      const imageOffers = await runConverterRoute('offers', tempRoot, { mimeType: 'image/tiff' });
+      expect(imageOffers.converters.map(({ id }) => id)).not.toContain('converter/disabled-image');
+      const directExecution = await runConverterRoute('convert-offered', tempRoot, {
+        enableImageMagickCli: true,
+        source: {
+          name: 'scan.tiff',
+          mimeType: 'image/tiff',
+          bodyBase64: Buffer.from('not-an-image').toString('base64'),
+        },
+        converter: { id: 'converter/disabled-image', format: 'png' },
+      });
+      expect(directExecution).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Converter is not offered by this Poff node.',
+      }));
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -3059,10 +3083,22 @@ describe('Poff converters', () => {
   });
 
   test('publishes locally executable converters as generic Poff node offers', async () => {
+    const defaultOffers = await runConverterRoute('offers', POFF_DIR, {
+      mimeType: 'image/tiff',
+      kind: 'image',
+      extension: 'tiff',
+      enableImageMagickCli: true,
+    });
+    expect(defaultOffers.converters).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'converter/convert-image' }),
+    ]));
+
     const result = await runConverterRoute('offers', POFF_DIR, {
       mimeType: 'image/tiff',
       kind: 'image',
       extension: 'tiff',
+      enableImageMagickCli: true,
+      testNetworkPublishOptIn: true,
       nodeUrl: 'https://provider.example/index.php',
       nodeId: 'provider-example',
     });
@@ -3193,9 +3229,106 @@ describe('Poff converters', () => {
     }
   });
 
+  test('connects discovered remote offer through conversion and local generated-work save', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-lifecycle-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempRoot, 'photo.heic'), 'test image bytes');
+
+    try {
+      const catalog = await runConverterRoute('remote-catalog', tempRoot, {
+        path: 'photo.heic',
+        nodeUrl: 'https://provider.example/index.php',
+        mimeType: 'image/heic',
+        kind: 'image',
+        extension: 'heic',
+        mockCatalog: {
+          ok: true,
+          protocol: 'poff-converter/1',
+          node: {
+            id: 'provider-lifecycle',
+            url: 'https://provider.example/index.php',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+          },
+          converters: [{
+            id: 'converter/convert-image',
+            name: 'convert-image',
+            label: 'Convert Image',
+            accepts: ['image/*'],
+            outputs: ['image/png'],
+            formats: ['png'],
+            defaults: { format: 'png' },
+            ui: {},
+          }],
+        },
+      });
+      const selectedConverter = catalog.available[0];
+      expect(selectedConverter).toEqual(expect.objectContaining({
+        id: 'converter/remote-provider-lifecycle-convert-image',
+        engine: 'remote-node',
+        node: expect.objectContaining({
+          id: 'provider-lifecycle',
+          converterId: 'converter/convert-image',
+        }),
+      }));
+
+      const converted = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'photo.heic',
+          path: 'photo.heic',
+          mimeType: 'image/heic',
+          kind: 'image',
+          extension: 'heic',
+        },
+        converter: { ...selectedConverter, format: 'png', quality: 'default' },
+        target: { mode: 'new-hidden-work', saveAs: 'photo.png' },
+        mockHttpPost: {
+          ok: true,
+          status: 200,
+          body: {
+            ok: true,
+            output: {
+              name: 'photo.png',
+              mimeType: 'image/png',
+              kind: 'image',
+              size: 8,
+              bodyBase64: Buffer.from('png-data').toString('base64'),
+            },
+            generatedBy: { id: 'converter/convert-image', node: 'provider-lifecycle' },
+          },
+        },
+      });
+      expect(converted).toEqual(expect.objectContaining({
+        ok: true,
+        output: expect.objectContaining({ mimeType: 'image/png' }),
+        generatedBy: expect.objectContaining({ node: 'provider-lifecycle' }),
+      }));
+
+      const saved = await runConverterRoute('save', tempRoot, {
+        sourcePath: 'photo.heic',
+        conversion: converted,
+      });
+      expect(saved).toEqual(expect.objectContaining({ ok: true, path: 'photo.png' }));
+      expect(fs.readFileSync(path.join(tempRoot, 'photo.png'), 'utf8')).toBe('png-data');
+      const config = JSON.parse(fs.readFileSync(path.join(tempRoot, 'poff.config.json'), 'utf8'));
+      expect(config.tree).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'photo.png',
+          generated: true,
+          sourceWork: 'photo.heic',
+          generatedBy: expect.objectContaining({ node: 'provider-lifecycle' }),
+        }),
+      ]));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('converts an inline file offered by a foreign Poff node', async () => {
     const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
     const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      enableImageMagickCli: true,
+      testNetworkPublishOptIn: true,
       source: {
         name: 'scan-001.tiff',
         path: 'scan-001.tiff',
@@ -3230,6 +3363,8 @@ describe('Poff converters', () => {
   test('keeps a requested jpg filename for a jpeg result', async () => {
     const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
     const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      enableImageMagickCli: true,
+      testNetworkPublishOptIn: true,
       source: {
         name: 'scan-001.tiff',
         path: 'scan-001.tiff',
@@ -3257,18 +3392,139 @@ describe('Poff converters', () => {
     expect(Buffer.from(result.output.bodyBase64, 'base64').subarray(0, 3).toString('hex')).toBe('ffd8ff');
   });
 
-  test('sends a local source to a discovered provider converter and receives its result', async () => {
-    const tempRoot = path.join(POFF_DIR, `converter-node-consumer-${Date.now()}`);
-    fs.mkdirSync(tempRoot, { recursive: true });
-    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
-    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+  test('rejects unsigned remote converter execution', async () => {
+    const result = await runConverterRoute('convert-offered-unsigned', POFF_DIR, {
+      testNetworkPublishOptIn: true,
+      source: {
+        name: 'scan.tiff',
+        mimeType: 'image/tiff',
+        bodyBase64: Buffer.from('not-an-image').toString('base64'),
+      },
+      converter: { id: 'converter/convert-image', format: 'png' },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      error: 'Authenticated converter peer request required.',
+    }));
+  });
+
+  test('rejects signed execution for a converter without explicit network publication', async () => {
+    const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      source: {
+        name: 'scan.tiff',
+        mimeType: 'image/tiff',
+        bodyBase64: Buffer.from('not-an-image').toString('base64'),
+      },
+      converter: { id: 'converter/convert-image', format: 'png' },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      error: 'Converter is not offered by this Poff node.',
+    }));
+  });
+
+  test('rejects reuse of a signed converter peer nonce', async () => {
+    const result = await runConverterRoute('peer-auth-replay', POFF_DIR, {
+      source: { name: 'scan.tiff', mimeType: 'image/tiff' },
+      converter: { id: 'converter/convert-image', format: 'png' },
+    });
+
+    expect(result).toEqual({ first: true, second: false });
+  });
+
+  test('rejects an expired signed converter peer request', async () => {
+    const result = await runConverterRoute('peer-auth-expired', POFF_DIR, {
+      testPeerTimestampOffset: -301,
+      source: { name: 'scan.tiff', mimeType: 'image/tiff' },
+    });
+
+    expect(result).toEqual({ authenticated: false });
+  });
+
+  test('rejects converter endpoint userinfo and fragments', async () => {
+    const credentials = await runConverterRoute('remote-security', POFF_DIR, {
+      url: 'https://user:password@provider.example/index.php?mcp=1#fragment',
+    });
+
+    expect(credentials.error).toBe('Converter endpoint credentials and fragments are not allowed.');
+  });
+
+  test('rejects DNS answers when any A or AAAA address is private or reserved', async () => {
+    const mixed = await runConverterRoute('dns-resolve', POFF_DIR, {
+      host: 'provider.example',
+      addresses: ['93.184.216.34', '10.0.0.8'],
+    });
+    const privateIpv6 = await runConverterRoute('dns-resolve', POFF_DIR, {
+      host: 'provider.example',
+      addresses: ['fd00::8'],
+    });
+
+    expect(mixed).toEqual(expect.objectContaining({
+      ok: false,
+      error: 'Converter endpoint resolves to a private or reserved IP address.',
+    }));
+    expect(privateIpv6.ok).toBe(false);
+  });
+
+  test('pins hostname requests to the validated DNS address', async () => {
+    let receivedHost = '';
+    const server = http.createServer((request, response) => {
+      receivedHost = request.headers.host;
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end('{"pinned":true}');
+    });
 
     try {
-      const sourcePath = path.join(tempRoot, 'scan-001.tiff');
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const result = await runConverterRoute('pinned-http-probe', POFF_DIR, {
+        url: `http://poff-test.invalid:${server.address().port}/probe`,
+        addresses: ['127.0.0.1'],
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: true,
+        body: '{"pinned":true}',
+      }));
+      expect(receivedHost).toBe(`poff-test.invalid:${server.address().port}`);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  test('rejects an oversized provider request before converter execution', async () => {
+    const result = await runConverterRoute('convert-offered', POFF_DIR, {
+      __poffRequestTooLarge: true,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      error: 'Converter request exceeds the allowed size.',
+    }));
+  });
+
+  test('rejects a signed converter request after its payload is changed', async () => {
+    const result = await runConverterRoute('peer-auth-tampered', POFF_DIR, {
+      source: { name: 'scan.tiff', mimeType: 'image/tiff' },
+    });
+
+    expect(result).toEqual({ authenticated: false });
+  });
+
+  test('sends a local source to a discovered provider converter and receives its result', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-consumer-${Date.now()}`);
+    const privateFolder = path.join(tempRoot, 'private-project', 'drafts');
+    fs.mkdirSync(privateFolder, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(privateFolder, 'scan-001.tiff'));
+
+    try {
+      const sourcePath = path.join(privateFolder, 'scan-001.tiff');
       const result = await runConverterRoute('convert', tempRoot, {
         source: {
           name: 'scan-001.tiff',
-          path: 'scan-001.tiff',
+          path: 'private-project/drafts/scan-001.tiff',
           mimeType: 'image/tiff',
           extension: 'tiff',
           size: fs.statSync(sourcePath).size,
@@ -3321,8 +3577,151 @@ describe('Poff converters', () => {
       );
       expect(result._capturedRemotePayload.converter.id).toBe('converter/convert-image');
       expect(result._capturedRemotePayload.converter.node).toBe('provider');
+      expect(result._capturedRemotePayload.source.path).toBe('scan-001.tiff');
+      expect(result._capturedRemotePayload.source.srcUrl).toBe('');
+      expect(result._capturedRemotePayload.target.folder).toBe('');
+      expect(result.source.path).toBe('private-project/drafts/scan-001.tiff');
       expect(result.generatedBy.node).toBe('provider-example');
     } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('remote conversion fails closed when credentials are missing or bound to another origin', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-missing-key-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+
+    try {
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: {
+          name: 'scan-001.tiff',
+          path: 'scan-001.tiff',
+          mimeType: 'image/tiff',
+        },
+        converter: {
+          id: 'converter/remote-provider-example-convert-image',
+          name: 'remote-provider-example-convert-image',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          engine: 'remote-node',
+          format: 'png',
+          node: {
+            id: 'provider-example',
+            endpoint: 'https://provider.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+      }, { POFF_CONVERTER_PEER_CREDENTIALS: '' });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Remote converter credentials do not match the selected provider.',
+      }));
+
+      const spoofedProvider = await runConverterRoute('convert', tempRoot, {
+        source: { name: 'scan-001.tiff', path: 'scan-001.tiff', mimeType: 'image/tiff' },
+        converter: {
+          id: 'converter/remote-provider-example-convert-image',
+          name: 'remote-provider-example-convert-image',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          engine: 'remote-node',
+          format: 'png',
+          node: {
+            id: 'provider-example',
+            endpoint: 'https://attacker.example/index.php?mcp=1&route=convert-offered',
+            converterId: 'converter/convert-image',
+          },
+        },
+      }, {
+        POFF_CONVERTER_PEER_CREDENTIALS: JSON.stringify({
+          'provider-example': {
+            peerId: 'consumer-node',
+            secret: 'test-shared-secret-32-bytes-long',
+            origin: 'https://provider.example',
+          },
+        }),
+      });
+      expect(spoofedProvider).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Remote converter credentials do not match the selected provider.',
+      }));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('signs remote conversion requests with the configured provider peer key', async () => {
+    const tempRoot = path.join(POFF_DIR, `converter-node-signed-request-${Date.now()}`);
+    fs.mkdirSync(tempRoot, { recursive: true });
+    fs.writeFileSync(path.join(tempRoot, '.edit.allow'), '');
+    fs.copyFileSync(path.join(ROOT, 'archive/scan-001.tiff'), path.join(tempRoot, 'scan-001.tiff'));
+    const secret = 'test-shared-secret-32-bytes-long';
+    let captured = null;
+    const server = http.createServer((request, response) => {
+      const chunks = [];
+      request.on('data', (chunk) => chunks.push(chunk));
+      request.on('end', () => {
+        const rawBody = Buffer.concat(chunks).toString('utf8');
+        const payload = JSON.parse(rawBody);
+        const timestamp = request.headers['x-poff-timestamp'];
+        const nonce = request.headers['x-poff-nonce'];
+        const canonical = `poff-converter/1\nPOST\nconvert-offered\n${timestamp}\n${nonce}\n${crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
+        const expected = crypto.createHmac('sha256', secret).update(canonical).digest('hex');
+        captured = {
+          peerId: request.headers['x-poff-node-id'],
+          nonce,
+          timestamp,
+          validSignature: request.headers['x-poff-signature'] === expected,
+          sourcePath: payload.source.path,
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({
+          ok: true,
+          output: {
+            name: 'scan-001.png',
+            mimeType: 'image/png',
+            kind: 'image',
+            size: 3,
+            bodyBase64: Buffer.from('png').toString('base64'),
+          },
+        }));
+      });
+    });
+
+    try {
+      await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const endpoint = `http://127.0.0.1:${server.address().port}/worktypes/templates/converter/convert-pageoff-remote-text/converter.php`;
+      const result = await runConverterRoute('convert', tempRoot, {
+        source: { name: 'scan-001.tiff', path: 'scan-001.tiff', mimeType: 'image/tiff' },
+        converter: {
+          id: 'converter/remote-provider-node-convert-image',
+          name: 'remote-provider-node-convert-image',
+          accepts: ['image/*'],
+          outputs: ['image/png'],
+          engine: 'remote-node',
+          format: 'png',
+          node: { id: 'provider-node', endpoint, converterId: 'converter/convert-image' },
+        },
+      }, {
+        POFF_ALLOW_PRIVATE_CONVERTER_HOSTS: '1',
+        POFF_CONVERTER_PEER_CREDENTIALS: JSON.stringify({
+          'provider-node': { peerId: 'consumer-node', secret, origin: `http://127.0.0.1:${server.address().port}` },
+        }),
+      });
+
+      expect(result.ok).toBe(true);
+      expect(captured).toEqual(expect.objectContaining({
+        peerId: 'consumer-node',
+        validSignature: true,
+        sourcePath: 'scan-001.tiff',
+      }));
+      expect(captured.nonce).toMatch(/^[a-f0-9]{32}$/);
+      expect(Number(captured.timestamp)).toBeGreaterThan(0);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
   });
@@ -4415,13 +4814,23 @@ describe('Poff converters', () => {
   });
 
   test.each(['new-hidden-work', 'replace-generated-work'])(
-    'save mode %s overwrites a same-name target',
+    'save mode %s preserves unrelated same-name targets',
     async (mode) => {
       const tempDir = path.join(POFF_DIR, `converter-save-mode-${Date.now()}`);
       fs.mkdirSync(tempDir, { recursive: true });
       fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
       fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
       fs.writeFileSync(path.join(tempDir, 'converted.png'), 'existing content');
+      if (mode === 'replace-generated-work') {
+        const sidecar = path.join(tempDir, '.works', 'converted.png.config.json');
+        fs.mkdirSync(path.dirname(sidecar), { recursive: true });
+        fs.writeFileSync(sidecar, JSON.stringify({
+          generated: true,
+          sourceWork: 'source.txt',
+          generatedBy: { id: 'converter/test' },
+          external: { relation: 'converted-from' },
+        }));
+      }
 
       try {
         const result = await runConverterRoute('save', tempDir, {
@@ -4439,13 +4848,111 @@ describe('Poff converters', () => {
           },
         });
 
-        expect(result.ok).toBe(true);
-        expect(fs.readFileSync(path.join(tempDir, 'converted.png'), 'utf8')).toBe('new conversion');
+        if (mode === 'replace-generated-work') {
+          expect(result.ok).toBe(true);
+          expect(fs.readFileSync(path.join(tempDir, 'converted.png'), 'utf8')).toBe('new conversion');
+        } else {
+          expect(result).toEqual(expect.objectContaining({
+            ok: false,
+            error: expect.stringContaining('Converted work already exists.'),
+          }));
+          expect(fs.readFileSync(path.join(tempDir, 'converted.png'), 'utf8')).toBe('existing content');
+        }
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     }
   );
+
+  test('new-hidden-work cannot overwrite the source file', async () => {
+    const tempDir = path.join(POFF_DIR, `converter-save-source-collision-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'source.txt'), 'original source');
+
+    try {
+      const result = await runConverterRoute('save', tempDir, {
+        sourcePath: 'source.txt',
+        conversion: {
+          ok: true,
+          source: { path: 'source.txt', mimeType: 'text/plain' },
+          output: {
+            name: 'source.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            bodyBase64: Buffer.from('replacement').toString('base64'),
+          },
+          target: { mode: 'new-hidden-work' },
+        },
+      });
+
+      expect(result.ok).toBe(false);
+      expect(fs.readFileSync(path.join(tempDir, 'source.txt'), 'utf8')).toBe('original source');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('temporary-preview-only results cannot be persisted through the save route', async () => {
+    const tempDir = path.join(POFF_DIR, `converter-preview-save-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
+
+    try {
+      const result = await runConverterRoute('save', tempDir, {
+        sourcePath: 'source.txt',
+        conversion: {
+          ok: true,
+          source: { path: 'source.txt', mimeType: 'text/plain' },
+          output: {
+            name: 'preview.txt',
+            mimeType: 'text/plain',
+            kind: 'text',
+            bodyBase64: Buffer.from('preview').toString('base64'),
+          },
+          target: { mode: 'temporary-preview-only' },
+        },
+      });
+
+      expect(result.ok).toBe(false);
+      expect(fs.existsSync(path.join(tempDir, 'preview.txt'))).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('save rejects a converted result whose declared size exceeds the response limit', async () => {
+    const tempDir = path.join(POFF_DIR, `converter-save-oversize-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.edit.allow'), '');
+    fs.writeFileSync(path.join(tempDir, 'source.txt'), 'source');
+
+    try {
+      const result = await runConverterRoute('save', tempDir, {
+        sourcePath: 'source.txt',
+        conversion: {
+          ok: true,
+          source: { path: 'source.txt', mimeType: 'text/plain' },
+          output: {
+            name: 'oversize.txt',
+            mimeType: 'text/plain',
+            size: 104857601,
+            bodyBase64: Buffer.from('small test payload').toString('base64'),
+          },
+          target: { mode: 'new-hidden-work' },
+        },
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        ok: false,
+        error: 'Converted output exceeds the allowed size.',
+      }));
+      expect(fs.existsSync(path.join(tempDir, 'oversize.txt'))).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 
   test('downloadUrl rejects HTTP redirects without requesting the destination', async () => {
     const tempDir = path.join(POFF_DIR, `converter-download-redirect-${Date.now()}`);

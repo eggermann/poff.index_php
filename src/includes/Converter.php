@@ -6,6 +6,9 @@ require_once __DIR__ . '/MediaType.php';
 class Converter
 {
     public const MAX_SOURCE_BYTES = 104857600;
+    public const MAX_REMOTE_REQUEST_BYTES = 150000000;
+    private const MAX_REMOTE_OUTPUT_BYTES = self::MAX_SOURCE_BYTES;
+    private const MAX_REMOTE_JSON_BYTES = 150000000;
 
     public static function definitions(string $rootDir = ''): array
     {
@@ -440,6 +443,7 @@ class Converter
             'defaults' => is_array($definition['defaults'] ?? null) ? $definition['defaults'] : [],
             'ui' => is_array($definition['ui'] ?? null) ? $definition['ui'] : self::defaultUi(),
             'remote' => $remote,
+            'network' => is_array($definition['network'] ?? null) ? $definition['network'] : [],
             'source' => (string) ($definition['source'] ?? ''),
             'grain' => (bool) ($definition['grain'] ?? false),
         ];
@@ -582,15 +586,42 @@ class Converter
     {
         return array_values(array_filter(
             self::availableFor($mimeType, $kind, $extension, $rootDir),
-            [self::class, 'canOffer']
+            static fn(array $definition): bool => self::canOffer($definition)
+                && self::networkPublicationEnabled($definition)
         ));
+    }
+
+    public static function networkPublicationEnabled(array $definition): bool
+    {
+        return ($definition['network']['publish'] ?? false) === true;
+    }
+
+    public static function peerRequestSignature(
+        array $payload,
+        string $timestamp,
+        string $nonce,
+        string $secret,
+        ?string $canonicalBody = null
+    ): string
+    {
+        $body = $canonicalBody ?? json_encode($payload, JSON_UNESCAPED_SLASHES);
+        if (!is_string($body) || $secret === '') {
+            return '';
+        }
+        $canonical = "poff-converter/1\nPOST\nconvert-offered\n"
+            . $timestamp . "\n" . $nonce . "\n" . hash('sha256', $body);
+        return hash_hmac('sha256', $canonical, $secret);
     }
 
     public static function canOffer(array $definition): bool
     {
+        if (($definition['enabled'] ?? false) !== true) {
+            return false;
+        }
+
         $engine = strtolower(trim((string) ($definition['engine'] ?? '')));
         if ($engine === 'text-copy') {
-            return ($definition['enabled'] ?? false) === true;
+            return true;
         }
         if (in_array($engine, ['imagemagick', 'simple-image'], true)) {
             return class_exists('Imagick') || self::findCliBinary() !== null;
@@ -866,7 +897,11 @@ class Converter
             is_array($payload['converter'] ?? null) ? $payload['converter'] : []
         );
         $definition = self::definition((string) ($converter['id'] ?? ''), $rootDir);
-        if ($definition === null || !self::canOffer($definition)) {
+        if (
+            $definition === null
+            || !self::canOffer($definition)
+            || !self::networkPublicationEnabled($definition)
+        ) {
             return self::error('Converter is not offered by this Poff node.');
         }
 
@@ -932,6 +967,9 @@ class Converter
         if (!is_string($outputBody) || $outputBody === '') {
             return self::error('Offered converter failed.');
         }
+        if (strlen($outputBody) > self::MAX_REMOTE_OUTPUT_BYTES) {
+            return self::error('Converted output exceeds the allowed size.');
+        }
 
         return [
             'ok' => true,
@@ -984,17 +1022,42 @@ class Converter
         $output = $conversion['output'];
         $target = is_array($conversion['target'] ?? null) ? $conversion['target'] : [];
         $saveMode = self::normalizeSaveMode((string) ($target['mode'] ?? 'new-hidden-work'));
+        if ($saveMode === 'temporary-preview-only') {
+            return self::error('Preview-only conversion results cannot be saved.');
+        }
         $rawOutputName = basename(str_replace('\\', '/', trim((string) ($output['name'] ?? 'converted.webp'))));
         $outputName = self::sanitizeOutputName($rawOutputName);
         $outputMime = strtolower(trim((string) ($output['mimeType'] ?? '')));
         if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png', 'application/json', 'text/plain', 'text/markdown', 'text/html'])) {
             return self::error('Converted MIME type is not allowed.');
         }
+        if (isset($output['size']) && (int) $output['size'] > self::MAX_REMOTE_OUTPUT_BYTES) {
+            return self::error('Converted output exceeds the allowed size.');
+        }
+
+        $folderDir = dirname($sourceFullPath);
+        $targetPath = $folderDir . DIRECTORY_SEPARATOR . $outputName;
+        if ($saveMode !== 'replace-source-file') {
+            if (is_link($targetPath)) {
+                return self::error('Converted work target cannot be a symbolic link.');
+            }
+            if (file_exists($targetPath)) {
+                if ($saveMode !== 'replace-generated-work') {
+                    return self::error('Converted work already exists. Choose replace-generated-work to replace a generated result.');
+                }
+                if (!self::generatedWorkBelongsToSource($folderDir, $outputName, basename($sourcePath))) {
+                    return self::error('Existing target is not a generated work from this source.');
+                }
+            }
+        }
 
         $body = '';
         if (isset($output['bodyBase64']) && is_string($output['bodyBase64']) && $output['bodyBase64'] !== '') {
+            if (strlen($output['bodyBase64']) > (int) ceil(self::MAX_REMOTE_OUTPUT_BYTES * 4 / 3) + 4) {
+                return self::error('Converted output exceeds the allowed size.');
+            }
             $decoded = base64_decode($output['bodyBase64'], true);
-            if ($decoded === false) {
+            if ($decoded === false || strlen($decoded) > self::MAX_REMOTE_OUTPUT_BYTES) {
                 return self::error('Converted body is invalid base64.');
             }
             $body = $decoded;
@@ -1004,6 +1067,9 @@ class Converter
                 return self::error('Converted download failed.');
             }
             $body = (string) ($download['body'] ?? '');
+            if (strlen($body) > self::MAX_REMOTE_OUTPUT_BYTES) {
+                return self::error('Converted output exceeds the allowed size.');
+            }
         } else {
             return self::error('Converted response has no body.');
         }
@@ -1025,9 +1091,18 @@ class Converter
             ];
         }
 
-        $folderDir = dirname($sourceFullPath);
-        $targetPath = $folderDir . DIRECTORY_SEPARATOR . $outputName;
-        if (file_put_contents($targetPath, $body) === false) {
+        if ($saveMode === 'new-hidden-work') {
+            $targetHandle = @fopen($targetPath, 'xb');
+            if (!is_resource($targetHandle)) {
+                return self::error('Converted work already exists. Choose replace-generated-work to replace a generated result.');
+            }
+            $written = fwrite($targetHandle, $body);
+            fclose($targetHandle);
+            if ($written !== strlen($body)) {
+                @unlink($targetPath);
+                return self::error('Failed to write converted work.');
+            }
+        } elseif (file_put_contents($targetPath, $body, LOCK_EX) === false) {
             return self::error('Failed to write converted work.');
         }
 
@@ -1075,6 +1150,23 @@ class Converter
             'path' => trim(dirname($sourcePath), '.') === '' ? $outputName : trim(dirname($sourcePath), '/\\') . '/' . $outputName,
             'entry' => $entry,
         ];
+    }
+
+    private static function generatedWorkBelongsToSource(string $folderDir, string $fileName, string $sourceName): bool
+    {
+        if (!class_exists('PoffConfig')) {
+            return false;
+        }
+        $configPath = PoffConfig::fileConfigPath($folderDir, $fileName);
+        if (!is_file($configPath)) {
+            return false;
+        }
+        $config = json_decode((string) @file_get_contents($configPath), true);
+        return is_array($config)
+            && ($config['generated'] ?? false) === true
+            && (string) ($config['sourceWork'] ?? '') === $sourceName
+            && (string) ($config['external']['relation'] ?? '') === 'converted-from'
+            && is_array($config['generatedBy'] ?? null);
     }
 
     private static function convertLocalImage(array $payload, array $definition, string $rootDir): array
@@ -1278,8 +1370,28 @@ HTML;
         if ($validation !== null) {
             return self::error($validation);
         }
+        $scheme = strtolower((string) (parse_url($endpoint, PHP_URL_SCHEME) ?? ''));
+        if (
+            $scheme !== 'https'
+            && !self::isTrustedLocalPageoffConverterEndpoint($endpoint)
+        ) {
+            return self::error('Remote converter requests require HTTPS.');
+        }
 
         $remotePayload = $payload;
+        $remotePayload['source'] = is_array($remotePayload['source'] ?? null)
+            ? $remotePayload['source']
+            : [];
+        $remotePayload['source']['path'] = basename(str_replace(
+            '\\',
+            '/',
+            (string) ($remotePayload['source']['path'] ?? $remotePayload['source']['name'] ?? 'source')
+        ));
+        $remotePayload['source']['srcUrl'] = '';
+        $remotePayload['target'] = is_array($remotePayload['target'] ?? null)
+            ? $remotePayload['target']
+            : [];
+        $remotePayload['target']['folder'] = '';
         $remotePayload['converter'] = is_array($remotePayload['converter'] ?? null)
             ? $remotePayload['converter']
             : [];
@@ -1295,14 +1407,21 @@ HTML;
         }
         $remotePayload['converter']['node'] = 'provider';
 
-        $response = self::httpPost($endpoint, $remotePayload);
+        $providerNodeId = trim((string) ($node['id'] ?? $remote['nodeId'] ?? ''));
+        $response = self::httpPost($endpoint, $remotePayload, $providerNodeId);
         if (($response['ok'] ?? false) !== true) {
-            return self::error('Remote converter request failed.', ['status' => $response['status'] ?? 0]);
+            $message = trim((string) ($response['error'] ?? ''));
+            return self::error(
+                $message !== '' ? $message : 'Remote converter request failed.',
+                ['status' => $response['status'] ?? 0]
+            );
         }
         $decoded = json_decode((string) ($response['body'] ?? ''), true);
         if (!is_array($decoded) || ($decoded['ok'] ?? false) !== true) {
             return self::error('Remote converter returned invalid response.');
         }
+        $decoded['source'] = is_array($decoded['source'] ?? null) ? $decoded['source'] : [];
+        $decoded['source']['path'] = (string) ($payload['source']['path'] ?? '');
         $outputMime = strtolower(trim((string) ($decoded['output']['mimeType'] ?? '')));
         if (!self::mimeAccepted($outputMime, $definition['outputs'] ?? [])) {
             return self::error('Remote output MIME type is not allowed.');
@@ -1329,8 +1448,15 @@ HTML;
 
     public static function validateRemoteEndpoint(string $url, bool $allowPrivate = false): ?string
     {
-        $scheme = strtolower((string) (parse_url($url, PHP_URL_SCHEME) ?? ''));
-        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+        $parts = parse_url(trim($url));
+        if (!is_array($parts)) {
+            return 'Converter endpoint is invalid.';
+        }
+        if (isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])) {
+            return 'Converter endpoint credentials and fragments are not allowed.';
+        }
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = strtolower((string) ($parts['host'] ?? ''));
         if (!in_array($scheme, ['http', 'https'], true)) {
             return 'Only http and https converter endpoints are allowed.';
         }
@@ -1342,6 +1468,175 @@ HTML;
             return 'Converter endpoint host is not allowed.';
         }
         return null;
+    }
+
+    public static function resolveRemoteAddresses(string $host, bool $allowPrivate = false): array
+    {
+        $host = trim(strtolower($host), '[]');
+        if ($host === '') {
+            return ['ok' => false, 'addresses' => [], 'error' => 'Converter endpoint host is missing.'];
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            $addresses = [$host];
+        } else {
+            if (preg_match('/^(?:[0-9.]+|0x[0-9a-f.]+)$/i', $host)) {
+                return ['ok' => false, 'addresses' => [], 'error' => 'Converter endpoint host uses an invalid numeric IP form.'];
+            }
+            $lookup = $GLOBALS['__poff_converter_dns_lookup'] ?? null;
+            $records = is_callable($lookup) ? $lookup($host) : @dns_get_record($host, DNS_A | DNS_AAAA);
+            $addresses = [];
+            if (is_array($records)) {
+                foreach ($records as $record) {
+                    if (!is_array($record)) {
+                        $addresses[] = (string) $record;
+                        continue;
+                    }
+                    foreach (['ip', 'ipv6'] as $addressKey) {
+                        if (isset($record[$addressKey])) {
+                            $addresses[] = (string) $record[$addressKey];
+                        }
+                    }
+                }
+            }
+            if ($addresses === []) {
+                $ipv4 = @gethostbynamel($host);
+                if (is_array($ipv4)) {
+                    $addresses = $ipv4;
+                }
+            }
+            $addresses = array_values(array_unique(array_filter($addresses, static fn(string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false)));
+        }
+
+        if ($addresses === []) {
+            return ['ok' => false, 'addresses' => [], 'error' => 'Converter endpoint host did not resolve to an IP address.'];
+        }
+        foreach ($addresses as $address) {
+            if (!$allowPrivate && !self::isPublicIpAddress($address)) {
+                return ['ok' => false, 'addresses' => [], 'error' => 'Converter endpoint resolves to a private or reserved IP address.'];
+            }
+        }
+        return ['ok' => true, 'addresses' => $addresses, 'error' => ''];
+    }
+
+    public static function httpRequestPinned(
+        string $method,
+        string $url,
+        ?string $body,
+        array $headers,
+        int $timeoutSeconds,
+        int $maxResponseBytes,
+        bool $allowPrivate = false
+    ): array {
+        $validation = self::validateRemoteEndpoint($url, $allowPrivate);
+        if ($validation !== null) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => $validation];
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts)) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Converter endpoint is invalid.'];
+        }
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $port = (int) ($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
+        $resolution = self::resolveRemoteAddresses($host, $allowPrivate);
+        if (($resolution['ok'] ?? false) !== true) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => $resolution['error'] ?? 'Converter endpoint host is not allowed.'];
+        }
+        $pinnedAddress = (string) $resolution['addresses'][0];
+
+        if (function_exists('curl_init')) {
+            $responseBody = '';
+            $tooLarge = false;
+            $responseHeaders = [];
+            $handle = curl_init($url);
+            if ($handle === false) {
+                return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Unable to initialize the pinned converter connection.'];
+            }
+            $resolveHost = str_contains($host, ':') ? '[' . trim($host, '[]') . ']' : $host;
+            $resolveAddress = str_contains($pinnedAddress, ':') ? '[' . trim($pinnedAddress, '[]') . ']' : $pinnedAddress;
+            $resolve = $resolveHost . ':' . $port . ':' . $resolveAddress;
+            curl_setopt_array($handle, [
+                CURLOPT_CUSTOMREQUEST => strtoupper($method),
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_TIMEOUT => max(1, $timeoutSeconds),
+                CURLOPT_CONNECTTIMEOUT => min(10, max(1, $timeoutSeconds)),
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_MAXREDIRS => 0,
+                CURLOPT_RETURNTRANSFER => false,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_RESOLVE => [$resolve],
+                CURLOPT_PROXY => '',
+                CURLOPT_NOSIGNAL => true,
+                CURLOPT_HEADERFUNCTION => static function ($curl, string $line) use (&$responseHeaders, &$tooLarge, $maxResponseBytes): int {
+                    $length = strlen($line);
+                    $responseHeaders[] = trim($line);
+                    if (preg_match('/^Content-Length:\\s*(\\d+)/i', $line, $matches)
+                        && (int) $matches[1] > $maxResponseBytes) {
+                        $tooLarge = true;
+                        return 0;
+                    }
+                    return $length;
+                },
+                CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk) use (&$responseBody, &$tooLarge, $maxResponseBytes): int {
+                    if (strlen($responseBody) + strlen($chunk) > $maxResponseBytes) {
+                        $tooLarge = true;
+                        return 0;
+                    }
+                    $responseBody .= $chunk;
+                    return strlen($chunk);
+                },
+            ]);
+            if ($body !== null && strtoupper($method) !== 'GET') {
+                curl_setopt($handle, CURLOPT_POSTFIELDS, $body);
+            }
+            if (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTP') && defined('CURLPROTO_HTTPS')) {
+                curl_setopt($handle, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+            }
+            $executed = curl_exec($handle);
+            $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+            $error = curl_error($handle);
+            curl_close($handle);
+            if ($tooLarge) {
+                return ['ok' => false, 'status' => $status, 'body' => '', 'error' => 'Remote response exceeds the allowed size.'];
+            }
+            return [
+                'ok' => $executed !== false && $status >= 200 && $status < 300,
+                'status' => $status,
+                'body' => $executed !== false ? $responseBody : '',
+                'error' => $executed === false ? $error : '',
+            ];
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) === false) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Pinned DNS transport requires the PHP cURL extension for hostnames.'];
+        }
+        $httpHeaders = implode("\r\n", $headers);
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => $httpHeaders,
+                'content' => $body ?? '',
+                'timeout' => max(1, $timeoutSeconds),
+                'ignore_errors' => true,
+                'follow_location' => 0,
+                'max_redirects' => 0,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'peer_name' => $host,
+                'SNI_enabled' => true,
+            ],
+        ]);
+        $response = self::readHttpResponse($url, $context, $maxResponseBytes);
+        return [
+            'ok' => !$response['tooLarge'] && $response['body'] !== false && $response['status'] >= 200 && $response['status'] < 300,
+            'status' => $response['status'],
+            'body' => $response['body'] !== false && !$response['tooLarge'] ? $response['body'] : '',
+            'error' => $response['tooLarge'] ? 'Remote response exceeds the allowed size.' : '',
+        ];
     }
 
     private static function definitionFromRemoteSelection(array $converter): ?array
@@ -1745,56 +2040,74 @@ HTML;
 
     private static function hostIsPrivate(string $host): bool
     {
-        if ($host === 'localhost' || str_ends_with($host, '.localhost')) {
-            return true;
+        $resolution = self::resolveRemoteAddresses($host, true);
+        if (($resolution['ok'] ?? false) !== true) {
+            return false;
         }
-        $ips = gethostbynamel($host);
-        if (!is_array($ips) || $ips === []) {
-            $ips = [$host];
-        }
-        foreach ($ips as $ip) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                    return true;
-                }
-            } elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
-                $normalized = strtolower($ip);
-                if ($normalized === '::1' || str_starts_with($normalized, 'fe80:') || str_starts_with($normalized, 'fc') || str_starts_with($normalized, 'fd')) {
-                    return true;
-                }
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                    return true;
-                }
+        foreach ($resolution['addresses'] as $address) {
+            if (!self::isPublicIpAddress((string) $address)) {
+                return true;
             }
         }
         return false;
     }
 
-    private static function httpPost(string $url, array $payload): array
+    private static function httpPost(string $url, array $payload, string $providerNodeId = ''): array
     {
         $override = $GLOBALS['__poff_converter_http_post'] ?? null;
         if (is_callable($override)) {
             $response = $override($url, ['Accept: application/json'], $payload);
             return is_array($response) ? $response : ['ok' => false, 'status' => 0, 'body' => ''];
         }
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => "Content-Type: application/json\r\nAccept: application/json",
-                'content' => json_encode($payload, JSON_UNESCAPED_SLASHES),
-                'timeout' => 30,
-                'ignore_errors' => true,
-                'follow_location' => 0,
-                'max_redirects' => 0,
+        $credentialsJson = getenv('POFF_CONVERTER_PEER_CREDENTIALS');
+        $credentials = is_string($credentialsJson) ? json_decode($credentialsJson, true) : null;
+        $credential = is_array($credentials) && is_array($credentials[$providerNodeId] ?? null)
+            ? $credentials[$providerNodeId]
+            : [];
+        $peerId = trim((string) ($credential['peerId'] ?? ''));
+        $secret = (string) ($credential['secret'] ?? '');
+        $configuredOrigin = self::remoteEndpointOrigin((string) ($credential['origin'] ?? ''));
+        $requestOrigin = self::remoteEndpointOrigin($url);
+        if (
+            $providerNodeId === ''
+            || !preg_match('/^[A-Za-z0-9._:-]{1,128}$/', $peerId)
+            || strlen($secret) < 32
+            || $configuredOrigin === ''
+            || $requestOrigin === ''
+            || !hash_equals($configuredOrigin, $requestOrigin)
+        ) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Remote converter credentials do not match the selected provider.'];
+        }
+        $timestamp = (string) time();
+        try {
+            $nonce = bin2hex(random_bytes(16));
+        } catch (Throwable $error) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Unable to create remote converter request signature.'];
+        }
+        $requestBody = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        if (!is_string($requestBody) || strlen($requestBody) > self::MAX_REMOTE_REQUEST_BYTES) {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Remote converter request exceeds the allowed size.'];
+        }
+        $signature = self::peerRequestSignature($payload, $timestamp, $nonce, $secret, $requestBody);
+        if ($signature === '') {
+            return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Unable to create remote converter request signature.'];
+        }
+        return self::httpRequestPinned(
+            'POST',
+            $url,
+            $requestBody,
+            [
+                'Content-Type: application/json',
+                'Accept: application/json',
+                'X-Poff-Node-Id: ' . $peerId,
+                'X-Poff-Timestamp: ' . $timestamp,
+                'X-Poff-Nonce: ' . $nonce,
+                'X-Poff-Signature: ' . $signature,
             ],
-        ]);
-        $body = @file_get_contents($url, false, $context);
-        $status = self::statusFromHeaders($http_response_header ?? []);
-        return [
-            'ok' => $body !== false && $status >= 200 && $status < 300,
-            'status' => $status,
-            'body' => $body !== false ? $body : '',
-        ];
+            30,
+            self::MAX_REMOTE_JSON_BYTES,
+            self::isTrustedLocalPageoffConverterEndpoint($url) || getenv('POFF_ALLOW_PRIVATE_CONVERTER_HOSTS') === '1'
+        );
     }
 
     private static function remoteUsesTextFormats(string $format, array $definition): bool
@@ -1841,21 +2154,98 @@ HTML;
         if ($validation !== null) {
             return ['ok' => false, 'status' => 0, 'body' => '', 'error' => $validation];
         }
-        $body = @file_get_contents($url, false, stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 30,
-                'ignore_errors' => true,
-                'follow_location' => 0,
-                'max_redirects' => 0,
-            ],
-        ]));
-        $status = self::statusFromHeaders($http_response_header ?? []);
-        return [
-            'ok' => $body !== false && $status >= 200 && $status < 300,
-            'status' => $status,
-            'body' => $body !== false ? $body : '',
-        ];
+        return self::httpRequestPinned(
+            'GET',
+            $url,
+            null,
+            ['Accept: */*'],
+            30,
+            self::MAX_REMOTE_OUTPUT_BYTES,
+            getenv('POFF_ALLOW_PRIVATE_CONVERTER_HOSTS') === '1'
+        );
+    }
+
+    private static function readHttpResponse(string $url, $context, int $maxBytes): array
+    {
+        $stream = @fopen($url, 'rb', false, $context);
+        if ($stream === false) {
+            return ['body' => false, 'status' => 0, 'tooLarge' => false];
+        }
+
+        $metadata = stream_get_meta_data($stream);
+        $headers = is_array($metadata['wrapper_data'] ?? null) ? $metadata['wrapper_data'] : [];
+        foreach ($headers as $header) {
+            if (preg_match('/^Content-Length:\s*(\d+)/i', (string) $header, $matches)
+                && (int) $matches[1] > $maxBytes) {
+                fclose($stream);
+                return ['body' => false, 'status' => self::statusFromHeaders($headers), 'tooLarge' => true];
+            }
+        }
+
+        $body = '';
+        while (!feof($stream)) {
+            $remaining = $maxBytes + 1 - strlen($body);
+            $chunk = fread($stream, min(8192, $remaining));
+            if ($chunk === false) {
+                fclose($stream);
+                return ['body' => false, 'status' => self::statusFromHeaders($headers), 'tooLarge' => false];
+            }
+            $body .= $chunk;
+            if (strlen($body) > $maxBytes) {
+                fclose($stream);
+                return ['body' => false, 'status' => self::statusFromHeaders($headers), 'tooLarge' => true];
+            }
+        }
+        fclose($stream);
+        return ['body' => $body, 'status' => self::statusFromHeaders($headers), 'tooLarge' => false];
+    }
+
+    private static function remoteEndpointOrigin(string $url): string
+    {
+        $parts = parse_url(trim($url));
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return '';
+        }
+        $scheme = strtolower((string) $parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return '';
+        }
+        $host = strtolower((string) $parts['host']);
+        if (str_contains($host, ':') && !str_starts_with($host, '[')) {
+            $host = '[' . $host . ']';
+        }
+        $port = (int) ($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
+        $defaultPort = ($scheme === 'https' && $port === 443) || ($scheme === 'http' && $port === 80);
+        return $scheme . '://' . $host . ($defaultPort ? '' : ':' . $port);
+    }
+
+    private static function isPublicIpAddress(string $address): bool
+    {
+        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return filter_var(
+                $address,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            ) !== false;
+        }
+        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+            return false;
+        }
+        $packed = @inet_pton($address);
+        if (!is_string($packed) || strlen($packed) !== 16) {
+            return false;
+        }
+        if (substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
+            return self::isPublicIpAddress((string) inet_ntop(substr($packed, 12, 4)));
+        }
+        if ((ord($packed[0]) & 0xe0) !== 0x20) {
+            return false;
+        }
+        return filter_var(
+            $address,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) !== false;
     }
 
     private static function statusFromHeaders(array $headers): int

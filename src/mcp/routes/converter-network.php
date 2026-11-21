@@ -52,6 +52,111 @@ function mcpConverterOfferDefinition(array $definition): array
     ];
 }
 
+function mcpConverterConsumePeerNonce(string $peerId, string $nonce): bool
+{
+    $configuredPath = getenv('POFF_CONVERTER_REPLAY_FILE');
+    if (is_string($configuredPath) && trim($configuredPath) !== '') {
+        $path = trim($configuredPath);
+    } else {
+        $directory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'pageoff-converter-replay-' . substr(hash('sha256', (string) gethostname()), 0, 20);
+        if (is_link($directory) || (!is_dir($directory) && !@mkdir($directory, 0700, true))) {
+            return false;
+        }
+        @chmod($directory, 0700);
+        $directoryMode = @fileperms($directory);
+        if (!is_int($directoryMode) || (($directoryMode & 0077) !== 0) || !is_writable($directory)) {
+            return false;
+        }
+        $path = $directory . DIRECTORY_SEPARATOR . 'nonces.json';
+    }
+    if (is_link($path)) {
+        return false;
+    }
+    $handle = @fopen($path, 'c+');
+    if (!is_resource($handle) || !flock($handle, LOCK_EX)) {
+        if (is_resource($handle)) {
+            fclose($handle);
+        }
+        return false;
+    }
+
+    rewind($handle);
+    $contents = stream_get_contents($handle, 2097153);
+    if (!is_string($contents) || strlen($contents) > 2097152) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        return false;
+    }
+    $records = $contents !== '' ? json_decode($contents, true) : [];
+    if (!is_array($records)) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        return false;
+    }
+
+    $now = time();
+    foreach ($records as $key => $record) {
+        $seenAt = is_array($record) ? (int) ($record['time'] ?? 0) : (int) $record;
+        if ($seenAt < $now - 300 || $seenAt > $now + 300) {
+            unset($records[$key]);
+        }
+    }
+    $recordKey = hash('sha256', $peerId . "\n" . $nonce);
+    if (isset($records[$recordKey]) || count($records) >= 5000) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        return false;
+    }
+    $records[$recordKey] = ['time' => $now];
+    $encoded = json_encode($records, JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded)) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        return false;
+    }
+    rewind($handle);
+    $written = fwrite($handle, $encoded);
+    $ok = $written === strlen($encoded) && ftruncate($handle, strlen($encoded)) && fflush($handle);
+    @chmod($path, 0600);
+    $fileMode = @fileperms($path);
+    $ok = $ok && is_int($fileMode) && (($fileMode & 0077) === 0);
+    flock($handle, LOCK_UN);
+    fclose($handle);
+    return $ok;
+}
+
+function mcpConverterAuthenticatePeer(array $payload): bool
+{
+    if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
+        return false;
+    }
+    $peerId = trim((string) ($_SERVER['HTTP_X_POFF_NODE_ID'] ?? ''));
+    $timestamp = trim((string) ($_SERVER['HTTP_X_POFF_TIMESTAMP'] ?? ''));
+    $nonce = strtolower(trim((string) ($_SERVER['HTTP_X_POFF_NONCE'] ?? '')));
+    $signature = strtolower(trim((string) ($_SERVER['HTTP_X_POFF_SIGNATURE'] ?? '')));
+    if (
+        !preg_match('/^[A-Za-z0-9._:-]{1,128}$/', $peerId)
+        || !preg_match('/^\d{10}$/', $timestamp)
+        || abs(time() - (int) $timestamp) > 300
+        || !preg_match('/^[a-f0-9]{32}$/', $nonce)
+        || !preg_match('/^[a-f0-9]{64}$/', $signature)
+    ) {
+        return false;
+    }
+
+    $trustedJson = getenv('POFF_CONVERTER_TRUSTED_PEERS');
+    $trusted = is_string($trustedJson) ? json_decode($trustedJson, true) : null;
+    $secret = is_array($trusted) ? (string) ($trusted[$peerId] ?? '') : '';
+    if (strlen($secret) < 32) {
+        return false;
+    }
+    $expected = Converter::peerRequestSignature($payload, $timestamp, $nonce, $secret);
+    return $expected !== ''
+        && hash_equals($expected, $signature)
+        && mcpConverterConsumePeerNonce($peerId, $nonce);
+}
+
 function handleConverterOffers(array $opts): array
 {
     $rootDir = (string) ($opts['rootDir'] ?? '');
@@ -87,30 +192,19 @@ function mcpConverterCatalogRequest(string $url, array $payload): array
         return is_array($response) ? $response : ['ok' => false, 'status' => 0, 'body' => ''];
     }
 
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\nAccept: application/json",
-            'content' => json_encode($payload, JSON_UNESCAPED_SLASHES),
-            'timeout' => 20,
-            'ignore_errors' => true,
-            'follow_location' => 0,
-            'max_redirects' => 0,
-        ],
-    ]);
-    $body = @file_get_contents($url, false, $context);
-    $status = 0;
-    foreach (($http_response_header ?? []) as $header) {
-        if (preg_match('#^HTTP/\S+\s+(\d{3})#i', (string) $header, $matches)) {
-            $status = (int) $matches[1];
-            break;
-        }
+    $requestBody = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    if (!is_string($requestBody) || strlen($requestBody) > Converter::MAX_REMOTE_REQUEST_BYTES) {
+        return ['ok' => false, 'status' => 0, 'body' => '', 'error' => 'Converter catalog request exceeds the allowed size.'];
     }
-    return [
-        'ok' => $body !== false && $status >= 200 && $status < 300,
-        'status' => $status,
-        'body' => $body !== false ? $body : '',
-    ];
+    return Converter::httpRequestPinned(
+        'POST',
+        $url,
+        $requestBody,
+        ['Content-Type: application/json', 'Accept: application/json'],
+        20,
+        1048576,
+        getenv('POFF_ALLOW_PRIVATE_CONVERTER_HOSTS') === '1'
+    );
 }
 
 function handleRemoteConverters(array $opts): array
@@ -358,6 +452,12 @@ function handleConvertOffered(array $opts): array
 {
     $rootDir = (string) ($opts['rootDir'] ?? '');
     $payload = is_array($opts['payload'] ?? null) ? $opts['payload'] : mcpReadRequestData();
+    if (($payload['__poffRequestTooLarge'] ?? false) === true) {
+        return ['ok' => false, 'route' => 'convert-offered', 'error' => 'Converter request exceeds the allowed size.'];
+    }
+    if (!mcpConverterAuthenticatePeer($payload)) {
+        return ['ok' => false, 'route' => 'convert-offered', 'error' => 'Authenticated converter peer request required.'];
+    }
     $result = Converter::convertOffered($payload, $rootDir);
     $result['route'] = 'convert-offered';
     return $result;

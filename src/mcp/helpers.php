@@ -207,6 +207,22 @@ function mcpReadRequestData(): array
     return is_array($data) ? $data : [];
 }
 
+function mcpReadLimitedRequestData(int $maxBytes): array
+{
+    $raw = file_get_contents('php://input', false, null, 0, max(0, $maxBytes) + 1);
+    if (!is_string($raw)) {
+        return [];
+    }
+    if (strlen($raw) > $maxBytes) {
+        return ['__poffRequestTooLarge' => true];
+    }
+    $data = $raw !== '' ? json_decode($raw, true) : [];
+    if (!is_array($data) || $data === []) {
+        $data = $_POST;
+    }
+    return is_array($data) ? $data : [];
+}
+
 function mcpResolvePathInsideRoot(string $rootDir, string $relativePath): ?string
 {
     $base = realpath(rtrim($rootDir, DIRECTORY_SEPARATOR));

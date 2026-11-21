@@ -160,8 +160,8 @@ function cmsAnnotateConfigWorktypeCatalog(array $config, string $subjectType, st
         $config['converterCatalog'] = [
             'webReadable' => Converter::isWebReadableMime($mime),
             'available' => $availableConverters,
-            'remoteNodeUrl' => 'https://pageoff.de/index.php',
-            'autoLoadRemote' => true,
+            'remoteNodeUrl' => '',
+            'autoLoadRemote' => false,
         ];
         $folderConfig = class_exists('PoffConfig') ? PoffConfig::read($targetDir) : [];
         $tree = is_array($folderConfig['tree'] ?? null) ? $folderConfig['tree'] : [];

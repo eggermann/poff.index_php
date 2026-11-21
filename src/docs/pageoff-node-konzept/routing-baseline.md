@@ -51,6 +51,12 @@ Alle 18 genannten Handler-Routen sind in `viewer.php` und dem Build-Rezept entha
 
 `http-server.php` bietet `workprompt`, `create`, `export_content`, `import_remote`, `converters`, `convert`, `save_converted_work`, `create_converter` und `converter_prompt`. Das ist keine vollständige Abbildung aller JSON-Routen. Dazu kommt der eigenständige `src/mcp/server.php`-Einstieg; seine Adapterrolle muss von der normalen `viewer.php`-Laufzeit getrennt bewertet werden.
 
+### Converter-Routen: discrepancy check
+
+Die frühere Vermutung, `converter-offers`, `remote-converters` oder `convert-offered` fehlten im aktuellen GitHub-Quellstand, trifft auf den hier geprüften Arbeitsstand nicht zu. Alle drei Routen sind in `src/includes/viewer.php`, `src/mcp/server.php` und `build/build.php` registriert; der Handler liegt in `src/mcp/routes/converter-network.php`. Der statische Vertragstest schützt die Zuordnung von Viewer und Builder. Die Streamable-MCP-Tool-Liste ist ein separater, absichtlich kleinerer Transport und enthält diese Provider-Routen nicht.
+
+Das belegt Routing im Source und Build-Rezept, keine Live-Laufzeitparität. Die Routen bleiben Teil der bestehenden JSON Node API und dürfen nicht an das optionale Streamable-MCP-Transportpaket gekoppelt werden. Request-/Response-Felder, Autorisierung und offene SSRF-/Payload-Grenzen sind in [remote-converter-protocol.md](remote-converter-protocol.md) festgehalten.
+
 ### Optionalitätsgrenze
 
 `src/mcp/http-server.php` ist eine separate Laufzeitdatei und wird nicht in `index.php` eingebettet. `build/build.php` fügt jedoch weiterhin die `mcp/routes/*.php`-Handler in den Einzeldatei-Build ein, weil dieselben Handler auch die bestehende JSON-Node-API bedienen. Diese Handler bei einem MCP-Schalter zu entfernen, würde daher bestehende `?mcp=1&route=…`-Clients brechen.

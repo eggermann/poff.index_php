@@ -54,6 +54,8 @@ Worktypes beschreiben, wie erkannte Ressourcen fachlich eingeordnet und gerender
 
 Der heutige Code registriert Worktypes und Converter über Dateien, Bundles und Build-Einbettung; einen gemeinsamen Plugin-Manager gibt es nicht. Architektur-Ziel führt deshalb keinen generischen Plugin-Rahmen ein. Exakte Matching-, Fallback-, Template- und Builder-Regeln stehen in der [Erweiterbarkeits-Baseline](erweiterbarkeit-baseline.md) und müssen als Kompatibilitätsverträge erhalten bleiben.
 
+**Remote Converter:** `converter-offers`, `remote-converters` und `convert-offered` sind im aktuellen Viewer-Router, Standalone-JSON-Router und Builder vorhanden. Die bestehende Integration umfasst Provider-Abfrage im Work Editor, Remote-Ausführung und lokales Speichern. Vertrag und offene Sicherheitsgrenzen stehen in der [Remote-Converter-Protokollreferenz](remote-converter-protocol.md). Öffentliche Offer-/Execution-Autorisierung ist nicht mit lokaler Editor-Authentifizierung gleichzusetzen.
+
 ## Node, Host, Work und Verbindung
 
 - **Node:** unabhängige PageOff-Installation mit eigener Adresse und eigenen Ressourcen.

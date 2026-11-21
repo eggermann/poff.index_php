@@ -271,7 +271,7 @@ export function renderConverterSection(config = {}) {
     const converter = (work.converter && typeof work.converter === 'object') ? work.converter : {};
     const selectedId = String(converter.id || available.find((item) => item?.enabled !== false)?.id || '').trim();
     const converterNode = converter.node && typeof converter.node === 'object' ? converter.node : {};
-    const remoteNodeUrl = String(catalog?.remoteNodeUrl || converterNode.baseUrl || 'https://pageoff.de/index.php').trim();
+    const remoteNodeUrl = String(catalog?.remoteNodeUrl || converterNode.baseUrl || '').trim();
     const conversionScope = config?.conversionScope && typeof config.conversionScope === 'object'
         ? config.conversionScope
         : {};

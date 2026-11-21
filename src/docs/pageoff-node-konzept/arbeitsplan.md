@@ -24,6 +24,8 @@ Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet me
 
 `Converter::offerableFor()` wählt passende Konverter nach der bestehenden Angebotsregel aus. `converter-offers` liest den Request, erzeugt die Anbieter-URL und gibt nur die öffentlichen Felder im Format `poff-converter/1` aus. Die Auswahl lässt sich im Core ohne HTTP-Request verwenden.
 
+Die tatsächlichen Route-, Editor- und Speicherverträge sowie die offenen Sicherheitsgrenzen sind jetzt in [remote-converter-protocol.md](remote-converter-protocol.md) festgehalten. Die Routen existieren im Quellrouter, Standalone-JSON-Router und Builder; es ist keine Neuanlage der Routen erforderlich.
+
 ## Reihenfolge für die Ausarbeitung
 
 1. **Transport/Core trennen:** weitere reine Konfiguration und Import-Operationen aus MCP-Routen in den Core verschieben; vorhandene Routennamen als Adapter erhalten.
@@ -34,6 +36,7 @@ Der read-only Work-ID-Resolver gibt nur eindeutige Treffer zurück und meldet me
 6. **Host und Rechte ausarbeiten:** `host`-Konfiguration, Open/Curated, Rollen, Vererbung und Grenzen festlegen. Bestehende Eingänge anhand des Quellcodes abgleichen; Host bleibt bis zur abgestimmten Umsetzung unimplementiert.
 7. **Build und Einführung absichern:** jede Änderung in temporärer Einzeldatei prüfen; generierte Inhaltsausgaben und bestehende lokale Build-Dateien unangetastet lassen.
 8. **Erweiterbarkeit erhalten:** Worktype-, Layout- und Converter-Verträge beibehalten; nur capability-spezifische Core-Grenzen extrahieren. [Audit-Baseline](erweiterbarkeit-baseline.md)
+9. **Remote Converter abschließen:** Explizite Angebotsfreigabe, HMAC-Node-Authentifizierung, Replay-Schutz, Pfad-Minimierung, begrenzte Payloads, sichere Save-Modes und DNS-/Verbindungs-Pinning sind umgesetzt und durch Regressionen abgesichert. Der Discovery-bis-Speichern-Lebenszyklus ist als kontrollierter Testfluss verbunden; ein zweiter lokaler PHP-Node über echten HTTP-Transport fehlt noch. Key-Rotation/Handshake und Quotas bleiben Betriebsaufgaben. Remote-Konvertierung ist für explizit freigegebene und konfigurierte Peers nutzbar; sie ersetzt keine Betreiberentscheidung über vertrauenswürdige Provider.
 
 Für jeden Schritt: erst Beispiele und Akzeptanzkriterien mit dem Nutzer durchgehen, dann Quellstand prüfen und eine kleine Änderung planen. Die Reihenfolge ist ein Vorschlag; sie verpflichtet noch nicht auf ein Datenformat oder eine öffentliche API.
 

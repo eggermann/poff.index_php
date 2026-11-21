@@ -144,7 +144,7 @@ if ((string) ($_GET['mcp'] ?? '') === '1') {
             case 'convert-offered':
                 mcpJsonResponse(handleConvertOffered([
                     'rootDir' => $rootDir,
-                    'payload' => mcpReadRequestData(),
+                    'payload' => mcpReadLimitedRequestData(Converter::MAX_REMOTE_REQUEST_BYTES),
                 ]));
             case 'create-converter':
                 mcpJsonResponse(handleCreateConverter([

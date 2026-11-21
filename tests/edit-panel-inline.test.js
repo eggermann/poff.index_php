@@ -585,7 +585,7 @@ test('remote converter selection preserves provider routing metadata', () => {
   }));
 });
 
-test('file converter defaults to pageoff and offers same-type bulk conversion', () => {
+test('file converter does not assume a remote provider and offers same-type bulk conversion', () => {
   const { renderConverterSection } = loadConverterSectionHelpers();
   const html = renderConverterSection({
     mimeType: 'image/heic',
@@ -595,11 +595,12 @@ test('file converter defaults to pageoff and offers same-type bulk conversion', 
     },
     converterCatalog: {
       available: [],
-      autoLoadRemote: true,
+      remoteNodeUrl: '',
+      autoLoadRemote: false,
     },
   });
 
-  expect(html).toContain('value="https://pageoff.de/index.php"');
+  expect(html).toContain('id="edit-converter-node-url" name="converter_node_url" type="url" value=""');
   expect(html).toContain('id="edit-converter-all-of-type" type="checkbox" checked');
   expect(html).toContain('Convert all 16 <strong>image/heic</strong> files in this folder');
   expect(html).toContain('id="edit-converter-hide-originals" type="checkbox" checked');
