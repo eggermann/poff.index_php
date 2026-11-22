@@ -3453,6 +3453,80 @@ describe('Poff converters', () => {
     }
   });
 
+  test('discovers, signs, executes and saves through a controlled PHP HTTP provider', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-two-node-'));
+    const consumer = path.join(root, 'consumer');
+    const provider = path.join(root, 'provider');
+    fs.mkdirSync(consumer);
+    fs.mkdirSync(provider);
+    fs.writeFileSync(path.join(consumer, '.edit.allow'), '');
+    fs.writeFileSync(path.join(consumer, 'source.txt'), 'hello peer');
+    createConverterApp(provider, 'convert-peer-text', {
+      engine: 'text-copy', accepts: ['text/plain'], outputs: ['text/plain'],
+      formats: ['txt'], defaults: { format: 'txt' }, network: { publish: true },
+    });
+    const reservation = http.createServer();
+    await new Promise((resolve) => reservation.listen(0, '127.0.0.1', resolve));
+    const port = reservation.address().port;
+    await new Promise((resolve) => reservation.close(resolve));
+    const secret = 'controlled-provider-secret-at-least-32-bytes';
+    const origin = `http://127.0.0.1:${port}`;
+    const providerUrl = `${origin}/worktypes/templates/converter/convert-text-editor/converter.php`;
+    const server = spawn('php', ['-S', `127.0.0.1:${port}`, path.join(ROOT, 'tests/php_converter_http_provider.php')], {
+      cwd: ROOT,
+      env: withTestEnv({
+        POFF_TEST_PROVIDER_ROOT: provider,
+        POFF_CONVERTER_TRUSTED_PEERS: JSON.stringify({ 'test-consumer': secret }),
+        POFF_CONVERTER_REPLAY_FILE: path.join(root, 'replay.json'),
+      }),
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('PHP test provider startup timed out')), 5000);
+        server.stderr.on('data', (chunk) => {
+          if (chunk.toString().includes('Development Server')) { clearTimeout(timer); resolve(); }
+        });
+        server.once('error', (error) => { clearTimeout(timer); reject(error); });
+        server.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PHP provider exited: ${code}`)); });
+      });
+      const env = {
+        POFF_ALLOW_PRIVATE_CONVERTER_HOSTS: '1',
+        POFF_CONVERTER_PEER_CREDENTIALS: JSON.stringify({
+          'test-provider': { peerId: 'test-consumer', secret, origin },
+        }),
+      };
+      const catalog = await runConverterRoute('remote-catalog', consumer, {
+        path: 'source.txt', nodeUrl: providerUrl, mimeType: 'text/plain', kind: 'text', extension: 'txt',
+      }, env);
+      expect(catalog.ok).toBe(true);
+      const selected = catalog.available.find((item) => item.node.converterId === 'converter/convert-peer-text');
+      expect(selected).toBeTruthy();
+      const conversion = await runConverterRoute('convert', consumer, {
+        source: { name: 'source.txt', path: 'source.txt', mimeType: 'text/plain', kind: 'text' },
+        converter: { ...selected, format: 'txt' },
+        target: { saveAs: 'result.txt', mode: 'new-hidden-work' },
+      }, env);
+      expect(conversion.ok).toBe(true);
+      expect(Buffer.from(conversion.output.bodyBase64, 'base64').toString()).toBe('hello peer');
+      expect(conversion.generatedBy.node).toBe('test-provider');
+      const saved = await runConverterRoute('save', consumer, { sourcePath: 'source.txt', conversion });
+      expect(saved.ok).toBe(true);
+      expect(fs.readFileSync(path.join(consumer, 'source.txt'), 'utf8')).toBe('hello peer');
+      expect(fs.readFileSync(path.join(consumer, 'result.txt'), 'utf8')).toBe('hello peer');
+      const sidecar = JSON.parse(fs.readFileSync(path.join(consumer, '.works', 'result.txt.config.json'), 'utf8'));
+      expect(sidecar.generatedBy.node).toBe('test-provider');
+      expect(sidecar.sourceWork).toBe('source.txt');
+    } finally {
+      if (server.exitCode === null) {
+        const stopped = new Promise((resolve) => server.once('exit', resolve));
+        server.kill();
+        await stopped;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('converts an inline file offered by a foreign Poff node', async () => {
     const body = fs.readFileSync(path.join(ROOT, 'archive/scan-001.tiff'));
     const result = await runConverterRoute('convert-offered', POFF_DIR, {

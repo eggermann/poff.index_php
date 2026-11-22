@@ -184,15 +184,17 @@ if ($mode === 'offers') {
 }
 
 if ($mode === 'remote-catalog') {
-    $mockCatalog = is_array($payload['mockCatalog'] ?? null) ? $payload['mockCatalog'] : [];
-    $GLOBALS['__poff_converter_catalog_post'] = static function (string $url, array $requestPayload) use ($mockCatalog): array {
-        return [
-            'ok' => true,
-            'status' => 200,
-            'body' => json_encode($mockCatalog, JSON_UNESCAPED_SLASHES),
-        ];
-    };
-    unset($payload['mockCatalog']);
+    if (isset($payload['mockCatalog']) && is_array($payload['mockCatalog'])) {
+        $mockCatalog = $payload['mockCatalog'];
+        $GLOBALS['__poff_converter_catalog_post'] = static function (string $url, array $requestPayload) use ($mockCatalog): array {
+            return [
+                'ok' => true,
+                'status' => 200,
+                'body' => json_encode($mockCatalog, JSON_UNESCAPED_SLASHES),
+            ];
+        };
+        unset($payload['mockCatalog']);
+    }
     echo json_encode(handleRemoteConverters([
         'rootDir' => $rootDir,
         'input' => $payload,

@@ -18,11 +18,11 @@ Recipe reconciliation (22 November 2026):
 | --- | --- | --- |
 | Route reconciliation and discovery | Three existing JSON routes in source, standalone router and Builder; routing contract tests | Bundled runtime equivalence is not asserted |
 | Work Editor | Existing selection and explicit provider URL; editor regression tests | Full browser interaction with a local provider remains unverified |
-| Execution and local save | HMAC peer execution, bounded transport and guarded save modes; converter tests | Local two-node HTTP provider lifecycle remains unverified |
+| Execution and local save | HMAC peer execution, bounded transport and guarded save modes; converter tests | Controlled local PHP HTTP provider lifecycle is covered; production TLS is not exercised |
 | Output validation | Offered MIME and body bounds; save validates optional integer size against actual decoded/downloaded bytes | MIME declaration is not proof of file content; broader malformed response tests remain |
 | Operations | Explicit per-definition publication and out-of-band peer credentials | Key rotation/handshake and per-peer quotas remain open |
 
-Next slices: declared-size persistence regression, then controlled provider transport integration and malformed-response coverage. The recipe is not complete while those verification gaps remain.
+Controlled provider HTTP integration now covers discovery, selection metadata, signed text conversion, validated response, local save and provenance. Browser selection, production TLS and remaining malformed-response/content-validation gaps still need separate verification.
 
 | Stage | Current implementation | Behavior |
 | --- | --- | --- |
@@ -229,7 +229,7 @@ The built-in byte limits and timeouts do not constitute per-peer rate or compute
 3. **P1 Peer operations:** add a key rotation/handshake procedure, persistent replay storage guidance and a distributed per-peer rate/compute quota. Current keys are provisioned out of band.
 4. **P1 Work Editor:** provider URL defaults empty and no catalog query runs on Work open. Add a regression proving the default server config keeps auto-load disabled and explicit URL entry loads offers.
 5. **P1 Persistence:** save-mode collision rules, preview rejection and declared output-size equality are covered. Size may be omitted; if provided, it must be a non-negative JSON integer equal to decoded/downloaded byte length. Add broader write-failure coverage.
-6. **P1 Compatibility tests:** mocked discovery → selected offer → remote result → local generated-work save is now covered as one flow; signed sender, provider auth, replay/expiry, DNS pinning and persistence also have focused regressions. Still add a local PHP two-node HTTP integration that exercises the provider handler over the pinned transport. No live public endpoint is used in tests.
+6. **P1 Compatibility tests:** mocked discovery → selected offer → remote result → local generated-work save is now covered as one flow; signed sender, provider auth, replay/expiry, DNS pinning and persistence also have focused regressions. A local PHP HTTP provider now exercises discovery and signed execution through the normal bounded transport, then local save and provenance. It uses the development-only private-host flag and trusted local endpoint path; production HTTPS and browser UI are not covered. No live public endpoint is used in tests.
 7. **P2 Docs/build:** architecture, workplan, routing and extension baselines are updated. Keep JSON API routing in source and Builder; no production `npm run build` without separate authorization.
 
 ## Test evidence and limits
