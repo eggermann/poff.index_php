@@ -3563,6 +3563,11 @@ describe('Poff converters', () => {
     expect(result).toEqual({ first: true, second: false });
   });
 
+  test('retains a peer nonce beyond five minutes for future-dated request protection', async () => {
+    const result = await runConverterRoute('peer-replay-retention', POFF_DIR, {});
+    expect(result.accepted).toBe(false);
+  });
+
   test('rejects an expired signed converter peer request', async () => {
     const result = await runConverterRoute('peer-auth-expired', POFF_DIR, {
       testPeerTimestampOffset: -301,
@@ -5048,6 +5053,29 @@ describe('Poff converters', () => {
       expect(fs.existsSync(path.join(tempDir, 'preview.txt'))).toBe(false);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test.each([0, 1, -1, 3.5, '4', null])('save rejects inconsistent or invalid output size %p without writing', async (size) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poff-output-size-'));
+    fs.writeFileSync(path.join(root, '.edit.allow'), '');
+    fs.writeFileSync(path.join(root, 'source.txt'), 'original source');
+    try {
+      const result = await runConverterRoute('save', root, {
+        sourcePath: 'source.txt',
+        conversion: {
+          ok: true,
+          source: { path: 'source.txt', mimeType: 'text/plain' },
+          target: { mode: 'new-hidden-work' },
+          output: { name: 'result.txt', mimeType: 'text/plain', size, bodyBase64: Buffer.from('text').toString('base64') },
+        },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/size/);
+      expect(fs.existsSync(path.join(root, 'result.txt'))).toBe(false);
+      expect(fs.readFileSync(path.join(root, 'source.txt'), 'utf8')).toBe('original source');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

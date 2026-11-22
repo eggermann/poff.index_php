@@ -12,6 +12,18 @@ Security boundary after the current repair: provider discovery remains public by
 
 ## Components and full lifecycle
 
+Recipe reconciliation (22 November 2026):
+
+| Recipe phase | Verified implementation / evidence | Remaining work |
+| --- | --- | --- |
+| Route reconciliation and discovery | Three existing JSON routes in source, standalone router and Builder; routing contract tests | Bundled runtime equivalence is not asserted |
+| Work Editor | Existing selection and explicit provider URL; editor regression tests | Full browser interaction with a local provider remains unverified |
+| Execution and local save | HMAC peer execution, bounded transport and guarded save modes; converter tests | Local two-node HTTP provider lifecycle remains unverified |
+| Output validation | Offered MIME and body bounds; save validates optional integer size against actual decoded/downloaded bytes | MIME declaration is not proof of file content; broader malformed response tests remain |
+| Operations | Explicit per-definition publication and out-of-band peer credentials | Key rotation/handshake and per-peer quotas remain open |
+
+Next slices: declared-size persistence regression, then controlled provider transport integration and malformed-response coverage. The recipe is not complete while those verification gaps remain.
+
 | Stage | Current implementation | Behavior |
 | --- | --- | --- |
 | Local catalog | `Converter::definitions()`, `discover()` | Reads `poff/converters`, `converters`, `.converters` in that order; later duplicate IDs win. Bundled grains and legacy definitions fill IDs not already found. |
@@ -167,7 +179,7 @@ Output bytes are returned inline as Base64 in the current path. The consumer sav
 | `converter-offers` | Public discovery; each definition requires `network.publish: true` and an available local engine | Returns only opted-in, locally executable offers. No caller identity is required to read this public catalog. |
 | `remote-converters` | Local editor access to the selected Work | Outbound POST to editor-supplied provider URL; 20-second timeout, redirects disabled, catalog response capped at 1 MiB. |
 | `convert` | Local editor access and in-root physical source check | Outbound POST to selected offer endpoint; requires configured per-provider peer credentials; 30-second timeout, redirects disabled, JSON response capped at 150,000,000 bytes. |
-| `convert-offered` | Trusted peer only | Request JSON is capped at 150,000,000 bytes before parsing. Requires HMAC-SHA256 signature, a trusted peer ID, a timestamp within ±300 seconds, a 128-bit nonce, and a nonce not used in the last five minutes. Execution requires the converter's explicit network publication opt-in. Decoded input and output are capped at 100 MiB. |
+| `convert-offered` | Trusted peer only | Request JSON is capped at 150,000,000 bytes before parsing. Requires HMAC-SHA256 signature, a trusted peer ID, a timestamp within ±300 seconds, a 128-bit nonce, and a nonce not used in the last ten minutes. Execution requires the converter's explicit network publication opt-in. Decoded input and output are capped at 100 MiB. |
 | `save-converted-work` | Local editor access and source-in-root check | May GET `downloadUrl` returned by a converter; redirects disabled, 30-second timeout, download capped at 100 MiB. Current main remote path uses inline Base64. |
 
 `Converter::httpRequestPinned()` is the outbound transport for catalog POSTs, conversion POSTs and download GETs. It resolves A and AAAA records, rejects the hostname if any answer is private or reserved, then pins the first accepted answer with cURL `CURLOPT_RESOLVE`. cURL keeps the original hostname for HTTP Host, TLS SNI and certificate verification; proxy use and redirects are disabled. If cURL is unavailable, hostname requests fail closed. Direct IP URLs can use the bounded PHP stream fallback with TLS peer verification. `POFF_ALLOW_PRIVATE_CONVERTER_HOSTS=1` is a development-only escape hatch for local tests. Endpoint validation rejects URL credentials/fragments and unsupported schemes. Discovery permits HTTP for compatibility; remote conversion requires HTTPS except for the built-in trusted local converter endpoints. Response size caps apply while reading, before parsing or saving.
@@ -186,6 +198,22 @@ Signature headers are `X-Poff-Node-Id`, `X-Poff-Timestamp`, `X-Poff-Nonce`, and 
 
 Remaining limitations: there is no peer-key rotation/handshake UI or distributed rate limit; catalog reads are public by design. The transport pins one validated address per request, so other public addresses from the same DNS answer are not retried if that address is unavailable. Authentication protects execution from untrusted callers; endpoint allowlisting remains an operator-level policy for trusted providers.
 
+### Operator procedure: rotating a peer key
+
+The current implementation has one secret per trusted peer ID. To overlap old and new credentials, use a new peer ID; there is no multi-key lookup for one ID.
+
+1. Generate a new random secret of at least 32 bytes using a cryptographically secure generator. Transfer it over the operator's trusted channel; never put it into Converter definitions, URLs, logs or public Node metadata.
+2. Add the new peer ID and secret to the provider's `POFF_CONVERTER_TRUSTED_PEERS` while retaining the old peer entry. Apply the environment change to every provider process serving the endpoint.
+3. Update the consumer's entry for that provider in `POFF_CONVERTER_PEER_CREDENTIALS` to the new peer ID and secret, keeping the verified provider origin. Apply it to every consumer process. Test a small authorized conversion with controlled non-private input.
+4. After all consumers have switched and in-flight requests have finished, remove the old peer ID from every provider process. Do not retain an old key merely to accommodate the five-minute signature window: removing it revokes new authentication immediately on updated processes.
+5. If a key is compromised, revoke it first. Availability may be interrupted until replacement credentials are installed. No handshake or automatic peer enrollment is implemented.
+
+### Operator procedure: replay storage and resource limits
+
+Set `POFF_CONVERTER_REPLAY_FILE` to a private, persistent file outside the public content root, writable only by the PHP service account and protected from other local users. Keep its containing directory private. All processes accepting requests for the same peer keys must share this replay store and honor its file locks. Independent replay files on multiple servers do not provide global replay protection. Do not clear or rotate away the store while signed requests can still be fresh. Maintain synchronized clocks; requests outside the ±300-second window are rejected. Nonces are retained for ten minutes after acceptance because a request first accepted with a timestamp five minutes ahead can remain valid for ten minutes in total.
+
+The built-in byte limits and timeouts do not constitute per-peer rate or compute quotas. A publicly reachable provider needs operator-managed concurrency and request-rate limits at its ingress, or restricted network reachability. Trusting a peer authorizes that peer to invoke its published converters repeatedly; distributed quotas remain unimplemented. An ingress header alone is not proof of peer identity before PageOff verifies the HMAC.
+
 ## Single-file and runtime packaging
 
 - `viewer.php` includes `converter-network.php` and dispatches all three JSON routes.
@@ -197,10 +225,10 @@ Remaining limitations: there is no peer-key rotation/handshake UI or distributed
 ## Known gaps and prioritized repair backlog
 
 1. **P0 Endpoint policy — implemented:** validate every A/AAAA answer, reject private/reserved destinations, pin the selected address to each outbound connection, reject URL credentials/fragments, restrict schemes, disable redirects/proxies and retain controlled local test support. Keep tests for mixed public/private answers and a hostname pinned to a deterministic local test server.
-2. **P1 Payload/privacy:** inline requests omit consumer-relative paths, source URL and destination folder; network reads and decoded/saved results have bounded byte limits. Add outgoing request-size verification and compare declared output size with actual decoded bytes.
+2. **P1 Payload/privacy:** inline requests omit consumer-relative paths, source URL and destination folder; network reads and decoded/saved results have bounded byte limits. Persistence rejects malformed or mismatched declared sizes before writing. Outgoing request-size regression and response validation before preview remain follow-up.
 3. **P1 Peer operations:** add a key rotation/handshake procedure, persistent replay storage guidance and a distributed per-peer rate/compute quota. Current keys are provisioned out of band.
 4. **P1 Work Editor:** provider URL defaults empty and no catalog query runs on Work open. Add a regression proving the default server config keeps auto-load disabled and explicit URL entry loads offers.
-5. **P1 Persistence:** save-mode collision rules and preview rejection are covered. Add broader write-failure coverage and verify declared output size equals saved bytes.
+5. **P1 Persistence:** save-mode collision rules, preview rejection and declared output-size equality are covered. Size may be omitted; if provided, it must be a non-negative JSON integer equal to decoded/downloaded byte length. Add broader write-failure coverage.
 6. **P1 Compatibility tests:** mocked discovery → selected offer → remote result → local generated-work save is now covered as one flow; signed sender, provider auth, replay/expiry, DNS pinning and persistence also have focused regressions. Still add a local PHP two-node HTTP integration that exercises the provider handler over the pinned transport. No live public endpoint is used in tests.
 7. **P2 Docs/build:** architecture, workplan, routing and extension baselines are updated. Keep JSON API routing in source and Builder; no production `npm run build` without separate authorization.
 

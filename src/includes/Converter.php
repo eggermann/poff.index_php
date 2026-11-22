@@ -1031,7 +1031,10 @@ class Converter
         if (!self::mimeAccepted($outputMime, ['image/webp', 'image/jpeg', 'image/png', 'application/json', 'text/plain', 'text/markdown', 'text/html'])) {
             return self::error('Converted MIME type is not allowed.');
         }
-        if (isset($output['size']) && (int) $output['size'] > self::MAX_REMOTE_OUTPUT_BYTES) {
+        if (array_key_exists('size', $output) && (!is_int($output['size']) || $output['size'] < 0)) {
+            return self::error('Converted output size must be a non-negative integer.');
+        }
+        if (isset($output['size']) && $output['size'] > self::MAX_REMOTE_OUTPUT_BYTES) {
             return self::error('Converted output exceeds the allowed size.');
         }
 
@@ -1072,6 +1075,10 @@ class Converter
             }
         } else {
             return self::error('Converted response has no body.');
+        }
+
+        if (isset($output['size']) && $output['size'] !== strlen($body)) {
+            return self::error('Converted output size does not match its body.');
         }
 
         if ($saveMode === 'replace-source-file') {

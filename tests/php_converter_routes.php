@@ -296,6 +296,18 @@ if ($mode === 'remote-security') {
     exit(0);
 }
 
+if ($mode === 'peer-replay-retention') {
+    $path = tempnam(sys_get_temp_dir(), 'poff-replay-retention-');
+    $peer = 'retention-test-peer';
+    $nonce = str_repeat('a', 32);
+    $key = hash('sha256', $peer . "\n" . $nonce);
+    file_put_contents($path, json_encode([$key => ['time' => time() - 301]]));
+    putenv('POFF_CONVERTER_REPLAY_FILE=' . $path);
+    echo json_encode(['accepted' => mcpConverterConsumePeerNonce($peer, $nonce)]);
+    @unlink($path);
+    exit(0);
+}
+
 if ($mode === 'dns-resolve') {
     $addresses = array_values((array) ($payload['addresses'] ?? []));
     $GLOBALS['__poff_converter_dns_lookup'] = static fn(string $host): array => $addresses;

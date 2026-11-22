@@ -98,7 +98,9 @@ function mcpConverterConsumePeerNonce(string $peerId, string $nonce): bool
     $now = time();
     foreach ($records as $key => $record) {
         $seenAt = is_array($record) ? (int) ($record['time'] ?? 0) : (int) $record;
-        if ($seenAt < $now - 300 || $seenAt > $now + 300) {
+        // A request dated five minutes ahead can remain fresh for ten minutes
+        // after its first acceptance. Keep its nonce for that entire window.
+        if ($seenAt < $now - 600 || $seenAt > $now + 300) {
             unset($records[$key]);
         }
     }
