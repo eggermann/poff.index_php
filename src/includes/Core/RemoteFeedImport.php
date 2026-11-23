@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Normalizes exported remote Works into local virtual-reference entries.
+ * Applies data rules for importing remote Works and updating followed feeds.
  * This class owns data rules only; the Node API adapter owns transport and persistence.
  */
 final class PoffRemoteFeedImport
@@ -18,6 +18,68 @@ final class PoffRemoteFeedImport
             return preg_replace('/[^a-z0-9._-]+/i', '-', strtolower($host)) ?: 'remote';
         }
         return 'remote';
+    }
+
+    /**
+     * Keep sources and tree entries that belong to other feeds.
+     * Return null if the incoming ID cannot confirm the node already bound to this URL.
+     *
+     * @return array{remoteSources: array, tree: array}|null
+     */
+    public static function planFeedReplacement(
+        array $remoteSources,
+        array $tree,
+        string $url,
+        string $sourceNodeId,
+        mixed $sourcePath
+    ): ?array {
+        $matchedUrls = [$url => true];
+        $remainingSources = [];
+        foreach ($remoteSources as $source) {
+            if (!is_array($source)) {
+                $remainingSources[] = $source;
+                continue;
+            }
+
+            $previousUrl = (string) ($source['url'] ?? '');
+            $previousNodeId = PoffNodeIdentity::normalizeId($source['nodeId'] ?? '');
+            if ($previousNodeId !== '' && $previousNodeId !== $sourceNodeId) {
+                if ($previousUrl === $url) {
+                    return null;
+                }
+                $remainingSources[] = $source;
+                continue;
+            }
+
+            $sameUrl = $previousUrl !== '' && $previousUrl === $url;
+            $sameNodeAndPath = $sourceNodeId !== '' && $previousNodeId === $sourceNodeId
+                && is_string($sourcePath) && ($source['path'] ?? null) === $sourcePath;
+            if ($sameUrl || $sameNodeAndPath) {
+                if ($previousUrl !== '') {
+                    $matchedUrls[$previousUrl] = true;
+                }
+                continue;
+            }
+
+            $remainingSources[] = $source;
+        }
+
+        $remainingTree = [];
+        foreach ($tree as $item) {
+            if (is_array($item)) {
+                $previousNodeId = PoffNodeIdentity::normalizeId($item['remoteFeedNodeId'] ?? '');
+                if ($previousNodeId === '' || $previousNodeId === $sourceNodeId) {
+                    $previousUrl = (string) ($item['remoteFeedUrl'] ?? '');
+                    if ($previousUrl !== '' && isset($matchedUrls[$previousUrl])) {
+                        continue;
+                    }
+                }
+            }
+
+            $remainingTree[] = $item;
+        }
+
+        return ['remoteSources' => $remainingSources, 'tree' => $remainingTree];
     }
 
     public static function flattenCopyItems(array $items): array

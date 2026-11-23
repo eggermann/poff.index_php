@@ -733,48 +733,18 @@ function handleImportRemote(array $opts): array
         ? $config['remoteSources'] : [];
 
     if ($replace) {
-        foreach ($existingRemoteSources as $existingSource) {
-            if (!is_array($existingSource) || (string) ($existingSource['url'] ?? '') !== $url) {
-                continue;
-            }
-            $existingNodeId = mcpRemoteStableNodeId($existingSource['nodeId'] ?? '');
-            if ($existingNodeId !== '' && $existingNodeId !== $sourceNodeId) {
-                return array_merge(['route' => 'import-remote'], mcpRemoteContentError('Feed URL belongs to a different or unverifiable node.'));
-            }
+        $replacement = PoffRemoteFeedImport::planFeedReplacement(
+            $existingRemoteSources,
+            $existingTree,
+            $url,
+            $sourceNodeId,
+            $sourcePath
+        );
+        if ($replacement === null) {
+            return array_merge(['route' => 'import-remote'], mcpRemoteContentError('Feed URL belongs to a different or unverifiable node.'));
         }
-        $matchedUrls = [$url => true];
-        $existingRemoteSources = array_values(array_filter($existingRemoteSources, static function ($source) use ($sourceNodeId, $sourcePath, $url, &$matchedUrls): bool {
-            if (!is_array($source)) {
-                return true;
-            }
-            $previousNodeId = mcpRemoteStableNodeId($source['nodeId'] ?? '');
-            if ($previousNodeId !== '' && ($sourceNodeId === '' || $previousNodeId !== $sourceNodeId)) {
-                return true;
-            }
-            $previousUrl = (string) ($source['url'] ?? '');
-            $sameUrl = $previousUrl !== '' && $previousUrl === $url;
-            $sameNodeAndPath = $sourceNodeId !== '' && $previousNodeId === $sourceNodeId
-                && is_string($sourcePath) && array_key_exists('path', $source)
-                && is_string($source['path']) && $source['path'] === $sourcePath;
-            if ($sameUrl || $sameNodeAndPath) {
-                if ($previousUrl !== '') {
-                    $matchedUrls[$previousUrl] = true;
-                }
-                return false;
-            }
-            return true;
-        }));
-        $existingTree = array_values(array_filter($existingTree, static function ($item) use ($sourceNodeId, $matchedUrls): bool {
-            if (!is_array($item)) {
-                return true;
-            }
-            $previousNodeId = mcpRemoteStableNodeId($item['remoteFeedNodeId'] ?? '');
-            if ($previousNodeId !== '' && ($sourceNodeId === '' || $previousNodeId !== $sourceNodeId)) {
-                return true;
-            }
-            $previousUrl = (string) ($item['remoteFeedUrl'] ?? '');
-            return $previousUrl === '' || !isset($matchedUrls[$previousUrl]);
-        }));
+        $existingRemoteSources = $replacement['remoteSources'];
+        $existingTree = $replacement['tree'];
     }
 
     $importedEntries = mcpRemoteImportTreeEntries($payload, $url, $resolvedSourceId, $existingTree);
@@ -786,9 +756,9 @@ function handleImportRemote(array $opts): array
         $existingRemoteSources,
         [[
             'id' => $resolvedSourceId,
-            'nodeId' => mcpRemoteStableNodeId($payload['source']['nodeId'] ?? ''),
+            'nodeId' => $sourceNodeId,
             'url' => $url,
-            'path' => $payload['source']['path'] ?? '',
+            'path' => $sourcePath ?? '',
             'importedAt' => $config['updatedAt'],
         ]]
     ), 'is_array'));
