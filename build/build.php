@@ -9,6 +9,7 @@ $config = require __DIR__ . '/BuildConfig.php';
 require_once __DIR__ . '/ComponentReader.php';
 require_once __DIR__ . '/FileCopier.php';
 require_once __DIR__ . '/PoffConfigBuilder.php';
+require_once __DIR__ . '/BuildMetadata.php';
 
 // Extract configuration
 $sourceDir = $config['sourceDir'];
@@ -578,6 +579,7 @@ PHP;
     $content = preg_replace('/<\?php.*?\?>\s*|^\s*\?>\s*|\s*\?>\s*$/s', '', $content);
     $content = str_replace('<html lang="en">', '<html lang="de">', $content);
     $buildContent .= trim($content) . "\n";
+    $buildContent .= BuildMetadata::htmlComment(dirname(__DIR__)) . "\n";
 
     // Add layout.php content and inject nav placeholder from includes/nav.php
     $layout = ComponentReader::readComponentFile($sourceDir . '/includes/layout.php');
