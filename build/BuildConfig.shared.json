@@ -16,10 +16,6 @@
   ],
   "additionalIndexCopyTargets": [
     {
-      "name": "dominikeggermann-project/page",
-      "cleanSubdirectories": true
-    },
-    {
       "name": "dominikeggermann-project",
       "cleanSubdirectories": false
     }

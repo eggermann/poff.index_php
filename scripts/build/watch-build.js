@@ -1,9 +1,10 @@
 #!/usr/bin/env node
+// Beobachtet src/-Änderungen, startet den Build und aktualisiert MAMP-Verknüpfung sowie Browser.
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(__dirname, '../..');
 const defaultMampPort = 8888; // default MAMP port; adjust here if needed
 
 function logBrowseUrl(linkName) {

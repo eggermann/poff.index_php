@@ -16,7 +16,7 @@ Quelle: [npm prompt-concator](https://www.npmjs.com/package/prompt-concator) · 
 
 `build/build.php` erzeugt aus der modularen PHP-Quelle die einzelne PHP-Einstiegsdatei. Es fügt Komponenten in expliziter Reihenfolge zusammen, entfernt PHP-Tags und ausgewählte `require_once`-Zeilen, baut Worktype-Komponenten ein, bettet LightnCandy ein und schreibt die Ausgabe. `BuildConfig.php` und `BuildConfig.shared.json` bestimmen Ausgabe und lokale Verteilungsziele. `ComponentReader.php`, `FileCopier.php` und `PoffConfigBuilder.php` sind Teile der Build-Implementierung.
 
-Asset-Build und Beobachtung laufen zusätzlich über `scripts/build-assets.js` und `scripts/watch-build.js`. Die erzeugten Asset-Dateien bleiben gebaute Ausgaben. `src/includes/header.built.php` und `src/includes/scripts.built.php` sind generiert. Sie sind keine Quellen für eine Implementierungsanalyse.
+Asset-Build und Beobachtung laufen zusätzlich über `scripts/build/build-assets.js` und `scripts/build/watch-build.js`. Die erzeugten Asset-Dateien bleiben gebaute Ausgaben. `src/includes/header.built.php` und `src/includes/scripts.built.php` sind generiert. Sie sind keine Quellen für eine Implementierungsanalyse.
 
 Die Builder-Logik kennt konkrete Dateireihenfolge, PHP-Tag-Entfernung, Compile-Zeit-Einbettung und Verteilung. Das ist projektspezifische Auslieferung und unterscheidet sich von einer generischen Dateikonkatenation. Das erzeugte Einzeldatei-Artefakt enthält außerdem eingebetteten LightnCandy-PHP-Code. Der ausgelieferte PHP-Code bleibt für den Betreiber lesbar.
 
@@ -25,8 +25,8 @@ Die Builder-Logik kennt konkrete Dateireihenfolge, PHP-Tag-Entfernung, Compile-Z
 ### Direkter Build und Konfiguration
 
 - `package.json` — Build-, Asset-Build- und Watch-Befehle.
-- `scripts/build-assets.js` — JS- und CSS-Build.
-- `scripts/watch-build.js` — Entwicklungs-Workflow, der auf Änderungen reagiert.
+- `scripts/build/build-assets.js` — JS- und CSS-Build.
+- `scripts/build/watch-build.js` — Entwicklungs-Workflow, der auf Änderungen reagiert.
 - `build/build.php` — zentrale PHP-Zusammenstellung, Komponentenreihenfolge und Output-Kopie.
 - `build/BuildConfig.php` — liest gemeinsame Build-Konfiguration.
 - `build/BuildConfig.shared.json` — Quellpfad, Ausgabe, Hosts und lokale Kopierziele.
@@ -50,7 +50,7 @@ Die Builder-Logik kennt konkrete Dateireihenfolge, PHP-Tag-Entfernung, Compile-Z
 - `tests/php_build_poff_config.php` — PHP-Helfer für Config-Build-Prüfungen.
 - `tests/php_file_copier_cleanup.php` — PHP-Helfer für Kopierbereinigung.
 
-Für eine kleine, fokussierte Frage reicht zuerst `package.json`, `build/build.php`, `build/ComponentReader.php`, `build/BuildConfig.php`, `scripts/build-assets.js` und `tests/build.poffconfig.test.js`. Die Komponentenliste in `build/build.php` zeigt dann gezielt auf die jeweiligen Dateien unter `src/`.
+Für eine kleine, fokussierte Frage reicht zuerst `package.json`, `build/build.php`, `build/ComponentReader.php`, `build/BuildConfig.php`, `scripts/build/build-assets.js` und `tests/build.poffconfig.test.js`. Die Komponentenliste in `build/build.php` zeigt dann gezielt auf die jeweiligen Dateien unter `src/`.
 
 ## Bestandsaufnahme vom 20. November 2026
 
@@ -87,7 +87,7 @@ Ein Regressionstest prüft diese Verdrahtung im Build-Rezept. Die unten beschrie
 | 10 Viewer- / 40 Editor- / 15 MCP-Dateien | 99.074 / 153.405 / 157.669 | Summen der drei expliziten PHP-Eingabelisten vor der Verarbeitung |
 | 14 HBS-Templates | 11.204 | 12 Templates direkt unter `templates/` und zwei Layout-Templates |
 
-Die beiden Assets ergeben zusammen 607.987 Bytes. Daraus lässt sich kein exakter Anteil an der fertigen PHP-Datei berechnen. Der Builder legt dasselbe App-CSS einmal im Header und nochmals als PHP-String für die eigenständige Viewer-Antwort ab. Beide Ausgabepfade brauchen das Stylesheet. **Ein gemeinsamer eingebetteter CSS-Wert** ist daher ein konkreter Kandidat. Seine tatsächliche Einsparung und die Darstellung beider Ansichten wären am selben Build zu prüfen. Für das Entfernen eines ganzen PHP-Fachmoduls liegt bislang kein entsprechender Nachweis vor. [Asset-Build](../../../scripts/build-assets.js) · [CSS im Viewer](../../includes/viewer/render/shell.php)
+Die beiden Assets ergeben zusammen 607.987 Bytes. Daraus lässt sich kein exakter Anteil an der fertigen PHP-Datei berechnen. Der Builder legt dasselbe App-CSS einmal im Header und nochmals als PHP-String für die eigenständige Viewer-Antwort ab. Beide Ausgabepfade brauchen das Stylesheet. **Ein gemeinsamer eingebetteter CSS-Wert** ist daher ein konkreter Kandidat. Seine tatsächliche Einsparung und die Darstellung beider Ansichten wären am selben Build zu prüfen. Für das Entfernen eines ganzen PHP-Fachmoduls liegt bislang kein entsprechender Nachweis vor. [Asset-Build](../../../scripts/build/build-assets.js) · [CSS im Viewer](../../includes/viewer/render/shell.php)
 
 Development und Production sind bereits vorhanden. Production aktiviert esbuild-Minifizierung und komprimierte Sass-Ausgabe. Der UnoCSS-Anteil wird separat erzeugt und angefügt. PHP nutzt `php_strip_whitespace` auf einer temporären Datei. Das Rezept für Production wählt `dist/` und überspringt die lokalen Verteilungskopien. [npm-Skripte](../../../package.json) · [Build-Konfiguration](../../../build/BuildConfig.php)
 
@@ -96,6 +96,6 @@ Development und Production sind bereits vorhanden. Production aktiviert esbuild-
 1. **Größenbericht beim Zusammenstellen.** Pro Block Herkunft, Kategorie und tatsächlich angehängte Bytes ausgeben. Die zweite CSS-Einbettung separat zählen. Vor und nach dem abschließenden PHP-Strip die Gesamtgröße messen. Development und Production nur aus demselben Quellstand mit den jeweils zugehörigen Assets vergleichen.
 2. **Abhängigkeiten prüfen.** Statisch auflösbare Includes samt Einbindungsart erfassen. Für dynamisch geladene Worktypes, eingebettete Templates und ausgeführte Initialisierung die bestehende Reihenfolge und Verarbeitung ausdrücklich beschreiben. Ein unbekannter Pfad bleibt ein offener Befund. Eine Streichung braucht den Nachweis, dass alle unterstützten Wege weiterhin funktionieren.
 3. **Kandidaten prüfen.** Den fertigen Inhalt in eine temporäre Datei im Zielverzeichnis schreiben, vollständig geschriebenen Umfang prüfen und `php -l` darauf anwenden. Die bestehende MCP-Suite prüft viele Quellpfade. Für eine künftige Release-Prüfung zusätzlich genau den Kandidaten mit isolierten Testdaten prüfen: Ein Konfigurations-POST speichert und liefert den neuen Wert. Der Aufruf zur Layoutübernahme liefert die erwartete Routenantwort. Hauptseite und Einzelviewer erhalten beide ihre Styles.
-4. **Geprüfte Datei übernehmen.** Erst nach erfolgreichen Prüfungen den Kandidaten im selben Dateisystem per `rename` übernehmen. Bei einem Fehler vor der Übernahme bleibt die bisherige Zieldatei verwendbar. Heute schreibt `file_put_contents` direkt ans Ziel. Die aktuelle temporäre Datei dient dem PHP-Strip. Für Kopien an weitere Nodes gilt die atomare Übernahme je Ziel einzeln. Der Watcher führt nach einem erfolgreichen Build eigene Kopierschritte aus und muss denselben geprüften Stand verwenden. [Schreibpfad](../../../build/build.php) · [Watcher](../../../scripts/watch-build.js) · [bestehender Builder-Test](../../../tests/build.poffconfig.test.js)
+4. **Geprüfte Datei übernehmen.** Erst nach erfolgreichen Prüfungen den Kandidaten im selben Dateisystem per `rename` übernehmen. Bei einem Fehler vor der Übernahme bleibt die bisherige Zieldatei verwendbar. Heute schreibt `file_put_contents` direkt ans Ziel. Die aktuelle temporäre Datei dient dem PHP-Strip. Für Kopien an weitere Nodes gilt die atomare Übernahme je Ziel einzeln. Der Watcher führt nach einem erfolgreichen Build eigene Kopierschritte aus und muss denselben geprüften Stand verwenden. [Schreibpfad](../../../build/build.php) · [Watcher](../../../scripts/build/watch-build.js) · [bestehender Builder-Test](../../../tests/build.poffconfig.test.js)
 
 Die nächsten Messpunkte sind die beiden MCP-Pfade am fertigen Release-Kandidaten und der tatsächliche Größenbeitrag der zweiten CSS-Einbettung.

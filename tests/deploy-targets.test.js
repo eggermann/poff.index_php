@@ -2,9 +2,16 @@ const {
   normalizeDeployTargetName,
   resolveDeployTargetProfile,
   resolveTargetEnvValue,
-} = require('../scripts/deploy-targets');
+  requireTargetEnvValue,
+} = require('../scripts/deploy/deploy-targets');
 
 describe('deploy target resolution', () => {
+  test('named profiles never inherit unsuffixed values', () => {
+    const env = { TEST_DEPLOY_HOST: 'wrong.example', TEST_DEPLOY_HOST_customer: 'customer.example' };
+    expect(resolveTargetEnvValue(env, ['TEST_DEPLOY_HOST'], 'customer')).toBe('customer.example');
+    expect(resolveTargetEnvValue(env, ['TEST_DEPLOY_HOST'], 'pageoff')).toBe('');
+    expect(() => requireTargetEnvValue(env, ['TEST_DEPLOY_HOST'], 'pageoff', 'host')).toThrow('Missing required deploy setting');
+  });
   test('normalizes target names', () => {
     expect(normalizeDeployTargetName(' Dodi 2 ')).toBe('dodi_2');
     expect(normalizeDeployTargetName('')).toBe('default');

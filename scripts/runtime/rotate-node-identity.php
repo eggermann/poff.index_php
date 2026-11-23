@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+// CLI-Werkzeug: rotiert die Node-ID im angegebenen Node-Verzeichnis.
+
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
     exit(1);
@@ -8,11 +10,11 @@ if (PHP_SAPI !== 'cli') {
 
 $nodeRoot = trim((string) ($argv[1] ?? ''));
 if ($nodeRoot === '') {
-    fwrite(STDERR, "Usage: php scripts/rotate-node-identity.php <node-root>\n");
+    fwrite(STDERR, "Usage: php scripts/runtime/rotate-node-identity.php <node-root>\n");
     exit(2);
 }
 
-require_once __DIR__ . '/../src/includes/NodeIdentity.php';
+require_once __DIR__ . '/../../src/includes/NodeIdentity.php';
 
 try {
     $rotated = PoffNodeIdentity::rotate($nodeRoot);

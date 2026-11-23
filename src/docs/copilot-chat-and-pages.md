@@ -56,6 +56,8 @@ Target-specific env vars use the same base keys with an optional suffix:
 - `host1`, `user1`, `destinationPath1`
 - `hostpageoff`, `userpageoff`, `destinationPathpageoff`
 
+Named profiles require their own complete settings, including source path and SSH authentication. They never inherit the default profile. The current local `customer` and `pageoff` profiles are not configured and abort before connecting. Check a target first with `node scripts/deploy/deploy.js <target> --dry-run`; this prints the source/host/destination without connecting and does not validate credentials.
+
 Numeric suffixes still work too:
 
 - `host2`, `user2`, `destinationPath2`

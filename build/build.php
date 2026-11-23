@@ -1,7 +1,6 @@
 <?php
 /**
- * Build script that concatenates modular PHP files into a single index.php file
- * and triggers SSH upload after successful build.
+ * Build script that concatenates modular PHP files into a single index.php file.
  */
 
 // Load configuration and modules
@@ -687,9 +686,23 @@ PHP;
         if (is_file($layoutAsset)) {
             FileCopier::copyFileToLayoutDirectories($layoutAsset, $outputDir);
         }
+    }
+
+    if (!$skipDistributionCopies || $isProductionBuild) {
         $converterGrainDir = $sourceDir . '/includes/worktypes/templates/converter';
         if (is_dir($converterGrainDir)) {
             FileCopier::mirrorDirectory($converterGrainDir, $outputDir . '/worktypes/templates/converter');
+        }
+    }
+
+    if ($isProductionBuild) {
+        $profileAsset = $sourceDir . '/includes/worktypes/templates/layout/default/poff.profile.jpg';
+        $layoutDirectory = $outputDir . '.layout';
+        if (!is_dir($layoutDirectory) && !mkdir($layoutDirectory, 0755, true)) {
+            throw new Exception('Failed to create the release layout directory.');
+        }
+        if (!copy($profileAsset, $layoutDirectory . '/poff.profile.jpg')) {
+            throw new Exception('Failed to copy the release profile image.');
         }
     }
 

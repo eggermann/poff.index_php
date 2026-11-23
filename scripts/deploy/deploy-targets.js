@@ -1,3 +1,4 @@
+// Normalisiert Deploy-Profilnamen und löst profilspezifische Umgebungsvariablen samt Suffix auf.
 function normalizeDeployTargetName(value) {
     const normalized = String(value ?? '').trim().toLowerCase().replace(/\s+/g, '_').replace(/-+/g, '_');
     return normalized || 'default';
@@ -57,7 +58,7 @@ function buildTargetedKeys(baseKeys, suffix) {
         targeted.push(`${key}_${suffix}`);
     }
 
-    return [...targeted, ...keyList];
+    return targeted;
 }
 
 function getEnvValue(env, keys, fallback = '') {

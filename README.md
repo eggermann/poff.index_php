@@ -166,7 +166,7 @@ npm run build:assets
 
 Manual (two-step) build:
 ```sh
-node scripts/build-assets.js
+node scripts/build/build-assets.js
 php build/build.php
 ```
 
@@ -177,11 +177,11 @@ npm run build:php
 ```
 
 Auto build:
-- The watcher script is `scripts/watch-build.js`.
+- The watcher script is `scripts/build/watch-build.js`.
 - If your `package.json` includes the watch script, run `npm run watch`.
 - Otherwise run:
 ```sh
-node scripts/watch-build.js
+node scripts/build/watch-build.js
 ```
 
 The watcher rebuilds on changes (assets + PHP) and optionally refreshes a browser tab when running under MAMP.
@@ -251,7 +251,7 @@ Those target names resolve to the suffixed env keys when present, for example `h
 
 Full folder sync:
 ```sh
-node scripts/deploy.js --full
+node scripts/deploy/deploy.js --full
 ```
 
 Required `.env` keys:

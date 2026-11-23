@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+// Baut Browser-JavaScript und CSS aus src/ und füllt die generierten PHP-Includes.
 const fs = require('fs');
 const path = require('path');
 const esbuild = require('esbuild');
 const sass = require('sass');
 const { createGenerator } = require('@unocss/core');
 
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(__dirname, '../..');
 const jsEntry = path.join(rootDir, 'src', 'assets', 'js', 'app.js');
 const scssEntry = path.join(rootDir, 'src', 'assets', 'scss', 'main.scss');
 const headerPath = path.join(rootDir, 'src', 'includes', 'header.built.php');

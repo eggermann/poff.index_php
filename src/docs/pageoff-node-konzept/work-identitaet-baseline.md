@@ -6,7 +6,7 @@ Codebefund 20. November 2026; Folgeänderungen 21. November 2026. Die beobachtet
 
 Die dauerhafte Referenz besteht aus stabiler Node-ID und stabiler Work-ID. Domain und URL sind erreichbare Adressen eines Nodes und dürfen wechseln, ohne die Identität zu ändern. Verschieben erhält die Work-ID; Kopieren erzeugt eine neue Work-ID. Remote-Referenzen speichern die Quell-Node-ID und Quell-Work-ID. Ein Pfadindex bleibt abgeleitet und neu aufbaubar.
 
-Die Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Exportierte Folder und physische Files erhalten `workId`; Remote-Works werden als `reference: { nodeId, workId }` weitergereicht. Beim Import werden IDs als `remoteNodeId`/`remoteWorkId` abgelegt, nicht als lokale Work-ID. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Identitätserzeugung beim Export braucht Schreibrecht im Node-Root. Eine vollständige Serverkopie übernimmt zunächst die Node-ID; das neue CLI-Werkzeug `php scripts/rotate-node-identity.php <node-root>` rotiert sie explizit, ohne Work-Metadaten anzufassen. Es wurde nicht auf einer realen Node ausgeführt.
+Die Umsetzung speichert die Node-ID in `poff.node.json` am Instanz-Root und veröffentlicht sie zusätzlich zum bestehenden `source.id` im Export. Exportierte Folder und physische Files erhalten `workId`; Remote-Works werden als `reference: { nodeId, workId }` weitergereicht. Beim Import werden IDs als `remoteNodeId`/`remoteWorkId` abgelegt, nicht als lokale Work-ID. Dadurch bleibt das Exportformat für bestehende Leser kompatibel. Identitätserzeugung beim Export braucht Schreibrecht im Node-Root. Eine vollständige Serverkopie übernimmt zunächst die Node-ID; das neue CLI-Werkzeug `php scripts/runtime/rotate-node-identity.php <node-root>` rotiert sie explizit, ohne Work-Metadaten anzufassen. Es wurde nicht auf einer realen Node ausgeführt.
 
 Die Formatprüfung von Node-IDs ist in `PoffNodeIdentity::normalizeId()` zentralisiert. Import-Core, Exportadapter und lokale Identitätsdatei nutzen denselben Validator; unpassende Werte werden verworfen beziehungsweise bei einer ungültigen lokalen Identitätsdatei als Fehler behandelt. Work-IDs bleiben opaque Zeichenketten und werden durch diesen Node-ID-Validator nicht eingeschränkt.
 
@@ -46,7 +46,7 @@ Eine read-only Zählung von 249 `poff.config.json`- und `*.config.json`-Metadate
 
 1. Move-Regressionen für partielle Dateisystemfehler ergänzen und den Request in die Edit-UI integrieren.
 2. Wie werden künftige echte ID-Kollisionen migriert, ohne Work-Links stillschweigend auf das falsche Ziel zu zeigen?
-3. Wie wird der Offline-Rotationsschritt in Klon-, Staging- und Restore-Abläufen verpflichtend gemacht? `PoffNodeIdentity::rotate()` und `scripts/rotate-node-identity.php` sind implementiert und getestet, blockieren aber den Start eines Klons nicht automatisch.
+3. Wie wird der Offline-Rotationsschritt in Klon-, Staging- und Restore-Abläufen verpflichtend gemacht? `PoffNodeIdentity::rotate()` und `scripts/runtime/rotate-node-identity.php` sind implementiert und getestet, blockieren aber den Start eines Klons nicht automatisch.
 4. Wenn aus einem ganzen Node ein unabhängiger Fork entsteht: genügt die neue Node-ID als neue globale Work-Identität, oder sollen zusätzlich alle kopierten Work-IDs neu vergeben werden? Das Werkzeug ändert derzeit nur die Node-ID.
 4. Bei größerem Bestand messen, ob der lesende Scan genügt oder ein abgeleiteter, neu aufbaubarer Index nötig wird.
 
